@@ -31,6 +31,13 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Disable Impeller to avoid GPU driver compatibility issues on real devices.
+             Impeller (the default renderer in Flutter 3.x+) uses Vulkan which has driver
+             bugs on certain Adreno/Mali GPUs causing a permanent black screen in release mode.
+             Emulators use SwiftShader (software Vulkan) which is unaffected. -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

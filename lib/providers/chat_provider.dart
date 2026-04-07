@@ -54,10 +54,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   Future<void> _load() async {
-    final box = await Hive.openBox(_boxName);
-    final raw = box.get(_key);
-    if (raw == null) return;
     try {
+      final box = await Hive.openBox(_boxName);
+      final raw = box.get(_key);
+      if (raw == null) return;
       final list = (jsonDecode(raw as String) as List)
           .map((e) => Conversation.fromJson(e as Map<String, dynamic>))
           .toList();
@@ -127,7 +127,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     );
     final messagesForApi = [...conv.messages, userMsg];
     final newTitle = conv.messages.isEmpty
-        ? (text.length > 60 ? '${text.substring(0, 60)}…' : text)
+        ? (text.length > 60 ? '${text.substring(0, 60)}\u2026' : text)
         : conv.title;
     conv = conv.copyWith(
       messages: messagesForApi,
