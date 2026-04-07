@@ -26,6 +26,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (nextCount > prevCount || next.isStreaming) {
         _scrollToBottom();
       }
+      if (next.error != null && next.error != prev?.error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next.error!),
+            backgroundColor: Colors.red[700],
+            duration: const Duration(seconds: 6),
+          ),
+        );
+        ref.read(chatProvider.notifier).clearError();
+      }
     });
   }
 
