@@ -14,11 +14,13 @@ class ChatState {
   final List<Conversation> conversations;
   final String? activeId;
   final bool isStreaming;
+  final String? error;
 
   const ChatState({
     this.conversations = const [],
     this.activeId,
     this.isStreaming = false,
+    this.error,
   });
 
   Conversation? get active =>
@@ -29,11 +31,14 @@ class ChatState {
     String? activeId,
     bool clearActive = false,
     bool? isStreaming,
+    String? error,
+    bool clearError = false,
   }) =>
       ChatState(
         conversations: conversations ?? this.conversations,
         activeId: clearActive ? null : (activeId ?? this.activeId),
         isStreaming: isStreaming ?? this.isStreaming,
+        error: clearError ? null : (error ?? this.error),
       );
 }
 
@@ -143,6 +148,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
     conv = conv.copyWith(messages: [...conv.messages, assistantMsg]);
     _replaceConversation(conv);
 
+    // Clear any previous error before starting
+    state = state.copyWith(clearError: true);
+
     // Stream response
     _streamSub = _service.chat(messagesForApi).listen(
       (chunk) {
@@ -162,7 +170,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
       },
       onError: (e) {
         debugPrint('Stream error: $e');
-        state = state.copyWith(isStreaming: false);
+        final message = e is Exception
+            ? e.toString().replaceFirst('Exception: ', '')
+            : e.toString();
+        state = state.copyWith(isStreaming: false, error: message);
         _save();
       },
       cancelOnError: true,
@@ -170,6 +181,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   void cancelStream() => _cancelStream();
+
+  void clearError() => state = state.copyWith(clearError: true);
 
   void _cancelStream() {
     _streamSub?.cancel();

@@ -9,10 +9,19 @@ class OllamaService {
   static const _cfId = String.fromEnvironment('CF_ACCESS_CLIENT_ID');
   static const _cfSecret = String.fromEnvironment('CF_ACCESS_CLIENT_SECRET');
 
+  static const _timeout = Duration(seconds: 30);
+
   final http.Client _client = http.Client();
 
   /// Streams assistant content chunks from Ollama.
   Stream<String> chat(List<Message> messages) async* {
+    if (_cfId.isEmpty || _cfSecret.isEmpty) {
+      throw Exception(
+        'CF Access credentials not configured. '
+        'Build with --dart-define=CF_ACCESS_CLIENT_ID=... --dart-define=CF_ACCESS_CLIENT_SECRET=...',
+      );
+    }
+
     final request = http.Request('POST', Uri.parse(_baseUrl));
     request.headers.addAll({
       'Content-Type': 'application/json',
@@ -25,7 +34,7 @@ class OllamaService {
       'stream': true,
     });
 
-    final response = await _client.send(request);
+    final response = await _client.send(request).timeout(_timeout);
 
     if (response.statusCode != 200) {
       final body = await response.stream.bytesToString();
