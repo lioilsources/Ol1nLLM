@@ -79,7 +79,7 @@ class _MessageBubbleState extends State<MessageBubble>
         final showCursor = widget.isStreaming;
         return SelectableText(
           showCursor
-              ? '$text${_cursorController.value > 0.5 ? '|' : ' '}'
+              ? '$text${_cursorController.value > 0.5 ? '|' : ''}'
               : text,
           style: TextStyle(
             color: isUser ? AppTheme.textPrimary : AppTheme.textPrimary,
@@ -95,11 +95,14 @@ class _MessageBubbleState extends State<MessageBubble>
     return AnimatedBuilder(
       animation: _cursorController,
       builder: (context, _) {
-        return Text(
-          _cursorController.value > 0.5 ? '▌' : ' ',
-          style: const TextStyle(
-            color: AppTheme.accent,
-            fontSize: 15,
+        return Opacity(
+          opacity: 0.3 + _cursorController.value * 0.7,
+          child: const Text(
+            '▌',
+            style: TextStyle(
+              color: AppTheme.accent,
+              fontSize: 15,
+            ),
           ),
         );
       },
