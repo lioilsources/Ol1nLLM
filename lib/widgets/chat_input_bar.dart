@@ -21,12 +21,12 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
     super.dispose();
   }
 
-  void _send() {
+  Future<void> _send() async {
     final text = _controller.text;
     if (text.trim().isEmpty) return;
-    ref.read(chatProvider.notifier).sendMessage(text);
     _controller.clear();
     _focusNode.requestFocus();
+    await ref.read(chatProvider.notifier).sendMessage(text);
   }
 
   @override

@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
+import 'package:cronet_http/cronet_http.dart';
 import 'package:http/http.dart' as http;
 import '../models/message.dart';
 
@@ -12,7 +14,16 @@ class OllamaService {
   static const _connectTimeout = Duration(seconds: 30);
   static const _streamTimeout = Duration(seconds: 120);
 
-  final http.Client _client = http.Client();
+  final http.Client _client = _makeClient();
+
+  static http.Client _makeClient() {
+    try {
+      if (Platform.isAndroid) return CronetClient.defaultCronetEngine();
+    } catch (_) {
+      // Cronet unavailable — fall back to dart:io
+    }
+    return http.Client();
+  }
 
   /// Streams assistant content chunks from Ollama.
   Stream<String> chat(List<Message> messages) async* {
