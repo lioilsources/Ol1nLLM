@@ -135,49 +135,54 @@ class ChatNotifier extends StateNotifier<ChatState> {
       updatedAt: DateTime.now(),
     );
     _replaceConversation(conv);
-    state = state.copyWith(isStreaming: true);
-    await _save();
+    state = state.copyWith(isStreaming: true, clearError: true);
 
-    // Add empty assistant bubble
-    final assistantMsg = Message(
-      id: _uuid.v4(),
-      role: MessageRole.assistant,
-      content: '',
-      createdAt: DateTime.now(),
-    );
-    conv = conv.copyWith(messages: [...conv.messages, assistantMsg]);
-    _replaceConversation(conv);
+    try {
+      await _save();
 
-    // Clear any previous error before starting
-    state = state.copyWith(clearError: true);
+      // Add empty assistant bubble
+      final assistantMsg = Message(
+        id: _uuid.v4(),
+        role: MessageRole.assistant,
+        content: '',
+        createdAt: DateTime.now(),
+      );
+      conv = conv.copyWith(messages: [...conv.messages, assistantMsg]);
+      _replaceConversation(conv);
 
-    // Stream response
-    _streamSub = _service.chat(messagesForApi).listen(
-      (chunk) {
-        final current = state.active;
-        if (current == null) return;
-        final msgs = List<Message>.from(current.messages);
-        final last = msgs.last;
-        msgs[msgs.length - 1] = last.copyWith(content: last.content + chunk);
-        _replaceConversation(current.copyWith(
-          messages: msgs,
-          updatedAt: DateTime.now(),
-        ));
-      },
-      onDone: () {
-        state = state.copyWith(isStreaming: false);
-        _save();
-      },
-      onError: (e) {
-        debugPrint('Stream error: $e');
-        final message = e is Exception
-            ? e.toString().replaceFirst('Exception: ', '')
-            : e.toString();
-        state = state.copyWith(isStreaming: false, error: message);
-        _save();
-      },
-      cancelOnError: true,
-    );
+      // Stream response
+      _streamSub = _service.chat(messagesForApi).listen(
+        (chunk) {
+          final current = state.active;
+          if (current == null) return;
+          final msgs = List<Message>.from(current.messages);
+          final last = msgs.last;
+          msgs[msgs.length - 1] = last.copyWith(content: last.content + chunk);
+          _replaceConversation(current.copyWith(
+            messages: msgs,
+            updatedAt: DateTime.now(),
+          ));
+        },
+        onDone: () {
+          state = state.copyWith(isStreaming: false);
+          _save();
+        },
+        onError: (e) {
+          debugPrint('Stream error: $e');
+          state = state.copyWith(isStreaming: false, error: _errorMessage(e));
+          _save();
+        },
+        cancelOnError: true,
+      );
+    } catch (e) {
+      debugPrint('sendMessage setup error: $e');
+      state = state.copyWith(isStreaming: false, error: _errorMessage(e));
+    }
+  }
+
+  static String _errorMessage(Object e) {
+    if (e is Exception) return e.toString().replaceFirst('Exception: ', '');
+    return e.toString();
   }
 
   void cancelStream() => _cancelStream();

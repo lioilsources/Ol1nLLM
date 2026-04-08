@@ -5,7 +5,7 @@ class AppTheme {
   static const surface = Color(0xFF1A1A1A);
   static const surfaceAlt = Color(0xFF212121);
   static const userBubble = Color(0xFF2A2A2A);
-  static const aiBubble = Color(0xFF161616);
+  static const aiBubble = Color(0xFF1E1E1E);
   static const accent = Color(0xFF10A37F);
   static const textPrimary = Color(0xFFECECEC);
   static const textSecondary = Color(0xFF8E8E8E);

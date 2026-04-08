@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
+import 'package:cronet_http/cronet_http.dart';
 import 'package:http/http.dart' as http;
 import '../models/message.dart';
 
@@ -9,9 +11,19 @@ class OllamaService {
   static const _cfId = String.fromEnvironment('CF_ACCESS_CLIENT_ID');
   static const _cfSecret = String.fromEnvironment('CF_ACCESS_CLIENT_SECRET');
 
-  static const _timeout = Duration(seconds: 30);
+  static const _connectTimeout = Duration(seconds: 30);
+  static const _streamTimeout = Duration(seconds: 120);
 
-  final http.Client _client = http.Client();
+  final http.Client _client = _makeClient();
+
+  static http.Client _makeClient() {
+    try {
+      if (Platform.isAndroid) return CronetClient.defaultCronetEngine();
+    } catch (_) {
+      // Cronet unavailable — fall back to dart:io
+    }
+    return http.Client();
+  }
 
   /// Streams assistant content chunks from Ollama.
   Stream<String> chat(List<Message> messages) async* {
@@ -34,7 +46,7 @@ class OllamaService {
       'stream': true,
     });
 
-    final response = await _client.send(request).timeout(_timeout);
+    final response = await _client.send(request).timeout(_connectTimeout);
 
     if (response.statusCode != 200) {
       final body = await response.stream.bytesToString();
@@ -43,7 +55,8 @@ class OllamaService {
 
     final lineStream = response.stream
         .transform(utf8.decoder)
-        .transform(const LineSplitter());
+        .transform(const LineSplitter())
+        .timeout(_streamTimeout);
 
     await for (final line in lineStream) {
       if (line.trim().isEmpty) continue;
