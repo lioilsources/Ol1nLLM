@@ -31,7 +31,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           SnackBar(
             content: Text(next.error!),
             backgroundColor: Colors.red[700],
-            duration: const Duration(seconds: 6),
+            duration: const Duration(seconds: 10),
           ),
         );
         ref.read(chatProvider.notifier).clearError();
