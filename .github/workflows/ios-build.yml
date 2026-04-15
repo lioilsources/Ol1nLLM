@@ -54,13 +54,15 @@ jobs:
       - name: Package app
         run: |
           cd build/ios/iphoneos
-          zip -r ol1n_llm_ios.zip Runner.app
+          mkdir -p Payload
+          cp -r Runner.app Payload/
+          zip -r ol1n_llm_ios.ipa Payload
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ol1n-llm-ios-${{ steps.version.outputs.value }}
-          path: build/ios/iphoneos/ol1n_llm_ios.zip
+          path: build/ios/iphoneos/ol1n_llm_ios.ipa
           retention-days: 30
 
   release:
@@ -99,4 +101,4 @@ jobs:
           name: ${{ needs.build.outputs.version }}
           prerelease: ${{ contains(needs.build.outputs.version, '-rc') || contains(needs.build.outputs.version, '-beta') || contains(needs.build.outputs.version, '-alpha') }}
           generate_release_notes: true
-          files: dist/ol1n_llm_ios.zip
+          files: dist/ol1n_llm_ios.ipa
