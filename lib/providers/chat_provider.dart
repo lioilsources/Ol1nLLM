@@ -6,7 +6,7 @@ import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 import '../models/conversation.dart';
 import '../models/message.dart';
-import '../services/ollama_service.dart';
+import '../services/nim_service.dart';
 
 const _uuid = Uuid();
 
@@ -46,7 +46,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   static const _boxName = 'conversations';
   static const _key = 'all';
 
-  final OllamaService _service = OllamaService();
+  final NimService _service = NimService();
   StreamSubscription<String>? _streamSub;
 
   ChatNotifier() : super(const ChatState()) {

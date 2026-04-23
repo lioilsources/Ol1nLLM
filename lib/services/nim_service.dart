@@ -5,8 +5,8 @@ import 'package:cronet_http/cronet_http.dart';
 import 'package:http/http.dart' as http;
 import '../models/message.dart';
 
-class OllamaService {
-  static const _baseUrl = 'https://llm.ol1n.com/api/chat';
+class NimService {
+  static const _baseUrl = 'https://llm.ol1n.com/v1/chat/completions';
   static const _model = 'llm-lab';
   static const _cfId = String.fromEnvironment('CF_ACCESS_CLIENT_ID');
   static const _cfSecret = String.fromEnvironment('CF_ACCESS_CLIENT_SECRET');
@@ -25,7 +25,7 @@ class OllamaService {
     return http.Client();
   }
 
-  /// Streams assistant content chunks from Ollama.
+  /// Streams assistant content chunks from NIM via LiteLLM.
   Stream<String> chat(List<Message> messages) async* {
     if (_cfId.isEmpty || _cfSecret.isEmpty) {
       throw Exception(
@@ -37,6 +37,7 @@ class OllamaService {
     final request = http.Request('POST', Uri.parse(_baseUrl));
     request.headers.addAll({
       'Content-Type': 'application/json',
+      'Authorization': 'Bearer dummy',
       'CF-Access-Client-Id': _cfId,
       'CF-Access-Client-Secret': _cfSecret,
     });
@@ -44,6 +45,8 @@ class OllamaService {
       'model': _model,
       'messages': messages.map((m) => m.toOllamaJson()).toList(),
       'stream': true,
+      'temperature': 0.7,
+      'max_tokens': 1024,
     });
 
     final response = await _client.send(request).timeout(_connectTimeout);
@@ -76,13 +79,15 @@ class OllamaService {
         .timeout(_streamTimeout);
 
     await for (final line in lineStream) {
-      if (line.trim().isEmpty) continue;
+      final trimmed = line.trim();
+      if (trimmed.isEmpty || !trimmed.startsWith('data: ')) continue;
+      final payload = trimmed.substring(6);
+      if (payload == '[DONE]') break;
       try {
-        final json = jsonDecode(line) as Map<String, dynamic>;
-        final done = json['done'] as bool? ?? false;
-        if (done) break;
-        final content =
-            (json['message'] as Map<String, dynamic>?)?['content'] as String?;
+        final json = jsonDecode(payload) as Map<String, dynamic>;
+        final delta = ((json['choices'] as List?)?.first
+            as Map<String, dynamic>?)?['delta'] as Map<String, dynamic>?;
+        final content = delta?['content'] as String?;
         if (content != null && content.isNotEmpty) {
           yield content;
         }
