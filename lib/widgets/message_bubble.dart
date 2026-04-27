@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/constants/theme.dart';
 import '../models/message.dart';
 
@@ -66,26 +68,52 @@ class _MessageBubbleState extends State<MessageBubble>
         ),
         child: widget.isStreaming && widget.message.content.isEmpty
             ? _buildTypingIndicator()
-            : _buildText(isUser),
+            : isUser
+                ? _buildPlainText()
+                : _buildMarkdown(context),
       ),
     );
   }
 
-  Widget _buildText(bool isUser) {
-    final text = widget.message.content;
+  Widget _buildPlainText() {
+    return SelectableText(
+      widget.message.content,
+      style: const TextStyle(
+        color: AppTheme.textPrimary,
+        fontSize: 15,
+        height: 1.5,
+      ),
+    );
+  }
+
+  Widget _buildMarkdown(BuildContext context) {
     return AnimatedBuilder(
       animation: _cursorController,
-      builder: (context, child) {
+      builder: (context, _) {
         final showCursor = widget.isStreaming;
-        return SelectableText(
-          showCursor
-              ? '$text${_cursorController.value > 0.5 ? '|' : ''}'
-              : text,
-          style: TextStyle(
-            color: isUser ? AppTheme.textPrimary : AppTheme.textPrimary,
-            fontSize: 15,
-            height: 1.5,
-          ),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            MarkdownBody(
+              data: widget.message.content,
+              selectable: true,
+              styleSheet: AppTheme.markdownStyle(context),
+              onTapLink: (text, href, title) async {
+                if (href == null) return;
+                final uri = Uri.tryParse(href);
+                if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+              },
+            ),
+            if (showCursor)
+              Opacity(
+                opacity: _cursorController.value > 0.5 ? 1.0 : 0.0,
+                child: const Text(
+                  '▌',
+                  style: TextStyle(color: AppTheme.accent, fontSize: 15),
+                ),
+              ),
+          ],
         );
       },
     );

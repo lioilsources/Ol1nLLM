@@ -45,7 +45,10 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Expanded(
-              child: TextField(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 120),
+                child: Scrollbar(
+                  child: TextField(
                 controller: _controller,
                 focusNode: _focusNode,
                 enabled: !isStreaming,
@@ -72,6 +75,8 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
                   ),
                 ),
                 onSubmitted: isStreaming ? null : (_) => _send(),
+              ),
+                ),
               ),
             ),
             const SizedBox(width: 8),
