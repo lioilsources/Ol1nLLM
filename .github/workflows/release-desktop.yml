@@ -1,0 +1,144 @@
+name: Release Desktop
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. v0.1.0-alpha)'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.41.x'
+
+jobs:
+  version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      value: ${{ steps.v.outputs.value }}
+    steps:
+      - id: v
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-macos:
+    name: Build macOS
+    runs-on: macos-15
+    needs: version
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Build macOS
+        run: |
+          flutter build macos --release \
+            --dart-define=CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }} \
+            --dart-define=CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+      - name: Package
+        run: |
+          cd build/macos/Build/Products/Release
+          zip -r "$GITHUB_WORKSPACE/ol1n-llm-${{ needs.version.outputs.value }}-macos.zip" *.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ needs.version.outputs.value }}
+          path: ol1n-llm-${{ needs.version.outputs.value }}-macos.zip
+          retention-days: 30
+
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    needs: version
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Build Windows
+        run: |
+          flutter build windows --release `
+            --dart-define=CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }} `
+            --dart-define=CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+      - name: Package
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path build\windows\x64\runner\Release\* `
+            -DestinationPath "ol1n-llm-${{ needs.version.outputs.value }}-windows.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{ needs.version.outputs.value }}
+          path: ol1n-llm-${{ needs.version.outputs.value }}-windows.zip
+          retention-days: 30
+
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+    needs: version
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Build Linux
+        run: |
+          flutter build linux --release \
+            --dart-define=CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }} \
+            --dart-define=CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+      - name: Package
+        run: |
+          tar -czf ol1n-llm-${{ needs.version.outputs.value }}-linux.tar.gz \
+            -C build/linux/x64/release/bundle .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ needs.version.outputs.value }}
+          path: ol1n-llm-${{ needs.version.outputs.value }}-linux.tar.gz
+          retention-days: 30
+
+  release:
+    name: Attach Desktop Builds to Release
+    runs-on: ubuntu-latest
+    needs: [version, build-macos, build-windows, build-linux]
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          merge-multiple: true
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.value }}
+          name: Ol1nLLM ${{ needs.version.outputs.value }}
+          generate_release_notes: true
+          prerelease: ${{ contains(needs.version.outputs.value, 'alpha') || contains(needs.version.outputs.value, 'beta') || contains(needs.version.outputs.value, 'rc') }}
+          files: |
+            dist/*-macos.zip
+            dist/*-windows.zip
+            dist/*-linux.tar.gz
