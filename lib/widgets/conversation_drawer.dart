@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/theme.dart';
+import '../models/persona.dart';
 import '../providers/chat_provider.dart';
+import '../services/persona_service.dart';
 
 class ConversationDrawer extends ConsumerWidget {
   const ConversationDrawer({super.key});
@@ -10,6 +12,16 @@ class ConversationDrawer extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(chatProvider);
     final notifier = ref.read(chatProvider.notifier);
+    final personas =
+        ref.watch(personaListProvider).maybeWhen(data: (l) => l, orElse: () => const <Persona>[]);
+
+    String? emojiFor(String? id) {
+      if (id == null) return null;
+      for (final p in personas) {
+        if (p.id == id) return p.emoji;
+      }
+      return null;
+    }
 
     return Drawer(
       child: SafeArea(
@@ -46,6 +58,7 @@ class ConversationDrawer extends ConsumerWidget {
                       itemBuilder: (context, index) {
                         final conv = state.conversations[index];
                         final isActive = conv.id == state.activeId;
+                        final emoji = emojiFor(conv.personaId);
                         return Dismissible(
                           key: ValueKey(conv.id),
                           direction: DismissDirection.endToStart,
@@ -59,6 +72,10 @@ class ConversationDrawer extends ConsumerWidget {
                           child: ListTile(
                             selected: isActive,
                             selectedTileColor: Colors.white10,
+                            leading: emoji == null
+                                ? null
+                                : Text(emoji,
+                                    style: const TextStyle(fontSize: 20)),
                             title: Text(
                               conv.title,
                               maxLines: 1,

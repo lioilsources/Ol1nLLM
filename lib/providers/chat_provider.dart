@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import '../models/conversation.dart';
 import '../models/message.dart';
 import '../services/nim_service.dart';
+import '../services/persona_service.dart';
 
 const _uuid = Uuid();
 
@@ -54,9 +55,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
   static const _key = 'all';
 
   final NimService _service = NimService();
+  final PersonaService _personaService;
   StreamSubscription<ChatEvent>? _streamSub;
 
-  ChatNotifier() : super(const ChatState()) {
+  ChatNotifier(this._personaService) : super(const ChatState()) {
     _load();
   }
 
@@ -86,13 +88,25 @@ class ChatNotifier extends StateNotifier<ChatState> {
     );
   }
 
-  void newConversation() {
-    final conv = Conversation.create();
+  void newConversation({String? personaId}) {
+    final conv = Conversation.create(personaId: personaId);
     state = state.copyWith(
       conversations: [conv, ...state.conversations],
       activeId: conv.id,
       pendingContinuation: false,
     );
+    _save();
+  }
+
+  /// Picks a persona for the current chat. If no conversation is active or
+  /// the active one already has messages, starts a fresh one with this persona.
+  void selectPersona(String personaId) {
+    final conv = state.active;
+    if (conv == null || conv.messages.isNotEmpty) {
+      newConversation(personaId: personaId);
+      return;
+    }
+    _replaceConversation(conv.copyWith(personaId: personaId));
     _save();
   }
 
@@ -138,7 +152,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     );
     final messagesForApi = [...conv.messages, userMsg];
     final newTitle = conv.messages.isEmpty
-        ? (text.length > 60 ? '${text.substring(0, 60)}\u2026' : text)
+        ? (text.length > 60 ? '${text.substring(0, 60)}…' : text)
         : conv.title;
     conv = conv.copyWith(
       messages: messagesForApi,
@@ -155,6 +169,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
     try {
       await _save();
 
+      // Resolve persona system prompt (null if no persona).
+      final systemPrompt =
+          await _personaService.systemPrompt(conv.personaId);
+
       // Add empty assistant bubble
       final assistantMsg = Message(
         id: _uuid.v4(),
@@ -166,7 +184,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
       _replaceConversation(conv);
 
       // Stream response
-      _streamSub = _service.chat(messagesForApi).listen(
+      _streamSub = _service
+          .chat(messagesForApi, systemPrompt: systemPrompt)
+          .listen(
         (event) {
           switch (event) {
             case ChatDelta(:final content):
@@ -236,5 +256,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 }
 
-final chatProvider =
-    StateNotifierProvider<ChatNotifier, ChatState>((ref) => ChatNotifier());
+final chatProvider = StateNotifierProvider<ChatNotifier, ChatState>(
+  (ref) => ChatNotifier(ref.read(personaServiceProvider)),
+);
