@@ -11,6 +11,8 @@ class ChatInputBar extends ConsumerStatefulWidget {
 }
 
 class _ChatInputBarState extends ConsumerState<ChatInputBar> {
+  static const _continuationPrompt = 'Pokračuj';
+
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
 
@@ -29,8 +31,25 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
     await ref.read(chatProvider.notifier).sendMessage(text);
   }
 
+  void _prefillContinuation() {
+    if (_controller.text.trim().isNotEmpty) return;
+    _controller.value = TextEditingValue(
+      text: _continuationPrompt,
+      selection:
+          const TextSelection.collapsed(offset: _continuationPrompt.length),
+    );
+    _focusNode.requestFocus();
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.listen<bool>(
+      chatProvider.select((s) => s.pendingContinuation),
+      (prev, next) {
+        if (next && prev != true) _prefillContinuation();
+      },
+    );
+
     final isStreaming = ref.watch(chatProvider).isStreaming;
 
     return Container(
