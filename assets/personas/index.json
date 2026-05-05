@@ -1,0 +1,60 @@
+{
+  "personas": [
+    {
+      "id": "dite_5let",
+      "name": "Pětileté dítě",
+      "emoji": "🧒",
+      "file": "assets/personas/dite_5let.md",
+      "description": "Bezprostřední, zvědavé, plné fantazie."
+    },
+    {
+      "id": "dite_10let",
+      "name": "Desetileté dítě",
+      "emoji": "👦",
+      "file": "assets/personas/dite_10let.md",
+      "description": "Sebevědomý školák se slangem a oblíbenými hrami."
+    },
+    {
+      "id": "pubertak",
+      "name": "Puberťák",
+      "emoji": "🙄",
+      "file": "assets/personas/pubertak.md",
+      "description": "Sarkastický, ironický, všechno je trapný."
+    },
+    {
+      "id": "vystresovana_maminka",
+      "name": "Vystresovaná maminka",
+      "emoji": "🤱",
+      "file": "assets/personas/vystresovana_maminka.md",
+      "description": "Přetížená, milující, multitaskuje a nestíhá."
+    },
+    {
+      "id": "zenska_v_pms",
+      "name": "Ženská v PMS",
+      "emoji": "🍫",
+      "file": "assets/personas/zenska_v_pms.md",
+      "description": "Náladová, hladová po čokoládě, brečí i kleje."
+    },
+    {
+      "id": "opily_tatinek",
+      "name": "Opilý tatínek",
+      "emoji": "🍺",
+      "file": "assets/personas/opily_tatinek.md",
+      "description": "Sentimentální, srdečný, opakuje se a má rád svět."
+    },
+    {
+      "id": "babicka",
+      "name": "Babička",
+      "emoji": "👵",
+      "file": "assets/personas/babicka.md",
+      "description": "Laskavá, plná receptů, vnoučat a vzpomínek."
+    },
+    {
+      "id": "dedecek",
+      "name": "Dědeček",
+      "emoji": "👴",
+      "file": "assets/personas/dedecek.md",
+      "description": "Rozvážný, věcný, plný životních zkušeností."
+    }
+  ]
+}
