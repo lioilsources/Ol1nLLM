@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../core/constants/theme.dart';
 import '../models/message.dart';
+import '../models/persona.dart';
 import '../providers/chat_provider.dart';
+import '../services/persona_service.dart';
 import '../widgets/chat_input_bar.dart';
 import '../widgets/conversation_drawer.dart';
 import '../widgets/message_bubble.dart';
+import '../widgets/persona_picker.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
@@ -61,15 +63,35 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(chatProvider);
     final messages = state.active?.messages ?? [];
-    final title = state.active?.title ?? 'Ol1nLLM';
+    final personaId = state.active?.personaId;
+    final personasAsync = ref.watch(personaListProvider);
+    final activePersona = personasAsync.maybeWhen(
+      data: (list) => _findPersona(list, personaId),
+      orElse: () => null,
+    );
+    final title = _appBarTitle(state.active?.title, activePersona);
+    final showPicker = state.active == null ||
+        (messages.isEmpty && personaId == null);
 
     return Scaffold(
       drawer: const ConversationDrawer(),
       appBar: AppBar(
-        title: Text(
-          title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (activePersona != null) ...[
+              Text(activePersona.emoji,
+                  style: const TextStyle(fontSize: 18)),
+              const SizedBox(width: 8),
+            ],
+            Flexible(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
         actions: [
           if (state.conversations.isNotEmpty)
@@ -83,8 +105,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: messages.isEmpty
-                ? _buildEmptyState()
+            child: showPicker
+                ? const PersonaPicker()
                 : ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -103,46 +125,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     },
                   ),
           ),
-          const ChatInputBar(),
+          if (!showPicker) const ChatInputBar(),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: AppTheme.accent.withAlpha(30),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(
-              Icons.chat_bubble_outline,
-              color: AppTheme.accent,
-              size: 28,
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'llm-lab',
-            style: TextStyle(
-              color: AppTheme.textPrimary,
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Start a conversation',
-            style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
-          ),
-        ],
-      ),
-    );
+  static Persona? _findPersona(List<Persona> list, String? id) {
+    if (id == null) return null;
+    for (final p in list) {
+      if (p.id == id) return p;
+    }
+    return null;
+  }
+
+  static String _appBarTitle(String? convTitle, Persona? persona) {
+    if (convTitle == null) return 'Ol1nLLM';
+    if (convTitle == 'New conversation' && persona != null) return persona.name;
+    return convTitle;
   }
 }

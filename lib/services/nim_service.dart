@@ -44,13 +44,22 @@ class NimService {
 
   /// Streams assistant events (deltas + a final ChatDone with finish_reason)
   /// from NIM via LiteLLM.
-  Stream<ChatEvent> chat(List<Message> messages) async* {
+  Stream<ChatEvent> chat(
+    List<Message> messages, {
+    String? systemPrompt,
+  }) async* {
     if (_cfId.isEmpty || _cfSecret.isEmpty) {
       throw Exception(
         'CF Access credentials not configured. '
         'Build with --dart-define=CF_ACCESS_CLIENT_ID=... --dart-define=CF_ACCESS_CLIENT_SECRET=...',
       );
     }
+
+    final payload = <Map<String, dynamic>>[
+      if (systemPrompt != null && systemPrompt.trim().isNotEmpty)
+        {'role': 'system', 'content': systemPrompt},
+      ...messages.map((m) => m.toOllamaJson()),
+    ];
 
     final request = http.Request('POST', Uri.parse(_baseUrl));
     request.headers.addAll({
@@ -61,7 +70,7 @@ class NimService {
     });
     request.body = jsonEncode({
       'model': _model,
-      'messages': messages.map((m) => m.toOllamaJson()).toList(),
+      'messages': payload,
       'stream': true,
       'temperature': 0.7,
       'max_tokens': 4096,
