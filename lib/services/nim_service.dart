@@ -5,6 +5,23 @@ import 'package:cronet_http/cronet_http.dart';
 import 'package:http/http.dart' as http;
 import '../models/message.dart';
 
+sealed class ChatEvent {
+  const ChatEvent();
+}
+
+class ChatDelta extends ChatEvent {
+  final String content;
+  const ChatDelta(this.content);
+}
+
+class ChatDone extends ChatEvent {
+  /// e.g. 'stop', 'length', 'content_filter', or null if server didn't send one.
+  final String? finishReason;
+  const ChatDone(this.finishReason);
+
+  bool get truncatedByLength => finishReason == 'length';
+}
+
 class NimService {
   static const _baseUrl = 'https://llm.ol1n.com/v1/chat/completions';
   static const _model = 'llm-lab';
@@ -25,8 +42,9 @@ class NimService {
     return http.Client();
   }
 
-  /// Streams assistant content chunks from NIM via LiteLLM.
-  Stream<String> chat(List<Message> messages) async* {
+  /// Streams assistant events (deltas + a final ChatDone with finish_reason)
+  /// from NIM via LiteLLM.
+  Stream<ChatEvent> chat(List<Message> messages) async* {
     if (_cfId.isEmpty || _cfSecret.isEmpty) {
       throw Exception(
         'CF Access credentials not configured. '
@@ -46,7 +64,7 @@ class NimService {
       'messages': messages.map((m) => m.toOllamaJson()).toList(),
       'stream': true,
       'temperature': 0.7,
-      'max_tokens': 1024,
+      'max_tokens': 4096,
     });
 
     final response = await _client.send(request).timeout(_connectTimeout);
@@ -78,6 +96,7 @@ class NimService {
         .transform(const LineSplitter())
         .timeout(_streamTimeout);
 
+    String? finishReason;
     await for (final line in lineStream) {
       final trimmed = line.trim();
       if (trimmed.isEmpty || !trimmed.startsWith('data: ')) continue;
@@ -85,16 +104,20 @@ class NimService {
       if (payload == '[DONE]') break;
       try {
         final json = jsonDecode(payload) as Map<String, dynamic>;
-        final delta = ((json['choices'] as List?)?.first
-            as Map<String, dynamic>?)?['delta'] as Map<String, dynamic>?;
-        final content = delta?['content'] as String?;
+        final choice =
+            (json['choices'] as List?)?.first as Map<String, dynamic>?;
+        final content =
+            (choice?['delta'] as Map<String, dynamic>?)?['content'] as String?;
         if (content != null && content.isNotEmpty) {
-          yield content;
+          yield ChatDelta(content);
         }
+        final fr = choice?['finish_reason'];
+        if (fr is String) finishReason = fr;
       } catch (_) {
         // Skip malformed lines
       }
     }
+    yield ChatDone(finishReason);
   }
 
   void dispose() => _client.close();

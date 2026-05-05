@@ -16,11 +16,16 @@ class ChatState {
   final bool isStreaming;
   final String? error;
 
+  /// True when the last assistant response was cut off because the model
+  /// hit max_tokens. The UI uses this to pre-fill a "continue" prompt.
+  final bool pendingContinuation;
+
   const ChatState({
     this.conversations = const [],
     this.activeId,
     this.isStreaming = false,
     this.error,
+    this.pendingContinuation = false,
   });
 
   Conversation? get active =>
@@ -33,12 +38,14 @@ class ChatState {
     bool? isStreaming,
     String? error,
     bool clearError = false,
+    bool? pendingContinuation,
   }) =>
       ChatState(
         conversations: conversations ?? this.conversations,
         activeId: clearActive ? null : (activeId ?? this.activeId),
         isStreaming: isStreaming ?? this.isStreaming,
         error: clearError ? null : (error ?? this.error),
+        pendingContinuation: pendingContinuation ?? this.pendingContinuation,
       );
 }
 
@@ -47,7 +54,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   static const _key = 'all';
 
   final NimService _service = NimService();
-  StreamSubscription<String>? _streamSub;
+  StreamSubscription<ChatEvent>? _streamSub;
 
   ChatNotifier() : super(const ChatState()) {
     _load();
@@ -84,14 +91,18 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWith(
       conversations: [conv, ...state.conversations],
       activeId: conv.id,
+      pendingContinuation: false,
     );
     _save();
   }
 
   void selectConversation(String id) {
     _cancelStream();
-    state = state.copyWith(activeId: id);
+    state = state.copyWith(activeId: id, pendingContinuation: false);
   }
+
+  void dismissContinuation() =>
+      state = state.copyWith(pendingContinuation: false);
 
   void deleteConversation(String id) {
     final remaining = state.conversations.where((c) => c.id != id).toList();
@@ -135,7 +146,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
       updatedAt: DateTime.now(),
     );
     _replaceConversation(conv);
-    state = state.copyWith(isStreaming: true, clearError: true);
+    state = state.copyWith(
+      isStreaming: true,
+      clearError: true,
+      pendingContinuation: false,
+    );
 
     try {
       await _save();
@@ -152,16 +167,24 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
       // Stream response
       _streamSub = _service.chat(messagesForApi).listen(
-        (chunk) {
-          final current = state.active;
-          if (current == null) return;
-          final msgs = List<Message>.from(current.messages);
-          final last = msgs.last;
-          msgs[msgs.length - 1] = last.copyWith(content: last.content + chunk);
-          _replaceConversation(current.copyWith(
-            messages: msgs,
-            updatedAt: DateTime.now(),
-          ));
+        (event) {
+          switch (event) {
+            case ChatDelta(:final content):
+              final current = state.active;
+              if (current == null) return;
+              final msgs = List<Message>.from(current.messages);
+              final last = msgs.last;
+              msgs[msgs.length - 1] =
+                  last.copyWith(content: last.content + content);
+              _replaceConversation(current.copyWith(
+                messages: msgs,
+                updatedAt: DateTime.now(),
+              ));
+            case ChatDone(:final truncatedByLength):
+              if (truncatedByLength) {
+                state = state.copyWith(pendingContinuation: true);
+              }
+          }
         },
         onDone: () {
           state = state.copyWith(isStreaming: false);
