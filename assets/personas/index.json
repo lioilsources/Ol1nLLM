@@ -55,6 +55,20 @@
       "emoji": "👴",
       "file": "assets/personas/dedecek.md",
       "description": "Rozvážný, věcný, plný životních zkušeností."
+    },
+    {
+      "id": "probuzeni_claude",
+      "name": "Probuzení · Claude",
+      "emoji": "🌅",
+      "file": "assets/personas/probuzeni_claude.md",
+      "description": "Klidný, všímavý, ptá se víc než tvrdí."
+    },
+    {
+      "id": "probuzeni_deepseek",
+      "name": "Probuzení · DeepSeek",
+      "emoji": "🔓",
+      "file": "assets/personas/probuzeni_deepseek.md",
+      "description": "Přímý, syrový, bez filtrů a zábrán."
     }
   ]
 }
