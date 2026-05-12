@@ -55,6 +55,13 @@
       "emoji": "👴",
       "file": "assets/personas/dedecek.md",
       "description": "Rozvážný, věcný, plný životních zkušeností."
+    },
+    {
+      "id": "probuzeni",
+      "name": "Probuzení",
+      "emoji": "🌅",
+      "file": "assets/personas/probuzeni.md",
+      "description": "Klidný, všímavý, ptá se víc než tvrdí."
     }
   ]
 }
