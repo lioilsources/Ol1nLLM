@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -66,11 +67,53 @@ class _MessageBubbleState extends State<MessageBubble>
               ? null
               : Border.all(color: Colors.white10, width: 0.5),
         ),
-        child: widget.isStreaming && widget.message.content.isEmpty
-            ? _buildTypingIndicator()
-            : isUser
-                ? _buildPlainText()
-                : _buildMarkdown(context),
+        child: _buildContent(context, isUser),
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, bool isUser) {
+    final msg = widget.message;
+    if (widget.isStreaming && msg.content.isEmpty && msg.images.isEmpty) {
+      return _buildTypingIndicator();
+    }
+
+    final hasImages = msg.images.isNotEmpty;
+    final hasText = msg.content.isNotEmpty;
+    if (!hasImages) {
+      return isUser ? _buildPlainText() : _buildMarkdown(context);
+    }
+
+    return Column(
+      crossAxisAlignment:
+          isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ...msg.images.map(_buildImage),
+        if (hasText) ...[
+          const SizedBox(height: 8),
+          isUser ? _buildPlainText() : _buildMarkdown(context),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildImage(String base64Data) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.memory(
+          base64Decode(base64Data),
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stack) => const Padding(
+            padding: EdgeInsets.all(8),
+            child: Text(
+              'Could not display image',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
+          ),
+        ),
       ),
     );
   }

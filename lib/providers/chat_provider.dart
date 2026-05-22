@@ -6,6 +6,7 @@ import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 import '../models/conversation.dart';
 import '../models/message.dart';
+import '../services/media_service.dart';
 import '../services/nim_service.dart';
 import '../services/persona_service.dart';
 
@@ -55,6 +56,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   static const _key = 'all';
 
   final NimService _service = NimService();
+  final MediaService _mediaService = MediaService();
   final PersonaService _personaService;
   StreamSubscription<ChatEvent>? _streamSub;
 
@@ -223,6 +225,136 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
   }
 
+  /// FLUX text→image generation.
+  Future<void> generateImage(String prompt) async {
+    final text = prompt.trim();
+    if (text.isEmpty || state.isStreaming) return;
+    await _runMedia(
+      userMsg: Message(
+        id: _uuid.v4(),
+        role: MessageRole.user,
+        content: text,
+        createdAt: DateTime.now(),
+      ),
+      titleSeed: text,
+      task: () async {
+        final images = await _mediaService.generateImage(prompt: text);
+        return Message(
+          id: _uuid.v4(),
+          role: MessageRole.assistant,
+          content: '',
+          createdAt: DateTime.now(),
+          images: images,
+        );
+      },
+    );
+  }
+
+  /// Qwen-Image-Edit: edit [imageBase64] using [prompt].
+  Future<void> editImage(String imageBase64, String prompt) async {
+    final text = prompt.trim();
+    if (text.isEmpty || imageBase64.isEmpty || state.isStreaming) return;
+    await _runMedia(
+      userMsg: Message(
+        id: _uuid.v4(),
+        role: MessageRole.user,
+        content: text,
+        createdAt: DateTime.now(),
+        images: [imageBase64],
+      ),
+      titleSeed: text,
+      task: () async {
+        final images = await _mediaService.editImage(
+          imageBase64: imageBase64,
+          prompt: text,
+        );
+        return Message(
+          id: _uuid.v4(),
+          role: MessageRole.assistant,
+          content: '',
+          createdAt: DateTime.now(),
+          images: images,
+        );
+      },
+    );
+  }
+
+  /// OCR: extract text from [imageBase64].
+  Future<void> runOcr(String imageBase64, {String? prompt}) async {
+    if (imageBase64.isEmpty || state.isStreaming) return;
+    await _runMedia(
+      userMsg: Message(
+        id: _uuid.v4(),
+        role: MessageRole.user,
+        content: prompt?.trim() ?? '',
+        createdAt: DateTime.now(),
+        images: [imageBase64],
+      ),
+      titleSeed: 'OCR',
+      task: () async {
+        final text = await _mediaService.ocr(
+          imageBase64: imageBase64,
+          prompt: prompt,
+        );
+        return Message(
+          id: _uuid.v4(),
+          role: MessageRole.assistant,
+          content: text.isEmpty ? '_(no text recognized)_' : text,
+          createdAt: DateTime.now(),
+        );
+      },
+    );
+  }
+
+  /// Shared flow for non-streaming media operations: append the user message,
+  /// run [task], then append the produced assistant message.
+  Future<void> _runMedia({
+    required Message userMsg,
+    required String titleSeed,
+    required Future<Message> Function() task,
+  }) async {
+    var conv = state.active;
+    if (conv == null) {
+      conv = Conversation.create();
+      state = state.copyWith(
+        conversations: [conv, ...state.conversations],
+        activeId: conv.id,
+      );
+    }
+
+    final newTitle = conv.messages.isEmpty
+        ? (titleSeed.length > 60 ? '${titleSeed.substring(0, 60)}…' : titleSeed)
+        : conv.title;
+    conv = conv.copyWith(
+      messages: [...conv.messages, userMsg],
+      title: newTitle,
+      updatedAt: DateTime.now(),
+    );
+    _replaceConversation(conv);
+    state = state.copyWith(
+      isStreaming: true,
+      clearError: true,
+      pendingContinuation: false,
+    );
+
+    try {
+      await _save();
+      final assistantMsg = await task();
+      final current = state.active;
+      if (current != null) {
+        _replaceConversation(current.copyWith(
+          messages: [...current.messages, assistantMsg],
+          updatedAt: DateTime.now(),
+        ));
+      }
+      state = state.copyWith(isStreaming: false);
+      await _save();
+    } catch (e) {
+      debugPrint('media op error: $e');
+      state = state.copyWith(isStreaming: false, error: _errorMessage(e));
+    }
+  }
+
   static String _errorMessage(Object e) {
     if (e is Exception) return e.toString().replaceFirst('Exception: ', '');
     return e.toString();
@@ -252,6 +384,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   void dispose() {
     _cancelStream();
     _service.dispose();
+    _mediaService.dispose();
     super.dispose();
   }
 }

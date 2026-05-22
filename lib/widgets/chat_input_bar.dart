@@ -1,7 +1,37 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../core/constants/theme.dart';
 import '../providers/chat_provider.dart';
+
+enum InputMode { chat, generateImage, editImage, ocr }
+
+extension on InputMode {
+  IconData get icon => switch (this) {
+        InputMode.chat => Icons.chat_bubble_outline,
+        InputMode.generateImage => Icons.auto_awesome,
+        InputMode.editImage => Icons.brush_outlined,
+        InputMode.ocr => Icons.document_scanner_outlined,
+      };
+
+  String get label => switch (this) {
+        InputMode.chat => 'Chat',
+        InputMode.generateImage => 'Generate image',
+        InputMode.editImage => 'Edit image',
+        InputMode.ocr => 'OCR',
+      };
+
+  String get hint => switch (this) {
+        InputMode.chat => 'Message llm-lab…',
+        InputMode.generateImage => 'Describe an image to generate…',
+        InputMode.editImage => 'Describe the edit…',
+        InputMode.ocr => 'Optional instruction…',
+      };
+
+  bool get needsImage => this == InputMode.editImage || this == InputMode.ocr;
+}
 
 class ChatInputBar extends ConsumerStatefulWidget {
   const ChatInputBar({super.key});
@@ -15,6 +45,11 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
 
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
+  final _picker = ImagePicker();
+
+  InputMode _mode = InputMode.chat;
+  Uint8List? _imageBytes;
+  String? _imageBase64;
 
   @override
   void dispose() {
@@ -23,12 +58,65 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
     super.dispose();
   }
 
+  bool get _canSend {
+    final hasText = _controller.text.trim().isNotEmpty;
+    final hasImage = _imageBytes != null;
+    return switch (_mode) {
+      InputMode.chat => hasText,
+      InputMode.generateImage => hasText,
+      InputMode.editImage => hasText && hasImage,
+      InputMode.ocr => hasImage,
+    };
+  }
+
+  Future<void> _pickImage() async {
+    final file = await _picker.pickImage(source: ImageSource.gallery);
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    setState(() {
+      _imageBytes = bytes;
+      _imageBase64 = base64Encode(bytes);
+    });
+  }
+
+  void _clearImage() {
+    setState(() {
+      _imageBytes = null;
+      _imageBase64 = null;
+    });
+  }
+
+  void _setMode(InputMode mode) {
+    setState(() {
+      _mode = mode;
+      if (!mode.needsImage) _clearImage();
+    });
+  }
+
   Future<void> _send() async {
+    final notifier = ref.read(chatProvider.notifier);
     final text = _controller.text;
-    if (text.trim().isEmpty) return;
-    _controller.clear();
-    _focusNode.requestFocus();
-    await ref.read(chatProvider.notifier).sendMessage(text);
+    if (!_canSend) return;
+
+    switch (_mode) {
+      case InputMode.chat:
+        _controller.clear();
+        _focusNode.requestFocus();
+        await notifier.sendMessage(text);
+      case InputMode.generateImage:
+        _controller.clear();
+        await notifier.generateImage(text);
+      case InputMode.editImage:
+        final image = _imageBase64!;
+        _controller.clear();
+        _clearImage();
+        await notifier.editImage(image, text);
+      case InputMode.ocr:
+        final image = _imageBase64!;
+        _controller.clear();
+        _clearImage();
+        await notifier.runOcr(image, prompt: text);
+    }
   }
 
   void _prefillContinuation() {
@@ -50,7 +138,7 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
       },
     );
 
-    final isStreaming = ref.watch(chatProvider).isStreaming;
+    final isBusy = ref.watch(chatProvider).isStreaming;
 
     return Container(
       decoration: const BoxDecoration(
@@ -60,49 +148,129 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: SafeArea(
         top: false,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 120),
-                child: Scrollbar(
-                  child: TextField(
-                controller: _controller,
-                focusNode: _focusNode,
-                enabled: !isStreaming,
-                maxLines: null,
-                minLines: 1,
-                keyboardType: TextInputType.multiline,
-                textCapitalization: TextCapitalization.sentences,
-                style: const TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontSize: 15,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'Message llm-lab…',
-                  hintStyle: const TextStyle(color: AppTheme.textSecondary),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: BorderSide.none,
+            if (_imageBytes != null) _buildImagePreview(),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                _buildModeButton(isBusy),
+                if (_mode.needsImage) ...[
+                  const SizedBox(width: 4),
+                  IconButton(
+                    icon: const Icon(Icons.image_outlined),
+                    color: AppTheme.textSecondary,
+                    tooltip: 'Pick image',
+                    onPressed: isBusy ? null : _pickImage,
                   ),
-                  filled: true,
-                  fillColor: AppTheme.surface,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
+                ],
+                Expanded(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 120),
+                    child: Scrollbar(
+                      child: TextField(
+                        controller: _controller,
+                        focusNode: _focusNode,
+                        enabled: !isBusy,
+                        maxLines: null,
+                        minLines: 1,
+                        keyboardType: TextInputType.multiline,
+                        textCapitalization: TextCapitalization.sentences,
+                        onChanged: (_) => setState(() {}),
+                        style: const TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 15,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: _mode.hint,
+                          hintStyle:
+                              const TextStyle(color: AppTheme.textSecondary),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide.none,
+                          ),
+                          filled: true,
+                          fillColor: AppTheme.surface,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                        ),
+                        onSubmitted:
+                            isBusy ? null : (_) => _send(),
+                      ),
+                    ),
                   ),
                 ),
-                onSubmitted: isStreaming ? null : (_) => _send(),
-              ),
+                const SizedBox(width: 8),
+                _ActionButton(
+                  isBusy: isBusy,
+                  enabled: _canSend,
+                  onSend: _send,
+                  onStop: () => ref.read(chatProvider.notifier).cancelStream(),
                 ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModeButton(bool isBusy) {
+    return PopupMenuButton<InputMode>(
+      enabled: !isBusy,
+      tooltip: 'Mode',
+      icon: Icon(_mode.icon, color: AppTheme.accent),
+      color: AppTheme.surface,
+      onSelected: _setMode,
+      itemBuilder: (context) => InputMode.values
+          .map(
+            (m) => PopupMenuItem(
+              value: m,
+              child: Row(
+                children: [
+                  Icon(m.icon,
+                      size: 18,
+                      color: m == _mode
+                          ? AppTheme.accent
+                          : AppTheme.textSecondary),
+                  const SizedBox(width: 10),
+                  Text(m.label,
+                      style: const TextStyle(color: AppTheme.textPrimary)),
+                ],
               ),
             ),
-            const SizedBox(width: 8),
-            _ActionButton(
-              isStreaming: isStreaming,
-              onSend: _send,
-              onStop: () => ref.read(chatProvider.notifier).cancelStream(),
+          )
+          .toList(),
+    );
+  }
+
+  Widget _buildImagePreview() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8, left: 4),
+        child: Stack(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.memory(
+                _imageBytes!,
+                width: 64,
+                height: 64,
+                fit: BoxFit.cover,
+              ),
+            ),
+            Positioned(
+              top: -8,
+              right: -8,
+              child: IconButton(
+                icon: const Icon(Icons.cancel, size: 20),
+                color: Colors.white70,
+                onPressed: _clearImage,
+              ),
             ),
           ],
         ),
@@ -112,33 +280,36 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
 }
 
 class _ActionButton extends StatelessWidget {
-  final bool isStreaming;
+  final bool isBusy;
+  final bool enabled;
   final VoidCallback onSend;
   final VoidCallback onStop;
 
   const _ActionButton({
-    required this.isStreaming,
+    required this.isBusy,
+    required this.enabled,
     required this.onSend,
     required this.onStop,
   });
 
   @override
   Widget build(BuildContext context) {
+    final active = isBusy || enabled;
     return Container(
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: AppTheme.accent,
+        color: active ? AppTheme.accent : AppTheme.surface,
         borderRadius: BorderRadius.circular(20),
       ),
       child: IconButton(
         padding: EdgeInsets.zero,
         icon: Icon(
-          isStreaming ? Icons.stop_rounded : Icons.arrow_upward_rounded,
-          color: Colors.white,
+          isBusy ? Icons.stop_rounded : Icons.arrow_upward_rounded,
+          color: active ? Colors.white : AppTheme.textSecondary,
           size: 20,
         ),
-        onPressed: isStreaming ? onStop : onSend,
+        onPressed: isBusy ? onStop : (enabled ? onSend : null),
       ),
     );
   }
