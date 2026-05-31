@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -66,11 +67,70 @@ class _MessageBubbleState extends State<MessageBubble>
               ? null
               : Border.all(color: Colors.white10, width: 0.5),
         ),
-        child: widget.isStreaming && widget.message.content.isEmpty
-            ? _buildTypingIndicator()
-            : isUser
-                ? _buildPlainText()
-                : _buildMarkdown(context),
+        child: _buildContent(context, isUser),
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, bool isUser) {
+    final msg = widget.message;
+    final hasImages = msg.images.isNotEmpty;
+    final hasText = msg.content.isNotEmpty;
+
+    // Typing indicator: streaming, no content, no images yet
+    if (widget.isStreaming && !hasText && !hasImages) {
+      return _buildTypingIndicator();
+    }
+
+    // Progress status text while job is running (streaming + text but no images)
+    if (widget.isStreaming && hasText && !hasImages) {
+      return _buildStatusText(msg.content);
+    }
+
+    // Images (with optional caption)
+    if (hasImages) {
+      return Column(
+        crossAxisAlignment:
+            isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ...msg.images.map(_buildImage),
+          if (hasText) ...[
+            const SizedBox(height: 8),
+            isUser ? _buildPlainText() : _buildMarkdown(context),
+          ],
+        ],
+      );
+    }
+
+    // User input with an attached image (base64 in images list shown above)
+    return isUser ? _buildPlainText() : _buildMarkdown(context);
+  }
+
+  Widget _buildImage(String base64) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.memory(
+          base64Decode(base64),
+          fit: BoxFit.contain,
+          errorBuilder: (_, _, _) => const Icon(
+            Icons.broken_image_outlined,
+            color: AppTheme.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusText(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        color: AppTheme.textSecondary,
+        fontSize: 14,
+        fontStyle: FontStyle.italic,
       ),
     );
   }
@@ -102,7 +162,9 @@ class _MessageBubbleState extends State<MessageBubble>
               onTapLink: (text, href, title) async {
                 if (href == null) return;
                 final uri = Uri.tryParse(href);
-                if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                if (uri != null) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
               },
             ),
             if (showCursor)

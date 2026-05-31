@@ -98,7 +98,7 @@ class _Breadcrumb extends ConsumerWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         itemCount: path.length,
-        separatorBuilder: (_, __) => const Padding(
+        separatorBuilder: (_, _) => const Padding(
           padding: EdgeInsets.symmetric(horizontal: 2),
           child: Icon(Icons.chevron_right,
               size: 16, color: AppTheme.textSecondary),

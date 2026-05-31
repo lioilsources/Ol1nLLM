@@ -97,14 +97,13 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
       clearSelected: true,
       clearError: true,
     );
-    await _run(
+    await _runAsync(
       node.id,
-      () => _media.generateImage(prompt: text, n: kVariantCount),
+      () => _media.submitGeneration(prompt: text, n: kVariantCount),
     );
   }
 
-  /// Round 2+: four Qwen-Image-Edit variants of the selected image, steered by
-  /// [prompt] as the edit instruction. Branches off the current node.
+  /// Round 2+: four Qwen-Image-Edit variants of the selected image.
   Future<void> refine(String prompt) async {
     final text = prompt.trim();
     final base = _imageById(state.selectedImageId);
@@ -120,9 +119,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
       clearSelected: true,
       clearError: true,
     );
-    await _run(
+    await _runAsync(
       node.id,
-      () => _media.editImage(
+      () => _media.submitEdit(
         imageBase64: base.b64,
         prompt: text,
         n: kVariantCount,
@@ -137,8 +136,10 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
     _patch(nodeId,
         (n) => n.copyWith(status: GenStatus.generating, clearError: true));
     if (node.isRoot) {
-      await _run(nodeId,
-          () => _media.generateImage(prompt: node.prompt, n: kVariantCount));
+      await _runAsync(
+        nodeId,
+        () => _media.submitGeneration(prompt: node.prompt, n: kVariantCount),
+      );
     } else {
       final base = _imageById(node.sourceImageId);
       if (base == null) {
@@ -146,9 +147,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
             (n) => n.copyWith(status: GenStatus.error, error: 'Source image gone'));
         return;
       }
-      await _run(
+      await _runAsync(
         nodeId,
-        () => _media.editImage(
+        () => _media.submitEdit(
           imageBase64: base.b64,
           prompt: node.prompt,
           n: kVariantCount,
@@ -157,27 +158,49 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
     }
   }
 
-  Future<void> _run(
+  /// Submit a job then poll until terminal state, updating [nodeId] in place.
+  Future<void> _runAsync(
     String nodeId,
-    Future<List<String>> Function() task,
+    Future<String> Function() submitJob,
   ) async {
+    String jobId;
     try {
-      final b64s = await task();
-      final images = [for (final b64 in b64s) GenImage.fromB64(b64)];
-      _patch(
-        nodeId,
-        (n) => n.copyWith(
-          status: GenStatus.ready,
-          images: images,
-          clearError: true,
-        ),
-      );
+      jobId = await submitJob();
     } catch (e) {
       final msg = e is Exception
           ? e.toString().replaceFirst('Exception: ', '')
           : e.toString();
       _patch(nodeId, (n) => n.copyWith(status: GenStatus.error, error: msg));
       state = state.copyWith(error: msg);
+      return;
+    }
+
+    await for (final status in _media.pollJob(jobId)) {
+      switch (status) {
+        case JobQueued() || JobRunning():
+          break; // node stays generating, _PlaceholderTile spinner stays visible
+        case JobDone(:final images):
+          _patch(
+            nodeId,
+            (n) => n.copyWith(
+              status: GenStatus.ready,
+              images: [for (final b64 in images) GenImage.fromB64(b64)],
+              clearError: true,
+            ),
+          );
+          return;
+        case JobFailed(:final message):
+          _patch(nodeId,
+              (n) => n.copyWith(status: GenStatus.error, error: message));
+          state = state.copyWith(error: message);
+          return;
+        case JobExpired():
+          const msg = 'Výsledek vypršel – zkus znovu';
+          _patch(nodeId,
+              (n) => n.copyWith(status: GenStatus.error, error: msg));
+          state = state.copyWith(error: msg);
+          return;
+      }
     }
   }
 
