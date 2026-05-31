@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:cronet_http/cronet_http.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 sealed class JobStatus {}
@@ -87,23 +88,29 @@ class MediaService {
       });
 
   Future<String> _submitJob(String path, Map<String, dynamic> body) async {
+    final url = '$_baseUrl$path';
+    debugPrint('[media] POST $url');
     final response = await _client
         .post(
-          Uri.parse('$_baseUrl$path'),
+          Uri.parse(url),
           headers: _headers,
           body: jsonEncode(body),
         )
         .timeout(_submitTimeout);
+    debugPrint('[media] POST $path → ${response.statusCode}');
     if (response.statusCode != 202) {
       final snippet = response.body.replaceAll(RegExp(r'\s+'), ' ').trim();
       final truncated =
           snippet.length > 160 ? '${snippet.substring(0, 160)}…' : snippet;
+      debugPrint('[media] error body: $truncated');
       throw Exception(
         'HTTP ${response.statusCode}${truncated.isNotEmpty ? ": $truncated" : ""}',
       );
     }
     final json = jsonDecode(response.body) as Map<String, dynamic>;
-    return json['id'] as String;
+    final jobId = json['id'] as String;
+    debugPrint('[media] job_id=$jobId');
+    return jobId;
   }
 
   /// Poll a job until it reaches a terminal state.
@@ -120,37 +127,48 @@ class MediaService {
               headers: _headers,
             )
             .timeout(_pollTimeout);
-      } catch (_) {
-        continue; // network hiccup — retry
+      } catch (e) {
+        debugPrint('[media] poll network error: $e — retrying');
+        continue;
       }
 
       if (response.statusCode == 404) {
+        debugPrint('[media] poll $jobId → 404 expired');
         yield JobExpired();
         return;
       }
       if (response.statusCode != 200) {
-        continue; // transient server error — retry
+        debugPrint('[media] poll $jobId → ${response.statusCode} retrying');
+        continue;
       }
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
-      switch (json['status'] as String) {
+      final status = json['status'] as String;
+      switch (status) {
         case 'queued':
-          yield JobQueued(json['queue_position'] as int? ?? 0);
+          final pos = json['queue_position'] as int? ?? 0;
+          debugPrint('[media] poll $jobId → queued pos=$pos');
+          yield JobQueued(pos);
         case 'running':
-          yield JobRunning(
-            json['step'] as int? ?? 0,
-            json['total'] as int? ?? 1,
-          );
+          final step = json['step'] as int? ?? 0;
+          final total = json['total'] as int? ?? 1;
+          debugPrint('[media] poll $jobId → running $step/$total');
+          yield JobRunning(step, total);
         case 'done':
           final data = json['data'] as List;
           final images = data
               .map((e) => (e as Map<String, dynamic>)['b64_json'] as String)
               .toList();
+          debugPrint('[media] poll $jobId → done (${images.length} image(s))');
           yield JobDone(images);
           return;
         case 'error':
-          yield JobFailed(json['error'] as String? ?? 'Unknown error');
+          final msg = json['error'] as String? ?? 'Unknown error';
+          debugPrint('[media] poll $jobId → error: $msg');
+          yield JobFailed(msg);
           return;
+        default:
+          debugPrint('[media] poll $jobId → unknown status "$status"');
       }
     }
   }
@@ -161,6 +179,7 @@ class MediaService {
     String? prompt,
     int maxNewTokens = 2048,
   }) async {
+    debugPrint('[media] POST /v1/ocr');
     final body = <String, dynamic>{
       'image': imageBase64,
       'max_new_tokens': maxNewTokens,
@@ -173,6 +192,7 @@ class MediaService {
           body: jsonEncode(body),
         )
         .timeout(_ocrTimeout);
+    debugPrint('[media] POST /v1/ocr → ${response.statusCode}');
     if (response.statusCode != 200) {
       final snippet = response.body.replaceAll(RegExp(r'\s+'), ' ').trim();
       final truncated =
