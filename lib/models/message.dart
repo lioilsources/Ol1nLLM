@@ -5,19 +5,22 @@ class Message {
   final MessageRole role;
   final String content;
   final DateTime createdAt;
+  final List<String> images; // base64-encoded PNG/JPEG
 
   const Message({
     required this.id,
     required this.role,
     required this.content,
     required this.createdAt,
+    this.images = const [],
   });
 
-  Message copyWith({String? content}) => Message(
+  Message copyWith({String? content, List<String>? images}) => Message(
         id: id,
         role: role,
         content: content ?? this.content,
         createdAt: createdAt,
+        images: images ?? this.images,
       );
 
   Map<String, dynamic> toOllamaJson() => {
@@ -30,6 +33,7 @@ class Message {
         'role': role.name,
         'content': content,
         'createdAt': createdAt.toIso8601String(),
+        if (images.isNotEmpty) 'images': images,
       };
 
   factory Message.fromJson(Map<String, dynamic> json) => Message(
@@ -37,5 +41,6 @@ class Message {
         role: MessageRole.values.byName(json['role'] as String),
         content: json['content'] as String,
         createdAt: DateTime.parse(json['createdAt'] as String),
+        images: (json['images'] as List?)?.cast<String>() ?? [],
       );
 }
