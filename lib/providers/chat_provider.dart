@@ -330,6 +330,14 @@ class ChatNotifier extends StateNotifier<ChatState> {
       title: newTitle,
       updatedAt: DateTime.now(),
     );
+    final placeholderId = _uuid.v4();
+    final placeholder = Message(
+      id: placeholderId,
+      role: MessageRole.assistant,
+      content: '',
+      createdAt: DateTime.now(),
+    );
+    conv = conv.copyWith(messages: [...conv.messages, placeholder]);
     _replaceConversation(conv);
     state = state.copyWith(
       isStreaming: true,
@@ -342,8 +350,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
       final assistantMsg = await task();
       final current = state.active;
       if (current != null) {
+        final msgs = current.messages
+            .map((m) => m.id == placeholderId ? assistantMsg : m)
+            .toList();
         _replaceConversation(current.copyWith(
-          messages: [...current.messages, assistantMsg],
+          messages: msgs,
           updatedAt: DateTime.now(),
         ));
       }
@@ -351,6 +362,14 @@ class ChatNotifier extends StateNotifier<ChatState> {
       await _save();
     } catch (e) {
       debugPrint('media op error: $e');
+      final current = state.active;
+      if (current != null) {
+        _replaceConversation(current.copyWith(
+          messages: current.messages
+              .where((m) => m.id != placeholderId)
+              .toList(),
+        ));
+      }
       state = state.copyWith(isStreaming: false, error: _errorMessage(e));
     }
   }

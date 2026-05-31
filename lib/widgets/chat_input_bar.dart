@@ -70,7 +70,12 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
   }
 
   Future<void> _pickImage() async {
-    final file = await _picker.pickImage(source: ImageSource.gallery);
+    final file = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 85,
+    );
     if (file == null) return;
     final bytes = await file.readAsBytes();
     setState(() {
