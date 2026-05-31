@@ -8,6 +8,7 @@ import '../widgets/chat_input_bar.dart';
 import '../widgets/conversation_drawer.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/persona_picker.dart';
+import 'image_studio_screen.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
@@ -94,6 +95,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.auto_awesome_outlined),
+            tooltip: 'Image Studio',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ImageStudioScreen()),
+            ),
+          ),
           if (state.conversations.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.add_comment_outlined),
