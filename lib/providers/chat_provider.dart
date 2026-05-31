@@ -398,21 +398,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
             final text =
                 step == 0 ? '⚙️ Spouštím…' : '⚙️ Generuji krok $step/$total';
             _updatePlaceholder(convId, placeholderId, text);
-          case JobDone(:final images):
+          case JobDone(:final resultUrl, :final count):
             _clearPendingJob();
-            _replacePlaceholder(
-              convId,
-              placeholderId,
-              Message(
-                id: _uuid.v4(),
-                role: MessageRole.assistant,
-                content: '',
-                createdAt: DateTime.now(),
-                images: images,
-              ),
-            );
-            state = state.copyWith(isStreaming: false);
-            _save();
+            _downloadAndFinish(convId, placeholderId, resultUrl, count);
           case JobFailed(:final message):
             _clearPendingJob();
             _removePlaceholder(convId, placeholderId);
@@ -444,6 +432,40 @@ class ChatNotifier extends StateNotifier<ChatState> {
           .map((m) => m.id == placeholderId ? m.copyWith(content: content) : m)
           .toList(),
     ));
+  }
+
+  Future<void> _downloadAndFinish(
+    String convId,
+    String placeholderId,
+    String resultUrl,
+    int count,
+  ) async {
+    try {
+      final images = <String>[];
+      for (var i = 0; i < count; i++) {
+        final bytes =
+            await _mediaService.downloadResult(resultUrl, index: i);
+        images.add(base64Encode(bytes));
+      }
+      _replacePlaceholder(
+        convId,
+        placeholderId,
+        Message(
+          id: _uuid.v4(),
+          role: MessageRole.assistant,
+          content: '',
+          createdAt: DateTime.now(),
+          images: images,
+        ),
+      );
+    } catch (e) {
+      debugPrint('result download error: $e');
+      _removePlaceholder(convId, placeholderId);
+      state = state.copyWith(error: _errorMessage(e));
+    } finally {
+      state = state.copyWith(isStreaming: false);
+      await _save();
+    }
   }
 
   void _replacePlaceholder(

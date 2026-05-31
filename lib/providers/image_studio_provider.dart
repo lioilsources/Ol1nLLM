@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/gen_node.dart';
 import '../services/media_service.dart';
@@ -179,12 +180,17 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
       switch (status) {
         case JobQueued() || JobRunning():
           break; // node stays generating, _PlaceholderTile spinner stays visible
-        case JobDone(:final images):
+        case JobDone(:final resultUrl, :final count):
+          final genImages = <GenImage>[];
+          for (var i = 0; i < count; i++) {
+            final bytes = await _media.downloadResult(resultUrl, index: i);
+            genImages.add(GenImage.fromB64(base64Encode(bytes)));
+          }
           _patch(
             nodeId,
             (n) => n.copyWith(
               status: GenStatus.ready,
-              images: [for (final b64 in images) GenImage.fromB64(b64)],
+              images: genImages,
               clearError: true,
             ),
           );

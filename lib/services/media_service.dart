@@ -17,9 +17,12 @@ class JobRunning extends JobStatus {
   JobRunning(this.step, this.total);
 }
 
+/// Job finished — images are NOT included here.
+/// Download them once via [MediaService.downloadResult].
 class JobDone extends JobStatus {
-  final List<String> images; // base64 strings
-  JobDone(this.images);
+  final String resultUrl;
+  final int count;
+  JobDone(this.resultUrl, this.count);
 }
 
 class JobFailed extends JobStatus {
@@ -155,12 +158,10 @@ class MediaService {
           debugPrint('[media] poll $jobId → running $step/$total');
           yield JobRunning(step, total);
         case 'done':
-          final data = json['data'] as List;
-          final images = data
-              .map((e) => (e as Map<String, dynamic>)['b64_json'] as String)
-              .toList();
-          debugPrint('[media] poll $jobId → done (${images.length} image(s))');
-          yield JobDone(images);
+          final resultUrl = json['result_url'] as String;
+          final count = json['count'] as int? ?? 1;
+          debugPrint('[media] poll $jobId → done count=$count result_url=$resultUrl');
+          yield JobDone(resultUrl, count);
           return;
         case 'error':
           final msg = json['error'] as String? ?? 'Unknown error';
@@ -171,6 +172,26 @@ class MediaService {
           debugPrint('[media] poll $jobId → unknown status "$status"');
       }
     }
+  }
+
+  /// Download a finished job's result image as raw PNG bytes.
+  /// Call ONCE per index after [pollJob] yields [JobDone] — do NOT poll this.
+  Future<Uint8List> downloadResult(String resultUrl, {int index = 0}) async {
+    final path = index > 0 ? '$resultUrl?index=$index' : resultUrl;
+    final uri = Uri.parse('$_baseUrl$path');
+    debugPrint('[media] GET $path (result download index=$index)');
+    // Result can be several MB — give it a generous timeout.
+    final response = await _client
+        .get(uri, headers: _headers)
+        .timeout(const Duration(seconds: 120));
+    debugPrint('[media] result download → ${response.statusCode} (${response.bodyBytes.length} bytes)');
+    if (response.statusCode == 409) {
+      throw Exception('Result not ready yet — job is not done (409)');
+    }
+    if (response.statusCode != 200) {
+      throw Exception('HTTP ${response.statusCode} downloading result');
+    }
+    return response.bodyBytes;
   }
 
   /// OCR — synchronous, quick endpoint (no job model).
