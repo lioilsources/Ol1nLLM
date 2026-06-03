@@ -28,17 +28,24 @@ class ImageStudioScreen extends ConsumerWidget {
     final state = ref.watch(imageStudioProvider);
     final current = state.current;
 
+    final notifier = ref.read(imageStudioProvider.notifier);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Image Studio'),
         actions: [
+          _BackendMenu(state: state),
+          if (state.isBusy)
+            IconButton(
+              icon: const Icon(Icons.stop_circle_outlined),
+              tooltip: 'Zrušit generování',
+              onPressed: notifier.cancel,
+            ),
           if (state.nodes.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.add_photo_alternate_outlined),
               tooltip: 'New image',
-              onPressed: state.isBusy
-                  ? null
-                  : () => ref.read(imageStudioProvider.notifier).startOver(),
+              onPressed: state.isBusy ? null : notifier.startOver,
             ),
         ],
       ),
@@ -50,6 +57,8 @@ class ImageStudioScreen extends ConsumerWidget {
                 ? const _EmptyHint()
                 : _NodeGrid(node: current, selectedId: state.selectedImageId),
           ),
+          if (current?.status == GenStatus.generating)
+            _ProgressBanner(node: current!),
           _StudioInputBar(state: state),
         ],
       ),
@@ -78,6 +87,100 @@ class _EmptyHint extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// AppBar picker to switch between the diffusers and ComfyUI backends.
+class _BackendMenu extends ConsumerWidget {
+  const _BackendMenu({required this.state});
+
+  final ImageStudioState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notifier = ref.read(imageStudioProvider.notifier);
+    final backends = notifier.backends;
+    final current = backends.firstWhere((b) => b.id == state.backendId,
+        orElse: () => backends.first);
+
+    return PopupMenuButton<String>(
+      enabled: !state.isBusy,
+      tooltip: 'Backend pro generování',
+      onSelected: notifier.setBackend,
+      itemBuilder: (context) => [
+        for (final b in backends)
+          PopupMenuItem<String>(
+            value: b.id,
+            child: Row(
+              children: [
+                Icon(
+                  b.id == state.backendId
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  size: 18,
+                  color: b.id == state.backendId
+                      ? AppTheme.accent
+                      : AppTheme.textSecondary,
+                ),
+                const SizedBox(width: 10),
+                Text(b.label),
+              ],
+            ),
+          ),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          children: [
+            const Icon(Icons.tune, size: 18, color: AppTheme.textSecondary),
+            const SizedBox(width: 6),
+            Text(
+              current.label,
+              style: const TextStyle(
+                  color: AppTheme.textSecondary, fontSize: 13),
+            ),
+            const Icon(Icons.arrow_drop_down,
+                size: 18, color: AppTheme.textSecondary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Thin progress strip shown under the grid while a round is generating.
+class _ProgressBanner extends StatelessWidget {
+  const _ProgressBanner({required this.node});
+
+  final GenNode node;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = node.progressLabel ?? 'Generování…';
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      color: AppTheme.background,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+                color: AppTheme.textSecondary, fontSize: 12),
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: node.progress,
+              minHeight: 4,
+              backgroundColor: AppTheme.surface,
+              color: AppTheme.accent,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -184,7 +287,7 @@ class _NodeGrid extends ConsumerWidget {
       ),
       itemCount: tiles,
       itemBuilder: (context, i) {
-        if (generating) return const _PlaceholderTile();
+        if (generating) return _PlaceholderTile(progress: node.progress);
         final img = node.images[i];
         return _ImageTile(
           image: img,
@@ -214,7 +317,10 @@ class _NodeGrid extends ConsumerWidget {
 }
 
 class _PlaceholderTile extends StatelessWidget {
-  const _PlaceholderTile();
+  const _PlaceholderTile({this.progress});
+
+  /// 0..1 determinate progress, or null for an indeterminate spinner.
+  final double? progress;
 
   @override
   Widget build(BuildContext context) {
@@ -223,11 +329,12 @@ class _PlaceholderTile extends StatelessWidget {
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: const Center(
+      child: Center(
         child: SizedBox(
           width: 22,
           height: 22,
           child: CircularProgressIndicator(
+            value: progress,
             strokeWidth: 2,
             color: AppTheme.textSecondary,
           ),

@@ -1,0 +1,60 @@
+# Standalone ComfyUI + cloudflared (Option B in cloudflared.md).
+#
+# Joins the existing external 'ai' network so it can sit alongside the other
+# backend services. ComfyUI is NOT published to the host publicly — only
+# cloudflared (with a Cloudflare Access service-token policy) reaches it.
+#
+# Deploy:
+#   cp backend/comfyui/cloudflared.config.example.yml ./config.yml   # edit it
+#   docker compose -f backend/comfyui/docker-compose.comfyui.yml up -d
+#
+# Prereqs:
+#   - external 'ai' network:  docker network create ai   (if it doesn't exist)
+#   - models on the host under ${COMFYUI_DATA}/models    (see README.md §2)
+#   - a cloudflared named tunnel + creds json            (see cloudflared.md)
+
+services:
+
+  comfyui:
+    image: ghcr.io/yanwk/comfyui-boot:cu124-slim
+    container_name: comfyui
+    restart: unless-stopped
+    # Bind to localhost only; cloudflared reaches it over the 'ai' network.
+    expose:
+      - "8188"
+    volumes:
+      - ${COMFYUI_DATA:-/home/ol1n/comfyui}/models:/app/models
+      - ${COMFYUI_DATA:-/home/ol1n/comfyui}/input:/app/input
+      - ${COMFYUI_DATA:-/home/ol1n/comfyui}/output:/app/output
+      - ${COMFYUI_DATA:-/home/ol1n/comfyui}/custom_nodes:/app/custom_nodes
+    networks: [ai]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8188/system_stats"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: comfyui-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    volumes:
+      # config.yml + <TUNNEL_ID>.json credentials
+      - ./config.yml:/etc/cloudflared/config.yml:ro
+      - ${CLOUDFLARED_CREDS:-/etc/cloudflared}:/etc/cloudflared:ro
+    networks: [ai]
+    depends_on:
+      - comfyui
+
+networks:
+  ai:
+    external: true
