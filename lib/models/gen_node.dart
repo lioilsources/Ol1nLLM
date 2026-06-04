@@ -36,6 +36,13 @@ class GenNode {
   final List<GenImage> images;
   final String? error;
 
+  /// Live generation progress in 0..1 while [status] == generating, or null
+  /// when the backend can't report a fraction yet (indeterminate).
+  final double? progress;
+
+  /// Short human-readable progress label (queue position, step, download…).
+  final String? progressLabel;
+
   const GenNode({
     required this.id,
     required this.parentId,
@@ -44,6 +51,8 @@ class GenNode {
     required this.status,
     this.images = const [],
     this.error,
+    this.progress,
+    this.progressLabel,
   });
 
   bool get isRoot => parentId == null;
@@ -66,6 +75,9 @@ class GenNode {
     List<GenImage>? images,
     String? error,
     bool clearError = false,
+    double? progress,
+    String? progressLabel,
+    bool clearProgress = false,
   }) =>
       GenNode(
         id: id,
@@ -75,5 +87,10 @@ class GenNode {
         status: status ?? this.status,
         images: images ?? this.images,
         error: clearError ? null : (error ?? this.error),
+        // clearProgress only resets the numeric fraction (→ indeterminate);
+        // the label follows its own argument so a queued/indeterminate state
+        // can still carry text like "Ve frontě…".
+        progress: clearProgress ? null : (progress ?? this.progress),
+        progressLabel: progressLabel ?? this.progressLabel,
       );
 }

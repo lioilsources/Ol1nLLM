@@ -1,0 +1,28 @@
+# cloudflared named-tunnel config for the ol1n.com AI stack.
+# Copy to the host's cloudflared config dir (e.g. /etc/cloudflared/config.yml
+# or ~/.cloudflared/config.yml) and fill in your tunnel id + creds path.
+#
+# Docs: backend/comfyui/cloudflared.md
+
+tunnel: ai-stack
+credentials-file: /etc/cloudflared/<TUNNEL_ID>.json
+
+# Keep WebSocket connections alive for live ComfyUI progress.
+originRequest:
+  noTLSVerify: true
+  connectTimeout: 30s
+  # cloudflared proxies WebSockets by default; nothing extra needed for /ws.
+
+ingress:
+  # ── existing diffusers / LLM API ──────────────────────────────
+  - hostname: llm.ol1n.com
+    service: http://llm:8000
+
+  # ── ComfyUI (NEW) ─────────────────────────────────────────────
+  # Use the container name if cloudflared shares the 'ai' Docker network,
+  # otherwise http://localhost:8188 for a bare-metal ComfyUI.
+  - hostname: comfyui.ol1n.com
+    service: http://comfyui:8188
+
+  # ── catch-all ─────────────────────────────────────────────────
+  - service: http_status:404

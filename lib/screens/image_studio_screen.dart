@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/theme.dart';
 import '../models/gen_node.dart';
 import '../providers/image_studio_provider.dart';
+import '../services/image_backend.dart' show kBackendComfyUI;
 
 /// Iterative image studio: generate 4 candidates from a prompt, pick one,
 /// describe a change, and get 4 refinements of it — repeat to converge.
@@ -28,17 +29,24 @@ class ImageStudioScreen extends ConsumerWidget {
     final state = ref.watch(imageStudioProvider);
     final current = state.current;
 
+    final notifier = ref.read(imageStudioProvider.notifier);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Image Studio'),
         actions: [
+          _BackendMenu(state: state),
+          if (state.isBusy)
+            IconButton(
+              icon: const Icon(Icons.stop_circle_outlined),
+              tooltip: 'Zrušit generování',
+              onPressed: notifier.cancel,
+            ),
           if (state.nodes.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.add_photo_alternate_outlined),
               tooltip: 'New image',
-              onPressed: state.isBusy
-                  ? null
-                  : () => ref.read(imageStudioProvider.notifier).startOver(),
+              onPressed: state.isBusy ? null : notifier.startOver,
             ),
         ],
       ),
@@ -50,6 +58,8 @@ class ImageStudioScreen extends ConsumerWidget {
                 ? const _EmptyHint()
                 : _NodeGrid(node: current, selectedId: state.selectedImageId),
           ),
+          if (current?.status == GenStatus.generating)
+            _ProgressBanner(node: current!),
           _StudioInputBar(state: state),
         ],
       ),
@@ -78,6 +88,100 @@ class _EmptyHint extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// AppBar picker to switch between the diffusers and ComfyUI backends.
+class _BackendMenu extends ConsumerWidget {
+  const _BackendMenu({required this.state});
+
+  final ImageStudioState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notifier = ref.read(imageStudioProvider.notifier);
+    final backends = notifier.backends;
+    final current = backends.firstWhere((b) => b.id == state.backendId,
+        orElse: () => backends.first);
+
+    return PopupMenuButton<String>(
+      enabled: !state.isBusy,
+      tooltip: 'Backend pro generování',
+      onSelected: notifier.setBackend,
+      itemBuilder: (context) => [
+        for (final b in backends)
+          PopupMenuItem<String>(
+            value: b.id,
+            child: Row(
+              children: [
+                Icon(
+                  b.id == state.backendId
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  size: 18,
+                  color: b.id == state.backendId
+                      ? AppTheme.accent
+                      : AppTheme.textSecondary,
+                ),
+                const SizedBox(width: 10),
+                Text(b.label),
+              ],
+            ),
+          ),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          children: [
+            const Icon(Icons.tune, size: 18, color: AppTheme.textSecondary),
+            const SizedBox(width: 6),
+            Text(
+              current.label,
+              style: const TextStyle(
+                  color: AppTheme.textSecondary, fontSize: 13),
+            ),
+            const Icon(Icons.arrow_drop_down,
+                size: 18, color: AppTheme.textSecondary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Thin progress strip shown under the grid while a round is generating.
+class _ProgressBanner extends StatelessWidget {
+  const _ProgressBanner({required this.node});
+
+  final GenNode node;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = node.progressLabel ?? 'Generování…';
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      color: AppTheme.background,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+                color: AppTheme.textSecondary, fontSize: 12),
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: node.progress,
+              minHeight: 4,
+              backgroundColor: AppTheme.surface,
+              color: AppTheme.accent,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -184,7 +288,7 @@ class _NodeGrid extends ConsumerWidget {
       ),
       itemCount: tiles,
       itemBuilder: (context, i) {
-        if (generating) return const _PlaceholderTile();
+        if (generating) return _PlaceholderTile(progress: node.progress);
         final img = node.images[i];
         return _ImageTile(
           image: img,
@@ -214,7 +318,10 @@ class _NodeGrid extends ConsumerWidget {
 }
 
 class _PlaceholderTile extends StatelessWidget {
-  const _PlaceholderTile();
+  const _PlaceholderTile({this.progress});
+
+  /// 0..1 determinate progress, or null for an indeterminate spinner.
+  final double? progress;
 
   @override
   Widget build(BuildContext context) {
@@ -223,11 +330,12 @@ class _PlaceholderTile extends StatelessWidget {
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: const Center(
+      child: Center(
         child: SizedBox(
           width: 22,
           height: 22,
           child: CircularProgressIndicator(
+            value: progress,
             strokeWidth: 2,
             color: AppTheme.textSecondary,
           ),
@@ -302,6 +410,135 @@ class _ImageTile extends StatelessWidget {
   }
 }
 
+class _LoraChip extends StatelessWidget {
+  const _LoraChip({
+    required this.loras,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final List<String> loras;
+  final String? selected;
+  final ValueChanged<String?> onChanged;
+
+  String _display(String name) {
+    final s = name.replaceAll('.safetensors', '');
+    return s.length > 22 ? '${s.substring(0, 22)}…' : s;
+  }
+
+  void _pick(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                'Vybrat LoRA',
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: Icon(
+                selected == null
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_unchecked,
+                color: selected == null ? AppTheme.accent : AppTheme.textSecondary,
+                size: 20,
+              ),
+              title: const Text('Žádná LoRA',
+                  style: TextStyle(color: AppTheme.textPrimary)),
+              onTap: () {
+                onChanged(null);
+                Navigator.of(context).pop();
+              },
+            ),
+            const Divider(height: 1, color: Colors.white12),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: loras.length,
+                itemBuilder: (_, i) {
+                  final lora = loras[i];
+                  final isSel = lora == selected;
+                  return ListTile(
+                    leading: Icon(
+                      isSel
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                      color: isSel ? AppTheme.accent : AppTheme.textSecondary,
+                      size: 20,
+                    ),
+                    title: Text(
+                      lora.replaceAll('.safetensors', ''),
+                      style: TextStyle(
+                        color: isSel ? AppTheme.accent : AppTheme.textPrimary,
+                      ),
+                    ),
+                    onTap: () {
+                      onChanged(lora);
+                      Navigator.of(context).pop();
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _pick(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected != null ? AppTheme.accent.withValues(alpha: 0.15) : AppTheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected != null ? AppTheme.accent : Colors.white24,
+            width: 0.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.style_outlined,
+                size: 14,
+                color: selected != null ? AppTheme.accent : AppTheme.textSecondary),
+            const SizedBox(width: 5),
+            Text(
+              selected != null ? _display(selected!) : 'LoRA',
+              style: TextStyle(
+                fontSize: 12,
+                color: selected != null ? AppTheme.accent : AppTheme.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 3),
+            Icon(Icons.expand_more,
+                size: 14,
+                color: selected != null ? AppTheme.accent : AppTheme.textSecondary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _StudioInputBar extends ConsumerStatefulWidget {
   const _StudioInputBar({required this.state});
 
@@ -357,6 +594,10 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
     final isBusy = widget.state.isBusy;
     final canSend = !isBusy && _controller.text.trim().isNotEmpty;
 
+    final isComfy = widget.state.backendId == kBackendComfyUI;
+    final loras = widget.state.availableLoras;
+    final selectedLora = widget.state.selectedLora;
+
     return Container(
       decoration: const BoxDecoration(
         color: AppTheme.background,
@@ -365,7 +606,21 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: SafeArea(
         top: false,
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (isComfy && loras.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: _LoraChip(
+                  loras: loras,
+                  selected: selectedLora,
+                  onChanged: (v) =>
+                      ref.read(imageStudioProvider.notifier).setLora(v),
+                ),
+              ),
+            Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Expanded(
@@ -429,6 +684,8 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                       ),
                       onPressed: canSend ? _send : null,
                     ),
+            ),
+          ],
             ),
           ],
         ),

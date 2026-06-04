@@ -4,4 +4,6 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Allow cleartext HTTP for local testing (e.g. spark-99bb:8188) -->
+    <application android:usesCleartextTraffic="true" />
 </manifest>
