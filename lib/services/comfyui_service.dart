@@ -30,8 +30,8 @@ import 'image_backend.dart';
 class ComfyUIService implements ImageBackend {
   ComfyUIService();
 
-  static const _baseUrl = 'https://comfyui.ol1n.com';
-  static const _wsUrl = 'wss://comfyui.ol1n.com/ws';
+  static const _baseUrl = 'http://192.168.88.66:8188';
+  static const _wsUrl = 'ws://192.168.88.66:8188/ws';
   static const _cfId = String.fromEnvironment('CF_ACCESS_CLIENT_ID');
   static const _cfSecret = String.fromEnvironment('CF_ACCESS_CLIENT_SECRET');
 
@@ -63,12 +63,7 @@ class ComfyUIService implements ImageBackend {
 
   // ── Auth headers ────────────────────────────────────────────
   Map<String, String> get _authHeaders {
-    if (_cfId.isEmpty || _cfSecret.isEmpty) {
-      throw Exception(
-        'CF Access credentials not configured. '
-        'Build with --dart-define=CF_ACCESS_CLIENT_ID=... --dart-define=CF_ACCESS_CLIENT_SECRET=...',
-      );
-    }
+    if (_cfId.isEmpty || _cfSecret.isEmpty) return const {};
     return {
       'CF-Access-Client-Id': _cfId,
       'CF-Access-Client-Secret': _cfSecret,

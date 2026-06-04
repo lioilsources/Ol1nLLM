@@ -3,7 +3,7 @@
     "class_type": "UNETLoader",
     "_meta": { "title": "Load FLUX UNET" },
     "inputs": {
-      "unet_name": "flux1-dev.safetensors",
+      "unet_name": "flux1-dev-kontext_fp8_scaled.safetensors",
       "weight_dtype": "fp8_e4m3fn"
     }
   },
@@ -23,9 +23,9 @@
   },
   "13": {
     "class_type": "LoraLoader",
-    "_meta": { "title": "Manga LoRA" },
+    "_meta": { "title": "NSFW LoRA" },
     "inputs": {
-      "lora_name": "manga_flux_lora.safetensors",
+      "lora_name": "sldr_flux_nsfw_v2-studio.safetensors",
       "strength_model": 0.9,
       "strength_clip": 0.9,
       "model": ["10", 0],
