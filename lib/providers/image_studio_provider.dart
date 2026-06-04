@@ -28,6 +28,12 @@ class ImageStudioState {
   /// Active image backend id (kBackendDiffusers | kBackendComfyUI).
   final String backendId;
 
+  /// LoRAs available on the ComfyUI server (empty when Diffusers is active).
+  final List<String> availableLoras;
+
+  /// Currently selected LoRA name, or null for no LoRA.
+  final String? selectedLora;
+
   /// Last error surfaced to the user (for a one-shot snackbar).
   final String? error;
 
@@ -36,6 +42,8 @@ class ImageStudioState {
     this.currentNodeId,
     this.selectedImageId,
     this.backendId = kBackendDiffusers,
+    this.availableLoras = const [],
+    this.selectedLora,
     this.error,
   });
 
@@ -69,6 +77,9 @@ class ImageStudioState {
     String? selectedImageId,
     bool clearSelected = false,
     String? backendId,
+    List<String>? availableLoras,
+    String? selectedLora,
+    bool clearLora = false,
     String? error,
     bool clearError = false,
   }) =>
@@ -78,12 +89,17 @@ class ImageStudioState {
         selectedImageId:
             clearSelected ? null : (selectedImageId ?? this.selectedImageId),
         backendId: backendId ?? this.backendId,
+        availableLoras: availableLoras ?? this.availableLoras,
+        selectedLora: clearLora ? null : (selectedLora ?? this.selectedLora),
         error: clearError ? null : (error ?? this.error),
       );
 }
 
 class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
-  ImageStudioNotifier() : super(const ImageStudioState());
+  ImageStudioNotifier() : super(const ImageStudioState()) {
+    // Pre-load LoRAs so they're ready before the user switches to ComfyUI.
+    _loadLoras();
+  }
 
   final DiffusersBackend _diffusers = DiffusersBackend();
   final ComfyUIService _comfyui = ComfyUIService();
@@ -117,6 +133,20 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
   void setBackend(String backendId) {
     if (state.isBusy || backendId == state.backendId) return;
     state = state.copyWith(backendId: backendId, clearSelected: true);
+    if (backendId == kBackendComfyUI) _loadLoras();
+  }
+
+  void setLora(String? loraName) {
+    _comfyui.setLora(loraName);
+    state = state.copyWith(
+      selectedLora: loraName,
+      clearLora: loraName == null,
+    );
+  }
+
+  Future<void> _loadLoras() async {
+    final loras = await _comfyui.fetchLoras();
+    state = state.copyWith(availableLoras: loras);
   }
 
   /// Round 1: [kVariantCount] text→image candidates from [prompt].

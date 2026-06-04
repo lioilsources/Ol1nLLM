@@ -30,8 +30,8 @@ import 'image_backend.dart';
 class ComfyUIService implements ImageBackend {
   ComfyUIService();
 
-  static const _baseUrl = 'http://192.168.88.66:8188';
-  static const _wsUrl = 'ws://192.168.88.66:8188/ws';
+  static const _baseUrl = 'https://comfyui.ol1n.com';
+  static const _wsUrl = 'wss://comfyui.ol1n.com/ws';
   static const _cfId = String.fromEnvironment('CF_ACCESS_CLIENT_ID');
   static const _cfSecret = String.fromEnvironment('CF_ACCESS_CLIENT_SECRET');
 
@@ -48,6 +48,28 @@ class ComfyUIService implements ImageBackend {
   final http.Client _client = _makeClient();
   final Map<String, Map<String, dynamic>> _templateCache = {};
 
+  String? _activeLora;
+
+  void setLora(String? loraName) => _activeLora = loraName;
+
+  Future<List<String>> fetchLoras() async {
+    try {
+      final resp = await _client
+          .get(Uri.parse('$_baseUrl/object_info/LoraLoader'),
+              headers: _authHeaders)
+          .timeout(_pollTimeout);
+      if (resp.statusCode != 200) return const [];
+      final json = jsonDecode(resp.body) as Map<String, dynamic>;
+      final names = ((json['LoraLoader']?['input']?['required']?['lora_name']
+              as List?)
+          ?.first as List?)
+          ?.cast<String>();
+      return names ?? const [];
+    } catch (_) {
+      return const [];
+    }
+  }
+
   static http.Client _makeClient() {
     try {
       if (Platform.isAndroid) return CronetClient.defaultCronetEngine();
@@ -63,7 +85,12 @@ class ComfyUIService implements ImageBackend {
 
   // ── Auth headers ────────────────────────────────────────────
   Map<String, String> get _authHeaders {
-    if (_cfId.isEmpty || _cfSecret.isEmpty) return const {};
+    if (_cfId.isEmpty || _cfSecret.isEmpty) {
+      throw Exception(
+        'CF Access credentials not configured. '
+        'Build with --dart-define=CF_ACCESS_CLIENT_ID=... --dart-define=CF_ACCESS_CLIENT_SECRET=...',
+      );
+    }
     return {
       'CF-Access-Client-Id': _cfId,
       'CF-Access-Client-Secret': _cfSecret,
@@ -400,6 +427,42 @@ class ComfyUIService implements ImageBackend {
   }) {
     final wf = jsonDecode(jsonEncode(template)) as Map<String, dynamic>;
     final seed = Random().nextInt(1 << 31);
+    final lora = _activeLora;
+
+    // Inject a LoraLoader (node "13") and re-route model/clip references when
+    // a LoRA is selected. The base templates wire directly from 10 (UNET) and
+    // 11 (CLIP); with LoRA we insert 13 in between.
+    if (lora != null) {
+      wf['13'] = {
+        'class_type': 'LoraLoader',
+        '_meta': {'title': 'LoRA: $lora'},
+        'inputs': {
+          'lora_name': lora,
+          'strength_model': 0.9,
+          'strength_clip': 0.9,
+          'model': ['10', 0],
+          'clip': ['11', 0],
+        },
+      };
+      // Redirect all ["10", 0] → ["13", 0]  (model)
+      //           and ["11", 0] → ["13", 1]  (clip)
+      for (final entry in wf.values) {
+        final inputs =
+            ((entry as Map).cast<String, dynamic>()['inputs'] as Map?)
+                ?.cast<String, dynamic>();
+        if (inputs == null) continue;
+        for (final k in inputs.keys.toList()) {
+          final v = inputs[k];
+          if (v is List && v.length == 2) {
+            if (v[0] == '10' && v[1] == 0) inputs[k] = ['13', 0];
+            if (v[0] == '11' && v[1] == 0) inputs[k] = ['13', 1];
+          }
+        }
+      }
+      // Keep LoraLoader's own inputs pointing at the original loaders.
+      (wf['13']!['inputs'] as Map)['model'] = ['10', 0];
+      (wf['13']!['inputs'] as Map)['clip'] = ['11', 0];
+    }
 
     for (final entry in wf.values) {
       final node = (entry as Map).cast<String, dynamic>();

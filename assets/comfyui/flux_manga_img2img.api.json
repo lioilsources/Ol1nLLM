@@ -21,23 +21,12 @@
     "_meta": { "title": "Load FLUX VAE" },
     "inputs": { "vae_name": "ae.safetensors" }
   },
-  "13": {
-    "class_type": "LoraLoader",
-    "_meta": { "title": "NSFW LoRA" },
-    "inputs": {
-      "lora_name": "sldr_flux_nsfw_v2-studio.safetensors",
-      "strength_model": 0.9,
-      "strength_clip": 0.9,
-      "model": ["10", 0],
-      "clip": ["11", 0]
-    }
-  },
   "14": {
     "class_type": "CLIPTextEncode",
     "_meta": { "title": "Edit instruction (positive)" },
     "inputs": {
       "text": "__PROMPT__",
-      "clip": ["13", 1]
+      "clip": ["11", 0]
     }
   },
   "15": {
@@ -45,7 +34,7 @@
     "_meta": { "title": "Negative (unused on FLUX, kept for CFG=1)" },
     "inputs": {
       "text": "",
-      "clip": ["13", 1]
+      "clip": ["11", 0]
     }
   },
   "16": {
@@ -90,7 +79,7 @@
       "sampler_name": "euler",
       "scheduler": "simple",
       "denoise": 0.72,
-      "model": ["13", 0],
+      "model": ["10", 0],
       "positive": ["16", 0],
       "negative": ["15", 0],
       "latent_image": ["32", 0]

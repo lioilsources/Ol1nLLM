@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/theme.dart';
 import '../models/gen_node.dart';
 import '../providers/image_studio_provider.dart';
+import '../services/image_backend.dart' show kBackendComfyUI;
 
 /// Iterative image studio: generate 4 candidates from a prompt, pick one,
 /// describe a change, and get 4 refinements of it — repeat to converge.
@@ -409,6 +410,135 @@ class _ImageTile extends StatelessWidget {
   }
 }
 
+class _LoraChip extends StatelessWidget {
+  const _LoraChip({
+    required this.loras,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final List<String> loras;
+  final String? selected;
+  final ValueChanged<String?> onChanged;
+
+  String _display(String name) {
+    final s = name.replaceAll('.safetensors', '');
+    return s.length > 22 ? '${s.substring(0, 22)}…' : s;
+  }
+
+  void _pick(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                'Vybrat LoRA',
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: Icon(
+                selected == null
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_unchecked,
+                color: selected == null ? AppTheme.accent : AppTheme.textSecondary,
+                size: 20,
+              ),
+              title: const Text('Žádná LoRA',
+                  style: TextStyle(color: AppTheme.textPrimary)),
+              onTap: () {
+                onChanged(null);
+                Navigator.of(context).pop();
+              },
+            ),
+            const Divider(height: 1, color: Colors.white12),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: loras.length,
+                itemBuilder: (_, i) {
+                  final lora = loras[i];
+                  final isSel = lora == selected;
+                  return ListTile(
+                    leading: Icon(
+                      isSel
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                      color: isSel ? AppTheme.accent : AppTheme.textSecondary,
+                      size: 20,
+                    ),
+                    title: Text(
+                      lora.replaceAll('.safetensors', ''),
+                      style: TextStyle(
+                        color: isSel ? AppTheme.accent : AppTheme.textPrimary,
+                      ),
+                    ),
+                    onTap: () {
+                      onChanged(lora);
+                      Navigator.of(context).pop();
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _pick(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected != null ? AppTheme.accent.withValues(alpha: 0.15) : AppTheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected != null ? AppTheme.accent : Colors.white24,
+            width: 0.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.style_outlined,
+                size: 14,
+                color: selected != null ? AppTheme.accent : AppTheme.textSecondary),
+            const SizedBox(width: 5),
+            Text(
+              selected != null ? _display(selected!) : 'LoRA',
+              style: TextStyle(
+                fontSize: 12,
+                color: selected != null ? AppTheme.accent : AppTheme.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 3),
+            Icon(Icons.expand_more,
+                size: 14,
+                color: selected != null ? AppTheme.accent : AppTheme.textSecondary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _StudioInputBar extends ConsumerStatefulWidget {
   const _StudioInputBar({required this.state});
 
@@ -464,6 +594,10 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
     final isBusy = widget.state.isBusy;
     final canSend = !isBusy && _controller.text.trim().isNotEmpty;
 
+    final isComfy = widget.state.backendId == kBackendComfyUI;
+    final loras = widget.state.availableLoras;
+    final selectedLora = widget.state.selectedLora;
+
     return Container(
       decoration: const BoxDecoration(
         color: AppTheme.background,
@@ -472,7 +606,21 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: SafeArea(
         top: false,
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (isComfy && loras.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: _LoraChip(
+                  loras: loras,
+                  selected: selectedLora,
+                  onChanged: (v) =>
+                      ref.read(imageStudioProvider.notifier).setLora(v),
+                ),
+              ),
+            Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Expanded(
@@ -536,6 +684,8 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                       ),
                       onPressed: canSend ? _send : null,
                     ),
+            ),
+          ],
             ),
           ],
         ),
