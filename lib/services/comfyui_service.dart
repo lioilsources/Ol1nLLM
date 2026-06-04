@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform, WebSocket;
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:cronet_http/cronet_http.dart';
 import 'package:flutter/foundation.dart';
