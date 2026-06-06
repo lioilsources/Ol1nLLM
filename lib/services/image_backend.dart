@@ -1,10 +1,6 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
-import 'media_service.dart';
-
-/// Stable ids for the two image backends the studio can target.
-const kBackendDiffusers = 'diffusers';
+/// Stable id for the (only) image backend the studio targets.
 const kBackendComfyUI = 'comfyui';
 
 /// A single progress/result event from any image backend.
@@ -14,6 +10,14 @@ const kBackendComfyUI = 'comfyui';
 /// behind this small event vocabulary that the Image Studio provider consumes.
 sealed class GenEvent {
   const GenEvent();
+}
+
+/// The job has been accepted by the server and assigned an id. Emitted once,
+/// before any progress, so callers can persist it and resume later (e.g. after
+/// an app restart) via [ImageBackend.follow].
+class GenSubmitted extends GenEvent {
+  final String jobId;
+  const GenSubmitted(this.jobId);
 }
 
 /// Job is waiting in the server queue. [position] is 0-based (0 = next up).
@@ -70,76 +74,13 @@ abstract class ImageBackend {
     required int n,
   });
 
+  /// Re-attach to an already-submitted job (by the [GenSubmitted.jobId] a
+  /// previous [generate]/[edit] emitted) and stream it to completion. Used to
+  /// resume a job that outlived the app session.
+  Stream<GenEvent> follow(String jobId);
+
   /// Best-effort cancel of the in-flight job (server-side where supported).
   Future<void> interrupt() async {}
 
   void dispose();
-}
-
-/// The existing diffusers/FLUX + Qwen-Image-Edit service behind llm.ol1n.com,
-/// adapted to the unified [GenEvent] stream. Wraps [MediaService]'s
-/// submit → poll → download job model.
-class DiffusersBackend implements ImageBackend {
-  DiffusersBackend([MediaService? media]) : _media = media ?? MediaService();
-
-  final MediaService _media;
-
-  @override
-  String get id => kBackendDiffusers;
-
-  @override
-  String get label => 'Diffusers (FLUX)';
-
-  @override
-  Stream<GenEvent> generate({required String prompt, required int n}) async* {
-    final jobId = await _media.submitGeneration(prompt: prompt, n: n);
-    yield* _follow(jobId);
-  }
-
-  @override
-  Stream<GenEvent> edit({
-    required Uint8List image,
-    required String prompt,
-    required int n,
-  }) async* {
-    final jobId = await _media.submitEdit(
-      imageBase64: base64Encode(image),
-      prompt: prompt,
-      n: n,
-    );
-    yield* _follow(jobId);
-  }
-
-  Stream<GenEvent> _follow(String jobId) async* {
-    await for (final s in _media.pollJob(jobId)) {
-      switch (s) {
-        case JobQueued(:final position):
-          yield GenQueued(position);
-        case JobRunning(:final step, :final total):
-          yield GenRunning(step, total);
-        case JobDone(:final resultUrl, :final count):
-          final images = <Uint8List>[];
-          for (var i = 0; i < count; i++) {
-            yield GenDownloading(i, count);
-            images.add(await _media.downloadResult(resultUrl, index: i));
-          }
-          yield GenComplete(images);
-          return;
-        case JobFailed(:final message):
-          yield GenFailed(message);
-          return;
-        case JobExpired():
-          yield const GenFailed('Výsledek vypršel – zkus znovu');
-          return;
-      }
-    }
-  }
-
-  /// The diffusers job model has no server-side cancel; stopping consumption
-  /// of the poll stream (done by the provider) is the best we can do.
-  @override
-  Future<void> interrupt() async {}
-
-  @override
-  void dispose() => _media.dispose();
 }

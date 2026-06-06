@@ -7,6 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/conversation.dart';
 import '../models/message.dart';
+import '../services/comfyui_service.dart';
+import '../services/image_backend.dart';
 import '../services/media_service.dart';
 import '../services/nim_service.dart';
 import '../services/persona_service.dart';
@@ -58,9 +60,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
   static const _key = 'all';
 
   final NimService _service = NimService();
-  final MediaService _mediaService = MediaService();
+  final MediaService _mediaService = MediaService(); // OCR only
+  final ComfyUIService _comfyui = ComfyUIService(); // image generation/editing
   final PersonaService _personaService;
   StreamSubscription<ChatEvent>? _streamSub;
+  StreamSubscription<GenEvent>? _imageSub;
 
   ChatNotifier(this._personaService) : super(const ChatState()) {
     _load();
@@ -135,7 +139,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
 
     state = state.copyWith(isStreaming: true);
-    _pollAndUpdate(jobId, convId, placeholderId);
+    _consumeImageStream(_comfyui.follow(jobId), convId, placeholderId);
   }
 
   // ── Conversation management ───────────────────────────────────────────────
@@ -281,7 +285,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
         createdAt: DateTime.now(),
       ),
       titleSeed: text,
-      submitJob: () => _mediaService.submitGeneration(prompt: text),
+      run: () => _comfyui.generate(prompt: text, n: 1),
     );
   }
 
@@ -297,8 +301,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
         images: [imageBase64],
       ),
       titleSeed: text,
-      submitJob: () =>
-          _mediaService.submitEdit(imageBase64: imageBase64, prompt: text),
+      run: () => _comfyui.edit(
+        image: base64Decode(imageBase64),
+        prompt: text,
+        n: 1,
+      ),
     );
   }
 
@@ -328,11 +335,13 @@ class ChatNotifier extends StateNotifier<ChatState> {
     );
   }
 
-  /// Submit an image job then poll, updating the placeholder message in place.
+  /// Start an image job (ComfyUI) then stream it, updating the placeholder
+  /// message in place. The server-assigned id is persisted on [GenSubmitted] so
+  /// the job can be resumed after an app restart.
   Future<void> _runMediaAsync({
     required Message userMsg,
     required String titleSeed,
-    required Future<String> Function() submitJob,
+    required Stream<GenEvent> Function() run,
   }) async {
     var conv = state.active;
     if (conv == null) {
@@ -367,59 +376,56 @@ class ChatNotifier extends StateNotifier<ChatState> {
     );
     await _save();
 
-    String jobId;
-    try {
-      jobId = await submitJob();
-    } catch (e) {
-      debugPrint('media submit error: $e');
-      _removePlaceholder(conv.id, placeholderId);
-      state = state.copyWith(isStreaming: false, error: _errorMessage(e));
-      return;
-    }
-
-    await _persistJob(
-      jobId: jobId,
-      convId: conv.id,
-      placeholderId: placeholderId,
-    );
-
-    _pollAndUpdate(jobId, conv.id, placeholderId);
+    _consumeImageStream(run(), conv.id, placeholderId);
   }
 
-  void _pollAndUpdate(String jobId, String convId, String placeholderId) {
-    _mediaService.pollJob(jobId).listen(
-      (status) {
-        switch (status) {
-          case JobQueued(:final position):
-            final text =
-                position > 0 ? '⏳ Ve frontě – pozice $position' : '⚙️ Spouštím…';
+  /// Consume a backend [GenEvent] stream to its terminal event, updating the
+  /// placeholder in place. Shared by fresh jobs and resumed ([_resumePendingJob])
+  /// ones.
+  void _consumeImageStream(
+    Stream<GenEvent> stream,
+    String convId,
+    String placeholderId,
+  ) {
+    _imageSub?.cancel();
+    _imageSub = stream.listen(
+      (event) {
+        switch (event) {
+          case GenSubmitted(:final jobId):
+            unawaited(_persistJob(
+              jobId: jobId,
+              convId: convId,
+              placeholderId: placeholderId,
+            ));
+          case GenQueued(:final position):
+            final text = position > 0
+                ? '⏳ Ve frontě – pozice $position'
+                : '⚙️ Spouštím…';
             _updatePlaceholder(convId, placeholderId, text);
-          case JobRunning(:final step, :final total):
-            final text =
-                step == 0 ? '⚙️ Spouštím…' : '⚙️ Generuji krok $step/$total';
+          case GenRunning(:final fraction):
+            final text = fraction == null
+                ? '⚙️ Generuji…'
+                : '⚙️ Generuji ${(fraction * 100).round()} %';
             _updatePlaceholder(convId, placeholderId, text);
-          case JobDone(:final resultUrl, :final count):
+          case GenDownloading(:final done, :final total):
+            _updatePlaceholder(
+                convId, placeholderId, '⬇️ Stahování ${done + 1}/$total');
+          case GenComplete(:final images):
             _clearPendingJob();
-            _downloadAndFinish(convId, placeholderId, resultUrl, count);
-          case JobFailed(:final message):
+            _finishImages(convId, placeholderId, images);
+          case GenFailed(:final message):
             _clearPendingJob();
             _removePlaceholder(convId, placeholderId);
             state = state.copyWith(isStreaming: false, error: message);
-          case JobExpired():
-            _clearPendingJob();
-            _removePlaceholder(convId, placeholderId);
-            state = state.copyWith(
-              isStreaming: false,
-              error: 'Výsledek vypršel – zkus vygenerovat znovu',
-            );
         }
       },
       onError: (e) {
-        debugPrint('poll error: $e');
+        debugPrint('image gen error: $e');
         _clearPendingJob();
         _removePlaceholder(convId, placeholderId);
         state = state.copyWith(isStreaming: false, error: _errorMessage(e));
       },
+      cancelOnError: true,
     );
   }
 
@@ -434,38 +440,24 @@ class ChatNotifier extends StateNotifier<ChatState> {
     ));
   }
 
-  Future<void> _downloadAndFinish(
+  void _finishImages(
     String convId,
     String placeholderId,
-    String resultUrl,
-    int count,
-  ) async {
-    try {
-      final images = <String>[];
-      for (var i = 0; i < count; i++) {
-        final bytes =
-            await _mediaService.downloadResult(resultUrl, index: i);
-        images.add(base64Encode(bytes));
-      }
-      _replacePlaceholder(
-        convId,
-        placeholderId,
-        Message(
-          id: _uuid.v4(),
-          role: MessageRole.assistant,
-          content: '',
-          createdAt: DateTime.now(),
-          images: images,
-        ),
-      );
-    } catch (e) {
-      debugPrint('result download error: $e');
-      _removePlaceholder(convId, placeholderId);
-      state = state.copyWith(error: _errorMessage(e));
-    } finally {
-      state = state.copyWith(isStreaming: false);
-      await _save();
-    }
+    List<Uint8List> images,
+  ) {
+    _replacePlaceholder(
+      convId,
+      placeholderId,
+      Message(
+        id: _uuid.v4(),
+        role: MessageRole.assistant,
+        content: '',
+        createdAt: DateTime.now(),
+        images: [for (final bytes in images) base64Encode(bytes)],
+      ),
+    );
+    state = state.copyWith(isStreaming: false);
+    unawaited(_save());
   }
 
   void _replacePlaceholder(
@@ -580,8 +572,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
   @override
   void dispose() {
     _cancelStream();
+    _imageSub?.cancel();
     _service.dispose();
     _mediaService.dispose();
+    _comfyui.dispose();
     super.dispose();
   }
 }

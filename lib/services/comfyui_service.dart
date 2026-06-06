@@ -119,9 +119,17 @@ class ComfyUIService implements ImageBackend {
     yield* _run(wf);
   }
 
+  @override
+  Stream<GenEvent> follow(String jobId) => _run(null, promptId: jobId);
+
   // ── Orchestration: enqueue → progress (WS|poll) → download ───
-  Stream<GenEvent> _run(Map<String, dynamic> workflow) async* {
-    final promptId = await _queuePrompt(workflow);
+  //
+  // When [workflow] is null, [promptId] must be supplied — we re-attach to an
+  // already-queued job (resume) instead of enqueueing a new one.
+  Stream<GenEvent> _run(Map<String, dynamic>? workflow,
+      {String? promptId}) async* {
+    promptId ??= await _queuePrompt(workflow!);
+    yield GenSubmitted(promptId);
     yield const GenQueued(0);
 
     // Prefer the websocket for true per-step progress; fall back to polling

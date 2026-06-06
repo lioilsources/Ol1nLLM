@@ -25,10 +25,11 @@ class ImageStudioState {
   /// Image selected within the current node — the base for the next refine.
   final String? selectedImageId;
 
-  /// Active image backend id (kBackendDiffusers | kBackendComfyUI).
+  /// Active image backend id (always kBackendComfyUI — kept for forward
+  /// compatibility if more backends return later).
   final String backendId;
 
-  /// LoRAs available on the ComfyUI server (empty when Diffusers is active).
+  /// LoRAs available on the ComfyUI server.
   final List<String> availableLoras;
 
   /// Currently selected LoRA name, or null for no LoRA.
@@ -41,7 +42,7 @@ class ImageStudioState {
     this.nodes = const [],
     this.currentNodeId,
     this.selectedImageId,
-    this.backendId = kBackendDiffusers,
+    this.backendId = kBackendComfyUI,
     this.availableLoras = const [],
     this.selectedLora,
     this.error,
@@ -97,22 +98,17 @@ class ImageStudioState {
 
 class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
   ImageStudioNotifier() : super(const ImageStudioState()) {
-    // Pre-load LoRAs so they're ready before the user switches to ComfyUI.
+    // Pre-load LoRAs so they're ready when the studio opens.
     _loadLoras();
   }
 
-  final DiffusersBackend _diffusers = DiffusersBackend();
   final ComfyUIService _comfyui = ComfyUIService();
 
   StreamSubscription<GenEvent>? _activeSub;
   String? _activeNodeId;
   Completer<void>? _activeCompleter;
 
-  ImageBackend get _backend =>
-      state.backendId == kBackendComfyUI ? _comfyui : _diffusers;
-
-  /// The backends the user can switch between, for the UI picker.
-  List<ImageBackend> get backends => [_diffusers, _comfyui];
+  ImageBackend get _backend => _comfyui;
 
   void selectImage(String imageId) =>
       state = state.copyWith(selectedImageId: imageId);
@@ -128,13 +124,6 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
   }
 
   void clearError() => state = state.copyWith(clearError: true);
-
-  /// Switch image backend (ignored while a job is in flight).
-  void setBackend(String backendId) {
-    if (state.isBusy || backendId == state.backendId) return;
-    state = state.copyWith(backendId: backendId, clearSelected: true);
-    if (backendId == kBackendComfyUI) _loadLoras();
-  }
 
   void setLora(String? loraName) {
     _comfyui.setLora(loraName);
@@ -277,6 +266,10 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
     _activeSub = run().listen(
       (event) {
         switch (event) {
+          case GenSubmitted():
+            // The studio runs jobs only while open; no cross-session resume,
+            // so the server-assigned id isn't persisted here.
+            break;
           case GenQueued(:final position):
             _patch(
               nodeId,
@@ -372,7 +365,6 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
   @override
   void dispose() {
     _activeSub?.cancel();
-    _diffusers.dispose();
     _comfyui.dispose();
     super.dispose();
   }

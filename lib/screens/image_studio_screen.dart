@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/theme.dart';
 import '../models/gen_node.dart';
 import '../providers/image_studio_provider.dart';
-import '../services/image_backend.dart' show kBackendComfyUI;
 
 /// Iterative image studio: generate 4 candidates from a prompt, pick one,
 /// describe a change, and get 4 refinements of it — repeat to converge.
@@ -35,7 +34,6 @@ class ImageStudioScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Image Studio'),
         actions: [
-          _BackendMenu(state: state),
           if (state.isBusy)
             IconButton(
               icon: const Icon(Icons.stop_circle_outlined),
@@ -86,64 +84,6 @@ class _EmptyHint extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(color: AppTheme.textSecondary, height: 1.5),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// AppBar picker to switch between the diffusers and ComfyUI backends.
-class _BackendMenu extends ConsumerWidget {
-  const _BackendMenu({required this.state});
-
-  final ImageStudioState state;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final notifier = ref.read(imageStudioProvider.notifier);
-    final backends = notifier.backends;
-    final current = backends.firstWhere((b) => b.id == state.backendId,
-        orElse: () => backends.first);
-
-    return PopupMenuButton<String>(
-      enabled: !state.isBusy,
-      tooltip: 'Backend pro generování',
-      onSelected: notifier.setBackend,
-      itemBuilder: (context) => [
-        for (final b in backends)
-          PopupMenuItem<String>(
-            value: b.id,
-            child: Row(
-              children: [
-                Icon(
-                  b.id == state.backendId
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_unchecked,
-                  size: 18,
-                  color: b.id == state.backendId
-                      ? AppTheme.accent
-                      : AppTheme.textSecondary,
-                ),
-                const SizedBox(width: 10),
-                Text(b.label),
-              ],
-            ),
-          ),
-      ],
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          children: [
-            const Icon(Icons.tune, size: 18, color: AppTheme.textSecondary),
-            const SizedBox(width: 6),
-            Text(
-              current.label,
-              style: const TextStyle(
-                  color: AppTheme.textSecondary, fontSize: 13),
-            ),
-            const Icon(Icons.arrow_drop_down,
-                size: 18, color: AppTheme.textSecondary),
           ],
         ),
       ),
@@ -594,7 +534,6 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
     final isBusy = widget.state.isBusy;
     final canSend = !isBusy && _controller.text.trim().isNotEmpty;
 
-    final isComfy = widget.state.backendId == kBackendComfyUI;
     final loras = widget.state.availableLoras;
     final selectedLora = widget.state.selectedLora;
 
@@ -610,7 +549,7 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (isComfy && loras.isNotEmpty)
+            if (loras.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: _LoraChip(
