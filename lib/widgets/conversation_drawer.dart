@@ -12,8 +12,9 @@ class ConversationDrawer extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(chatProvider);
     final notifier = ref.read(chatProvider.notifier);
-    final personas =
-        ref.watch(personaListProvider).maybeWhen(data: (l) => l, orElse: () => const <Persona>[]);
+    final personas = ref
+        .watch(personaListProvider)
+        .maybeWhen(data: (l) => l, orElse: () => const <Persona>[]);
 
     String? emojiFor(String? id) {
       if (id == null) return null;
@@ -66,16 +67,22 @@ class ConversationDrawer extends ConsumerWidget {
                             alignment: Alignment.centerRight,
                             padding: const EdgeInsets.only(right: 16),
                             color: Colors.red.shade900,
-                            child: const Icon(Icons.delete, color: Colors.white),
+                            child: const Icon(
+                              Icons.delete,
+                              color: Colors.white,
+                            ),
                           ),
-                          onDismissed: (_) => notifier.deleteConversation(conv.id),
+                          onDismissed: (_) =>
+                              notifier.deleteConversation(conv.id),
                           child: ListTile(
                             selected: isActive,
                             selectedTileColor: Colors.white10,
                             leading: emoji == null
                                 ? null
-                                : Text(emoji,
-                                    style: const TextStyle(fontSize: 20)),
+                                : Text(
+                                    emoji,
+                                    style: const TextStyle(fontSize: 20),
+                                  ),
                             title: Text(
                               conv.title,
                               maxLines: 1,

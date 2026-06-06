@@ -19,12 +19,12 @@ class Conversation {
   });
 
   factory Conversation.create({String? personaId}) => Conversation(
-        id: _uuid.v4(),
-        title: 'New conversation',
-        messages: const [],
-        updatedAt: DateTime.now(),
-        personaId: personaId,
-      );
+    id: _uuid.v4(),
+    title: 'New conversation',
+    messages: const [],
+    updatedAt: DateTime.now(),
+    personaId: personaId,
+  );
 
   Conversation copyWith({
     String? title,
@@ -32,30 +32,29 @@ class Conversation {
     DateTime? updatedAt,
     String? personaId,
     bool clearPersona = false,
-  }) =>
-      Conversation(
-        id: id,
-        title: title ?? this.title,
-        messages: messages ?? this.messages,
-        updatedAt: updatedAt ?? this.updatedAt,
-        personaId: clearPersona ? null : (personaId ?? this.personaId),
-      );
+  }) => Conversation(
+    id: id,
+    title: title ?? this.title,
+    messages: messages ?? this.messages,
+    updatedAt: updatedAt ?? this.updatedAt,
+    personaId: clearPersona ? null : (personaId ?? this.personaId),
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        'messages': messages.map((m) => m.toJson()).toList(),
-        'updatedAt': updatedAt.toIso8601String(),
-        if (personaId != null) 'personaId': personaId,
-      };
+    'id': id,
+    'title': title,
+    'messages': messages.map((m) => m.toJson()).toList(),
+    'updatedAt': updatedAt.toIso8601String(),
+    if (personaId != null) 'personaId': personaId,
+  };
 
   factory Conversation.fromJson(Map<String, dynamic> json) => Conversation(
-        id: json['id'] as String,
-        title: json['title'] as String,
-        messages: (json['messages'] as List)
-            .map((e) => Message.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        updatedAt: DateTime.parse(json['updatedAt'] as String),
-        personaId: json['personaId'] as String?,
-      );
+    id: json['id'] as String,
+    title: json['title'] as String,
+    messages: (json['messages'] as List)
+        .map((e) => Message.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    updatedAt: DateTime.parse(json['updatedAt'] as String),
+    personaId: json['personaId'] as String?,
+  );
 }

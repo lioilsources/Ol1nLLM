@@ -16,31 +16,31 @@ class Message {
   });
 
   Message copyWith({String? content, List<String>? images}) => Message(
-        id: id,
-        role: role,
-        content: content ?? this.content,
-        createdAt: createdAt,
-        images: images ?? this.images,
-      );
+    id: id,
+    role: role,
+    content: content ?? this.content,
+    createdAt: createdAt,
+    images: images ?? this.images,
+  );
 
   Map<String, dynamic> toOllamaJson() => {
-        'role': role.name,
-        'content': content,
-      };
+    'role': role.name,
+    'content': content,
+  };
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'role': role.name,
-        'content': content,
-        'createdAt': createdAt.toIso8601String(),
-        if (images.isNotEmpty) 'images': images,
-      };
+    'id': id,
+    'role': role.name,
+    'content': content,
+    'createdAt': createdAt.toIso8601String(),
+    if (images.isNotEmpty) 'images': images,
+  };
 
   factory Message.fromJson(Map<String, dynamic> json) => Message(
-        id: json['id'] as String,
-        role: MessageRole.values.byName(json['role'] as String),
-        content: json['content'] as String,
-        createdAt: DateTime.parse(json['createdAt'] as String),
-        images: (json['images'] as List?)?.cast<String>() ?? [],
-      );
+    id: json['id'] as String,
+    role: MessageRole.values.byName(json['role'] as String),
+    content: json['content'] as String,
+    createdAt: DateTime.parse(json['createdAt'] as String),
+    images: (json['images'] as List?)?.cast<String>() ?? [],
+  );
 }

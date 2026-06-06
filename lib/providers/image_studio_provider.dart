@@ -9,8 +9,8 @@ import '../services/image_backend.dart';
 
 final imageStudioProvider =
     StateNotifierProvider<ImageStudioNotifier, ImageStudioState>(
-  (ref) => ImageStudioNotifier(),
-);
+      (ref) => ImageStudioNotifier(),
+    );
 
 /// How many candidates each round produces.
 const kVariantCount = 4;
@@ -25,10 +25,11 @@ class ImageStudioState {
   /// Image selected within the current node — the base for the next refine.
   final String? selectedImageId;
 
-  /// Active image backend id (kBackendDiffusers | kBackendComfyUI).
+  /// Active image backend id (always kBackendComfyUI — kept for forward
+  /// compatibility if more backends return later).
   final String backendId;
 
-  /// LoRAs available on the ComfyUI server (empty when Diffusers is active).
+  /// LoRAs available on the ComfyUI server.
   final List<String> availableLoras;
 
   /// Currently selected LoRA name, or null for no LoRA.
@@ -41,7 +42,7 @@ class ImageStudioState {
     this.nodes = const [],
     this.currentNodeId,
     this.selectedImageId,
-    this.backendId = kBackendDiffusers,
+    this.backendId = kBackendComfyUI,
     this.availableLoras = const [],
     this.selectedLora,
     this.error,
@@ -82,37 +83,32 @@ class ImageStudioState {
     bool clearLora = false,
     String? error,
     bool clearError = false,
-  }) =>
-      ImageStudioState(
-        nodes: nodes ?? this.nodes,
-        currentNodeId: currentNodeId ?? this.currentNodeId,
-        selectedImageId:
-            clearSelected ? null : (selectedImageId ?? this.selectedImageId),
-        backendId: backendId ?? this.backendId,
-        availableLoras: availableLoras ?? this.availableLoras,
-        selectedLora: clearLora ? null : (selectedLora ?? this.selectedLora),
-        error: clearError ? null : (error ?? this.error),
-      );
+  }) => ImageStudioState(
+    nodes: nodes ?? this.nodes,
+    currentNodeId: currentNodeId ?? this.currentNodeId,
+    selectedImageId: clearSelected
+        ? null
+        : (selectedImageId ?? this.selectedImageId),
+    backendId: backendId ?? this.backendId,
+    availableLoras: availableLoras ?? this.availableLoras,
+    selectedLora: clearLora ? null : (selectedLora ?? this.selectedLora),
+    error: clearError ? null : (error ?? this.error),
+  );
 }
 
 class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
   ImageStudioNotifier() : super(const ImageStudioState()) {
-    // Pre-load LoRAs so they're ready before the user switches to ComfyUI.
+    // Pre-load LoRAs so they're ready when the studio opens.
     _loadLoras();
   }
 
-  final DiffusersBackend _diffusers = DiffusersBackend();
   final ComfyUIService _comfyui = ComfyUIService();
 
   StreamSubscription<GenEvent>? _activeSub;
   String? _activeNodeId;
   Completer<void>? _activeCompleter;
 
-  ImageBackend get _backend =>
-      state.backendId == kBackendComfyUI ? _comfyui : _diffusers;
-
-  /// The backends the user can switch between, for the UI picker.
-  List<ImageBackend> get backends => [_diffusers, _comfyui];
+  ImageBackend get _backend => _comfyui;
 
   void selectImage(String imageId) =>
       state = state.copyWith(selectedImageId: imageId);
@@ -129,19 +125,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
 
   void clearError() => state = state.copyWith(clearError: true);
 
-  /// Switch image backend (ignored while a job is in flight).
-  void setBackend(String backendId) {
-    if (state.isBusy || backendId == state.backendId) return;
-    state = state.copyWith(backendId: backendId, clearSelected: true);
-    if (backendId == kBackendComfyUI) _loadLoras();
-  }
-
   void setLora(String? loraName) {
     _comfyui.setLora(loraName);
-    state = state.copyWith(
-      selectedLora: loraName,
-      clearLora: loraName == null,
-    );
+    state = state.copyWith(selectedLora: loraName, clearLora: loraName == null);
   }
 
   Future<void> _loadLoras() async {
@@ -198,7 +184,11 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
     if (node == null || node.status == GenStatus.generating) return;
     _patch(
       nodeId,
-      (n) => n.copyWith(status: GenStatus.generating, clearError: true, clearProgress: true),
+      (n) => n.copyWith(
+        status: GenStatus.generating,
+        clearError: true,
+        clearProgress: true,
+      ),
     );
     if (node.isRoot) {
       await _runAsync(
@@ -208,8 +198,11 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
     } else {
       final base = _imageById(node.sourceImageId);
       if (base == null) {
-        _patch(nodeId,
-            (n) => n.copyWith(status: GenStatus.error, error: 'Source image gone'));
+        _patch(
+          nodeId,
+          (n) =>
+              n.copyWith(status: GenStatus.error, error: 'Source image gone'),
+        );
         return;
       }
       await _runAsync(
@@ -252,10 +245,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
 
   /// Consume a backend [GenEvent] stream, updating [nodeId] in place until a
   /// terminal event. Stored as the active subscription so [cancel] can stop it.
-  Future<void> _runAsync(
-    String nodeId,
-    Stream<GenEvent> Function() run,
-  ) async {
+  Future<void> _runAsync(String nodeId, Stream<GenEvent> Function() run) async {
     await _activeSub?.cancel();
     _activeNodeId = nodeId;
     final completer = Completer<void>();
@@ -269,7 +259,10 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
       _patch(
         nodeId,
         (n) => n.copyWith(
-            status: GenStatus.error, error: msg, clearProgress: true),
+          status: GenStatus.error,
+          error: msg,
+          clearProgress: true,
+        ),
       );
       state = state.copyWith(error: msg);
     }
@@ -277,13 +270,18 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
     _activeSub = run().listen(
       (event) {
         switch (event) {
+          case GenSubmitted():
+            // The studio runs jobs only while open; no cross-session resume,
+            // so the server-assigned id isn't persisted here.
+            break;
           case GenQueued(:final position):
             _patch(
               nodeId,
               (n) => n.copyWith(
                 clearProgress: true,
-                progressLabel:
-                    position > 0 ? 'Ve frontě: $position' : 'Ve frontě…',
+                progressLabel: position > 0
+                    ? 'Ve frontě: $position'
+                    : 'Ve frontě…',
               ),
             );
           case GenRunning(:final fraction):
@@ -372,7 +370,6 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
   @override
   void dispose() {
     _activeSub?.cancel();
-    _diffusers.dispose();
     _comfyui.dispose();
     super.dispose();
   }

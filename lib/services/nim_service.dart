@@ -81,18 +81,22 @@ class NimService {
     if (response.statusCode != 200) {
       final body = await response.stream.bytesToString();
       final diagHeaders = response.headers.entries
-          .where((e) => const {
-                'server',
-                'cf-ray',
-                'x-powered-by',
-                'content-type',
-              }.contains(e.key.toLowerCase()))
+          .where(
+            (e) => const {
+              'server',
+              'cf-ray',
+              'x-powered-by',
+              'content-type',
+            }.contains(e.key.toLowerCase()),
+          )
           .map((e) => '${e.key}: ${e.value}')
           .join(', ');
-      final bodySnippet =
-          body.isNotEmpty ? body.replaceAll(RegExp(r'\s+'), ' ').trim() : '';
-      final truncated =
-          bodySnippet.length > 120 ? '${bodySnippet.substring(0, 120)}…' : bodySnippet;
+      final bodySnippet = body.isNotEmpty
+          ? body.replaceAll(RegExp(r'\s+'), ' ').trim()
+          : '';
+      final truncated = bodySnippet.length > 120
+          ? '${bodySnippet.substring(0, 120)}…'
+          : bodySnippet;
       throw Exception(
         'HTTP ${response.statusCode}'
         '${truncated.isNotEmpty ? ": $truncated" : ""}'

@@ -41,7 +41,9 @@ class PersonaService {
   }
 }
 
-final personaServiceProvider = Provider<PersonaService>((_) => PersonaService());
+final personaServiceProvider = Provider<PersonaService>(
+  (_) => PersonaService(),
+);
 
 final personaListProvider = FutureProvider<List<Persona>>((ref) async {
   return ref.read(personaServiceProvider).list();

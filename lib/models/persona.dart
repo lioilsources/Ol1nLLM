@@ -14,10 +14,10 @@ class Persona {
   });
 
   factory Persona.fromJson(Map<String, dynamic> json) => Persona(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        emoji: json['emoji'] as String,
-        description: json['description'] as String,
-        file: json['file'] as String,
-      );
+    id: json['id'] as String,
+    name: json['name'] as String,
+    emoji: json['emoji'] as String,
+    description: json['description'] as String,
+    file: json['file'] as String,
+  );
 }

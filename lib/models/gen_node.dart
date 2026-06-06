@@ -12,8 +12,7 @@ class GenImage {
 
   const GenImage({required this.id, required this.b64});
 
-  factory GenImage.fromB64(String b64) =>
-      GenImage(id: _uuid.v4(), b64: b64);
+  factory GenImage.fromB64(String b64) => GenImage(id: _uuid.v4(), b64: b64);
 }
 
 /// One round in the refinement tree.
@@ -61,14 +60,13 @@ class GenNode {
     String? parentId,
     String? sourceImageId,
     required String prompt,
-  }) =>
-      GenNode(
-        id: _uuid.v4(),
-        parentId: parentId,
-        sourceImageId: sourceImageId,
-        prompt: prompt,
-        status: GenStatus.generating,
-      );
+  }) => GenNode(
+    id: _uuid.v4(),
+    parentId: parentId,
+    sourceImageId: sourceImageId,
+    prompt: prompt,
+    status: GenStatus.generating,
+  );
 
   GenNode copyWith({
     GenStatus? status,
@@ -78,19 +76,18 @@ class GenNode {
     double? progress,
     String? progressLabel,
     bool clearProgress = false,
-  }) =>
-      GenNode(
-        id: id,
-        parentId: parentId,
-        sourceImageId: sourceImageId,
-        prompt: prompt,
-        status: status ?? this.status,
-        images: images ?? this.images,
-        error: clearError ? null : (error ?? this.error),
-        // clearProgress only resets the numeric fraction (→ indeterminate);
-        // the label follows its own argument so a queued/indeterminate state
-        // can still carry text like "Ve frontě…".
-        progress: clearProgress ? null : (progress ?? this.progress),
-        progressLabel: progressLabel ?? this.progressLabel,
-      );
+  }) => GenNode(
+    id: id,
+    parentId: parentId,
+    sourceImageId: sourceImageId,
+    prompt: prompt,
+    status: status ?? this.status,
+    images: images ?? this.images,
+    error: clearError ? null : (error ?? this.error),
+    // clearProgress only resets the numeric fraction (→ indeterminate);
+    // the label follows its own argument so a queued/indeterminate state
+    // can still carry text like "Ve frontě…".
+    progress: clearProgress ? null : (progress ?? this.progress),
+    progressLabel: progressLabel ?? this.progressLabel,
+  );
 }

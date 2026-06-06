@@ -4,42 +4,13 @@ import 'package:cronet_http/cronet_http.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-sealed class JobStatus {}
-
-class JobQueued extends JobStatus {
-  final int position;
-  JobQueued(this.position);
-}
-
-class JobRunning extends JobStatus {
-  final int step;
-  final int total;
-  JobRunning(this.step, this.total);
-}
-
-/// Job finished — images are NOT included here.
-/// Download them once via [MediaService.downloadResult].
-class JobDone extends JobStatus {
-  final String resultUrl;
-  final int count;
-  JobDone(this.resultUrl, this.count);
-}
-
-class JobFailed extends JobStatus {
-  final String message;
-  JobFailed(this.message);
-}
-
-class JobExpired extends JobStatus {}
-
+/// Talks to the AiStack gateway at llm.ol1n.com. Image generation/editing has
+/// moved to ComfyUI ([ComfyUIService]); this service now only carries OCR.
 class MediaService {
   static const _baseUrl = 'https://llm.ol1n.com';
   static const _cfId = String.fromEnvironment('CF_ACCESS_CLIENT_ID');
   static const _cfSecret = String.fromEnvironment('CF_ACCESS_CLIENT_SECRET');
-  static const _submitTimeout = Duration(seconds: 30);
   static const _ocrTimeout = Duration(seconds: 90);
-  static const _pollTimeout = Duration(seconds: 15);
-  static const _pollInterval = Duration(seconds: 2);
 
   final http.Client _client = _makeClient();
 
@@ -64,136 +35,6 @@ class MediaService {
     };
   }
 
-  /// Submit a text→image generation job. Returns the job id.
-  Future<String> submitGeneration({
-    required String prompt,
-    int n = 1,
-    String size = '1024x1024',
-  }) =>
-      _submitJob('/v1/images/generations', {
-        'prompt': prompt,
-        'n': n,
-        'size': size,
-      });
-
-  /// Submit an image-edit job. Returns the job id.
-  Future<String> submitEdit({
-    required String imageBase64,
-    required String prompt,
-    int n = 1,
-    String size = '1024x1024',
-  }) =>
-      _submitJob('/v1/images/edits', {
-        'image': imageBase64,
-        'prompt': prompt,
-        'n': n,
-        'size': size,
-      });
-
-  Future<String> _submitJob(String path, Map<String, dynamic> body) async {
-    final url = '$_baseUrl$path';
-    debugPrint('[media] POST $url');
-    final response = await _client
-        .post(
-          Uri.parse(url),
-          headers: _headers,
-          body: jsonEncode(body),
-        )
-        .timeout(_submitTimeout);
-    debugPrint('[media] POST $path → ${response.statusCode}');
-    if (response.statusCode != 202) {
-      final snippet = response.body.replaceAll(RegExp(r'\s+'), ' ').trim();
-      final truncated =
-          snippet.length > 160 ? '${snippet.substring(0, 160)}…' : snippet;
-      debugPrint('[media] error body: $truncated');
-      throw Exception(
-        'HTTP ${response.statusCode}${truncated.isNotEmpty ? ": $truncated" : ""}',
-      );
-    }
-    final json = jsonDecode(response.body) as Map<String, dynamic>;
-    final jobId = json['id'] as String;
-    debugPrint('[media] job_id=$jobId');
-    return jobId;
-  }
-
-  /// Poll a job until it reaches a terminal state.
-  /// Yields status updates; on network errors retries silently.
-  Stream<JobStatus> pollJob(String jobId) async* {
-    while (true) {
-      await Future.delayed(_pollInterval);
-
-      http.Response response;
-      try {
-        response = await _client
-            .get(
-              Uri.parse('$_baseUrl/v1/images/jobs/$jobId'),
-              headers: _headers,
-            )
-            .timeout(_pollTimeout);
-      } catch (e) {
-        debugPrint('[media] poll network error: $e — retrying');
-        continue;
-      }
-
-      if (response.statusCode == 404) {
-        debugPrint('[media] poll $jobId → 404 expired');
-        yield JobExpired();
-        return;
-      }
-      if (response.statusCode != 200) {
-        debugPrint('[media] poll $jobId → ${response.statusCode} retrying');
-        continue;
-      }
-
-      final json = jsonDecode(response.body) as Map<String, dynamic>;
-      final status = json['status'] as String;
-      switch (status) {
-        case 'queued':
-          final pos = json['queue_position'] as int? ?? 0;
-          debugPrint('[media] poll $jobId → queued pos=$pos');
-          yield JobQueued(pos);
-        case 'running':
-          final step = json['step'] as int? ?? 0;
-          final total = json['total'] as int? ?? 1;
-          debugPrint('[media] poll $jobId → running $step/$total');
-          yield JobRunning(step, total);
-        case 'done':
-          final resultUrl = json['result_url'] as String;
-          final count = json['count'] as int? ?? 1;
-          debugPrint('[media] poll $jobId → done count=$count result_url=$resultUrl');
-          yield JobDone(resultUrl, count);
-          return;
-        case 'error':
-          final msg = json['error'] as String? ?? 'Unknown error';
-          debugPrint('[media] poll $jobId → error: $msg');
-          yield JobFailed(msg);
-          return;
-        default:
-          debugPrint('[media] poll $jobId → unknown status "$status"');
-      }
-    }
-  }
-
-  /// Download a finished job's result image as raw PNG bytes.
-  /// Call ONCE per index after [pollJob] yields [JobDone] — do NOT poll this.
-  Future<Uint8List> downloadResult(String resultUrl, {int index = 0}) async {
-    final path = index > 0 ? '$resultUrl?index=$index' : resultUrl;
-    final uri = Uri.parse('$_baseUrl$path');
-    debugPrint('[media] GET $path (result download index=$index)');
-    // Result can be several MB — give it a generous timeout.
-    final response = await _client
-        .get(uri, headers: _headers)
-        .timeout(const Duration(seconds: 120));
-    debugPrint('[media] result download → ${response.statusCode} (${response.bodyBytes.length} bytes)');
-    if (response.statusCode == 409) {
-      throw Exception('Result not ready yet — job is not done (409)');
-    }
-    if (response.statusCode != 200) {
-      throw Exception('HTTP ${response.statusCode} downloading result');
-    }
-    return response.bodyBytes;
-  }
-
   /// OCR — synchronous, quick endpoint (no job model).
   Future<String> ocr({
     required String imageBase64,
@@ -216,8 +57,9 @@ class MediaService {
     debugPrint('[media] POST /v1/ocr → ${response.statusCode}');
     if (response.statusCode != 200) {
       final snippet = response.body.replaceAll(RegExp(r'\s+'), ' ').trim();
-      final truncated =
-          snippet.length > 160 ? '${snippet.substring(0, 160)}…' : snippet;
+      final truncated = snippet.length > 160
+          ? '${snippet.substring(0, 160)}…'
+          : snippet;
       throw Exception(
         'HTTP ${response.statusCode}${truncated.isNotEmpty ? ": $truncated" : ""}',
       );

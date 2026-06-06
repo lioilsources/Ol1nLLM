@@ -42,8 +42,8 @@ class _PersonaGrid extends ConsumerWidget {
         final crossAxisCount = constraints.maxWidth > 720
             ? 4
             : constraints.maxWidth > 480
-                ? 3
-                : 2;
+            ? 3
+            : 2;
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
           child: Column(
