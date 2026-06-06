@@ -54,15 +54,18 @@ class ComfyUIService implements ImageBackend {
   Future<List<String>> fetchLoras() async {
     try {
       final resp = await _client
-          .get(Uri.parse('$_baseUrl/object_info/LoraLoader'),
-              headers: _authHeaders)
+          .get(
+            Uri.parse('$_baseUrl/object_info/LoraLoader'),
+            headers: _authHeaders,
+          )
           .timeout(_pollTimeout);
       if (resp.statusCode != 200) return const [];
       final json = jsonDecode(resp.body) as Map<String, dynamic>;
-      final names = ((json['LoraLoader']?['input']?['required']?['lora_name']
-              as List?)
-          ?.first as List?)
-          ?.cast<String>();
+      final names =
+          ((json['LoraLoader']?['input']?['required']?['lora_name'] as List?)
+                      ?.first
+                  as List?)
+              ?.cast<String>();
       return names ?? const [];
     } catch (_) {
       return const [];
@@ -90,14 +93,13 @@ class ComfyUIService implements ImageBackend {
         'Build with --dart-define=CF_ACCESS_CLIENT_ID=... --dart-define=CF_ACCESS_CLIENT_SECRET=...',
       );
     }
-    return {
-      'CF-Access-Client-Id': _cfId,
-      'CF-Access-Client-Secret': _cfSecret,
-    };
+    return {'CF-Access-Client-Id': _cfId, 'CF-Access-Client-Secret': _cfSecret};
   }
 
-  Map<String, String> get _jsonHeaders =>
-      {..._authHeaders, 'Content-Type': 'application/json'};
+  Map<String, String> get _jsonHeaders => {
+    ..._authHeaders,
+    'Content-Type': 'application/json',
+  };
 
   // ── Public backend API ──────────────────────────────────────
   @override
@@ -126,8 +128,10 @@ class ComfyUIService implements ImageBackend {
   //
   // When [workflow] is null, [promptId] must be supplied — we re-attach to an
   // already-queued job (resume) instead of enqueueing a new one.
-  Stream<GenEvent> _run(Map<String, dynamic>? workflow,
-      {String? promptId}) async* {
+  Stream<GenEvent> _run(
+    Map<String, dynamic>? workflow, {
+    String? promptId,
+  }) async* {
     promptId ??= await _queuePrompt(workflow!);
     yield GenSubmitted(promptId);
     yield const GenQueued(0);
@@ -137,9 +141,10 @@ class ComfyUIService implements ImageBackend {
     // the upgrade, or on platforms without dart:io sockets).
     WebSocket? ws;
     try {
-      ws = await WebSocket.connect('$_wsUrl?clientId=$_clientId',
-              headers: _authHeaders)
-          .timeout(_wsConnectTimeout);
+      ws = await WebSocket.connect(
+        '$_wsUrl?clientId=$_clientId',
+        headers: _authHeaders,
+      ).timeout(_wsConnectTimeout);
     } catch (e) {
       debugPrint('[comfy] ws connect failed ($e) — polling instead');
       ws = null;
@@ -165,8 +170,9 @@ class ComfyUIService implements ImageBackend {
           switch (type) {
             case 'status':
               if (!started) {
-                final remaining = ((data['status'] as Map?)?['exec_info']
-                    as Map?)?['queue_remaining'];
+                final remaining =
+                    ((data['status'] as Map?)?['exec_info']
+                        as Map?)?['queue_remaining'];
                 if (remaining is int) {
                   yield GenQueued(remaining > 0 ? remaining - 1 : 0);
                 }
@@ -287,11 +293,13 @@ class ComfyUIService implements ImageBackend {
     for (var i = 0; i < refs.length; i++) {
       yield GenDownloading(i, refs.length);
       final r = refs[i];
-      out.add(await _view(
-        r['filename'] as String,
-        (r['subfolder'] as String?) ?? '',
-        (r['type'] as String?) ?? 'output',
-      ));
+      out.add(
+        await _view(
+          r['filename'] as String,
+          (r['subfolder'] as String?) ?? '',
+          (r['type'] as String?) ?? 'output',
+        ),
+      );
     }
     yield GenComplete(out);
   }
@@ -307,8 +315,10 @@ class ComfyUIService implements ImageBackend {
         .timeout(_submitTimeout);
     debugPrint('[comfy] POST /prompt → ${resp.statusCode}');
     if (resp.statusCode != 200) {
-      throw Exception('ComfyUI /prompt HTTP ${resp.statusCode}: '
-          '${_snippet(resp.body)}');
+      throw Exception(
+        'ComfyUI /prompt HTTP ${resp.statusCode}: '
+        '${_snippet(resp.body)}',
+      );
     }
     final json = jsonDecode(resp.body) as Map<String, dynamic>;
     final nodeErrors = json['node_errors'];
@@ -341,16 +351,24 @@ class ComfyUIService implements ImageBackend {
   }
 
   Future<Uint8List> _view(
-      String filename, String subfolder, String type) async {
-    final uri = Uri.parse('$_baseUrl/view').replace(queryParameters: {
-      'filename': filename,
-      'subfolder': subfolder,
-      'type': type,
-    });
-    final resp =
-        await _client.get(uri, headers: _authHeaders).timeout(_downloadTimeout);
-    debugPrint('[comfy] GET /view $filename → ${resp.statusCode} '
-        '(${resp.bodyBytes.length} bytes)');
+    String filename,
+    String subfolder,
+    String type,
+  ) async {
+    final uri = Uri.parse('$_baseUrl/view').replace(
+      queryParameters: {
+        'filename': filename,
+        'subfolder': subfolder,
+        'type': type,
+      },
+    );
+    final resp = await _client
+        .get(uri, headers: _authHeaders)
+        .timeout(_downloadTimeout);
+    debugPrint(
+      '[comfy] GET /view $filename → ${resp.statusCode} '
+      '(${resp.bodyBytes.length} bytes)',
+    );
     if (resp.statusCode != 200) {
       throw Exception('ComfyUI /view HTTP ${resp.statusCode} for $filename');
     }
@@ -358,20 +376,26 @@ class ComfyUIService implements ImageBackend {
   }
 
   Future<String> _uploadImage(Uint8List bytes) async {
-    final req = http.MultipartRequest('POST', Uri.parse('$_baseUrl/upload/image'))
-      ..headers.addAll(_authHeaders)
-      ..fields['overwrite'] = 'true'
-      ..files.add(http.MultipartFile.fromBytes(
-        'image',
-        bytes,
-        filename: 'ol1n_input_${DateTime.now().millisecondsSinceEpoch}.png',
-      ));
+    final req =
+        http.MultipartRequest('POST', Uri.parse('$_baseUrl/upload/image'))
+          ..headers.addAll(_authHeaders)
+          ..fields['overwrite'] = 'true'
+          ..files.add(
+            http.MultipartFile.fromBytes(
+              'image',
+              bytes,
+              filename:
+                  'ol1n_input_${DateTime.now().millisecondsSinceEpoch}.png',
+            ),
+          );
     final streamed = await _client.send(req).timeout(_submitTimeout);
     final resp = await http.Response.fromStream(streamed);
     debugPrint('[comfy] POST /upload/image → ${resp.statusCode}');
     if (resp.statusCode != 200) {
-      throw Exception('ComfyUI /upload/image HTTP ${resp.statusCode}: '
-          '${_snippet(resp.body)}');
+      throw Exception(
+        'ComfyUI /upload/image HTTP ${resp.statusCode}: '
+        '${_snippet(resp.body)}',
+      );
     }
     final json = jsonDecode(resp.body) as Map<String, dynamic>;
     final name = json['name'] as String;
@@ -398,8 +422,10 @@ class ComfyUIService implements ImageBackend {
           .post(
             Uri.parse('$_baseUrl/free'),
             headers: _jsonHeaders,
-            body: jsonEncode(
-                {'free_memory': true, 'unload_models': unloadModels}),
+            body: jsonEncode({
+              'free_memory': true,
+              'unload_models': unloadModels,
+            }),
           )
           .timeout(_pollTimeout);
     } catch (e) {
@@ -504,7 +530,8 @@ class ComfyUIService implements ImageBackend {
   }
 
   String _historyErrorMessage(Map<String, dynamic> hist) {
-    final messages = ((hist['status'] as Map?)?['messages'] as List?) ?? const [];
+    final messages =
+        ((hist['status'] as Map?)?['messages'] as List?) ?? const [];
     for (final m in messages.reversed) {
       if (m is List && m.isNotEmpty && '${m[0]}'.contains('error')) {
         return 'ComfyUI chyba — ${jsonEncode(m.length > 1 ? m[1] : m[0])}';

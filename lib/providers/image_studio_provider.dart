@@ -9,8 +9,8 @@ import '../services/image_backend.dart';
 
 final imageStudioProvider =
     StateNotifierProvider<ImageStudioNotifier, ImageStudioState>(
-  (ref) => ImageStudioNotifier(),
-);
+      (ref) => ImageStudioNotifier(),
+    );
 
 /// How many candidates each round produces.
 const kVariantCount = 4;
@@ -83,17 +83,17 @@ class ImageStudioState {
     bool clearLora = false,
     String? error,
     bool clearError = false,
-  }) =>
-      ImageStudioState(
-        nodes: nodes ?? this.nodes,
-        currentNodeId: currentNodeId ?? this.currentNodeId,
-        selectedImageId:
-            clearSelected ? null : (selectedImageId ?? this.selectedImageId),
-        backendId: backendId ?? this.backendId,
-        availableLoras: availableLoras ?? this.availableLoras,
-        selectedLora: clearLora ? null : (selectedLora ?? this.selectedLora),
-        error: clearError ? null : (error ?? this.error),
-      );
+  }) => ImageStudioState(
+    nodes: nodes ?? this.nodes,
+    currentNodeId: currentNodeId ?? this.currentNodeId,
+    selectedImageId: clearSelected
+        ? null
+        : (selectedImageId ?? this.selectedImageId),
+    backendId: backendId ?? this.backendId,
+    availableLoras: availableLoras ?? this.availableLoras,
+    selectedLora: clearLora ? null : (selectedLora ?? this.selectedLora),
+    error: clearError ? null : (error ?? this.error),
+  );
 }
 
 class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
@@ -127,10 +127,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
 
   void setLora(String? loraName) {
     _comfyui.setLora(loraName);
-    state = state.copyWith(
-      selectedLora: loraName,
-      clearLora: loraName == null,
-    );
+    state = state.copyWith(selectedLora: loraName, clearLora: loraName == null);
   }
 
   Future<void> _loadLoras() async {
@@ -187,7 +184,11 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
     if (node == null || node.status == GenStatus.generating) return;
     _patch(
       nodeId,
-      (n) => n.copyWith(status: GenStatus.generating, clearError: true, clearProgress: true),
+      (n) => n.copyWith(
+        status: GenStatus.generating,
+        clearError: true,
+        clearProgress: true,
+      ),
     );
     if (node.isRoot) {
       await _runAsync(
@@ -197,8 +198,11 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
     } else {
       final base = _imageById(node.sourceImageId);
       if (base == null) {
-        _patch(nodeId,
-            (n) => n.copyWith(status: GenStatus.error, error: 'Source image gone'));
+        _patch(
+          nodeId,
+          (n) =>
+              n.copyWith(status: GenStatus.error, error: 'Source image gone'),
+        );
         return;
       }
       await _runAsync(
@@ -241,10 +245,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
 
   /// Consume a backend [GenEvent] stream, updating [nodeId] in place until a
   /// terminal event. Stored as the active subscription so [cancel] can stop it.
-  Future<void> _runAsync(
-    String nodeId,
-    Stream<GenEvent> Function() run,
-  ) async {
+  Future<void> _runAsync(String nodeId, Stream<GenEvent> Function() run) async {
     await _activeSub?.cancel();
     _activeNodeId = nodeId;
     final completer = Completer<void>();
@@ -258,7 +259,10 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
       _patch(
         nodeId,
         (n) => n.copyWith(
-            status: GenStatus.error, error: msg, clearProgress: true),
+          status: GenStatus.error,
+          error: msg,
+          clearProgress: true,
+        ),
       );
       state = state.copyWith(error: msg);
     }
@@ -275,8 +279,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
               nodeId,
               (n) => n.copyWith(
                 clearProgress: true,
-                progressLabel:
-                    position > 0 ? 'Ve frontě: $position' : 'Ve frontě…',
+                progressLabel: position > 0
+                    ? 'Ve frontě: $position'
+                    : 'Ve frontě…',
               ),
             );
           case GenRunning(:final fraction):

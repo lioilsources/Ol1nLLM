@@ -45,14 +45,13 @@ class ChatState {
     String? error,
     bool clearError = false,
     bool? pendingContinuation,
-  }) =>
-      ChatState(
-        conversations: conversations ?? this.conversations,
-        activeId: clearActive ? null : (activeId ?? this.activeId),
-        isStreaming: isStreaming ?? this.isStreaming,
-        error: clearError ? null : (error ?? this.error),
-        pendingContinuation: pendingContinuation ?? this.pendingContinuation,
-      );
+  }) => ChatState(
+    conversations: conversations ?? this.conversations,
+    activeId: clearActive ? null : (activeId ?? this.activeId),
+    isStreaming: isStreaming ?? this.isStreaming,
+    error: clearError ? null : (error ?? this.error),
+    pendingContinuation: pendingContinuation ?? this.pendingContinuation,
+  );
 }
 
 class ChatNotifier extends StateNotifier<ChatState> {
@@ -132,8 +131,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     final placeholderId = data['placeholder_id'] as String;
 
     final conv = state.conversations.where((c) => c.id == convId).firstOrNull;
-    if (conv == null ||
-        !conv.messages.any((m) => m.id == placeholderId)) {
+    if (conv == null || !conv.messages.any((m) => m.id == placeholderId)) {
       await _clearPendingJob();
       return;
     }
@@ -235,37 +233,42 @@ class ChatNotifier extends StateNotifier<ChatState> {
       conv = conv.copyWith(messages: [...conv.messages, assistantMsg]);
       _replaceConversation(conv);
 
-      _streamSub = _service.chat(messagesForApi, systemPrompt: systemPrompt).listen(
-        (event) {
-          switch (event) {
-            case ChatDelta(:final content):
-              final current = state.active;
-              if (current == null) return;
-              final msgs = List<Message>.from(current.messages);
-              final last = msgs.last;
-              msgs[msgs.length - 1] =
-                  last.copyWith(content: last.content + content);
-              _replaceConversation(current.copyWith(
-                messages: msgs,
-                updatedAt: DateTime.now(),
-              ));
-            case ChatDone(:final truncatedByLength):
-              if (truncatedByLength) {
-                state = state.copyWith(pendingContinuation: true);
+      _streamSub = _service
+          .chat(messagesForApi, systemPrompt: systemPrompt)
+          .listen(
+            (event) {
+              switch (event) {
+                case ChatDelta(:final content):
+                  final current = state.active;
+                  if (current == null) return;
+                  final msgs = List<Message>.from(current.messages);
+                  final last = msgs.last;
+                  msgs[msgs.length - 1] = last.copyWith(
+                    content: last.content + content,
+                  );
+                  _replaceConversation(
+                    current.copyWith(messages: msgs, updatedAt: DateTime.now()),
+                  );
+                case ChatDone(:final truncatedByLength):
+                  if (truncatedByLength) {
+                    state = state.copyWith(pendingContinuation: true);
+                  }
               }
-          }
-        },
-        onDone: () {
-          state = state.copyWith(isStreaming: false);
-          _save();
-        },
-        onError: (e) {
-          debugPrint('Stream error: $e');
-          state = state.copyWith(isStreaming: false, error: _errorMessage(e));
-          _save();
-        },
-        cancelOnError: true,
-      );
+            },
+            onDone: () {
+              state = state.copyWith(isStreaming: false);
+              _save();
+            },
+            onError: (e) {
+              debugPrint('Stream error: $e');
+              state = state.copyWith(
+                isStreaming: false,
+                error: _errorMessage(e),
+              );
+              _save();
+            },
+            cancelOnError: true,
+          );
     } catch (e) {
       debugPrint('sendMessage setup error: $e');
       state = state.copyWith(isStreaming: false, error: _errorMessage(e));
@@ -301,11 +304,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
         images: [imageBase64],
       ),
       titleSeed: text,
-      run: () => _comfyui.edit(
-        image: base64Decode(imageBase64),
-        prompt: text,
-        n: 1,
-      ),
+      run: () =>
+          _comfyui.edit(image: base64Decode(imageBase64), prompt: text, n: 1),
     );
   }
 
@@ -392,11 +392,13 @@ class ChatNotifier extends StateNotifier<ChatState> {
       (event) {
         switch (event) {
           case GenSubmitted(:final jobId):
-            unawaited(_persistJob(
-              jobId: jobId,
-              convId: convId,
-              placeholderId: placeholderId,
-            ));
+            unawaited(
+              _persistJob(
+                jobId: jobId,
+                convId: convId,
+                placeholderId: placeholderId,
+              ),
+            );
           case GenQueued(:final position):
             final text = position > 0
                 ? '⏳ Ve frontě – pozice $position'
@@ -409,7 +411,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
             _updatePlaceholder(convId, placeholderId, text);
           case GenDownloading(:final done, :final total):
             _updatePlaceholder(
-                convId, placeholderId, '⬇️ Stahování ${done + 1}/$total');
+              convId,
+              placeholderId,
+              '⬇️ Stahování ${done + 1}/$total',
+            );
           case GenComplete(:final images):
             _clearPendingJob();
             _finishImages(convId, placeholderId, images);
@@ -430,14 +435,17 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   void _updatePlaceholder(String convId, String placeholderId, String content) {
-    final conv =
-        state.conversations.where((c) => c.id == convId).firstOrNull;
+    final conv = state.conversations.where((c) => c.id == convId).firstOrNull;
     if (conv == null) return;
-    _replaceConversation(conv.copyWith(
-      messages: conv.messages
-          .map((m) => m.id == placeholderId ? m.copyWith(content: content) : m)
-          .toList(),
-    ));
+    _replaceConversation(
+      conv.copyWith(
+        messages: conv.messages
+            .map(
+              (m) => m.id == placeholderId ? m.copyWith(content: content) : m,
+            )
+            .toList(),
+      ),
+    );
   }
 
   void _finishImages(
@@ -461,25 +469,30 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   void _replacePlaceholder(
-      String convId, String placeholderId, Message replacement) {
-    final conv =
-        state.conversations.where((c) => c.id == convId).firstOrNull;
+    String convId,
+    String placeholderId,
+    Message replacement,
+  ) {
+    final conv = state.conversations.where((c) => c.id == convId).firstOrNull;
     if (conv == null) return;
-    _replaceConversation(conv.copyWith(
-      messages: conv.messages
-          .map((m) => m.id == placeholderId ? replacement : m)
-          .toList(),
-      updatedAt: DateTime.now(),
-    ));
+    _replaceConversation(
+      conv.copyWith(
+        messages: conv.messages
+            .map((m) => m.id == placeholderId ? replacement : m)
+            .toList(),
+        updatedAt: DateTime.now(),
+      ),
+    );
   }
 
   void _removePlaceholder(String convId, String placeholderId) {
-    final conv =
-        state.conversations.where((c) => c.id == convId).firstOrNull;
+    final conv = state.conversations.where((c) => c.id == convId).firstOrNull;
     if (conv == null) return;
-    _replaceConversation(conv.copyWith(
-      messages: conv.messages.where((m) => m.id != placeholderId).toList(),
-    ));
+    _replaceConversation(
+      conv.copyWith(
+        messages: conv.messages.where((m) => m.id != placeholderId).toList(),
+      ),
+    );
   }
 
   /// OCR uses synchronous endpoint — old _runMedia pattern.
@@ -523,15 +536,18 @@ class ChatNotifier extends StateNotifier<ChatState> {
     try {
       await _save();
       final result = await task();
-      final current =
-          state.conversations.where((c) => c.id == convId).firstOrNull;
+      final current = state.conversations
+          .where((c) => c.id == convId)
+          .firstOrNull;
       if (current != null) {
-        _replaceConversation(current.copyWith(
-          messages: current.messages
-              .map((m) => m.id == placeholderId ? result : m)
-              .toList(),
-          updatedAt: DateTime.now(),
-        ));
+        _replaceConversation(
+          current.copyWith(
+            messages: current.messages
+                .map((m) => m.id == placeholderId ? result : m)
+                .toList(),
+            updatedAt: DateTime.now(),
+          ),
+        );
       }
       state = state.copyWith(isStreaming: false);
       await _save();

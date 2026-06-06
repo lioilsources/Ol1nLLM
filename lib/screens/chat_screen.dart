@@ -71,8 +71,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       orElse: () => null,
     );
     final title = _appBarTitle(state.active?.title, activePersona);
-    final showPicker = state.active == null ||
-        (messages.isEmpty && personaId == null);
+    final showPicker =
+        state.active == null || (messages.isEmpty && personaId == null);
 
     return Scaffold(
       drawer: const ConversationDrawer(),
@@ -81,16 +81,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (activePersona != null) ...[
-              Text(activePersona.emoji,
-                  style: const TextStyle(fontSize: 18)),
+              Text(activePersona.emoji, style: const TextStyle(fontSize: 18)),
               const SizedBox(width: 8),
             ],
             Flexible(
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+              child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
             ),
           ],
         ),
@@ -106,7 +101,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             IconButton(
               icon: const Icon(Icons.add_comment_outlined),
               tooltip: 'New chat',
-              onPressed: () => ref.read(chatProvider.notifier).newConversation(),
+              onPressed: () =>
+                  ref.read(chatProvider.notifier).newConversation(),
             ),
         ],
       ),
@@ -122,7 +118,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     itemBuilder: (context, index) {
                       final message = messages[index];
                       final isLast = index == messages.length - 1;
-                      final isStreamingThisMsg = state.isStreaming &&
+                      final isStreamingThisMsg =
+                          state.isStreaming &&
                           isLast &&
                           message.role == MessageRole.assistant;
                       return MessageBubble(

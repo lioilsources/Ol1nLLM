@@ -13,11 +13,7 @@ class AppTheme {
   static const drawerWidth = 280.0;
 
   static MarkdownStyleSheet markdownStyle(BuildContext context) {
-    const base = TextStyle(
-      color: textPrimary,
-      fontSize: 15,
-      height: 1.5,
-    );
+    const base = TextStyle(color: textPrimary, fontSize: 15, height: 1.5);
     return MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
       p: base,
       strong: base.copyWith(fontWeight: FontWeight.w700),
@@ -38,9 +34,7 @@ class AppTheme {
       ),
       codeblockPadding: const EdgeInsets.all(12),
       blockquoteDecoration: const BoxDecoration(
-        border: Border(
-          left: BorderSide(color: accent, width: 3),
-        ),
+        border: Border(left: BorderSide(color: accent, width: 3)),
       ),
       blockquotePadding: const EdgeInsets.only(left: 12, top: 4, bottom: 4),
       blockquote: base.copyWith(color: textSecondary),
@@ -50,27 +44,24 @@ class AppTheme {
   }
 
   static ThemeData get dark => ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: background,
-        colorScheme: const ColorScheme.dark(
-          surface: surface,
-          primary: accent,
-        ),
-        drawerTheme: const DrawerThemeData(
-          backgroundColor: surface,
-          width: drawerWidth,
-        ),
-        dividerColor: Colors.white12,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: background,
-          surfaceTintColor: Colors.transparent,
-          elevation: 0,
-          titleTextStyle: TextStyle(
-            color: textPrimary,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-          iconTheme: IconThemeData(color: textPrimary),
-        ),
-      );
+    brightness: Brightness.dark,
+    scaffoldBackgroundColor: background,
+    colorScheme: const ColorScheme.dark(surface: surface, primary: accent),
+    drawerTheme: const DrawerThemeData(
+      backgroundColor: surface,
+      width: drawerWidth,
+    ),
+    dividerColor: Colors.white12,
+    appBarTheme: const AppBarTheme(
+      backgroundColor: background,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      titleTextStyle: TextStyle(
+        color: textPrimary,
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+      ),
+      iconTheme: IconThemeData(color: textPrimary),
+    ),
+  );
 }

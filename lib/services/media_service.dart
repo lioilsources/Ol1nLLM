@@ -57,8 +57,9 @@ class MediaService {
     debugPrint('[media] POST /v1/ocr → ${response.statusCode}');
     if (response.statusCode != 200) {
       final snippet = response.body.replaceAll(RegExp(r'\s+'), ' ').trim();
-      final truncated =
-          snippet.length > 160 ? '${snippet.substring(0, 160)}…' : snippet;
+      final truncated = snippet.length > 160
+          ? '${snippet.substring(0, 160)}…'
+          : snippet;
       throw Exception(
         'HTTP ${response.statusCode}${truncated.isNotEmpty ? ": $truncated" : ""}',
       );

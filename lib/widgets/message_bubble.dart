@@ -63,9 +63,7 @@ class _MessageBubbleState extends State<MessageBubble>
             bottomLeft: Radius.circular(isUser ? 16 : 4),
             bottomRight: Radius.circular(isUser ? 4 : 16),
           ),
-          border: isUser
-              ? null
-              : Border.all(color: Colors.white10, width: 0.5),
+          border: isUser ? null : Border.all(color: Colors.white10, width: 0.5),
         ),
         child: _buildContent(context, isUser),
       ),
@@ -90,8 +88,9 @@ class _MessageBubbleState extends State<MessageBubble>
     // Images (with optional caption)
     if (hasImages) {
       return Column(
-        crossAxisAlignment:
-            isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: isUser
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           ...msg.images.map(_buildImage),
@@ -189,10 +188,7 @@ class _MessageBubbleState extends State<MessageBubble>
           opacity: 0.3 + _cursorController.value * 0.7,
           child: const Text(
             '▌',
-            style: TextStyle(
-              color: AppTheme.accent,
-              fontSize: 15,
-            ),
+            style: TextStyle(color: AppTheme.accent, fontSize: 15),
           ),
         );
       },

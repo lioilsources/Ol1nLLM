@@ -108,8 +108,7 @@ class _ProgressBanner extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
-                color: AppTheme.textSecondary, fontSize: 12),
+            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
           ),
           const SizedBox(height: 6),
           ClipRRect(
@@ -144,8 +143,11 @@ class _Breadcrumb extends ConsumerWidget {
         itemCount: path.length,
         separatorBuilder: (_, _) => const Padding(
           padding: EdgeInsets.symmetric(horizontal: 2),
-          child: Icon(Icons.chevron_right,
-              size: 16, color: AppTheme.textSecondary),
+          child: Icon(
+            Icons.chevron_right,
+            size: 16,
+            color: AppTheme.textSecondary,
+          ),
         ),
         itemBuilder: (context, i) {
           final node = path[i];
@@ -166,8 +168,7 @@ class _Breadcrumb extends ConsumerWidget {
                 fontSize: 12,
               ),
             ),
-            backgroundColor:
-                isCurrent ? AppTheme.accent : AppTheme.surface,
+            backgroundColor: isCurrent ? AppTheme.accent : AppTheme.surface,
             side: BorderSide.none,
             onPressed: isCurrent ? null : () => notifier.navigateTo(node.id),
           );
@@ -192,8 +193,11 @@ class _NodeGrid extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline,
-                  size: 40, color: AppTheme.textSecondary),
+              const Icon(
+                Icons.error_outline,
+                size: 40,
+                color: AppTheme.textSecondary,
+              ),
               const SizedBox(height: 12),
               Text(
                 node.error ?? 'Generation failed',
@@ -206,8 +210,7 @@ class _NodeGrid extends ConsumerWidget {
                     ref.read(imageStudioProvider.notifier).retry(node.id),
                 icon: const Icon(Icons.refresh, size: 18),
                 label: const Text('Retry'),
-                style:
-                    FilledButton.styleFrom(backgroundColor: AppTheme.accent),
+                style: FilledButton.styleFrom(backgroundColor: AppTheme.accent),
               ),
             ],
           ),
@@ -394,11 +397,15 @@ class _LoraChip extends StatelessWidget {
                 selected == null
                     ? Icons.radio_button_checked
                     : Icons.radio_button_unchecked,
-                color: selected == null ? AppTheme.accent : AppTheme.textSecondary,
+                color: selected == null
+                    ? AppTheme.accent
+                    : AppTheme.textSecondary,
                 size: 20,
               ),
-              title: const Text('Žádná LoRA',
-                  style: TextStyle(color: AppTheme.textPrimary)),
+              title: const Text(
+                'Žádná LoRA',
+                style: TextStyle(color: AppTheme.textPrimary),
+              ),
               onTap: () {
                 onChanged(null);
                 Navigator.of(context).pop();
@@ -447,7 +454,9 @@ class _LoraChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: selected != null ? AppTheme.accent.withValues(alpha: 0.15) : AppTheme.surface,
+          color: selected != null
+              ? AppTheme.accent.withValues(alpha: 0.15)
+              : AppTheme.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: selected != null ? AppTheme.accent : Colors.white24,
@@ -457,21 +466,31 @@ class _LoraChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.style_outlined,
-                size: 14,
-                color: selected != null ? AppTheme.accent : AppTheme.textSecondary),
+            Icon(
+              Icons.style_outlined,
+              size: 14,
+              color: selected != null
+                  ? AppTheme.accent
+                  : AppTheme.textSecondary,
+            ),
             const SizedBox(width: 5),
             Text(
               selected != null ? _display(selected!) : 'LoRA',
               style: TextStyle(
                 fontSize: 12,
-                color: selected != null ? AppTheme.accent : AppTheme.textSecondary,
+                color: selected != null
+                    ? AppTheme.accent
+                    : AppTheme.textSecondary,
               ),
             ),
             const SizedBox(width: 3),
-            Icon(Icons.expand_more,
-                size: 14,
-                color: selected != null ? AppTheme.accent : AppTheme.textSecondary),
+            Icon(
+              Icons.expand_more,
+              size: 14,
+              color: selected != null
+                  ? AppTheme.accent
+                  : AppTheme.textSecondary,
+            ),
           ],
         ),
       ),
@@ -560,71 +579,75 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                 ),
               ),
             Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 120),
-                child: Scrollbar(
-                  child: TextField(
-                    controller: _controller,
-                    focusNode: _focusNode,
-                    enabled: !isBusy,
-                    maxLines: null,
-                    minLines: 1,
-                    keyboardType: TextInputType.multiline,
-                    textCapitalization: TextCapitalization.sentences,
-                    onChanged: (_) => setState(() {}),
-                    onSubmitted: isBusy ? null : (_) => _send(),
-                    style: const TextStyle(
-                      color: AppTheme.textPrimary,
-                      fontSize: 15,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: _hint,
-                      hintStyle: const TextStyle(color: AppTheme.textSecondary),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: AppTheme.surface,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 120),
+                    child: Scrollbar(
+                      child: TextField(
+                        controller: _controller,
+                        focusNode: _focusNode,
+                        enabled: !isBusy,
+                        maxLines: null,
+                        minLines: 1,
+                        keyboardType: TextInputType.multiline,
+                        textCapitalization: TextCapitalization.sentences,
+                        onChanged: (_) => setState(() {}),
+                        onSubmitted: isBusy ? null : (_) => _send(),
+                        style: const TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 15,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: _hint,
+                          hintStyle: const TextStyle(
+                            color: AppTheme.textSecondary,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide.none,
+                          ),
+                          filled: true,
+                          fillColor: AppTheme.surface,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: canSend ? AppTheme.accent : AppTheme.surface,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: isBusy
-                  ? const Padding(
-                      padding: EdgeInsets.all(10),
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppTheme.textSecondary,
-                      ),
-                    )
-                  : IconButton(
-                      padding: EdgeInsets.zero,
-                      icon: Icon(
-                        Icons.arrow_upward_rounded,
-                        color: canSend ? Colors.white : AppTheme.textSecondary,
-                        size: 20,
-                      ),
-                      onPressed: canSend ? _send : null,
-                    ),
-            ),
-          ],
+                const SizedBox(width: 8),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: canSend ? AppTheme.accent : AppTheme.surface,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: isBusy
+                      ? const Padding(
+                          padding: EdgeInsets.all(10),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppTheme.textSecondary,
+                          ),
+                        )
+                      : IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: Icon(
+                            Icons.arrow_upward_rounded,
+                            color: canSend
+                                ? Colors.white
+                                : AppTheme.textSecondary,
+                            size: 20,
+                          ),
+                          onPressed: canSend ? _send : null,
+                        ),
+                ),
+              ],
             ),
           ],
         ),

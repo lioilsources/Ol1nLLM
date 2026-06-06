@@ -10,25 +10,25 @@ enum InputMode { chat, generateImage, editImage, ocr }
 
 extension on InputMode {
   IconData get icon => switch (this) {
-        InputMode.chat => Icons.chat_bubble_outline,
-        InputMode.generateImage => Icons.auto_awesome,
-        InputMode.editImage => Icons.brush_outlined,
-        InputMode.ocr => Icons.document_scanner_outlined,
-      };
+    InputMode.chat => Icons.chat_bubble_outline,
+    InputMode.generateImage => Icons.auto_awesome,
+    InputMode.editImage => Icons.brush_outlined,
+    InputMode.ocr => Icons.document_scanner_outlined,
+  };
 
   String get label => switch (this) {
-        InputMode.chat => 'Chat',
-        InputMode.generateImage => 'Generate image',
-        InputMode.editImage => 'Edit image',
-        InputMode.ocr => 'OCR',
-      };
+    InputMode.chat => 'Chat',
+    InputMode.generateImage => 'Generate image',
+    InputMode.editImage => 'Edit image',
+    InputMode.ocr => 'OCR',
+  };
 
   String get hint => switch (this) {
-        InputMode.chat => 'Message llm-lab…',
-        InputMode.generateImage => 'Describe an image to generate…',
-        InputMode.editImage => 'Describe the edit…',
-        InputMode.ocr => 'Optional instruction…',
-      };
+    InputMode.chat => 'Message llm-lab…',
+    InputMode.generateImage => 'Describe an image to generate…',
+    InputMode.editImage => 'Describe the edit…',
+    InputMode.ocr => 'Optional instruction…',
+  };
 
   bool get needsImage => this == InputMode.editImage || this == InputMode.ocr;
 }
@@ -128,20 +128,21 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
     if (_controller.text.trim().isNotEmpty) return;
     _controller.value = TextEditingValue(
       text: _continuationPrompt,
-      selection:
-          const TextSelection.collapsed(offset: _continuationPrompt.length),
+      selection: const TextSelection.collapsed(
+        offset: _continuationPrompt.length,
+      ),
     );
     _focusNode.requestFocus();
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<bool>(
-      chatProvider.select((s) => s.pendingContinuation),
-      (prev, next) {
-        if (next && prev != true) _prefillContinuation();
-      },
-    );
+    ref.listen<bool>(chatProvider.select((s) => s.pendingContinuation), (
+      prev,
+      next,
+    ) {
+      if (next && prev != true) _prefillContinuation();
+    });
 
     final isBusy = ref.watch(chatProvider).isStreaming;
 
@@ -189,8 +190,9 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
                         ),
                         decoration: InputDecoration(
                           hintText: _mode.hint,
-                          hintStyle:
-                              const TextStyle(color: AppTheme.textSecondary),
+                          hintStyle: const TextStyle(
+                            color: AppTheme.textSecondary,
+                          ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(20),
                             borderSide: BorderSide.none,
@@ -238,12 +240,15 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
                   Icon(
                     m.icon,
                     size: 18,
-                    color:
-                        m == _mode ? AppTheme.accent : AppTheme.textSecondary,
+                    color: m == _mode
+                        ? AppTheme.accent
+                        : AppTheme.textSecondary,
                   ),
                   const SizedBox(width: 10),
-                  Text(m.label,
-                      style: const TextStyle(color: AppTheme.textPrimary)),
+                  Text(
+                    m.label,
+                    style: const TextStyle(color: AppTheme.textPrimary),
+                  ),
                 ],
               ),
             ),
