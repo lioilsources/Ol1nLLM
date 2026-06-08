@@ -259,8 +259,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
               state = state.copyWith(isStreaming: false);
               _save();
             },
-            onError: (e) {
-              debugPrint('Stream error: $e');
+            onError: (e, st) {
+              debugPrint('[nim] stream error type=${e.runtimeType} msg=$e');
+              debugPrint('[nim] stack: $st');
               state = state.copyWith(
                 isStreaming: false,
                 error: _errorMessage(e),

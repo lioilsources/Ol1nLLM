@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform;
-import 'package:cronet_http/cronet_http.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/message.dart';
 
@@ -33,14 +32,7 @@ class NimService {
 
   final http.Client _client = _makeClient();
 
-  static http.Client _makeClient() {
-    try {
-      if (Platform.isAndroid) return CronetClient.defaultCronetEngine();
-    } catch (_) {
-      // Cronet unavailable — fall back to dart:io
-    }
-    return http.Client();
-  }
+  static http.Client _makeClient() => http.Client();
 
   /// Streams assistant events (deltas + a final ChatDone with finish_reason)
   /// from NIM via LiteLLM.
@@ -117,6 +109,14 @@ class NimService {
       if (payload == '[DONE]') break;
       try {
         final json = jsonDecode(payload) as Map<String, dynamic>;
+        final errorField = json['error'];
+        if (errorField != null) {
+          final msg = errorField is Map
+              ? '${errorField['message'] ?? errorField}'
+              : errorField.toString();
+          debugPrint('[nim] SSE error event: $msg');
+          throw Exception(msg);
+        }
         final choice =
             (json['choices'] as List?)?.first as Map<String, dynamic>?;
         final content =
@@ -126,8 +126,9 @@ class NimService {
         }
         final fr = choice?['finish_reason'];
         if (fr is String) finishReason = fr;
-      } catch (_) {
-        // Skip malformed lines
+      } catch (e) {
+        if (e is Exception) rethrow;
+        // Skip malformed JSON lines
       }
     }
     yield ChatDone(finishReason);
