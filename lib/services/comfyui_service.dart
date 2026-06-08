@@ -11,6 +11,9 @@ import 'package:uuid/uuid.dart';
 
 import 'image_backend.dart';
 
+/// Which ComfyUI workflow (and model family) to use.
+enum ComfyWorkflow { flux, pony }
+
 /// Talks to a ComfyUI instance behind Cloudflare Access at comfyui.ol1n.com,
 /// reusing the same CF service-token credentials as the chat/diffusers paths.
 ///
@@ -34,8 +37,10 @@ class ComfyUIService implements ImageBackend {
   static const _cfId = String.fromEnvironment('CF_ACCESS_CLIENT_ID');
   static const _cfSecret = String.fromEnvironment('CF_ACCESS_CLIENT_SECRET');
 
-  static const _txt2imgAsset = 'assets/comfyui/flux_manga_txt2img.api.json';
-  static const _img2imgAsset = 'assets/comfyui/flux_manga_img2img.api.json';
+  static const _fluxTxt2img = 'assets/comfyui/flux_manga_txt2img.api.json';
+  static const _fluxImg2img = 'assets/comfyui/flux_manga_img2img.api.json';
+  static const _ponyTxt2img = 'assets/comfyui/pony_txt2img.api.json';
+  static const _ponyImg2img = 'assets/comfyui/pony_img2img.api.json';
 
   static const _submitTimeout = Duration(seconds: 30);
   static const _pollTimeout = Duration(seconds: 15);
@@ -48,8 +53,15 @@ class ComfyUIService implements ImageBackend {
   final Map<String, Map<String, dynamic>> _templateCache = {};
 
   String? _activeLora;
+  ComfyWorkflow _workflow = ComfyWorkflow.flux;
 
   void setLora(String? loraName) => _activeLora = loraName;
+  void setWorkflow(ComfyWorkflow wf) => _workflow = wf;
+
+  String get _txt2imgAsset =>
+      _workflow == ComfyWorkflow.pony ? _ponyTxt2img : _fluxTxt2img;
+  String get _img2imgAsset =>
+      _workflow == ComfyWorkflow.pony ? _ponyImg2img : _fluxImg2img;
 
   Future<List<String>> fetchLoras() async {
     try {
@@ -462,39 +474,37 @@ class ComfyUIService implements ImageBackend {
     final seed = Random().nextInt(1 << 31);
     final lora = _activeLora;
 
-    // Inject a LoraLoader (node "13") and re-route model/clip references when
-    // a LoRA is selected. The base templates wire directly from 10 (UNET) and
-    // 11 (CLIP); with LoRA we insert 13 in between.
+    // Inject a LoraLoader and re-route model/clip references. Works for both
+    // Flux (UNETLoader + DualCLIPLoader) and Pony (CheckpointLoaderSimple).
     if (lora != null) {
-      wf['13'] = {
-        'class_type': 'LoraLoader',
-        '_meta': {'title': 'LoRA: $lora'},
-        'inputs': {
-          'lora_name': lora,
-          'strength_model': 0.9,
-          'strength_clip': 0.9,
-          'model': ['10', 0],
-          'clip': ['11', 0],
-        },
-      };
-      // Redirect all ["10", 0] → ["13", 0]  (model)
-      //           and ["11", 0] → ["13", 1]  (clip)
-      for (final entry in wf.values) {
-        final inputs =
-            ((entry as Map).cast<String, dynamic>()['inputs'] as Map?)
-                ?.cast<String, dynamic>();
-        if (inputs == null) continue;
-        for (final k in inputs.keys.toList()) {
-          final v = inputs[k];
-          if (v is List && v.length == 2) {
-            if (v[0] == '10' && v[1] == 0) inputs[k] = ['13', 0];
-            if (v[0] == '11' && v[1] == 0) inputs[k] = ['13', 1];
+      final src = _findModelClipSources(wf);
+      if (src != null) {
+        const loraId = '__lora__';
+        wf[loraId] = {
+          'class_type': 'LoraLoader',
+          '_meta': {'title': 'LoRA: $lora'},
+          'inputs': {
+            'lora_name': lora,
+            'strength_model': 0.9,
+            'strength_clip': 0.9,
+            'model': [src.$1, src.$2],
+            'clip': [src.$3, src.$4],
+          },
+        };
+        for (final entry in wf.entries) {
+          if (entry.key == loraId) continue;
+          final inputs =
+              ((entry.value as Map).cast<String, dynamic>()['inputs'] as Map?)
+                  ?.cast<String, dynamic>();
+          if (inputs == null) continue;
+          for (final k in inputs.keys.toList()) {
+            final v = inputs[k];
+            if (v is! List || v.length != 2) continue;
+            if (v[0] == src.$1 && v[1] == src.$2) inputs[k] = [loraId, 0];
+            if (v[0] == src.$3 && v[1] == src.$4) inputs[k] = [loraId, 1];
           }
         }
       }
-      // Keep LoraLoader's own inputs pointing at the original loaders.
-      (wf['13']!['inputs'] as Map)['model'] = ['10', 0];
-      (wf['13']!['inputs'] as Map)['clip'] = ['11', 0];
     }
 
     for (final entry in wf.values) {
@@ -519,6 +529,31 @@ class ComfyUIService implements ImageBackend {
       if (inputs.containsKey('noise_seed')) inputs['noise_seed'] = seed;
     }
     return wf;
+  }
+
+  // ── LoRA source detection ───────────────────────────────────
+  // Returns (modelNodeId, modelOutput, clipNodeId, clipOutput), or null if
+  // no recognisable model loader is present in the workflow.
+  //
+  // Flux:  UNETLoader[0]=model, DualCLIPLoader[0]=clip (separate nodes)
+  // Pony:  CheckpointLoaderSimple[0]=model, [1]=clip, [2]=vae (same node)
+  (String, int, String, int)? _findModelClipSources(
+    Map<String, dynamic> wf,
+  ) {
+    String? unetId, dualClipId, ckptId;
+    for (final e in wf.entries) {
+      final cls = (e.value as Map?)?['class_type'] as String?;
+      if (cls == 'UNETLoader') unetId = e.key;
+      if (cls == 'DualCLIPLoader') dualClipId = e.key;
+      if (cls == 'CheckpointLoaderSimple') ckptId = e.key;
+    }
+    if (unetId != null && dualClipId != null) {
+      return (unetId, 0, dualClipId, 0);
+    }
+    if (ckptId != null) {
+      return (ckptId, 0, ckptId, 1);
+    }
+    return null;
   }
 
   // ── Small helpers ───────────────────────────────────────────

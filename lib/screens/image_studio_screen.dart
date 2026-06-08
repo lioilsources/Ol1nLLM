@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/theme.dart';
 import '../models/gen_node.dart';
 import '../providers/image_studio_provider.dart';
+import '../services/comfyui_service.dart' show ComfyWorkflow;
 
 /// Iterative image studio: generate 4 candidates from a prompt, pick one,
 /// describe a change, and get 4 refinements of it — repeat to converge.
@@ -498,6 +499,55 @@ class _LoraChip extends StatelessWidget {
   }
 }
 
+class _WorkflowChip extends StatelessWidget {
+  const _WorkflowChip({
+    required this.current,
+    required this.onChanged,
+  });
+
+  final ComfyWorkflow current;
+  final ValueChanged<ComfyWorkflow> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final isPony = current == ComfyWorkflow.pony;
+    return GestureDetector(
+      onTap: () => onChanged(isPony ? ComfyWorkflow.flux : ComfyWorkflow.pony),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isPony
+              ? AppTheme.accent.withValues(alpha: 0.15)
+              : AppTheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isPony ? AppTheme.accent : Colors.white24,
+            width: 0.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.auto_fix_high_outlined,
+              size: 14,
+              color: isPony ? AppTheme.accent : AppTheme.textSecondary,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              isPony ? 'Pony' : 'Flux',
+              style: TextStyle(
+                fontSize: 12,
+                color: isPony ? AppTheme.accent : AppTheme.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _StudioInputBar extends ConsumerStatefulWidget {
   const _StudioInputBar({required this.state});
 
@@ -555,6 +605,7 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
 
     final loras = widget.state.availableLoras;
     final selectedLora = widget.state.selectedLora;
+    final workflow = widget.state.workflow;
 
     return Container(
       decoration: const BoxDecoration(
@@ -568,16 +619,27 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (loras.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: _LoraChip(
-                  loras: loras,
-                  selected: selectedLora,
-                  onChanged: (v) =>
-                      ref.read(imageStudioProvider.notifier).setLora(v),
-                ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  _WorkflowChip(
+                    current: workflow,
+                    onChanged: (wf) =>
+                        ref.read(imageStudioProvider.notifier).setWorkflow(wf),
+                  ),
+                  if (loras.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    _LoraChip(
+                      loras: loras,
+                      selected: selectedLora,
+                      onChanged: (v) =>
+                          ref.read(imageStudioProvider.notifier).setLora(v),
+                    ),
+                  ],
+                ],
               ),
+            ),
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [

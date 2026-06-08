@@ -35,6 +35,9 @@ class ImageStudioState {
   /// Currently selected LoRA name, or null for no LoRA.
   final String? selectedLora;
 
+  /// Active ComfyUI workflow / model family.
+  final ComfyWorkflow workflow;
+
   /// Last error surfaced to the user (for a one-shot snackbar).
   final String? error;
 
@@ -45,6 +48,7 @@ class ImageStudioState {
     this.backendId = kBackendComfyUI,
     this.availableLoras = const [],
     this.selectedLora,
+    this.workflow = ComfyWorkflow.flux,
     this.error,
   });
 
@@ -81,6 +85,7 @@ class ImageStudioState {
     List<String>? availableLoras,
     String? selectedLora,
     bool clearLora = false,
+    ComfyWorkflow? workflow,
     String? error,
     bool clearError = false,
   }) => ImageStudioState(
@@ -92,6 +97,7 @@ class ImageStudioState {
     backendId: backendId ?? this.backendId,
     availableLoras: availableLoras ?? this.availableLoras,
     selectedLora: clearLora ? null : (selectedLora ?? this.selectedLora),
+    workflow: workflow ?? this.workflow,
     error: clearError ? null : (error ?? this.error),
   );
 }
@@ -128,6 +134,11 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
   void setLora(String? loraName) {
     _comfyui.setLora(loraName);
     state = state.copyWith(selectedLora: loraName, clearLora: loraName == null);
+  }
+
+  void setWorkflow(ComfyWorkflow wf) {
+    _comfyui.setWorkflow(wf);
+    state = state.copyWith(workflow: wf);
   }
 
   Future<void> _loadLoras() async {
