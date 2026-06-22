@@ -881,6 +881,18 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
     final selectedLora = widget.state.selectedLora;
     final workflow = widget.state.workflow;
 
+    // Parent prompt shown as context when the current node is a refinement.
+    final currentNode = widget.state.current;
+    String? parentPrompt;
+    if (currentNode?.parentId != null) {
+      for (final n in widget.state.nodes) {
+        if (n.id == currentNode!.parentId && n.prompt.isNotEmpty) {
+          parentPrompt = n.prompt;
+          break;
+        }
+      }
+    }
+
     return Container(
       decoration: const BoxDecoration(
         color: AppTheme.background,
@@ -914,6 +926,32 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                 ],
               ),
             ),
+            if (parentPrompt != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.subdirectory_arrow_right,
+                      size: 13,
+                      color: AppTheme.textSecondary,
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        parentPrompt,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 11,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
