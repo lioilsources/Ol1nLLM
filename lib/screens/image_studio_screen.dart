@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gal/gal.dart';
+import 'package:image_picker/image_picker.dart';
 import '../core/constants/theme.dart';
 import '../models/gen_node.dart';
 import '../providers/image_studio_provider.dart';
@@ -89,7 +91,8 @@ class _EmptyHint extends StatelessWidget {
             Icon(Icons.auto_awesome, size: 48, color: AppTheme.textSecondary),
             SizedBox(height: 16),
             Text(
-              'Describe an image to generate four variants.\n'
+              'Describe an image to generate four variants,\n'
+              'or tap the camera to start from a photo.\n'
               'Tap one, describe a change, and refine it.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppTheme.textSecondary, height: 1.5),
@@ -834,6 +837,7 @@ class _StudioInputBar extends ConsumerStatefulWidget {
 class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
+  final _picker = ImagePicker();
 
   @override
   void dispose() {
@@ -849,6 +853,67 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
     if (!_hasRoot) return 'Describe an image to generate…';
     if (_isRefineMode) return 'Describe the change to the selected image…';
     return 'Pick an image to refine, or tap ＋ for a new one';
+  }
+
+  /// Let the user start a fresh image from a camera photo (or gallery pick).
+  /// The chosen photo becomes a ready root that the next message refines.
+  Future<void> _startFromPhoto() async {
+    if (widget.state.isBusy) return;
+    final source = await _chooseSource();
+    if (source == null) return;
+    Uint8List bytes;
+    try {
+      final file = await _picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 90,
+      );
+      if (file == null) return;
+      bytes = await file.readAsBytes();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Nepodařilo se načíst fotku: $e'),
+          backgroundColor: Colors.red[700],
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+    await ref.read(imageStudioProvider.notifier).startFromImage(bytes);
+  }
+
+  Future<ImageSource?> _chooseSource() {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined,
+                  color: AppTheme.textPrimary),
+              title: const Text('Vyfotit',
+                  style: TextStyle(color: AppTheme.textPrimary)),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined,
+                  color: AppTheme.textPrimary),
+              title: const Text('Vybrat z galerie',
+                  style: TextStyle(color: AppTheme.textPrimary)),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _send() async {
@@ -955,6 +1020,15 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                if (!_hasRoot) ...[
+                  IconButton(
+                    icon: const Icon(Icons.photo_camera_outlined),
+                    color: AppTheme.textSecondary,
+                    tooltip: 'Začít z fotky',
+                    onPressed: isBusy ? null : _startFromPhoto,
+                  ),
+                  const SizedBox(width: 4),
+                ],
                 Expanded(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 120),
