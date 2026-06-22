@@ -946,17 +946,12 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
     final selectedLora = widget.state.selectedLora;
     final workflow = widget.state.workflow;
 
-    // Parent prompt shown as context when the current node is a refinement.
+    // The current node's own prompt shown as context (the text→image prompt
+    // for a root, or the edit instruction that produced this refinement).
     final currentNode = widget.state.current;
-    String? parentPrompt;
-    if (currentNode?.parentId != null) {
-      for (final n in widget.state.nodes) {
-        if (n.id == currentNode!.parentId && n.prompt.isNotEmpty) {
-          parentPrompt = n.prompt;
-          break;
-        }
-      }
-    }
+    final nodePrompt = (currentNode?.prompt.isNotEmpty ?? false)
+        ? currentNode!.prompt
+        : null;
 
     return Container(
       decoration: const BoxDecoration(
@@ -991,7 +986,7 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                 ],
               ),
             ),
-            if (parentPrompt != null)
+            if (nodePrompt != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Row(
@@ -1004,7 +999,7 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        parentPrompt,
+                        nodePrompt,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
