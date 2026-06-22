@@ -10,7 +10,7 @@ import '../models/message.dart';
 import '../services/comfyui_service.dart';
 import '../services/image_backend.dart';
 import '../services/media_service.dart';
-import '../services/nim_service.dart';
+import '../services/vllm_service.dart';
 import '../services/persona_service.dart';
 
 const _uuid = Uuid();
@@ -58,7 +58,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   static const _boxName = 'conversations';
   static const _key = 'all';
 
-  final NimService _service = NimService();
+  final VllmService _service = VllmService();
   final MediaService _mediaService = MediaService(); // OCR only
   final ComfyUIService _comfyui = ComfyUIService(); // image generation/editing
   final PersonaService _personaService;
@@ -260,8 +260,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
               _save();
             },
             onError: (e, st) {
-              debugPrint('[nim] stream error type=${e.runtimeType} msg=$e');
-              debugPrint('[nim] stack: $st');
+              debugPrint('[vllm] stream error type=${e.runtimeType} msg=$e');
+              debugPrint('[vllm] stack: $st');
               state = state.copyWith(
                 isStreaming: false,
                 error: _errorMessage(e),

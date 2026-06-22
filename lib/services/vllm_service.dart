@@ -21,7 +21,7 @@ class ChatDone extends ChatEvent {
   bool get truncatedByLength => finishReason == 'length';
 }
 
-class NimService {
+class VllmService {
   static const _baseUrl = 'https://llm.ol1n.com/v1/chat/completions';
   static const _model = 'llm-lab';
   static const _cfId = String.fromEnvironment('CF_ACCESS_CLIENT_ID');
@@ -35,7 +35,7 @@ class NimService {
   static http.Client _makeClient() => http.Client();
 
   /// Streams assistant events (deltas + a final ChatDone with finish_reason)
-  /// from NIM via LiteLLM.
+  /// from the vLLM OpenAI-compatible endpoint.
   Stream<ChatEvent> chat(
     List<Message> messages, {
     String? systemPrompt,
@@ -114,7 +114,7 @@ class NimService {
           final msg = errorField is Map
               ? '${errorField['message'] ?? errorField}'
               : errorField.toString();
-          debugPrint('[nim] SSE error event: $msg');
+          debugPrint('[vllm] SSE error event: $msg');
           throw Exception(msg);
         }
         final choice =

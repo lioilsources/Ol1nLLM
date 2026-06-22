@@ -1,9 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform, WebSocket;
+import 'dart:io' show WebSocket;
 import 'dart:math';
 
-import 'package:cronet_http/cronet_http.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
@@ -84,12 +83,7 @@ class ComfyUIService implements ImageBackend {
     }
   }
 
-  static http.Client _makeClient() {
-    try {
-      if (Platform.isAndroid) return CronetClient.defaultCronetEngine();
-    } catch (_) {}
-    return http.Client();
-  }
+  static http.Client _makeClient() => http.Client();
 
   @override
   String get id => kBackendComfyUI;

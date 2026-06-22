@@ -1,6 +1,4 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
-import 'package:cronet_http/cronet_http.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
@@ -14,12 +12,7 @@ class MediaService {
 
   final http.Client _client = _makeClient();
 
-  static http.Client _makeClient() {
-    try {
-      if (Platform.isAndroid) return CronetClient.defaultCronetEngine();
-    } catch (_) {}
-    return http.Client();
-  }
+  static http.Client _makeClient() => http.Client();
 
   Map<String, String> get _headers {
     if (_cfId.isEmpty || _cfSecret.isEmpty) {
