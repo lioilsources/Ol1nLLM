@@ -13,6 +13,11 @@ class GenImage {
   const GenImage({required this.id, required this.b64});
 
   factory GenImage.fromB64(String b64) => GenImage(id: _uuid.v4(), b64: b64);
+
+  Map<String, dynamic> toJson() => {'id': id, 'b64': b64};
+
+  factory GenImage.fromJson(Map<String, dynamic> json) =>
+      GenImage(id: json['id'] as String, b64: json['b64'] as String);
 }
 
 /// One round in the refinement tree.
@@ -67,6 +72,35 @@ class GenNode {
     prompt: prompt,
     status: GenStatus.generating,
   );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    if (parentId != null) 'parentId': parentId,
+    if (sourceImageId != null) 'sourceImageId': sourceImageId,
+    'prompt': prompt,
+    'status': status.name,
+    'images': images.map((i) => i.toJson()).toList(),
+    if (error != null) 'error': error,
+  };
+
+  factory GenNode.fromJson(Map<String, dynamic> json) {
+    var status = GenStatus.values.byName(json['status'] as String);
+    // A generating node can't be resumed after serialization — mark as error
+    if (status == GenStatus.generating) status = GenStatus.error;
+    return GenNode(
+      id: json['id'] as String,
+      parentId: json['parentId'] as String?,
+      sourceImageId: json['sourceImageId'] as String?,
+      prompt: json['prompt'] as String,
+      status: status,
+      images: (json['images'] as List)
+          .map((e) => GenImage.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      error: status == GenStatus.error
+          ? (json['error'] as String? ?? 'Generování přerušeno')
+          : null,
+    );
+  }
 
   GenNode copyWith({
     GenStatus? status,

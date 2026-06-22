@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 import '../models/gen_node.dart';
+import '../models/image_session.dart';
 import '../services/comfyui_service.dart';
 import '../services/image_backend.dart';
 
@@ -41,6 +44,12 @@ class ImageStudioState {
   /// Last error surfaced to the user (for a one-shot snackbar).
   final String? error;
 
+  /// All persisted sessions (sorted newest-first).
+  final List<ImageSession> sessions;
+
+  /// ID of the session currently being edited (null = unsaved new session).
+  final String? activeSessionId;
+
   const ImageStudioState({
     this.nodes = const [],
     this.currentNodeId,
@@ -50,6 +59,8 @@ class ImageStudioState {
     this.selectedLora,
     this.workflow = ComfyWorkflow.flux,
     this.error,
+    this.sessions = const [],
+    this.activeSessionId,
   });
 
   GenNode? get current {
@@ -88,6 +99,9 @@ class ImageStudioState {
     ComfyWorkflow? workflow,
     String? error,
     bool clearError = false,
+    List<ImageSession>? sessions,
+    String? activeSessionId,
+    bool clearActiveSessionId = false,
   }) => ImageStudioState(
     nodes: nodes ?? this.nodes,
     currentNodeId: currentNodeId ?? this.currentNodeId,
@@ -99,14 +113,21 @@ class ImageStudioState {
     selectedLora: clearLora ? null : (selectedLora ?? this.selectedLora),
     workflow: workflow ?? this.workflow,
     error: clearError ? null : (error ?? this.error),
+    sessions: sessions ?? this.sessions,
+    activeSessionId: clearActiveSessionId
+        ? null
+        : (activeSessionId ?? this.activeSessionId),
   );
 }
 
 class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
   ImageStudioNotifier() : super(const ImageStudioState()) {
-    // Pre-load LoRAs so they're ready when the studio opens.
     _loadLoras();
+    _load();
   }
+
+  static const _boxName = 'image_sessions';
+  static const _key = 'all';
 
   final ComfyUIService _comfyui = ComfyUIService();
 
@@ -122,11 +143,121 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
   void navigateTo(String nodeId) =>
       state = state.copyWith(currentNodeId: nodeId, clearSelected: true);
 
-  void startOver() {
+  void newSession() {
     _activeSub?.cancel();
     _activeSub = null;
     _activeNodeId = null;
-    state = ImageStudioState(backendId: state.backendId);
+    state = ImageStudioState(
+      sessions: state.sessions,
+      backendId: state.backendId,
+      availableLoras: state.availableLoras,
+      workflow: state.workflow,
+      selectedLora: state.selectedLora,
+    );
+  }
+
+  void selectSession(String id) {
+    final session = state.sessions.firstWhere((s) => s.id == id);
+    _comfyui.setLora(session.selectedLora);
+    _comfyui.setWorkflow(session.workflow);
+    state = ImageStudioState(
+      sessions: state.sessions,
+      activeSessionId: id,
+      nodes: session.nodes.toList(),
+      currentNodeId: session.currentNodeId,
+      selectedLora: session.selectedLora,
+      workflow: session.workflow,
+      backendId: state.backendId,
+      availableLoras: state.availableLoras,
+    );
+  }
+
+  Future<void> deleteSession(String id) async {
+    final updated = state.sessions.where((s) => s.id != id).toList();
+    if (state.activeSessionId == id) {
+      final next = updated.isNotEmpty ? updated.first : null;
+      if (next != null) {
+        _comfyui.setLora(next.selectedLora);
+        _comfyui.setWorkflow(next.workflow);
+        state = ImageStudioState(
+          sessions: updated,
+          activeSessionId: next.id,
+          nodes: next.nodes.toList(),
+          currentNodeId: next.currentNodeId,
+          selectedLora: next.selectedLora,
+          workflow: next.workflow,
+          backendId: state.backendId,
+          availableLoras: state.availableLoras,
+        );
+      } else {
+        state = ImageStudioState(
+          sessions: const [],
+          backendId: state.backendId,
+          availableLoras: state.availableLoras,
+          workflow: state.workflow,
+        );
+      }
+    } else {
+      state = state.copyWith(sessions: updated);
+    }
+    await _persistSessions(updated);
+  }
+
+  Future<void> _load() async {
+    try {
+      final box = await Hive.openBox(_boxName);
+      final raw = box.get(_key);
+      if (raw == null) return;
+      final sessions = (jsonDecode(raw as String) as List)
+          .map((e) => ImageSession.fromJson(e as Map<String, dynamic>))
+          .toList()
+        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      if (sessions.isNotEmpty) {
+        final latest = sessions.first;
+        _comfyui.setLora(latest.selectedLora);
+        _comfyui.setWorkflow(latest.workflow);
+        state = ImageStudioState(
+          sessions: sessions,
+          activeSessionId: latest.id,
+          nodes: latest.nodes.toList(),
+          currentNodeId: latest.currentNodeId,
+          selectedLora: latest.selectedLora,
+          workflow: latest.workflow,
+          backendId: state.backendId,
+          availableLoras: state.availableLoras,
+        );
+      } else {
+        state = state.copyWith(sessions: sessions);
+      }
+    } catch (e) {
+      debugPrint('ImageStudioNotifier._load error: $e');
+    }
+  }
+
+  Future<void> _save() async {
+    if (state.nodes.isEmpty) return;
+    final session = ImageSession.create(
+      id: state.activeSessionId,
+      nodes: state.nodes,
+      currentNodeId: state.currentNodeId,
+      selectedLora: state.selectedLora,
+      workflow: state.workflow,
+    );
+    final updated = [
+      session,
+      ...state.sessions.where((s) => s.id != session.id),
+    ]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    state = state.copyWith(sessions: updated, activeSessionId: session.id);
+    await _persistSessions(updated);
+  }
+
+  Future<void> _persistSessions(List<ImageSession> sessions) async {
+    try {
+      final box = await Hive.openBox(_boxName);
+      await box.put(_key, jsonEncode(sessions.map((s) => s.toJson()).toList()));
+    } catch (e) {
+      debugPrint('ImageStudioNotifier._persistSessions error: $e');
+    }
   }
 
   void clearError() => state = state.copyWith(clearError: true);
@@ -327,6 +458,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
                 clearProgress: true,
               ),
             );
+            unawaited(_save());
           case GenFailed(:final message):
             fail(message);
         }

@@ -6,6 +6,7 @@ import '../core/constants/theme.dart';
 import '../models/gen_node.dart';
 import '../providers/image_studio_provider.dart';
 import '../services/comfyui_service.dart' show ComfyWorkflow;
+import '../widgets/image_session_drawer.dart';
 
 /// Iterative image studio: generate 4 candidates from a prompt, pick one,
 /// describe a change, and get 4 refinements of it — repeat to converge.
@@ -33,8 +34,16 @@ class ImageStudioScreen extends ConsumerWidget {
     final notifier = ref.read(imageStudioProvider.notifier);
 
     return Scaffold(
+      drawer: const ImageSessionDrawer(),
       appBar: AppBar(
         title: const Text('Image Studio'),
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'Session history',
+            onPressed: () => Scaffold.of(ctx).openDrawer(),
+          ),
+        ),
         actions: [
           if (state.isBusy)
             IconButton(
@@ -42,12 +51,11 @@ class ImageStudioScreen extends ConsumerWidget {
               tooltip: 'Zrušit generování',
               onPressed: notifier.cancel,
             ),
-          if (state.nodes.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.add_photo_alternate_outlined),
-              tooltip: 'New image',
-              onPressed: state.isBusy ? null : notifier.startOver,
-            ),
+          IconButton(
+            icon: const Icon(Icons.add_photo_alternate_outlined),
+            tooltip: 'New session',
+            onPressed: state.isBusy ? null : notifier.newSession,
+          ),
         ],
       ),
       body: Column(
@@ -236,12 +244,16 @@ class _TreeNodeWidget extends StatelessWidget {
   const _TreeNodeWidget({
     required this.layoutNode,
     required this.isCurrent,
+    required this.isParent,
     required this.onTap,
+    this.displayImageId,
   });
 
   final _LayoutNode layoutNode;
   final bool isCurrent;
+  final bool isParent;
   final VoidCallback onTap;
+  final String? displayImageId;
 
   @override
   Widget build(BuildContext context) {
@@ -257,9 +269,15 @@ class _TreeNodeWidget extends StatelessWidget {
     } else if (node.status == GenStatus.error) {
       inner = const Icon(Icons.error_outline, size: 22, color: Colors.redAccent);
     } else if (node.images.isNotEmpty) {
+      final displayImg = displayImageId != null
+          ? node.images.firstWhere(
+              (img) => img.id == displayImageId,
+              orElse: () => node.images.first,
+            )
+          : node.images.first;
       inner = ClipOval(
         child: Image.memory(
-          base64Decode(node.images.first.b64),
+          base64Decode(displayImg.b64),
           fit: BoxFit.cover,
           width: size,
           height: size,
@@ -282,10 +300,18 @@ class _TreeNodeWidget extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: isCurrent ? AppTheme.accent : AppTheme.surface,
+          color: isCurrent
+              ? AppTheme.accent
+              : isParent
+                  ? AppTheme.accent.withValues(alpha: 0.12)
+                  : AppTheme.surface,
           border: Border.all(
-            color: isCurrent ? AppTheme.accent : Colors.white24,
-            width: isCurrent ? 2.5 : 0.5,
+            color: isCurrent
+                ? AppTheme.accent
+                : isParent
+                    ? AppTheme.accent.withValues(alpha: 0.6)
+                    : Colors.white24,
+            width: isCurrent ? 2.5 : isParent ? 1.5 : 0.5,
           ),
           boxShadow: isCurrent
               ? [BoxShadow(color: AppTheme.accent.withValues(alpha: 0.4), blurRadius: 8)]
@@ -306,6 +332,16 @@ class _TreeNavigator extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(imageStudioProvider.notifier);
 
+    // Find the parent of the currently displayed node so we can highlight it.
+    GenNode? currentNode;
+    for (final n in state.nodes) {
+      if (n.id == state.currentNodeId) {
+        currentNode = n;
+        break;
+      }
+    }
+    final parentId = currentNode?.parentId;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final layout = _TreeLayout.compute(
@@ -322,6 +358,7 @@ class _TreeNavigator extends ConsumerWidget {
               child: _TreeNodeWidget(
                 layoutNode: layoutNodes.first,
                 isCurrent: true,
+                isParent: false,
                 onTap: () {},
               ),
             ),
@@ -352,6 +389,10 @@ class _TreeNavigator extends ConsumerWidget {
                       child: _TreeNodeWidget(
                         layoutNode: ln,
                         isCurrent: ln.node.id == state.currentNodeId,
+                        isParent: ln.node.id == parentId,
+                        displayImageId: ln.node.id == parentId
+                            ? currentNode?.sourceImageId
+                            : null,
                         onTap: () => notifier.navigateTo(ln.node.id),
                       ),
                     ),
