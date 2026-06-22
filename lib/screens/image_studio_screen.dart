@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -280,7 +279,7 @@ class _TreeNodeWidget extends StatelessWidget {
           : node.images.first;
       inner = ClipOval(
         child: Image.memory(
-          base64Decode(displayImg.b64),
+          displayImg.bytes,
           fit: BoxFit.cover,
           width: size,
           height: size,
@@ -335,7 +334,10 @@ class _TreeNavigator extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(imageStudioProvider.notifier);
 
-    // Find the parent of the currently displayed node so we can highlight it.
+    // Find the parent of the currently displayed node so we can highlight it
+    // and — only when a child is the current node — show that child's source
+    // image on the parent's thumbnail (so the parent reflects what was refined,
+    // not its own first variant).
     GenNode? currentNode;
     for (final n in state.nodes) {
       if (n.id == state.currentNodeId) {
@@ -449,8 +451,21 @@ class _NodeGrid extends ConsumerWidget {
       );
     }
 
-    final generating = node.status == GenStatus.generating;
-    final tiles = generating ? kVariantCount : node.images.length;
+    // One spinner per generating node (the per-step label lives in the
+    // progress banner below the grid).
+    if (node.status == GenStatus.generating) {
+      return Center(
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: CircularProgressIndicator(
+            value: node.progress,
+            strokeWidth: 2.5,
+            color: AppTheme.accent,
+          ),
+        ),
+      );
+    }
 
     return GridView.builder(
       padding: const EdgeInsets.all(12),
@@ -460,23 +475,22 @@ class _NodeGrid extends ConsumerWidget {
         crossAxisSpacing: 12,
         childAspectRatio: 1,
       ),
-      itemCount: tiles,
+      itemCount: node.images.length,
       itemBuilder: (context, i) {
-        if (generating) return _PlaceholderTile(progress: node.progress);
         final img = node.images[i];
         return _ImageTile(
           image: img,
           selected: img.id == selectedId,
           onSelect: () =>
               ref.read(imageStudioProvider.notifier).selectImage(img.id),
-          onExpand: () => _showFullscreen(context, img.b64),
-          onSave: () => _saveImage(context, img.b64),
+          onExpand: () => _showFullscreen(context, img),
+          onSave: () => _saveImage(context, img),
         );
       },
     );
   }
 
-  void _showFullscreen(BuildContext context, String b64) {
+  void _showFullscreen(BuildContext context, GenImage image) {
     showDialog<void>(
       context: context,
       barrierColor: Colors.black87,
@@ -484,16 +498,16 @@ class _NodeGrid extends ConsumerWidget {
         onTap: () => Navigator.of(context).pop(),
         child: InteractiveViewer(
           child: Center(
-            child: Image.memory(base64Decode(b64), fit: BoxFit.contain),
+            child: Image.memory(image.bytes, fit: BoxFit.contain),
           ),
         ),
       ),
     );
   }
 
-  Future<void> _saveImage(BuildContext context, String b64) async {
+  Future<void> _saveImage(BuildContext context, GenImage image) async {
     try {
-      await Gal.putImageBytes(base64Decode(b64));
+      await Gal.putImageBytes(image.bytes);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -517,34 +531,6 @@ class _NodeGrid extends ConsumerWidget {
         );
       }
     }
-  }
-}
-
-class _PlaceholderTile extends StatelessWidget {
-  const _PlaceholderTile({this.progress});
-
-  /// 0..1 determinate progress, or null for an indeterminate spinner.
-  final double? progress;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Center(
-        child: SizedBox(
-          width: 22,
-          height: 22,
-          child: CircularProgressIndicator(
-            value: progress,
-            strokeWidth: 2,
-            color: AppTheme.textSecondary,
-          ),
-        ),
-      ),
-    );
   }
 }
 
@@ -580,7 +566,7 @@ class _ImageTile extends StatelessWidget {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: Image.memory(base64Decode(image.b64), fit: BoxFit.cover),
+              child: Image.memory(image.bytes, fit: BoxFit.cover),
             ),
           ),
           if (selected)

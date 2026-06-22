@@ -72,7 +72,10 @@ class ImageStudioState {
     return null;
   }
 
-  bool get isBusy => current?.status == GenStatus.generating;
+  /// True while *any* node is generating — the studio runs one job at a time,
+  /// so this globally locks input/new-session/retry until it finishes. (The
+  /// per-node progress banner keys off the individual node's status instead.)
+  bool get isBusy => nodes.any((n) => n.status == GenStatus.generating);
 
   /// Root→current chain, for the breadcrumb.
   List<GenNode> get path {
@@ -343,6 +346,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
 
   /// Re-run a failed (or finished) node with its original prompt.
   Future<void> retry(String nodeId) async {
+    if (state.isBusy) return;
     final node = _nodeById(nodeId);
     if (node == null || node.status == GenStatus.generating) return;
     _patch(

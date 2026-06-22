@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:uuid/uuid.dart';
 
 const _uuid = Uuid();
@@ -9,8 +12,15 @@ enum GenStatus { generating, ready, error }
 class GenImage {
   final String id;
   final String b64;
+  Uint8List? _bytes;
 
-  const GenImage({required this.id, required this.b64});
+  GenImage({required this.id, required this.b64});
+
+  /// Decoded PNG bytes, decoded lazily once and cached. Reusing the same
+  /// [Uint8List] instance across rebuilds lets `Image.memory` recognise the
+  /// image as unchanged, so it isn't re-decoded (which caused tiles and tree
+  /// thumbnails to flicker on every progress tick / selection).
+  Uint8List get bytes => _bytes ??= base64Decode(b64);
 
   factory GenImage.fromB64(String b64) => GenImage(id: _uuid.v4(), b64: b64);
 
