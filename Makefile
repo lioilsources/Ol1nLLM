@@ -7,7 +7,7 @@ DART_DEFINES = \
 	--dart-define=CF_ACCESS_CLIENT_SECRET=$(CF_ACCESS_CLIENT_SECRET)
 
 run:
-	flutter run $(DART_DEFINES)
+	flutter run --release $(DART_DEFINES)
 
 build-ios:
 	flutter build ipa --release \
