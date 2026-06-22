@@ -1,5 +1,7 @@
 .PHONY: run build-ios build-android
 
+-include .env.local
+
 DART_DEFINES = \
 	--dart-define=CF_ACCESS_CLIENT_ID=$(CF_ACCESS_CLIENT_ID) \
 	--dart-define=CF_ACCESS_CLIENT_SECRET=$(CF_ACCESS_CLIENT_SECRET)

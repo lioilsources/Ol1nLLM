@@ -1,5 +1,7 @@
 # Secrets
 .env.json
+.env.local
+ios/ExportOptions.plist
 
 # Miscellaneous
 *.class
