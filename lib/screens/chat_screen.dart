@@ -4,6 +4,7 @@ import '../models/message.dart';
 import '../models/persona.dart';
 import '../providers/chat_provider.dart';
 import '../services/persona_service.dart';
+import '../widgets/chat_branch_tree.dart';
 import '../widgets/chat_input_bar.dart';
 import '../widgets/conversation_drawer.dart';
 import '../widgets/message_bubble.dart';
@@ -24,8 +25,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void initState() {
     super.initState();
     ref.listenManual(chatProvider, (prev, next) {
-      final prevCount = prev?.active?.messages.length ?? 0;
-      final nextCount = next.active?.messages.length ?? 0;
+      final prevCount = prev?.active?.thread.length ?? 0;
+      final nextCount = next.active?.thread.length ?? 0;
       if (nextCount > prevCount || next.isStreaming) {
         _scrollToBottom();
       }
@@ -63,7 +64,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(chatProvider);
-    final messages = state.active?.messages ?? [];
+    final messages = state.active?.thread ?? [];
     final personaId = state.active?.personaId;
     final personasAsync = ref.watch(personaListProvider);
     final activePersona = personasAsync.maybeWhen(
@@ -108,6 +109,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
       body: Column(
         children: [
+          if (!showPicker) const ChatBranchTree(),
           Expanded(
             child: showPicker
                 ? const PersonaPicker()

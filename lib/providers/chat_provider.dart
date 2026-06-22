@@ -167,6 +167,19 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWith(activeId: id, pendingContinuation: false);
   }
 
+  /// Switch the active branch to the turn started by [userMessageId]. Moves the
+  /// leaf to that turn's reply (or the user message itself if it has none), so
+  /// the thread shows that path and the next message branches from there.
+  void selectBranch(String userMessageId) {
+    if (state.isStreaming) return;
+    final conv = state.active;
+    if (conv == null) return;
+    final leaf = conv.replyOf(userMessageId)?.id ?? userMessageId;
+    if (!conv.messages.any((m) => m.id == leaf)) return;
+    _replaceConversation(conv.copyWith(activeLeafId: leaf));
+    _save();
+  }
+
   void dismissContinuation() =>
       state = state.copyWith(pendingContinuation: false);
 
@@ -199,18 +212,21 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
     final userMsg = Message(
       id: _uuid.v4(),
+      parentId: conv.activeLeafId,
       role: MessageRole.user,
       content: text.trim(),
       createdAt: DateTime.now(),
     );
-    final messagesForApi = [...conv.messages, userMsg];
+    // API sees only the active branch (root→leaf) plus the new user turn.
+    final messagesForApi = [...conv.thread, userMsg];
     final newTitle = conv.messages.isEmpty
         ? (text.length > 60 ? '${text.substring(0, 60)}…' : text)
         : conv.title;
     conv = conv.copyWith(
-      messages: messagesForApi,
+      messages: [...conv.messages, userMsg],
       title: newTitle,
       updatedAt: DateTime.now(),
+      activeLeafId: userMsg.id,
     );
     _replaceConversation(conv);
     state = state.copyWith(
@@ -226,11 +242,15 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
       final assistantMsg = Message(
         id: _uuid.v4(),
+        parentId: userMsg.id,
         role: MessageRole.assistant,
         content: '',
         createdAt: DateTime.now(),
       );
-      conv = conv.copyWith(messages: [...conv.messages, assistantMsg]);
+      conv = conv.copyWith(
+        messages: [...conv.messages, assistantMsg],
+        activeLeafId: assistantMsg.id,
+      );
       _replaceConversation(conv);
 
       _streamSub = _service
@@ -241,11 +261,13 @@ class ChatNotifier extends StateNotifier<ChatState> {
                 case ChatDelta(:final content):
                   final current = state.active;
                   if (current == null) return;
-                  final msgs = List<Message>.from(current.messages);
-                  final last = msgs.last;
-                  msgs[msgs.length - 1] = last.copyWith(
-                    content: last.content + content,
-                  );
+                  final msgs = current.messages
+                      .map(
+                        (m) => m.id == assistantMsg.id
+                            ? m.copyWith(content: m.content + content)
+                            : m,
+                      )
+                      .toList();
                   _replaceConversation(
                     current.copyWith(messages: msgs, updatedAt: DateTime.now()),
                   );
@@ -353,9 +375,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
       );
     }
 
+    final user = userMsg.copyWith(parentId: conv.activeLeafId);
     final placeholderId = _uuid.v4();
     final placeholder = Message(
       id: placeholderId,
+      parentId: user.id,
       role: MessageRole.assistant,
       content: '',
       createdAt: DateTime.now(),
@@ -365,9 +389,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
         ? (titleSeed.length > 60 ? '${titleSeed.substring(0, 60)}…' : titleSeed)
         : conv.title;
     conv = conv.copyWith(
-      messages: [...conv.messages, userMsg, placeholder],
+      messages: [...conv.messages, user, placeholder],
       title: newTitle,
       updatedAt: DateTime.now(),
+      activeLeafId: placeholderId,
     );
     _replaceConversation(conv);
     state = state.copyWith(
@@ -454,44 +479,43 @@ class ChatNotifier extends StateNotifier<ChatState> {
     String placeholderId,
     List<Uint8List> images,
   ) {
-    _replacePlaceholder(
-      convId,
-      placeholderId,
-      Message(
-        id: _uuid.v4(),
-        role: MessageRole.assistant,
-        content: '',
-        createdAt: DateTime.now(),
-        images: [for (final bytes in images) base64Encode(bytes)],
+    final conv = state.conversations.where((c) => c.id == convId).firstOrNull;
+    if (conv == null) return;
+    // Reuse the placeholder's id (and parent link) so activeLeafId stays valid.
+    _replaceConversation(
+      conv.copyWith(
+        messages: conv.messages
+            .map(
+              (m) => m.id == placeholderId
+                  ? m.copyWith(
+                      content: '',
+                      images: [for (final bytes in images) base64Encode(bytes)],
+                    )
+                  : m,
+            )
+            .toList(),
+        updatedAt: DateTime.now(),
       ),
     );
     state = state.copyWith(isStreaming: false);
     unawaited(_save());
   }
 
-  void _replacePlaceholder(
-    String convId,
-    String placeholderId,
-    Message replacement,
-  ) {
-    final conv = state.conversations.where((c) => c.id == convId).firstOrNull;
-    if (conv == null) return;
-    _replaceConversation(
-      conv.copyWith(
-        messages: conv.messages
-            .map((m) => m.id == placeholderId ? replacement : m)
-            .toList(),
-        updatedAt: DateTime.now(),
-      ),
-    );
-  }
-
   void _removePlaceholder(String convId, String placeholderId) {
     final conv = state.conversations.where((c) => c.id == convId).firstOrNull;
     if (conv == null) return;
+    // Drop the placeholder and pull the branch tip back to its parent so the
+    // user can retry from the same point.
+    final placeholder = conv.messages
+        .where((m) => m.id == placeholderId)
+        .firstOrNull;
+    final newLeaf = conv.activeLeafId == placeholderId
+        ? placeholder?.parentId
+        : conv.activeLeafId;
     _replaceConversation(
       conv.copyWith(
         messages: conv.messages.where((m) => m.id != placeholderId).toList(),
+        activeLeafId: newLeaf,
       ),
     );
   }
@@ -511,9 +535,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
       );
     }
 
+    final user = userMsg.copyWith(parentId: conv.activeLeafId);
     final placeholderId = _uuid.v4();
     final placeholder = Message(
       id: placeholderId,
+      parentId: user.id,
       role: MessageRole.assistant,
       content: '',
       createdAt: DateTime.now(),
@@ -522,9 +548,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
         ? (titleSeed.length > 60 ? '${titleSeed.substring(0, 60)}…' : titleSeed)
         : conv.title;
     conv = conv.copyWith(
-      messages: [...conv.messages, userMsg, placeholder],
+      messages: [...conv.messages, user, placeholder],
       title: newTitle,
       updatedAt: DateTime.now(),
+      activeLeafId: placeholderId,
     );
     _replaceConversation(conv);
     state = state.copyWith(
@@ -541,10 +568,15 @@ class ChatNotifier extends StateNotifier<ChatState> {
           .where((c) => c.id == convId)
           .firstOrNull;
       if (current != null) {
+        // Keep the placeholder's id/parent so the branch tip stays valid.
         _replaceConversation(
           current.copyWith(
             messages: current.messages
-                .map((m) => m.id == placeholderId ? result : m)
+                .map(
+                  (m) => m.id == placeholderId
+                      ? m.copyWith(content: result.content, images: result.images)
+                      : m,
+                )
                 .toList(),
             updatedAt: DateTime.now(),
           ),
