@@ -61,6 +61,8 @@
 	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Used to select images for editing and OCR.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Used to save generated images to your photo library.</string>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

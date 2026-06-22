@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gal/gal.dart';
 import '../core/constants/theme.dart';
 import '../models/gen_node.dart';
 import '../providers/image_studio_provider.dart';
@@ -51,7 +52,7 @@ class ImageStudioScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
-          if (state.path.length > 1) _Breadcrumb(state: state),
+          if (state.nodes.isNotEmpty) _TreeNavigator(state: state),
           Expanded(
             child: current == null
                 ? const _EmptyHint()
@@ -127,54 +128,239 @@ class _ProgressBanner extends StatelessWidget {
   }
 }
 
-class _Breadcrumb extends ConsumerWidget {
-  const _Breadcrumb({required this.state});
+// ── Tree navigator ─────────────────────────────────────────────────────────
+
+class _LayoutNode {
+  final GenNode node;
+  final Offset position;
+  _LayoutNode(this.node, this.position);
+}
+
+class _TreeLayout {
+  static const double kNodeSize    = 48.0;
+  static const double kLevelStride = 60.0;
+  static const double kUnitWidth   = 64.0;
+
+  static ({List<_LayoutNode> nodes, Size canvasSize}) compute(
+    List<GenNode> all, {
+    double minWidth = 0,
+  }) {
+    if (all.isEmpty) return (nodes: [], canvasSize: Size.zero);
+
+    final childrenMap = <String, List<GenNode>>{};
+    GenNode? root;
+    for (final n in all) {
+      childrenMap.putIfAbsent(n.id, () => []);
+      if (n.parentId == null) {
+        root = n;
+      } else {
+        childrenMap.putIfAbsent(n.parentId!, () => []).add(n);
+      }
+    }
+    if (root == null) return (nodes: [], canvasSize: Size.zero);
+
+    final subtreeWidths = <String, int>{};
+    void calcWidth(GenNode n) {
+      final kids = childrenMap[n.id] ?? [];
+      if (kids.isEmpty) {
+        subtreeWidths[n.id] = 1;
+      } else {
+        for (final k in kids) {
+          calcWidth(k);
+        }
+        subtreeWidths[n.id] = kids.fold(0, (acc, k) => acc + subtreeWidths[k.id]!);
+      }
+    }
+    calcWidth(root);
+
+    final rawWidth = subtreeWidths[root.id]! * kUnitWidth;
+    final canvasWidth = rawWidth < minWidth ? minWidth : rawWidth;
+    final xOffset = (canvasWidth - rawWidth) / 2;
+
+    final result = <_LayoutNode>[];
+    void assignPos(GenNode n, double leftX, int level) {
+      final w = subtreeWidths[n.id]! * kUnitWidth;
+      result.add(_LayoutNode(n, Offset(leftX + w / 2, kNodeSize / 2 + level * kLevelStride)));
+      final kids = childrenMap[n.id] ?? [];
+      double cursor = leftX;
+      for (final k in kids) {
+        assignPos(k, cursor, level + 1);
+        cursor += subtreeWidths[k.id]! * kUnitWidth;
+      }
+    }
+    assignPos(root, xOffset, 0);
+
+    double maxY = 0;
+    for (final ln in result) {
+      if (ln.position.dy > maxY) maxY = ln.position.dy;
+    }
+
+    return (
+      nodes: result,
+      canvasSize: Size(canvasWidth, maxY + kNodeSize / 2 + 8),
+    );
+  }
+}
+
+class _TreeLinePainter extends CustomPainter {
+  _TreeLinePainter(this.nodes)
+      : _posById = {for (final ln in nodes) ln.node.id: ln.position};
+
+  final List<_LayoutNode> nodes;
+  final Map<String, Offset> _posById;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white24
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    for (final ln in nodes) {
+      final pid = ln.node.parentId;
+      if (pid == null) continue;
+      final parentPos = _posById[pid];
+      if (parentPos == null) continue;
+      canvas.drawLine(
+        Offset(parentPos.dx, parentPos.dy + _TreeLayout.kNodeSize / 2),
+        Offset(ln.position.dx, ln.position.dy - _TreeLayout.kNodeSize / 2),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_TreeLinePainter old) => old.nodes != nodes;
+}
+
+class _TreeNodeWidget extends StatelessWidget {
+  const _TreeNodeWidget({
+    required this.layoutNode,
+    required this.isCurrent,
+    required this.onTap,
+  });
+
+  final _LayoutNode layoutNode;
+  final bool isCurrent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final node = layoutNode.node;
+    const size = _TreeLayout.kNodeSize;
+
+    Widget inner;
+    if (node.status == GenStatus.generating) {
+      inner = const Padding(
+        padding: EdgeInsets.all(12),
+        child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.textSecondary),
+      );
+    } else if (node.status == GenStatus.error) {
+      inner = const Icon(Icons.error_outline, size: 22, color: Colors.redAccent);
+    } else if (node.images.isNotEmpty) {
+      inner = ClipOval(
+        child: Image.memory(
+          base64Decode(node.images.first.b64),
+          fit: BoxFit.cover,
+          width: size,
+          height: size,
+          cacheWidth: 48,
+          cacheHeight: 48,
+        ),
+      );
+    } else {
+      inner = Icon(
+        node.isRoot ? Icons.auto_awesome : Icons.brush_outlined,
+        size: 20,
+        color: AppTheme.textSecondary,
+      );
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isCurrent ? AppTheme.accent : AppTheme.surface,
+          border: Border.all(
+            color: isCurrent ? AppTheme.accent : Colors.white24,
+            width: isCurrent ? 2.5 : 0.5,
+          ),
+          boxShadow: isCurrent
+              ? [BoxShadow(color: AppTheme.accent.withValues(alpha: 0.4), blurRadius: 8)]
+              : null,
+        ),
+        child: Center(child: inner),
+      ),
+    );
+  }
+}
+
+class _TreeNavigator extends ConsumerWidget {
+  const _TreeNavigator({required this.state});
 
   final ImageStudioState state;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(imageStudioProvider.notifier);
-    final path = state.path;
-    return SizedBox(
-      height: 44,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        itemCount: path.length,
-        separatorBuilder: (_, _) => const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 2),
-          child: Icon(
-            Icons.chevron_right,
-            size: 16,
-            color: AppTheme.textSecondary,
-          ),
-        ),
-        itemBuilder: (context, i) {
-          final node = path[i];
-          final isCurrent = node.id == state.currentNodeId;
-          final label = node.prompt.isEmpty
-              ? (node.isRoot ? 'prompt' : 'edit')
-              : node.prompt;
-          return ActionChip(
-            avatar: Icon(
-              node.isRoot ? Icons.auto_awesome : Icons.brush_outlined,
-              size: 14,
-              color: isCurrent ? Colors.white : AppTheme.textSecondary,
-            ),
-            label: Text(
-              label.length > 22 ? '${label.substring(0, 22)}…' : label,
-              style: TextStyle(
-                color: isCurrent ? Colors.white : AppTheme.textSecondary,
-                fontSize: 12,
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final layout = _TreeLayout.compute(
+          state.nodes,
+          minWidth: constraints.maxWidth,
+        );
+        final layoutNodes = layout.nodes;
+        final canvasSize = layout.canvasSize;
+
+        if (layoutNodes.length == 1) {
+          return SizedBox(
+            height: 80,
+            child: Center(
+              child: _TreeNodeWidget(
+                layoutNode: layoutNodes.first,
+                isCurrent: true,
+                onTap: () {},
               ),
             ),
-            backgroundColor: isCurrent ? AppTheme.accent : AppTheme.surface,
-            side: BorderSide.none,
-            onPressed: isCurrent ? null : () => notifier.navigateTo(node.id),
           );
-        },
-      ),
+        }
+
+        return SizedBox(
+          height: 150,
+          child: InteractiveViewer(
+            constrained: false,
+            minScale: 0.5,
+            maxScale: 2.0,
+            child: SizedBox(
+              width: canvasSize.width,
+              height: canvasSize.height,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _TreeLinePainter(layoutNodes),
+                      size: canvasSize,
+                    ),
+                  ),
+                  for (final ln in layoutNodes)
+                    Positioned(
+                      left: ln.position.dx - _TreeLayout.kNodeSize / 2,
+                      top: ln.position.dy - _TreeLayout.kNodeSize / 2,
+                      child: _TreeNodeWidget(
+                        layoutNode: ln,
+                        isCurrent: ln.node.id == state.currentNodeId,
+                        onTap: () => notifier.navigateTo(ln.node.id),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -240,6 +426,7 @@ class _NodeGrid extends ConsumerWidget {
           onSelect: () =>
               ref.read(imageStudioProvider.notifier).selectImage(img.id),
           onExpand: () => _showFullscreen(context, img.b64),
+          onSave: () => _saveImage(context, img.b64),
         );
       },
     );
@@ -258,6 +445,34 @@ class _NodeGrid extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _saveImage(BuildContext context, String b64) async {
+    try {
+      await Gal.putImageBytes(base64Decode(b64));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Image saved to gallery'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } on GalException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              e.type == GalExceptionType.accessDenied
+                  ? 'Gallery permission denied'
+                  : 'Failed to save: ${e.type.message}',
+            ),
+            backgroundColor: Colors.red[700],
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
   }
 }
 
@@ -295,12 +510,14 @@ class _ImageTile extends StatelessWidget {
     required this.selected,
     required this.onSelect,
     required this.onExpand,
+    required this.onSave,
   });
 
   final GenImage image;
   final bool selected;
   final VoidCallback onSelect;
   final VoidCallback onExpand;
+  final VoidCallback onSave;
 
   @override
   Widget build(BuildContext context) {
@@ -332,6 +549,22 @@ class _ImageTile extends StatelessWidget {
                 child: Icon(Icons.check, size: 16, color: Colors.white),
               ),
             ),
+          Positioned(
+            bottom: 4,
+            right: 40,
+            child: Material(
+              color: Colors.black54,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onSave,
+                child: const Padding(
+                  padding: EdgeInsets.all(6),
+                  child: Icon(Icons.download_outlined, size: 18, color: Colors.white),
+                ),
+              ),
+            ),
+          ),
           Positioned(
             bottom: 4,
             right: 4,
