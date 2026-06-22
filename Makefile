@@ -1,0 +1,17 @@
+.PHONY: run build-ios build-android
+
+DART_DEFINES = \
+	--dart-define=CF_ACCESS_CLIENT_ID=$(CF_ACCESS_CLIENT_ID) \
+	--dart-define=CF_ACCESS_CLIENT_SECRET=$(CF_ACCESS_CLIENT_SECRET)
+
+run:
+	flutter run $(DART_DEFINES)
+
+build-ios:
+	flutter build ipa --release \
+		--export-options-plist=ios/ExportOptions.plist \
+		$(DART_DEFINES)
+
+build-android:
+	flutter build apk --release \
+		$(DART_DEFINES)
