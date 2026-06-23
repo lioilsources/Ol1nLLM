@@ -1,5 +1,8 @@
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/constants/theme.dart';
+import '../core/utils/keyword.dart';
 import '../models/message.dart';
 import '../models/persona.dart';
 import '../providers/chat_provider.dart';
@@ -132,6 +135,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     },
                   ),
           ),
+          if (!showPicker && (state.active?.forksOnNextSend ?? false))
+            _BranchHint(
+              label: keywordOf(
+                state.active!.thread
+                        .where((m) => m.role == MessageRole.user)
+                        .lastOrNull
+                        ?.content ??
+                    '',
+              ),
+            ),
           if (!showPicker) const ChatInputBar(),
         ],
       ),
@@ -150,5 +163,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (convTitle == null) return 'Ol1nLLM';
     if (convTitle == 'New conversation' && persona != null) return persona.name;
     return convTitle;
+  }
+}
+
+/// Thin strip shown when the active leaf already has children, signalling that
+/// the next message will fork a new branch from [label] rather than continue
+/// the current one linearly.
+class _BranchHint extends StatelessWidget {
+  const _BranchHint({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: AppTheme.accent.withValues(alpha: 0.12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        children: [
+          const Icon(Icons.call_split, size: 14, color: AppTheme.accent),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'Nová zpráva založí větev z „$label"',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: AppTheme.accent, fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

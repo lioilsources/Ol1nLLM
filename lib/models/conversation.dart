@@ -75,6 +75,11 @@ class Conversation {
     return out;
   }
 
+  /// True when the active leaf already has a child, so the next message will
+  /// fork a new sibling branch rather than extend the current one linearly.
+  bool get forksOnNextSend =>
+      activeLeafId != null && messages.any((m) => m.parentId == activeLeafId);
+
   /// The assistant reply that directly follows [userMessageId] on its branch
   /// (the second half of a turn), or null if none yet.
   Message? replyOf(String userMessageId) => messages
