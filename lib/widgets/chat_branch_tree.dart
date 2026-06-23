@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/constants/theme.dart';
-import '../core/utils/keyword.dart';
 import '../models/conversation.dart';
 import '../models/message.dart';
+import '../models/persona.dart';
 import '../providers/chat_provider.dart';
+import '../services/persona_service.dart';
 
 /// A compact branch map for the active conversation. Each node is a *turn*
 /// (a user message + its reply) labelled with the most relevant word of the
@@ -38,6 +39,20 @@ class ChatBranchTree extends ConsumerWidget {
         .map((m) => m.id)
         .lastOrNull;
 
+    final personas = ref
+        .watch(personaListProvider)
+        .maybeWhen(data: (l) => l, orElse: () => const <Persona>[]);
+    final emojiById = {for (final p in personas) p.id: p.emoji};
+
+    // Role emoji for a turn: its message persona (or the conversation's),
+    // falling back to an image/chat glyph when there's no role.
+    String emojiFor(Message u) {
+      final pid = u.personaId ?? conv.personaId;
+      final e = pid == null ? null : emojiById[pid];
+      if (e != null) return e;
+      return (conv.replyOf(u.id)?.images.isNotEmpty ?? false) ? '🖼️' : '💬';
+    }
+
     return Container(
       height: 132,
       decoration: const BoxDecoration(
@@ -63,10 +78,8 @@ class ChatBranchTree extends ConsumerWidget {
                 Positioned(
                   left: ln.position.dx - _TurnLayout.kNodeW / 2,
                   top: ln.position.dy - _TurnLayout.kNodeH / 2,
-                  child: _TurnChip(
-                    label: keywordOf(ln.message.content),
-                    hasImage:
-                        conv.replyOf(ln.message.id)?.images.isNotEmpty ?? false,
+                  child: _TurnDot(
+                    emoji: emojiFor(ln.message),
                     onPath: threadUserIds.contains(ln.message.id),
                     isCurrent: ln.message.id == currentUserId,
                     onTap: () => ref
@@ -94,10 +107,10 @@ class _TurnNode {
 }
 
 class _TurnLayout {
-  static const double kNodeW = 88.0;
-  static const double kNodeH = 30.0;
-  static const double kUnitWidth = 100.0;
-  static const double kLevelStride = 50.0;
+  static const double kNodeW = 44.0;
+  static const double kNodeH = 44.0;
+  static const double kUnitWidth = 58.0;
+  static const double kLevelStride = 56.0;
 
   final List<_TurnNode> nodes;
   final Size canvasSize;
@@ -205,17 +218,15 @@ class _TurnLinePainter extends CustomPainter {
       old.nodes != nodes || old.onPath != onPath;
 }
 
-class _TurnChip extends StatelessWidget {
-  const _TurnChip({
-    required this.label,
-    required this.hasImage,
+class _TurnDot extends StatelessWidget {
+  const _TurnDot({
+    required this.emoji,
     required this.onPath,
     required this.isCurrent,
     required this.onTap,
   });
 
-  final String label;
-  final bool hasImage;
+  final String emoji;
   final bool onPath;
   final bool isCurrent;
   final VoidCallback onTap;
@@ -227,45 +238,27 @@ class _TurnChip extends StatelessWidget {
       child: Container(
         width: _TurnLayout.kNodeW,
         height: _TurnLayout.kNodeH,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
+          shape: BoxShape.circle,
           color: isCurrent
-              ? AppTheme.accent
+              ? AppTheme.accent.withValues(alpha: 0.25)
               : onPath
-                  ? AppTheme.accent.withValues(alpha: 0.14)
+                  ? AppTheme.accent.withValues(alpha: 0.12)
                   : AppTheme.surface,
-          borderRadius: BorderRadius.circular(15),
           border: Border.all(
             color: isCurrent
                 ? AppTheme.accent
                 : onPath
                     ? AppTheme.accent.withValues(alpha: 0.6)
                     : Colors.white24,
-            width: isCurrent ? 2 : 0.5,
+            width: isCurrent ? 2.5 : 0.5,
           ),
+          boxShadow: isCurrent
+              ? [BoxShadow(color: AppTheme.accent.withValues(alpha: 0.4), blurRadius: 8)]
+              : null,
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              hasImage ? Icons.image_outlined : Icons.chat_bubble_outline,
-              size: 12,
-              color: isCurrent ? Colors.white : AppTheme.textSecondary,
-            ),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: isCurrent ? Colors.white : AppTheme.textPrimary,
-                ),
-              ),
-            ),
-          ],
-        ),
+        child: Text(emoji, style: const TextStyle(fontSize: 20)),
       ),
     );
   }

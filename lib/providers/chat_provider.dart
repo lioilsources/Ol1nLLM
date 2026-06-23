@@ -198,7 +198,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   // ── Chat ─────────────────────────────────────────────────────────────────
 
-  Future<void> sendMessage(String text) async {
+  Future<void> sendMessage(String text, {String? personaId}) async {
     if (text.trim().isEmpty || state.isStreaming) return;
 
     var conv = state.active;
@@ -210,12 +210,15 @@ class ChatNotifier extends StateNotifier<ChatState> {
       );
     }
 
+    // Role for this turn: an explicit pick, else the active branch's persona.
+    final turnPersonaId = personaId ?? conv.activePersonaId;
     final userMsg = Message(
       id: _uuid.v4(),
       parentId: conv.activeLeafId,
       role: MessageRole.user,
       content: text.trim(),
       createdAt: DateTime.now(),
+      personaId: turnPersonaId,
     );
     // API sees only the active branch (root→leaf) plus the new user turn.
     final messagesForApi = [...conv.thread, userMsg];
@@ -238,7 +241,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     try {
       await _save();
 
-      final systemPrompt = await _personaService.systemPrompt(conv.personaId);
+      final systemPrompt = await _personaService.systemPrompt(turnPersonaId);
 
       final assistantMsg = Message(
         id: _uuid.v4(),

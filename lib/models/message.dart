@@ -13,6 +13,11 @@ class Message {
   final DateTime createdAt;
   final List<String> images; // base64-encoded PNG/JPEG
 
+  /// Persona (role) this turn was sent under. Set on the user message so a
+  /// branch can switch roles independently; node visuals use its emoji and the
+  /// active branch inherits the nearest message that carries one.
+  final String? personaId;
+
   const Message({
     required this.id,
     this.parentId,
@@ -20,17 +25,23 @@ class Message {
     required this.content,
     required this.createdAt,
     this.images = const [],
+    this.personaId,
   });
 
-  Message copyWith({String? content, List<String>? images, String? parentId}) =>
-      Message(
-        id: id,
-        parentId: parentId ?? this.parentId,
-        role: role,
-        content: content ?? this.content,
-        createdAt: createdAt,
-        images: images ?? this.images,
-      );
+  Message copyWith({
+    String? content,
+    List<String>? images,
+    String? parentId,
+    String? personaId,
+  }) => Message(
+    id: id,
+    parentId: parentId ?? this.parentId,
+    role: role,
+    content: content ?? this.content,
+    createdAt: createdAt,
+    images: images ?? this.images,
+    personaId: personaId ?? this.personaId,
+  );
 
   Map<String, dynamic> toOllamaJson() => {
     'role': role.name,
@@ -44,6 +55,7 @@ class Message {
     'content': content,
     'createdAt': createdAt.toIso8601String(),
     if (images.isNotEmpty) 'images': images,
+    if (personaId != null) 'personaId': personaId,
   };
 
   factory Message.fromJson(Map<String, dynamic> json) => Message(
@@ -53,5 +65,6 @@ class Message {
     content: json['content'] as String,
     createdAt: DateTime.parse(json['createdAt'] as String),
     images: (json['images'] as List?)?.cast<String>() ?? [],
+    personaId: json['personaId'] as String?,
   );
 }

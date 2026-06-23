@@ -75,6 +75,15 @@ class Conversation {
     return out;
   }
 
+  /// Effective persona for the active branch: the nearest message on the
+  /// thread that carries one, falling back to the conversation persona.
+  String? get activePersonaId {
+    for (final m in thread.reversed) {
+      if (m.personaId != null) return m.personaId;
+    }
+    return personaId;
+  }
+
   /// True when the active leaf already has a child, so the next message will
   /// fork a new sibling branch rather than extend the current one linearly.
   bool get forksOnNextSend =>

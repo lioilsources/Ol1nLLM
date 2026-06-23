@@ -1,10 +1,14 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/constants/theme.dart';
+import '../models/conversation.dart';
+import '../models/persona.dart';
 import '../providers/chat_provider.dart';
+import '../services/persona_service.dart';
 
 enum InputMode { chat, generateImage, editImage, ocr }
 
@@ -50,6 +54,13 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
   InputMode _mode = InputMode.chat;
   Uint8List? _imageBytes;
   String? _imageBase64;
+
+  /// Explicit role pick for the next message; null = inherit the active
+  /// branch's persona. Reset after each send and when switching conversations.
+  String? _personaOverride;
+
+  String? _effectivePersonaId(Conversation? conv) =>
+      _personaOverride ?? conv?.activePersonaId;
 
   @override
   void dispose() {
@@ -105,9 +116,11 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
 
     switch (_mode) {
       case InputMode.chat:
+        final personaId = _effectivePersonaId(ref.read(chatProvider).active);
         _controller.clear();
         _focusNode.requestFocus();
-        await notifier.sendMessage(text);
+        setState(() => _personaOverride = null);
+        await notifier.sendMessage(text, personaId: personaId);
       case InputMode.generateImage:
         _controller.clear();
         await notifier.generateImage(text);
@@ -143,8 +156,16 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
     ) {
       if (next && prev != true) _prefillContinuation();
     });
+    // Drop an explicit role pick when the conversation changes.
+    ref.listen<String?>(chatProvider.select((s) => s.activeId), (_, __) {
+      if (_personaOverride != null) setState(() => _personaOverride = null);
+    });
 
     final isBusy = ref.watch(chatProvider).isStreaming;
+    final conv = ref.watch(chatProvider).active;
+    final personas = ref
+        .watch(personaListProvider)
+        .maybeWhen(data: (l) => l, orElse: () => const <Persona>[]);
 
     return Container(
       decoration: const BoxDecoration(
@@ -162,6 +183,10 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 _buildModeButton(isBusy),
+                if (_mode == InputMode.chat && personas.isNotEmpty) ...[
+                  const SizedBox(width: 4),
+                  _buildPersonaButton(isBusy, conv, personas),
+                ],
                 if (_mode.needsImage) ...[
                   const SizedBox(width: 4),
                   IconButton(
@@ -254,6 +279,100 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
             ),
           )
           .toList(),
+    );
+  }
+
+  /// Role switcher: shows the emoji of the role the next message will use
+  /// (an explicit pick, else the active branch's persona). Picking a different
+  /// one here forks the branch under that role on the next send.
+  Widget _buildPersonaButton(
+    bool isBusy,
+    Conversation? conv,
+    List<Persona> personas,
+  ) {
+    final selectedId = _effectivePersonaId(conv);
+    final selected = personas.where((p) => p.id == selectedId).firstOrNull;
+    return GestureDetector(
+      onTap: isBusy ? null : () => _pickPersona(conv, personas),
+      child: Container(
+        width: 36,
+        height: 36,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: _personaOverride != null ? AppTheme.accent : Colors.white24,
+            width: _personaOverride != null ? 1.5 : 0.5,
+          ),
+        ),
+        child: selected != null
+            ? Text(selected.emoji, style: const TextStyle(fontSize: 18))
+            : const Icon(
+                Icons.person_outline,
+                size: 18,
+                color: AppTheme.textSecondary,
+              ),
+      ),
+    );
+  }
+
+  void _pickPersona(Conversation? conv, List<Persona> personas) {
+    final selectedId = _effectivePersonaId(conv);
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                'Role pro další zprávu',
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final p in personas)
+                    ListTile(
+                      leading: Text(
+                        p.emoji,
+                        style: const TextStyle(fontSize: 20),
+                      ),
+                      title: Text(
+                        p.name,
+                        style: TextStyle(
+                          color: p.id == selectedId
+                              ? AppTheme.accent
+                              : AppTheme.textPrimary,
+                        ),
+                      ),
+                      trailing: p.id == selectedId
+                          ? const Icon(Icons.check, color: AppTheme.accent, size: 20)
+                          : null,
+                      onTap: () {
+                        setState(() => _personaOverride = p.id);
+                        Navigator.of(ctx).pop();
+                      },
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
