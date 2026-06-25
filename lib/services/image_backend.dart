@@ -1,7 +1,8 @@
 import 'dart:typed_data';
 
-/// Stable id for the (only) image backend the studio targets.
+/// Stable ids for the image backends the studio supports.
 const kBackendComfyUI = 'comfyui';
+const kBackendFluxNim = 'flux_nim';
 
 /// A single progress/result event from any image backend.
 ///

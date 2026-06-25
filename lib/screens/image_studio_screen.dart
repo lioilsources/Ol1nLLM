@@ -6,6 +6,7 @@ import '../core/constants/theme.dart';
 import '../models/gen_node.dart';
 import '../providers/image_studio_provider.dart';
 import '../services/comfyui_service.dart' show ComfyWorkflow;
+import '../services/image_backend.dart' show kBackendFluxNim;
 import '../widgets/image_session_drawer.dart';
 
 /// Iterative image studio: generate 4 candidates from a prompt, pick one,
@@ -773,6 +774,52 @@ class _LoraChip extends StatelessWidget {
   }
 }
 
+class _BackendChip extends StatelessWidget {
+  const _BackendChip({required this.backendId, required this.onChanged});
+
+  final String backendId;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final isNim = backendId == kBackendFluxNim;
+    return GestureDetector(
+      onTap: () => onChanged(isNim ? 'comfyui' : kBackendFluxNim),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isNim
+              ? AppTheme.accent.withValues(alpha: 0.15)
+              : AppTheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isNim ? AppTheme.accent : Colors.white24,
+            width: 0.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isNim ? Icons.bolt : Icons.hub_outlined,
+              size: 14,
+              color: isNim ? AppTheme.accent : AppTheme.textSecondary,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              isNim ? 'NIM' : 'ComfyUI',
+              style: TextStyle(
+                fontSize: 12,
+                color: isNim ? AppTheme.accent : AppTheme.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _WorkflowChip extends StatelessWidget {
   const _WorkflowChip({
     required this.current,
@@ -880,6 +927,8 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
     final loras = widget.state.availableLoras;
     final selectedLora = widget.state.selectedLora;
     final workflow = widget.state.workflow;
+    final backendId = widget.state.backendId;
+    final isNim = backendId == kBackendFluxNim;
 
     // Parent prompt shown as context when the current node is a refinement.
     final currentNode = widget.state.current;
@@ -909,19 +958,27 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
               padding: const EdgeInsets.only(bottom: 6),
               child: Row(
                 children: [
-                  _WorkflowChip(
-                    current: workflow,
-                    onChanged: (wf) =>
-                        ref.read(imageStudioProvider.notifier).setWorkflow(wf),
+                  _BackendChip(
+                    backendId: backendId,
+                    onChanged: (id) =>
+                        ref.read(imageStudioProvider.notifier).setBackend(id),
                   ),
-                  if (loras.isNotEmpty) ...[
+                  if (!isNim) ...[
                     const SizedBox(width: 8),
-                    _LoraChip(
-                      loras: loras,
-                      selected: selectedLora,
-                      onChanged: (v) =>
-                          ref.read(imageStudioProvider.notifier).setLora(v),
+                    _WorkflowChip(
+                      current: workflow,
+                      onChanged: (wf) =>
+                          ref.read(imageStudioProvider.notifier).setWorkflow(wf),
                     ),
+                    if (loras.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      _LoraChip(
+                        loras: loras,
+                        selected: selectedLora,
+                        onChanged: (v) =>
+                            ref.read(imageStudioProvider.notifier).setLora(v),
+                      ),
+                    ],
                   ],
                 ],
               ),

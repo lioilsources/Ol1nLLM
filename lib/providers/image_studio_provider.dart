@@ -8,6 +8,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../models/gen_node.dart';
 import '../models/image_session.dart';
 import '../services/comfyui_service.dart';
+import '../services/flux_nim_service.dart';
 import '../services/image_backend.dart';
 
 final imageStudioProvider =
@@ -130,12 +131,16 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
   static const _key = 'all';
 
   final ComfyUIService _comfyui = ComfyUIService();
+  final FluxNimService _fluxNim = FluxNimService();
 
   StreamSubscription<GenEvent>? _activeSub;
   String? _activeNodeId;
   Completer<void>? _activeCompleter;
 
-  ImageBackend get _backend => _comfyui;
+  ImageBackend get _backend =>
+      state.backendId == kBackendFluxNim ? _fluxNim : _comfyui;
+
+  void setBackend(String id) => state = state.copyWith(backendId: id);
 
   void selectImage(String imageId) =>
       state = state.copyWith(selectedImageId: imageId);
@@ -167,7 +172,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
       currentNodeId: session.currentNodeId,
       selectedLora: session.selectedLora,
       workflow: session.workflow,
-      backendId: state.backendId,
+      backendId: session.backendId,
       availableLoras: state.availableLoras,
     );
   }
@@ -186,7 +191,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
           currentNodeId: next.currentNodeId,
           selectedLora: next.selectedLora,
           workflow: next.workflow,
-          backendId: state.backendId,
+          backendId: next.backendId,
           availableLoras: state.availableLoras,
         );
       } else {
@@ -223,7 +228,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
           currentNodeId: latest.currentNodeId,
           selectedLora: latest.selectedLora,
           workflow: latest.workflow,
-          backendId: state.backendId,
+          backendId: latest.backendId,
           availableLoras: state.availableLoras,
         );
       } else {
@@ -242,6 +247,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
       currentNodeId: state.currentNodeId,
       selectedLora: state.selectedLora,
       workflow: state.workflow,
+      backendId: state.backendId,
     );
     final updated = [
       session,
@@ -514,6 +520,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
   void dispose() {
     _activeSub?.cancel();
     _comfyui.dispose();
+    _fluxNim.dispose();
     super.dispose();
   }
 }

@@ -1,6 +1,7 @@
 import 'package:uuid/uuid.dart';
 import 'gen_node.dart';
 import '../services/comfyui_service.dart' show ComfyWorkflow;
+import '../services/image_backend.dart' show kBackendComfyUI;
 
 const _uuid = Uuid();
 
@@ -13,6 +14,7 @@ class ImageSession {
     this.selectedLora,
     required this.workflow,
     required this.updatedAt,
+    this.backendId = kBackendComfyUI,
   });
 
   final String id;
@@ -22,6 +24,7 @@ class ImageSession {
   final String? selectedLora;
   final ComfyWorkflow workflow;
   final DateTime updatedAt;
+  final String backendId;
 
   String? get thumbnailB64 {
     for (final n in nodes) {
@@ -38,6 +41,7 @@ class ImageSession {
     String? currentNodeId,
     String? selectedLora,
     required ComfyWorkflow workflow,
+    String backendId = kBackendComfyUI,
   }) {
     GenNode? root;
     for (final n in nodes) {
@@ -61,6 +65,7 @@ class ImageSession {
       selectedLora: selectedLora,
       workflow: workflow,
       updatedAt: DateTime.now(),
+      backendId: backendId,
     );
   }
 
@@ -72,6 +77,7 @@ class ImageSession {
     if (selectedLora != null) 'selectedLora': selectedLora,
     'workflow': workflow.name,
     'updatedAt': updatedAt.toIso8601String(),
+    'backendId': backendId,
   };
 
   factory ImageSession.fromJson(Map<String, dynamic> json) => ImageSession(
@@ -84,5 +90,6 @@ class ImageSession {
     selectedLora: json['selectedLora'] as String?,
     workflow: ComfyWorkflow.values.byName(json['workflow'] as String),
     updatedAt: DateTime.parse(json['updatedAt'] as String),
+    backendId: json['backendId'] as String? ?? kBackendComfyUI,
   );
 }
