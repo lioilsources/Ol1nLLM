@@ -1121,15 +1121,7 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                     color: canSend ? AppTheme.accent : AppTheme.surface,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: isBusy
-                      ? const Padding(
-                          padding: EdgeInsets.all(10),
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppTheme.textSecondary,
-                          ),
-                        )
-                      : IconButton(
+                  child: IconButton(
                           padding: EdgeInsets.zero,
                           icon: Icon(
                             Icons.arrow_upward_rounded,
