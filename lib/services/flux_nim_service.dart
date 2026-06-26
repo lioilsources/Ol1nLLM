@@ -26,11 +26,19 @@ class FluxNimService implements ImageBackend {
 
   final http.Client _client = http.Client();
 
-  Map<String, String> get _authHeaders => {
-    'Content-Type': 'application/json',
-    if (_cfId.isNotEmpty) 'CF-Access-Client-Id': _cfId,
-    if (_cfSecret.isNotEmpty) 'CF-Access-Client-Secret': _cfSecret,
-  };
+  Map<String, String> get _authHeaders {
+    if (_cfId.isEmpty || _cfSecret.isEmpty) {
+      throw Exception(
+        'CF Access credentials not configured. '
+        'Build with --dart-define=CF_ACCESS_CLIENT_ID=... --dart-define=CF_ACCESS_CLIENT_SECRET=...',
+      );
+    }
+    return {
+      'Content-Type': 'application/json',
+      'CF-Access-Client-Id': _cfId,
+      'CF-Access-Client-Secret': _cfSecret,
+    };
+  }
 
   @override
   String get id => kBackendFluxNim;
