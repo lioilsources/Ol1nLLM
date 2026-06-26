@@ -1,7 +1,8 @@
-import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gal/gal.dart';
+import 'package:image_picker/image_picker.dart';
 import '../core/constants/theme.dart';
 import '../models/gen_node.dart';
 import '../providers/image_studio_provider.dart';
@@ -90,7 +91,8 @@ class _EmptyHint extends StatelessWidget {
             Icon(Icons.auto_awesome, size: 48, color: AppTheme.textSecondary),
             SizedBox(height: 16),
             Text(
-              'Describe an image to generate four variants.\n'
+              'Describe an image to generate four variants,\n'
+              'or tap the camera to start from a photo.\n'
               'Tap one, describe a change, and refine it.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppTheme.textSecondary, height: 1.5),
@@ -278,7 +280,7 @@ class _TreeNodeWidget extends StatelessWidget {
           : node.images.first;
       inner = ClipOval(
         child: Image.memory(
-          base64Decode(displayImg.b64),
+          displayImg.bytes,
           fit: BoxFit.cover,
           width: size,
           height: size,
@@ -333,7 +335,10 @@ class _TreeNavigator extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(imageStudioProvider.notifier);
 
-    // Find the parent of the currently displayed node so we can highlight it.
+    // Find the parent of the currently displayed node so we can highlight it
+    // and — only when a child is the current node — show that child's source
+    // image on the parent's thumbnail (so the parent reflects what was refined,
+    // not its own first variant).
     GenNode? currentNode;
     for (final n in state.nodes) {
       if (n.id == state.currentNodeId) {
@@ -447,8 +452,21 @@ class _NodeGrid extends ConsumerWidget {
       );
     }
 
-    final generating = node.status == GenStatus.generating;
-    final tiles = generating ? kVariantCount : node.images.length;
+    // One spinner per generating node (the per-step label lives in the
+    // progress banner below the grid).
+    if (node.status == GenStatus.generating) {
+      return Center(
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: CircularProgressIndicator(
+            value: node.progress,
+            strokeWidth: 2.5,
+            color: AppTheme.accent,
+          ),
+        ),
+      );
+    }
 
     return GridView.builder(
       padding: const EdgeInsets.all(12),
@@ -458,23 +476,22 @@ class _NodeGrid extends ConsumerWidget {
         crossAxisSpacing: 12,
         childAspectRatio: 1,
       ),
-      itemCount: tiles,
+      itemCount: node.images.length,
       itemBuilder: (context, i) {
-        if (generating) return _PlaceholderTile(progress: node.progress);
         final img = node.images[i];
         return _ImageTile(
           image: img,
           selected: img.id == selectedId,
           onSelect: () =>
               ref.read(imageStudioProvider.notifier).selectImage(img.id),
-          onExpand: () => _showFullscreen(context, img.b64),
-          onSave: () => _saveImage(context, img.b64),
+          onExpand: () => _showFullscreen(context, img),
+          onSave: () => _saveImage(context, img),
         );
       },
     );
   }
 
-  void _showFullscreen(BuildContext context, String b64) {
+  void _showFullscreen(BuildContext context, GenImage image) {
     showDialog<void>(
       context: context,
       barrierColor: Colors.black87,
@@ -482,16 +499,16 @@ class _NodeGrid extends ConsumerWidget {
         onTap: () => Navigator.of(context).pop(),
         child: InteractiveViewer(
           child: Center(
-            child: Image.memory(base64Decode(b64), fit: BoxFit.contain),
+            child: Image.memory(image.bytes, fit: BoxFit.contain),
           ),
         ),
       ),
     );
   }
 
-  Future<void> _saveImage(BuildContext context, String b64) async {
+  Future<void> _saveImage(BuildContext context, GenImage image) async {
     try {
-      await Gal.putImageBytes(base64Decode(b64));
+      await Gal.putImageBytes(image.bytes);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -515,34 +532,6 @@ class _NodeGrid extends ConsumerWidget {
         );
       }
     }
-  }
-}
-
-class _PlaceholderTile extends StatelessWidget {
-  const _PlaceholderTile({this.progress});
-
-  /// 0..1 determinate progress, or null for an indeterminate spinner.
-  final double? progress;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Center(
-        child: SizedBox(
-          width: 22,
-          height: 22,
-          child: CircularProgressIndicator(
-            value: progress,
-            strokeWidth: 2,
-            color: AppTheme.textSecondary,
-          ),
-        ),
-      ),
-    );
   }
 }
 
@@ -578,7 +567,7 @@ class _ImageTile extends StatelessWidget {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: Image.memory(base64Decode(image.b64), fit: BoxFit.cover),
+              child: Image.memory(image.bytes, fit: BoxFit.cover),
             ),
           ),
           if (selected)
@@ -881,6 +870,7 @@ class _StudioInputBar extends ConsumerStatefulWidget {
 class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
+  final _picker = ImagePicker();
 
   @override
   void dispose() {
@@ -896,6 +886,67 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
     if (!_hasRoot) return 'Describe an image to generate…';
     if (_isRefineMode) return 'Describe the change to the selected image…';
     return 'Pick an image to refine, or tap ＋ for a new one';
+  }
+
+  /// Let the user start a fresh image from a camera photo (or gallery pick).
+  /// The chosen photo becomes a ready root that the next message refines.
+  Future<void> _startFromPhoto() async {
+    if (widget.state.isBusy) return;
+    final source = await _chooseSource();
+    if (source == null) return;
+    Uint8List bytes;
+    try {
+      final file = await _picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 90,
+      );
+      if (file == null) return;
+      bytes = await file.readAsBytes();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Nepodařilo se načíst fotku: $e'),
+          backgroundColor: Colors.red[700],
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+    await ref.read(imageStudioProvider.notifier).startFromImage(bytes);
+  }
+
+  Future<ImageSource?> _chooseSource() {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined,
+                  color: AppTheme.textPrimary),
+              title: const Text('Vyfotit',
+                  style: TextStyle(color: AppTheme.textPrimary)),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined,
+                  color: AppTheme.textPrimary),
+              title: const Text('Vybrat z galerie',
+                  style: TextStyle(color: AppTheme.textPrimary)),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _send() async {
@@ -930,17 +981,12 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
     final backendId = widget.state.backendId;
     final isNim = backendId == kBackendFluxNim;
 
-    // Parent prompt shown as context when the current node is a refinement.
+    // The current node's own prompt shown as context (the text→image prompt
+    // for a root, or the edit instruction that produced this refinement).
     final currentNode = widget.state.current;
-    String? parentPrompt;
-    if (currentNode?.parentId != null) {
-      for (final n in widget.state.nodes) {
-        if (n.id == currentNode!.parentId && n.prompt.isNotEmpty) {
-          parentPrompt = n.prompt;
-          break;
-        }
-      }
-    }
+    final nodePrompt = (currentNode?.prompt.isNotEmpty ?? false)
+        ? currentNode!.prompt
+        : null;
 
     return Container(
       decoration: const BoxDecoration(
@@ -983,7 +1029,7 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                 ],
               ),
             ),
-            if (parentPrompt != null)
+            if (nodePrompt != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Row(
@@ -996,7 +1042,7 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        parentPrompt,
+                        nodePrompt,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -1012,6 +1058,15 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                if (!_hasRoot) ...[
+                  IconButton(
+                    icon: const Icon(Icons.photo_camera_outlined),
+                    color: AppTheme.textSecondary,
+                    tooltip: 'Začít z fotky',
+                    onPressed: isBusy ? null : _startFromPhoto,
+                  ),
+                  const SizedBox(width: 4),
+                ],
                 Expanded(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 120),

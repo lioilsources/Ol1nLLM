@@ -73,7 +73,10 @@ class ImageStudioState {
     return null;
   }
 
-  bool get isBusy => current?.status == GenStatus.generating;
+  /// True while *any* node is generating — the studio runs one job at a time,
+  /// so this globally locks input/new-session/retry until it finishes. (The
+  /// per-node progress banner keys off the individual node's status instead.)
+  bool get isBusy => nodes.any((n) => n.status == GenStatus.generating);
 
   /// Root→current chain, for the breadcrumb.
   List<GenNode> get path {
@@ -300,6 +303,27 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
     );
   }
 
+  /// Start a new root from a user-supplied photo (camera or gallery) instead
+  /// of a text→image generation. The photo becomes a ready root node holding
+  /// that single image, and is auto-selected so the next message refines it
+  /// (img2img) — i.e. the photo is uploaded to ComfyUI only once the user
+  /// describes a change.
+  Future<void> startFromImage(Uint8List bytes) async {
+    if (state.isBusy) return;
+    final image = GenImage.fromB64(base64Encode(bytes));
+    final node = GenNode.create(prompt: '').copyWith(
+      status: GenStatus.ready,
+      images: [image],
+    );
+    state = state.copyWith(
+      nodes: [...state.nodes, node],
+      currentNodeId: node.id,
+      selectedImageId: image.id,
+      clearError: true,
+    );
+    await _save();
+  }
+
   /// Round 2+: [kVariantCount] edits of the selected image.
   Future<void> refine(String prompt) async {
     final text = prompt.trim();
@@ -328,6 +352,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
 
   /// Re-run a failed (or finished) node with its original prompt.
   Future<void> retry(String nodeId) async {
+    if (state.isBusy) return;
     final node = _nodeById(nodeId);
     if (node == null || node.status == GenStatus.generating) return;
     _patch(

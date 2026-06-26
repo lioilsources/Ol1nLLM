@@ -59,6 +59,8 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Used to take a photo to start or refine an image in Image Studio.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Used to select images for editing and OCR.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
