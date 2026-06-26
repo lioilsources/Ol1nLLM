@@ -4,6 +4,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:image/image.dart' as img;
 
 import 'image_backend.dart';
 
@@ -45,13 +46,35 @@ class FluxKontextNimService implements ImageBackend {
     yield* _infer(prompt: prompt, imageB64: null, n: n);
   }
 
+  // Dimensions supported by the Kontext TRT buffer. Input images must use
+  // values from this set on both axes to avoid tensor size mismatch errors.
+  static const _supportedDims = [
+    672, 688, 720, 752, 800, 832, 880, 944, 1024,
+    1104, 1184, 1248, 1328, 1392, 1456, 1504, 1568,
+  ];
+
+  static int _snap(int v) => _supportedDims.reduce(
+        (a, b) => (a - v).abs() <= (b - v).abs() ? a : b,
+      );
+
+  static Uint8List _snapImage(Uint8List bytes) {
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) return bytes;
+    final sw = _snap(decoded.width);
+    final sh = _snap(decoded.height);
+    if (sw == decoded.width && sh == decoded.height) return bytes;
+    final resized = img.copyResize(decoded, width: sw, height: sh,
+        interpolation: img.Interpolation.cubic);
+    return Uint8List.fromList(img.encodePng(resized));
+  }
+
   @override
   Stream<GenEvent> edit({
     required Uint8List image,
     required String prompt,
     required int n,
   }) async* {
-    yield* _infer(prompt: prompt, imageB64: base64Encode(image), n: n);
+    yield* _infer(prompt: prompt, imageB64: base64Encode(_snapImage(image)), n: n);
   }
 
   Stream<GenEvent> _infer({
