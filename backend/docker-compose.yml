@@ -72,6 +72,24 @@ services:
       retries: 3
       start_period: 300s
 
+  nim-kontext-proxy:
+    build: ./nim-kontext-proxy
+    image: ol1nllm/nim-kontext-proxy:latest
+    container_name: ai-nim-kontext-proxy
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8004:8004"
+    environment:
+      - NIM_KONTEXT_URL=${NIM_KONTEXT_URL:-http://ai-flux-kontext-nim:8000}
+      - JOB_TTL=${JOB_TTL:-3600}
+    networks: [ai]
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
 networks:
   ai:
     external: true
