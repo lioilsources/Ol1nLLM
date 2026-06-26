@@ -86,9 +86,12 @@ def _call_nim(body: dict) -> bytes:
     resp = _requests.post(f"{NIM_KONTEXT_URL}/v1/infer", json=body, timeout=300)
     resp.raise_for_status()
     data = resp.json()
-    b64 = data.get("image", "")
+    artifacts = data.get("artifacts", [])
+    if not artifacts:
+        raise ValueError(f"NIM Kontext returned no artifacts: {data}")
+    b64 = artifacts[0].get("base64", "")
     if not b64:
-        raise ValueError("NIM Kontext returned empty image")
+        raise ValueError(f"NIM Kontext artifact missing base64: {artifacts[0]}")
     from PIL import Image as _Pil
     raw = base64.b64decode(b64)
     buf = io.BytesIO()
