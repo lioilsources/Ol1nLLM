@@ -138,6 +138,17 @@ class ComfyUIService implements ImageBackend {
     Map<String, dynamic>? workflow, {
     String? promptId,
   }) async* {
+    // Validate credentials upfront. When workflow is null (follow() path),
+    // _queuePrompt is skipped so _authHeaders is never called — without this
+    // check the WS try/catch swallows the auth error and _pollUntilDone retries
+    // forever.
+    if (_cfId.isEmpty || _cfSecret.isEmpty) {
+      yield GenFailed(
+        'CF Access credentials not configured. '
+        'Rebuild with --dart-define=CF_ACCESS_CLIENT_ID=... --dart-define=CF_ACCESS_CLIENT_SECRET=...',
+      );
+      return;
+    }
     promptId ??= await _queuePrompt(workflow!);
     yield GenSubmitted(promptId);
     yield const GenQueued(0);
