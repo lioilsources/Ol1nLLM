@@ -23,7 +23,7 @@ class ChatDone extends ChatEvent {
 
 class VllmService {
   static const _baseUrl = 'https://llm.ol1n.com/v1/chat/completions';
-  static const _model = 'llm-lab';
+  static const _model = 'lab';
   static const _cfId = String.fromEnvironment('CF_ACCESS_CLIENT_ID');
   static const _cfSecret = String.fromEnvironment('CF_ACCESS_CLIENT_SECRET');
 

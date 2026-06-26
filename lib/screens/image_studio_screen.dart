@@ -7,7 +7,8 @@ import '../core/constants/theme.dart';
 import '../models/gen_node.dart';
 import '../providers/image_studio_provider.dart';
 import '../services/comfyui_service.dart' show ComfyWorkflow;
-import '../services/image_backend.dart' show kBackendFluxNim;
+import '../services/flux_kontext_nim_service.dart' show kBackendFluxKontextNim;
+import '../services/image_backend.dart' show kBackendComfyUI, kBackendFluxNim;
 import '../widgets/image_session_drawer.dart';
 
 /// Iterative image studio: generate 4 candidates from a prompt, pick one,
@@ -769,38 +770,44 @@ class _BackendChip extends StatelessWidget {
   final String backendId;
   final ValueChanged<String> onChanged;
 
+  static const _cycle = [
+    kBackendComfyUI,
+    kBackendFluxNim,
+    kBackendFluxKontextNim,
+  ];
+
   @override
   Widget build(BuildContext context) {
-    final isNim = backendId == kBackendFluxNim;
+    final idx = _cycle.indexOf(backendId);
+    final next = _cycle[(idx + 1) % _cycle.length];
+
+    final (Color color, IconData icon, String label) = switch (backendId) {
+      kBackendFluxNim => (AppTheme.accent, Icons.bolt, 'FLUX Schnell'),
+      kBackendFluxKontextNim => (Colors.orange, Icons.auto_fix_high, 'FLUX Kontext'),
+      _ => (AppTheme.textSecondary, Icons.hub_outlined, 'ComfyUI'),
+    };
+    final isActive = backendId != kBackendComfyUI;
+
     return GestureDetector(
-      onTap: () => onChanged(isNim ? 'comfyui' : kBackendFluxNim),
+      onTap: () => onChanged(next),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: isNim
-              ? AppTheme.accent.withValues(alpha: 0.15)
-              : AppTheme.surface,
+          color: isActive ? color.withValues(alpha: 0.15) : AppTheme.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isNim ? AppTheme.accent : Colors.white24,
+            color: isActive ? color : Colors.white24,
             width: 0.5,
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              isNim ? Icons.bolt : Icons.hub_outlined,
-              size: 14,
-              color: isNim ? AppTheme.accent : AppTheme.textSecondary,
-            ),
+            Icon(icon, size: 14, color: color),
             const SizedBox(width: 5),
             Text(
-              isNim ? 'NIM' : 'ComfyUI',
-              style: TextStyle(
-                fontSize: 12,
-                color: isNim ? AppTheme.accent : AppTheme.textSecondary,
-              ),
+              label,
+              style: TextStyle(fontSize: 12, color: color),
             ),
           ],
         ),
@@ -979,7 +986,8 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
     final selectedLora = widget.state.selectedLora;
     final workflow = widget.state.workflow;
     final backendId = widget.state.backendId;
-    final isNim = backendId == kBackendFluxNim;
+    final isNim =
+        backendId == kBackendFluxNim || backendId == kBackendFluxKontextNim;
 
     // The current node's own prompt shown as context (the text→image prompt
     // for a root, or the edit instruction that produced this refinement).

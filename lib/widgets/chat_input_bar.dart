@@ -28,7 +28,7 @@ extension on InputMode {
   };
 
   String get hint => switch (this) {
-    InputMode.chat => 'Message llm-lab…',
+    InputMode.chat => 'Message lab…',
     InputMode.generateImage => 'Describe an image to generate…',
     InputMode.editImage => 'Describe the edit…',
     InputMode.ocr => 'Optional instruction…',

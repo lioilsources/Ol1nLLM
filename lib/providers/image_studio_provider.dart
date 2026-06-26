@@ -8,6 +8,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../models/gen_node.dart';
 import '../models/image_session.dart';
 import '../services/comfyui_service.dart';
+import '../services/flux_kontext_nim_service.dart';
 import '../services/flux_nim_service.dart';
 import '../services/image_backend.dart';
 
@@ -135,13 +136,17 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
 
   final ComfyUIService _comfyui = ComfyUIService();
   final FluxNimService _fluxNim = FluxNimService();
+  final FluxKontextNimService _fluxKontextNim = FluxKontextNimService();
 
   StreamSubscription<GenEvent>? _activeSub;
   String? _activeNodeId;
   Completer<void>? _activeCompleter;
 
-  ImageBackend get _backend =>
-      state.backendId == kBackendFluxNim ? _fluxNim : _comfyui;
+  ImageBackend get _backend => switch (state.backendId) {
+    kBackendFluxNim => _fluxNim,
+    kBackendFluxKontextNim => _fluxKontextNim,
+    _ => _comfyui,
+  };
 
   void setBackend(String id) => state = state.copyWith(backendId: id);
 
@@ -546,6 +551,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
     _activeSub?.cancel();
     _comfyui.dispose();
     _fluxNim.dispose();
+    _fluxKontextNim.dispose();
     super.dispose();
   }
 }
