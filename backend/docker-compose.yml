@@ -1,47 +1,11 @@
-# Ol1nLLM — backend services (image generation + OCR)
+# Ol1nLLM — backend services (OCR)
 #
 # Requires AiStack infra to be running first (it creates the 'ai' Docker network).
+# nim-kontext-proxy a image-api přesunuto/odebráno — viz AiStack/deploy/docker-compose.yml.
 # Deploy: docker compose -f backend/docker-compose.yml up -d --build
 # Env vars: copy backend/.env.example to backend/.env and fill in secrets
 
 services:
-
-  image-api:
-    build: ./image-api
-    image: ol1nllm/image-api:latest
-    container_name: ai-image-api
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:8002:8002"
-    environment:
-      - HF_TOKEN=${HF_TOKEN}
-      - HF_HUB_OFFLINE=1
-      - FLUX_MODEL_ID=${FLUX_MODEL_ID:-black-forest-labs/FLUX.1-dev}
-      - QWEN_IMAGE_MODEL_ID=${QWEN_IMAGE_MODEL_ID:-Qwen/Qwen-Image-Edit-2511}
-      - FLUX_FP8=${FLUX_FP8:-0}
-      - LOAD_FLUX=${LOAD_FLUX:-1}
-      - LOAD_FLUX_LORA=${LOAD_FLUX_LORA:-1}
-      - FLUX_NSFW_LORA=${FLUX_NSFW_LORA:-/root/.cache/huggingface/flux/lora/lora.safetensors}
-      - FLUX_NSFW_LORA_SCALE=${FLUX_NSFW_LORA_SCALE:-1.0}
-      - LOAD_QWEN_IMAGE=${LOAD_QWEN_IMAGE:-1}
-    volumes:
-      - ${CACHE_FLUX}:/root/.cache/huggingface/flux
-      - ${CACHE_QWEN_IMAGE}:/root/.cache/huggingface/qwen-image
-    shm_size: 32gb
-    networks: [ai]
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8002/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 300s
 
   ocr-api:
     build: ./ocr-api
@@ -71,24 +35,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 300s
-
-  nim-kontext-proxy:
-    build: ./nim-kontext-proxy
-    image: ol1nllm/nim-kontext-proxy:latest
-    container_name: ai-nim-kontext-proxy
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:8004:8004"
-    environment:
-      - NIM_KONTEXT_URL=${NIM_KONTEXT_URL:-http://ai-flux-kontext-nim:8000}
-      - JOB_TTL=${JOB_TTL:-3600}
-    networks: [ai]
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8004/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
 
 networks:
   ai:
