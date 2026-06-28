@@ -164,6 +164,12 @@ class FluxKontextNimService implements ImageBackend {
               )
               .timeout(_pollTimeout);
 
+          if (pollResp.statusCode == 404) {
+            yield const GenFailed(
+              '[nim-proxy] job nenalezen – proxy byl restartován? Zkus generovat znovu.',
+            );
+            return;
+          }
           if (pollResp.statusCode != 200) {
             yield GenFailed(HttpLayerError.parse(
               statusCode: pollResp.statusCode,

@@ -30,10 +30,47 @@ class HttpLayerError {
     required String step,
     required String service,
   }) {
-    // 1. Cloudflare edge
     final server = headers['server']?.toLowerCase() ?? '';
     final hasCfRay = headers.containsKey('cf-ray');
-    if (server.contains('cloudflare') || hasCfRay) {
+    final isCfEdge = server.contains('cloudflare') || hasCfRay;
+
+    // 1–4. Try JSON parse first — origin errors arrive via Cloudflare too
+    //      so cf-ray/server headers cannot distinguish origin vs edge errors.
+    Map<String, dynamic>? json;
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map) json = decoded.cast<String, dynamic>();
+    } catch (_) {}
+
+    if (json != null) {
+      // 1. Gateway: {"error":{"type":"gateway_error"}}
+      final errField = json['error'];
+      if (errField is Map && errField['type'] == 'gateway_error') {
+        final msg = (errField['message'] as String?) ?? 'upstream service nedostupný';
+        return HttpLayerError(layer: 'Gateway', code: statusCode, message: msg);
+      }
+
+      // 2. nim-kontext-proxy FastAPI: {"detail":...}
+      if (json.containsKey('detail')) {
+        return _parseProxyDetail(json['detail'], statusCode);
+      }
+
+      // 3. OpenAI / LiteLLM / NIM: {"error":{"message":"...","type":"..."}}
+      if (errField is Map) {
+        final msg = (errField['message'] as String?) ?? _snippet(body);
+        final type = errField['type'] as String?;
+        final suffix = (type != null && type.isNotEmpty) ? ' ($type)' : '';
+        return HttpLayerError(layer: service, code: statusCode, message: '$msg$suffix');
+      }
+
+      // 4. Cloudflare edge JSON errors: {"error":"error code: 1001"} / {"error":"unauthorized"}
+      if (errField is String) {
+        return HttpLayerError(layer: 'Cloudflare', code: statusCode, message: errField);
+      }
+    }
+
+    // 5. Non-JSON body: classify by CF headers (HTML error pages from CF edge)
+    if (isCfEdge) {
       return switch (statusCode) {
         403 => HttpLayerError(
             layer: 'Cloudflare',
@@ -58,41 +95,7 @@ class HttpLayerError {
       };
     }
 
-    // Try JSON parse
-    Map<String, dynamic>? json;
-    try {
-      final decoded = jsonDecode(body);
-      if (decoded is Map) json = decoded.cast<String, dynamic>();
-    } catch (_) {}
-
-    if (json != null) {
-      // 2. Gateway: {"error":{"type":"gateway_error"}}
-      final errField = json['error'];
-      if (errField is Map && errField['type'] == 'gateway_error') {
-        final msg = (errField['message'] as String?) ?? 'upstream service nedostupný';
-        return HttpLayerError(layer: 'Gateway', code: statusCode, message: msg);
-      }
-
-      // 3. nim-kontext-proxy FastAPI: {"detail":...}
-      if (json.containsKey('detail')) {
-        return _parseProxyDetail(json['detail'], statusCode);
-      }
-
-      // 4. OpenAI / LiteLLM / NIM: {"error":{"message":"...","type":"..."}}
-      if (errField is Map) {
-        final msg = (errField['message'] as String?) ?? _snippet(body);
-        final type = errField['type'] as String?;
-        final suffix = (type != null && type.isNotEmpty) ? ' ($type)' : '';
-        return HttpLayerError(layer: service, code: statusCode, message: '$msg$suffix');
-      }
-
-      // Cloudflare JSON errors: {"error":"error code: 1001"} / {"error":"unauthorized"}
-      if (errField is String) {
-        return HttpLayerError(layer: 'Cloudflare', code: statusCode, message: errField);
-      }
-    }
-
-    // 5. Fallback
+    // 6. Fallback
     return HttpLayerError(
       layer: service,
       code: statusCode,
