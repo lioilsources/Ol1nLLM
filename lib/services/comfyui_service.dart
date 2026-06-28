@@ -92,6 +92,9 @@ class ComfyUIService implements ImageBackend {
   @override
   String get label => 'ComfyUI';
 
+  @override
+  int get variantCount => 4;
+
   // ── Auth headers ────────────────────────────────────────────
   Map<String, String> get _authHeaders {
     if (_cfId.isEmpty || _cfSecret.isEmpty) {

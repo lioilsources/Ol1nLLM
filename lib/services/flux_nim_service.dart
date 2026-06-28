@@ -9,11 +9,14 @@ import 'package:http/http.dart' as http;
 import 'http_error.dart';
 import 'image_backend.dart';
 
-/// Calls the FLUX NIM native API at POST /v1/infer.
+const kBackendFluxNim = 'flux_nim';
+
+/// Calls the FLUX Schnell async job queue exposed by gen-queue at
+/// /nim/flux-schnell/v1/infer (202 + job_id), polls status, and downloads
+/// the PNG result when done.
 ///
-/// Uses the native NIM endpoint (not the OpenAI-compatible one) so we can
-/// disable the safety checker. Each request generates exactly one image;
-/// n>1 is fulfilled by sequential requests.
+/// gen-queue wraps the synchronous NIM /v1/infer call so the Cloudflare 100 s
+/// edge timeout is never hit and jobs survive iOS app suspension (follow() works).
 class FluxNimService implements ImageBackend {
   FluxNimService();
 
@@ -24,7 +27,10 @@ class FluxNimService implements ImageBackend {
   static const _cfId = String.fromEnvironment('CF_ACCESS_CLIENT_ID');
   static const _cfSecret = String.fromEnvironment('CF_ACCESS_CLIENT_SECRET');
 
-  static const _generateTimeout = Duration(seconds: 120);
+  static const _submitTimeout   = Duration(seconds: 30);
+  static const _pollInterval    = Duration(seconds: 3);
+  static const _pollTimeout     = Duration(seconds: 15);
+  static const _downloadTimeout = Duration(seconds: 120);
 
   final http.Client _client = http.Client();
 
@@ -49,71 +55,11 @@ class FluxNimService implements ImageBackend {
   String get label => 'FLUX NIM';
 
   @override
+  int get variantCount => 1;
+
+  @override
   Stream<GenEvent> generate({required String prompt, required int n}) async* {
-    // NIM supports only n=1 per request — run n sequential requests.
-    final images = <Uint8List>[];
-    for (var i = 0; i < n; i++) {
-      yield GenRunning(i, n);
-      try {
-        final body = jsonEncode({
-          'prompt': prompt,
-          'width': 1024,
-          'height': 1024,
-          'steps': 4,
-          'seed': Random().nextInt(1 << 31),
-        });
-        final resp = await _client
-            .post(
-              Uri.parse('$_baseUrl/nim/flux-schnell/v1/infer'),
-              headers: _authHeaders,
-              body: body,
-            )
-            .timeout(_generateTimeout);
-
-        if (resp.statusCode != 200) {
-          yield GenFailed(HttpLayerError.parse(
-            statusCode: resp.statusCode,
-            body: resp.body,
-            headers: resp.headers,
-            step: 'generate',
-            service: 'flux-nim',
-          ).toString());
-          return;
-        }
-
-        final json = jsonDecode(resp.body) as Map<String, dynamic>;
-        final artifacts = json['artifacts'] as List?;
-        final b64 = artifacts != null && artifacts.isNotEmpty
-            ? (artifacts.first as Map<String, dynamic>)['base64'] as String?
-            : null;
-        if (b64 == null || b64.isEmpty) {
-          yield const GenFailed('[flux-nim] NIM: prázdná odpověď (žádné artifacts)');
-          return;
-        }
-        images.add(base64Decode(b64));
-      } on TimeoutException catch (e) {
-        yield GenFailed(
-          HttpLayerError.fromException(
-            e,
-            'generate',
-            'flux-nim',
-            timeout: _generateTimeout,
-          ).toString(),
-        );
-        return;
-      } on SocketException catch (e) {
-        yield GenFailed(
-          HttpLayerError.fromException(e, 'generate', 'flux-nim').toString(),
-        );
-        return;
-      } catch (e) {
-        yield GenFailed(
-          HttpLayerError.fromException(e, 'generate', 'flux-nim').toString(),
-        );
-        return;
-      }
-    }
-    yield GenComplete(images);
+    yield* _infer(prompt: prompt, n: n);
   }
 
   @override
@@ -122,12 +68,230 @@ class FluxNimService implements ImageBackend {
     required String prompt,
     required int n,
   }) async* {
-    yield const GenFailed('[flux-nim] FLUX Schnell nepodporuje img2img');
+    yield const GenFailed('[FLUX NIM] tento model podporuje pouze txt2img. Pro img2img použijte FLUX Kontext nebo ComfyUI.');
+  }
+
+  Stream<GenEvent> _infer({required String prompt, required int n}) async* {
+    final images = <Uint8List>[];
+    for (var i = 0; i < n; i++) {
+      var step = 'submit';
+      var currentTimeout = _submitTimeout;
+      try {
+        // ── 1. Submit ──────────────────────────────────────────
+        final bodyMap = {
+          'prompt': prompt,
+          'width': 1024,
+          'height': 1024,
+          'steps': 4,
+          'seed': Random().nextInt(1 << 31),
+        };
+
+        final submitResp = await _client
+            .post(
+              Uri.parse('$_baseUrl/nim/flux-schnell/v1/infer'),
+              headers: _authHeaders,
+              body: jsonEncode(bodyMap),
+            )
+            .timeout(_submitTimeout);
+
+        if (submitResp.statusCode != 202) {
+          yield GenFailed(HttpLayerError.parse(
+            statusCode: submitResp.statusCode,
+            body: submitResp.body,
+            headers: submitResp.headers,
+            step: 'submit',
+            service: 'flux-nim',
+          ).toString());
+          return;
+        }
+
+        final submitted = jsonDecode(submitResp.body) as Map<String, dynamic>;
+        final jobId = submitted['id'] as String;
+        final qpos  = submitted['queue_position'] as int? ?? 0;
+        yield GenSubmitted(jobId);
+        yield GenQueued(qpos);
+
+        // ── 2. Poll until done ─────────────────────────────────
+        step = 'poll';
+        currentTimeout = _pollTimeout;
+        while (true) {
+          await Future.delayed(_pollInterval);
+
+          final pollResp = await _client
+              .get(
+                Uri.parse('$_baseUrl/nim/flux-schnell/jobs/$jobId'),
+                headers: _authHeaders,
+              )
+              .timeout(_pollTimeout);
+
+          if (pollResp.statusCode == 404) {
+            yield const GenFailed(
+              '[gen-queue] job nenalezen – queue byl restartován? Zkus generovat znovu.',
+            );
+            return;
+          }
+          if (pollResp.statusCode != 200) {
+            yield GenFailed(HttpLayerError.parse(
+              statusCode: pollResp.statusCode,
+              body: pollResp.body,
+              headers: pollResp.headers,
+              step: 'poll',
+              service: 'flux-nim',
+            ).toString());
+            return;
+          }
+
+          final p      = jsonDecode(pollResp.body) as Map<String, dynamic>;
+          final status = p['status'] as String;
+
+          if (status == 'queued') {
+            yield GenQueued(p['queue_position'] as int? ?? 0);
+          } else if (status == 'running') {
+            // NIM Schnell je synchronní — gen-queue nevidí per-step progress.
+            yield const GenRunning(0, 0);
+          } else if (status == 'done') {
+            break;
+          } else if (status == 'error') {
+            final jobErr = (p['error'] as String?) ?? 'neznámá chyba';
+            yield GenFailed(HttpLayerError.parseJobError(jobErr));
+            return;
+          }
+        }
+
+        // ── 3. Download result ─────────────────────────────────
+        step = 'download';
+        currentTimeout = _downloadTimeout;
+        yield GenDownloading(i, n);
+        final resultResp = await _client
+            .get(
+              Uri.parse('$_baseUrl/nim/flux-schnell/jobs/$jobId/result'),
+              headers: _authHeaders,
+            )
+            .timeout(_downloadTimeout);
+
+        if (resultResp.statusCode != 200) {
+          yield GenFailed(HttpLayerError.parse(
+            statusCode: resultResp.statusCode,
+            body: resultResp.body,
+            headers: resultResp.headers,
+            step: 'download',
+            service: 'flux-nim',
+          ).toString());
+          return;
+        }
+        images.add(resultResp.bodyBytes);
+      } on TimeoutException catch (e) {
+        yield GenFailed(
+          HttpLayerError.fromException(
+            e,
+            step,
+            'flux-nim',
+            timeout: currentTimeout,
+          ).toString(),
+        );
+        return;
+      } on SocketException catch (e) {
+        yield GenFailed(
+          HttpLayerError.fromException(e, step, 'flux-nim').toString(),
+        );
+        return;
+      } catch (e) {
+        yield GenFailed(
+          HttpLayerError.fromException(e, step, 'flux-nim').toString(),
+        );
+        return;
+      }
+    }
+    yield GenComplete(images);
   }
 
   @override
   Stream<GenEvent> follow(String jobId) async* {
-    yield const GenFailed('[flux-nim] job nelze obnovit');
+    yield GenSubmitted(jobId);
+    var step = 'poll';
+    var currentTimeout = _pollTimeout;
+    while (true) {
+      await Future.delayed(_pollInterval);
+      try {
+        final pollResp = await _client
+            .get(
+              Uri.parse('$_baseUrl/nim/flux-schnell/jobs/$jobId'),
+              headers: _authHeaders,
+            )
+            .timeout(_pollTimeout);
+
+        if (pollResp.statusCode == 404) {
+          yield const GenFailed(
+            '[gen-queue] job nenalezen – queue byl restartován? Zkus generovat znovu.',
+          );
+          return;
+        }
+        if (pollResp.statusCode != 200) {
+          yield GenFailed(HttpLayerError.parse(
+            statusCode: pollResp.statusCode,
+            body: pollResp.body,
+            headers: pollResp.headers,
+            step: 'poll',
+            service: 'flux-nim',
+          ).toString());
+          return;
+        }
+
+        final p      = jsonDecode(pollResp.body) as Map<String, dynamic>;
+        final status = p['status'] as String;
+
+        if (status == 'queued') {
+          yield GenQueued(p['queue_position'] as int? ?? 0);
+        } else if (status == 'running') {
+          yield const GenRunning(0, 0);
+        } else if (status == 'done') {
+          step = 'download';
+          currentTimeout = _downloadTimeout;
+          final resultResp = await _client
+              .get(
+                Uri.parse('$_baseUrl/nim/flux-schnell/jobs/$jobId/result'),
+                headers: _authHeaders,
+              )
+              .timeout(_downloadTimeout);
+          if (resultResp.statusCode != 200) {
+            yield GenFailed(HttpLayerError.parse(
+              statusCode: resultResp.statusCode,
+              body: resultResp.body,
+              headers: resultResp.headers,
+              step: 'download',
+              service: 'flux-nim',
+            ).toString());
+            return;
+          }
+          yield GenComplete([resultResp.bodyBytes]);
+          return;
+        } else if (status == 'error') {
+          final jobErr = (p['error'] as String?) ?? 'neznámá chyba';
+          yield GenFailed(HttpLayerError.parseJobError(jobErr));
+          return;
+        }
+      } on TimeoutException catch (e) {
+        yield GenFailed(
+          HttpLayerError.fromException(
+            e,
+            step,
+            'flux-nim',
+            timeout: currentTimeout,
+          ).toString(),
+        );
+        return;
+      } on SocketException catch (e) {
+        yield GenFailed(
+          HttpLayerError.fromException(e, step, 'flux-nim').toString(),
+        );
+        return;
+      } catch (e) {
+        yield GenFailed(
+          HttpLayerError.fromException(e, step, 'flux-nim').toString(),
+        );
+        return;
+      }
+    }
   }
 
   @override

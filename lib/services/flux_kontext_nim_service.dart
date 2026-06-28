@@ -2,8 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show SocketException;
 import 'dart:math';
-import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 
@@ -57,6 +56,9 @@ class FluxKontextNimService implements ImageBackend {
 
   @override
   String get label => 'FLUX Kontext';
+
+  @override
+  int get variantCount => 1;
 
   /// FLUX.1-Kontext is an img2img-only model — the NIM API requires an `image`
   /// field in every request. txt2img is not supported.
@@ -127,6 +129,7 @@ class FluxKontextNimService implements ImageBackend {
           'seed': Random().nextInt(1 << 31),
         };
 
+        debugPrint('[kontext] #${i + 1}/$n submit → POST /nim/flux-kontext/v1/infer');
         final submitResp = await _client
             .post(
               Uri.parse('$_baseUrl/nim/flux-kontext/v1/infer'),
@@ -135,7 +138,9 @@ class FluxKontextNimService implements ImageBackend {
             )
             .timeout(_submitTimeout);
 
+        debugPrint('[kontext] submit ← ${submitResp.statusCode} (${submitResp.body.length} B)');
         if (submitResp.statusCode != 202) {
+          debugPrint('[kontext] submit error body: ${submitResp.body}');
           yield GenFailed(HttpLayerError.parse(
             statusCode: submitResp.statusCode,
             body: submitResp.body,
@@ -148,8 +153,10 @@ class FluxKontextNimService implements ImageBackend {
 
         final submitted = jsonDecode(submitResp.body) as Map<String, dynamic>;
         final jobId = submitted['id'] as String;
+        final qpos = submitted['queue_position'] as int? ?? 0;
+        debugPrint('[kontext] job=$jobId queue_position=$qpos');
         yield GenSubmitted(jobId);
-        yield GenQueued(submitted['queue_position'] as int? ?? 0);
+        yield GenQueued(qpos);
 
         // ── 2. Poll until done ─────────────────────────────────
         step = 'poll';
@@ -164,13 +171,16 @@ class FluxKontextNimService implements ImageBackend {
               )
               .timeout(_pollTimeout);
 
+          debugPrint('[kontext] poll ← ${pollResp.statusCode} body=${pollResp.body}');
           if (pollResp.statusCode == 404) {
+            debugPrint('[kontext] 404 — job=$jobId not found');
             yield const GenFailed(
               '[nim-proxy] job nenalezen – proxy byl restartován? Zkus generovat znovu.',
             );
             return;
           }
           if (pollResp.statusCode != 200) {
+            debugPrint('[kontext] poll error ${pollResp.statusCode}: ${pollResp.body}');
             yield GenFailed(HttpLayerError.parse(
               statusCode: pollResp.statusCode,
               body: pollResp.body,
@@ -191,9 +201,11 @@ class FluxKontextNimService implements ImageBackend {
             final total = p['total'] as int? ?? 0;
             yield GenRunning(runStep, total);
           } else if (status == 'done') {
+            debugPrint('[kontext] job=$jobId done → downloading result');
             break;
           } else if (status == 'error') {
             final jobErr = (p['error'] as String?) ?? 'neznámá chyba';
+            debugPrint('[kontext] job=$jobId server error: $jobErr');
             yield GenFailed(HttpLayerError.parseJobError(jobErr));
             return;
           }
@@ -203,6 +215,7 @@ class FluxKontextNimService implements ImageBackend {
         step = 'download';
         currentTimeout = _downloadTimeout;
         yield GenDownloading(i, n);
+        debugPrint('[kontext] GET /result job=$jobId');
         final resultResp = await _client
             .get(
               Uri.parse('$_baseUrl/nim/flux-kontext/jobs/$jobId/result'),
@@ -210,7 +223,9 @@ class FluxKontextNimService implements ImageBackend {
             )
             .timeout(_downloadTimeout);
 
+        debugPrint('[kontext] result ← ${resultResp.statusCode} (${resultResp.bodyBytes.length} B)');
         if (resultResp.statusCode != 200) {
+          debugPrint('[kontext] result error body: ${resultResp.body}');
           yield GenFailed(HttpLayerError.parse(
             statusCode: resultResp.statusCode,
             body: resultResp.body,
@@ -222,6 +237,7 @@ class FluxKontextNimService implements ImageBackend {
         }
         images.add(resultResp.bodyBytes);
       } on TimeoutException catch (e) {
+        debugPrint('[kontext] TIMEOUT step=$step after ${currentTimeout.inSeconds}s');
         yield GenFailed(
           HttpLayerError.fromException(
             e,
@@ -232,22 +248,26 @@ class FluxKontextNimService implements ImageBackend {
         );
         return;
       } on SocketException catch (e) {
+        debugPrint('[kontext] SocketException step=$step: $e');
         yield GenFailed(
           HttpLayerError.fromException(e, step, 'flux-kontext').toString(),
         );
         return;
       } catch (e) {
+        debugPrint('[kontext] exception step=$step: $e');
         yield GenFailed(
           HttpLayerError.fromException(e, step, 'flux-kontext').toString(),
         );
         return;
       }
     }
+    debugPrint('[kontext] all $n images done → GenComplete');
     yield GenComplete(images);
   }
 
   @override
   Stream<GenEvent> follow(String jobId) async* {
+    debugPrint('[kontext] follow job=$jobId');
     yield GenSubmitted(jobId);
     var step = 'poll';
     var currentTimeout = _pollTimeout;
@@ -262,12 +282,14 @@ class FluxKontextNimService implements ImageBackend {
             .timeout(_pollTimeout);
 
         if (pollResp.statusCode == 404) {
+          debugPrint('[kontext/follow] 404 — job=$jobId not found (TTL expired or proxy restart)');
           yield const GenFailed(
             '[nim-proxy] job nenalezen – proxy byl restartován? Zkus generovat znovu.',
           );
           return;
         }
         if (pollResp.statusCode != 200) {
+          debugPrint('[kontext/follow] poll error ${pollResp.statusCode}: ${pollResp.body}');
           yield GenFailed(HttpLayerError.parse(
             statusCode: pollResp.statusCode,
             body: pollResp.body,
@@ -278,6 +300,7 @@ class FluxKontextNimService implements ImageBackend {
           return;
         }
 
+        debugPrint('[kontext/follow] poll ← ${pollResp.statusCode} body=${pollResp.body}');
         final p = jsonDecode(pollResp.body) as Map<String, dynamic>;
         final status = p['status'] as String;
 
@@ -288,15 +311,19 @@ class FluxKontextNimService implements ImageBackend {
           final total = p['total'] as int? ?? 0;
           yield GenRunning(runStep, total);
         } else if (status == 'done') {
+          debugPrint('[kontext/follow] done → downloading result');
           step = 'download';
           currentTimeout = _downloadTimeout;
+          debugPrint('[kontext/follow] GET /result job=$jobId');
           final resultResp = await _client
               .get(
                 Uri.parse('$_baseUrl/nim/flux-kontext/jobs/$jobId/result'),
                 headers: _authHeaders,
               )
               .timeout(_downloadTimeout);
+          debugPrint('[kontext/follow] result ← ${resultResp.statusCode} (${resultResp.bodyBytes.length} B)');
           if (resultResp.statusCode != 200) {
+            debugPrint('[kontext/follow] result error: ${resultResp.body}');
             yield GenFailed(HttpLayerError.parse(
               statusCode: resultResp.statusCode,
               body: resultResp.body,
@@ -310,10 +337,12 @@ class FluxKontextNimService implements ImageBackend {
           return;
         } else if (status == 'error') {
           final jobErr = (p['error'] as String?) ?? 'neznámá chyba';
+          debugPrint('[kontext/follow] server error: $jobErr');
           yield GenFailed(HttpLayerError.parseJobError(jobErr));
           return;
         }
       } on TimeoutException catch (e) {
+        debugPrint('[kontext/follow] TIMEOUT step=$step after ${currentTimeout.inSeconds}s');
         yield GenFailed(
           HttpLayerError.fromException(
             e,
@@ -324,11 +353,13 @@ class FluxKontextNimService implements ImageBackend {
         );
         return;
       } on SocketException catch (e) {
+        debugPrint('[kontext/follow] SocketException step=$step: $e');
         yield GenFailed(
           HttpLayerError.fromException(e, step, 'flux-kontext').toString(),
         );
         return;
       } catch (e) {
+        debugPrint('[kontext/follow] exception step=$step: $e');
         yield GenFailed(
           HttpLayerError.fromException(e, step, 'flux-kontext').toString(),
         );

@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../models/gen_node.dart';
 import '../models/image_session.dart';
@@ -17,7 +20,8 @@ final imageStudioProvider =
       (ref) => ImageStudioNotifier(),
     );
 
-/// How many candidates each round produces.
+/// How many candidates ComfyUI produces per round (native batch, free).
+/// NIM backends override [ImageBackend.variantCount] to 1.
 const kVariantCount = 4;
 
 class ImageStudioState {
@@ -125,13 +129,35 @@ class ImageStudioState {
   );
 }
 
-class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
+class ImageStudioNotifier extends StateNotifier<ImageStudioState>
+    with WidgetsBindingObserver {
   ImageStudioNotifier() : super(const ImageStudioState()) {
+    WidgetsBinding.instance.addObserver(this);
     _loadLoras();
     _load();
+    unawaited(_deleteLegacyBox());
   }
 
-  static const _boxName = 'image_sessions';
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _resumeInFlightJob();
+  }
+
+  /// Silently removes the old v1 box file that stored full base64 PNG blobs.
+  /// Uses direct file I/O to avoid triggering Hive reads (which would OOM).
+  Future<void> _deleteLegacyBox() async {
+    try {
+      final dir = (await getApplicationDocumentsDirectory()).path;
+      for (final suffix in ['.hive', '.hive.lock']) {
+        try { await File('$dir/$_legacyBoxName$suffix').delete(); } catch (_) {}
+      }
+    } catch (_) {}
+  }
+
+  // v2: images stored as files, box holds only paths — old v1 box had full
+  // base64 PNG blobs and caused OOM; new name sidesteps the old file entirely.
+  static const _boxName = 'image_sessions_v2';
+  static const _legacyBoxName = 'image_sessions';
   static const _key = 'all';
 
   final ComfyUIService _comfyui = ComfyUIService();
@@ -142,11 +168,39 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
   String? _activeNodeId;
   Completer<void>? _activeCompleter;
 
+  late final Future<Directory> _dirFuture = _initDir();
+
+  Future<Directory> _initDir() async {
+    final base = await getApplicationSupportDirectory();
+    final dir = Directory('${base.path}/image_studio');
+    await dir.create(recursive: true);
+    return dir;
+  }
+
   ImageBackend get _backend => switch (state.backendId) {
     kBackendFluxNim => _fluxNim,
     kBackendFluxKontextNim => _fluxKontextNim,
     _ => _comfyui,
   };
+
+  /// Re-attach to an in-flight job after iOS suspension or app restart.
+  ///
+  /// Looks for the first generating node that has a persisted [GenNode.jobId]
+  /// and calls the appropriate backend's [ImageBackend.follow]. A no-op if
+  /// a generation is already active or no resumable node exists.
+  void _resumeInFlightJob() {
+    if (_activeSub != null) return;
+    final node = state.nodes
+        .where((n) => n.status == GenStatus.generating && n.jobId != null)
+        .firstOrNull;
+    if (node == null) return;
+    final backend = switch (state.backendId) {
+      kBackendFluxNim => _fluxNim,
+      kBackendFluxKontextNim => _fluxKontextNim,
+      _ => _comfyui,
+    };
+    unawaited(_runAsync(node.id, () => backend.follow(node.jobId!)));
+  }
 
   void setBackend(String id) => state = state.copyWith(backendId: id);
 
@@ -186,6 +240,14 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
   }
 
   Future<void> deleteSession(String id) async {
+    final toDelete = state.sessions.where((s) => s.id == id).firstOrNull;
+    if (toDelete != null) {
+      for (final node in toDelete.nodes) {
+        for (final image in node.images) {
+          try { await File(image.filePath).delete(); } catch (_) {}
+        }
+      }
+    }
     final updated = state.sessions.where((s) => s.id != id).toList();
     if (state.activeSessionId == id) {
       final next = updated.isNotEmpty ? updated.first : null;
@@ -239,6 +301,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
           backendId: latest.backendId,
           availableLoras: state.availableLoras,
         );
+        _resumeInFlightJob();
       } else {
         state = state.copyWith(sessions: sessions);
       }
@@ -304,7 +367,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
     );
     await _runAsync(
       node.id,
-      () => _backend.generate(prompt: text, n: kVariantCount),
+      () => _backend.generate(prompt: text, n: _backend.variantCount),
     );
   }
 
@@ -315,7 +378,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
   /// describes a change.
   Future<void> startFromImage(Uint8List bytes) async {
     if (state.isBusy) return;
-    final image = GenImage.fromB64(base64Encode(bytes));
+    final dir = await _dirFuture;
+    final image = await GenImage.save(bytes, dir);
     final node = GenNode.create(prompt: '').copyWith(
       status: GenStatus.ready,
       images: [image],
@@ -348,9 +412,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
     await _runAsync(
       node.id,
       () => _backend.edit(
-        image: base64Decode(base.b64),
+        image: base.bytes,
         prompt: text,
-        n: kVariantCount,
+        n: _backend.variantCount,
       ),
     );
   }
@@ -371,7 +435,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
     if (node.isRoot) {
       await _runAsync(
         nodeId,
-        () => _backend.generate(prompt: node.prompt, n: kVariantCount),
+        () => _backend.generate(prompt: node.prompt, n: _backend.variantCount),
       );
     } else {
       final base = _imageById(node.sourceImageId);
@@ -386,9 +450,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
       await _runAsync(
         nodeId,
         () => _backend.edit(
-          image: base64Decode(base.b64),
+          image: base.bytes,
           prompt: node.prompt,
-          n: kVariantCount,
+          n: _backend.variantCount,
         ),
       );
     }
@@ -411,6 +475,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
             status: GenStatus.error,
             error: 'Zrušeno',
             clearProgress: true,
+            clearJobId: true,
           ),
         );
       }
@@ -428,6 +493,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
     _activeNodeId = nodeId;
     final completer = Completer<void>();
     _activeCompleter = completer;
+    // Set to true when GenComplete schedules its async save so onDone skips
+    // the redundant finish() call — the async save calls finish() itself.
+    bool completedByEvent = false;
 
     void finish() {
       if (!completer.isCompleted) completer.complete();
@@ -440,6 +508,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
           status: GenStatus.error,
           error: msg,
           clearProgress: true,
+          clearJobId: true,
         ),
       );
       state = state.copyWith(error: msg);
@@ -448,10 +517,10 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
     _activeSub = run().listen(
       (event) {
         switch (event) {
-          case GenSubmitted():
-            // The studio runs jobs only while open; no cross-session resume,
-            // so the server-assigned id isn't persisted here.
-            break;
+          case GenSubmitted(:final jobId):
+            // Persist jobId so follow() can resume after iOS suspension.
+            _patch(nodeId, (n) => n.copyWith(jobId: jobId));
+            unawaited(_save());
           case GenQueued(:final position):
             _patch(
               nodeId,
@@ -482,19 +551,26 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
               ),
             );
           case GenComplete(:final images):
-            final genImages = [
-              for (final bytes in images) GenImage.fromB64(base64Encode(bytes)),
-            ];
-            _patch(
-              nodeId,
-              (n) => n.copyWith(
-                status: GenStatus.ready,
-                images: genImages,
-                clearError: true,
-                clearProgress: true,
-              ),
-            );
-            unawaited(_save());
+            completedByEvent = true;
+            unawaited(() async {
+              final dir = await _dirFuture;
+              final genImages = await Future.wait([
+                for (final bytes in images) GenImage.save(bytes, dir),
+              ]);
+              if (!mounted) return;
+              _patch(
+                nodeId,
+                (n) => n.copyWith(
+                  status: GenStatus.ready,
+                  images: genImages,
+                  clearError: true,
+                  clearProgress: true,
+                  clearJobId: true,
+                ),
+              );
+              unawaited(_save());
+              finish();
+            }());
           case GenFailed(:final message):
             fail(message);
         }
@@ -512,7 +588,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
       onDone: () {
         _activeSub = null;
         if (_activeNodeId == nodeId) _activeNodeId = null;
-        finish();
+        if (!completedByEvent) finish();
       },
       cancelOnError: true,
     );
@@ -548,6 +624,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _activeSub?.cancel();
     _comfyui.dispose();
     _fluxNim.dispose();

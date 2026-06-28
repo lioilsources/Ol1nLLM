@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/theme.dart';
@@ -114,8 +114,8 @@ class _SessionThumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final b64 = session.thumbnailB64;
-    if (b64 == null) {
+    final path = session.thumbnailFilePath;
+    if (path == null) {
       return Container(
         width: 40,
         height: 40,
@@ -128,8 +128,8 @@ class _SessionThumbnail extends StatelessWidget {
     }
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
-      child: Image.memory(
-        base64Decode(b64),
+      child: Image.file(
+        File(path),
         width: 40,
         height: 40,
         fit: BoxFit.cover,

@@ -67,6 +67,12 @@ abstract class ImageBackend {
   String get id;
   String get label;
 
+  /// How many image variants the provider should request per generation round.
+  ///
+  /// ComfyUI batches natively (free), so 4 is sensible. NIM backends process
+  /// each variant sequentially (~120 s each), so 1 is the right default there.
+  int get variantCount => 4;
+
   Stream<GenEvent> generate({required String prompt, required int n});
 
   Stream<GenEvent> edit({

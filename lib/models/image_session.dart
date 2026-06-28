@@ -26,10 +26,10 @@ class ImageSession {
   final DateTime updatedAt;
   final String backendId;
 
-  String? get thumbnailB64 {
+  String? get thumbnailFilePath {
     for (final n in nodes) {
       if (n.status == GenStatus.ready && n.images.isNotEmpty) {
-        return n.images.first.b64;
+        return n.images.first.filePath;
       }
     }
     return null;

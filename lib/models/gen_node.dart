@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:uuid/uuid.dart';
@@ -8,26 +8,34 @@ const _uuid = Uuid();
 /// Lifecycle of a single generation round.
 enum GenStatus { generating, ready, error }
 
-/// One produced image (base64 PNG) with a stable local id used for selection.
+/// One produced image stored as a PNG file on disk.
+///
+/// Keeping full PNG bytes inside the Hive session box caused OOM when reading
+/// back large multi-session blobs. The box now stores only the file path.
 class GenImage {
   final String id;
-  final String b64;
+  final String filePath;
   Uint8List? _bytes;
 
-  GenImage({required this.id, required this.b64});
+  GenImage({required this.id, required this.filePath});
 
-  /// Decoded PNG bytes, decoded lazily once and cached. Reusing the same
-  /// [Uint8List] instance across rebuilds lets `Image.memory` recognise the
-  /// image as unchanged, so it isn't re-decoded (which caused tiles and tree
-  /// thumbnails to flicker on every progress tick / selection).
-  Uint8List get bytes => _bytes ??= base64Decode(b64);
+  /// PNG bytes, read from [filePath] and cached for the lifetime of this
+  /// instance so repeated accesses (e.g. Gal save) skip the disk read.
+  Uint8List get bytes => _bytes ??= File(filePath).readAsBytesSync();
 
-  factory GenImage.fromB64(String b64) => GenImage(id: _uuid.v4(), b64: b64);
+  /// Write [bytes] to [dir] as `<uuid>.png` and return a [GenImage] pointing
+  /// to the new file. The bytes are cached so the first [bytes] call is free.
+  static Future<GenImage> save(Uint8List bytes, Directory dir) async {
+    final id = _uuid.v4();
+    final file = File('${dir.path}/$id.png');
+    await file.writeAsBytes(bytes, flush: true);
+    return GenImage(id: id, filePath: file.path).._bytes = bytes;
+  }
 
-  Map<String, dynamic> toJson() => {'id': id, 'b64': b64};
+  Map<String, dynamic> toJson() => {'id': id, 'filePath': filePath};
 
   factory GenImage.fromJson(Map<String, dynamic> json) =>
-      GenImage(id: json['id'] as String, b64: json['b64'] as String);
+      GenImage(id: json['id'] as String, filePath: json['filePath'] as String);
 }
 
 /// One round in the refinement tree.
@@ -57,6 +65,10 @@ class GenNode {
   /// Short human-readable progress label (queue position, step, download…).
   final String? progressLabel;
 
+  /// Server-assigned job id emitted by [GenSubmitted]. Persisted so the
+  /// provider can call [ImageBackend.follow] after an app suspension/restart.
+  final String? jobId;
+
   const GenNode({
     required this.id,
     required this.parentId,
@@ -67,6 +79,7 @@ class GenNode {
     this.error,
     this.progress,
     this.progressLabel,
+    this.jobId,
   });
 
   bool get isRoot => parentId == null;
@@ -91,12 +104,17 @@ class GenNode {
     'status': status.name,
     'images': images.map((i) => i.toJson()).toList(),
     if (error != null) 'error': error,
+    if (jobId != null) 'jobId': jobId,
   };
 
   factory GenNode.fromJson(Map<String, dynamic> json) {
     var status = GenStatus.values.byName(json['status'] as String);
-    // A generating node can't be resumed after serialization — mark as error
-    if (status == GenStatus.generating) status = GenStatus.error;
+    final jobId = json['jobId'] as String?;
+    // Keep generating status only when a jobId is present — the provider
+    // will call follow() to re-attach. Without jobId there's no way to resume.
+    if (status == GenStatus.generating && jobId == null) {
+      status = GenStatus.error;
+    }
     return GenNode(
       id: json['id'] as String,
       parentId: json['parentId'] as String?,
@@ -109,6 +127,7 @@ class GenNode {
       error: status == GenStatus.error
           ? (json['error'] as String? ?? 'Generování přerušeno')
           : null,
+      jobId: jobId,
     );
   }
 
@@ -120,6 +139,8 @@ class GenNode {
     double? progress,
     String? progressLabel,
     bool clearProgress = false,
+    String? jobId,
+    bool clearJobId = false,
   }) => GenNode(
     id: id,
     parentId: parentId,
@@ -133,5 +154,6 @@ class GenNode {
     // can still carry text like "Ve frontě…".
     progress: clearProgress ? null : (progress ?? this.progress),
     progressLabel: progressLabel ?? this.progressLabel,
+    jobId: clearJobId ? null : (jobId ?? this.jobId),
   );
 }

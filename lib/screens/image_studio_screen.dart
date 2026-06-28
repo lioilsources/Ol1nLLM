@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -280,8 +281,8 @@ class _TreeNodeWidget extends StatelessWidget {
             )
           : node.images.first;
       inner = ClipOval(
-        child: Image.memory(
-          displayImg.bytes,
+        child: Image.file(
+          File(displayImg.filePath),
           fit: BoxFit.cover,
           width: size,
           height: size,
@@ -471,8 +472,8 @@ class _NodeGrid extends ConsumerWidget {
 
     return GridView.builder(
       padding: const EdgeInsets.all(12),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: node.images.length == 1 ? 1 : 2,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
         childAspectRatio: 1,
@@ -500,7 +501,7 @@ class _NodeGrid extends ConsumerWidget {
         onTap: () => Navigator.of(context).pop(),
         child: InteractiveViewer(
           child: Center(
-            child: Image.memory(image.bytes, fit: BoxFit.contain),
+            child: Image.file(File(image.filePath), fit: BoxFit.contain),
           ),
         ),
       ),
@@ -568,7 +569,7 @@ class _ImageTile extends StatelessWidget {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: Image.memory(image.bytes, fit: BoxFit.cover),
+              child: Image.file(File(image.filePath), fit: BoxFit.cover),
             ),
           ),
           if (selected)
