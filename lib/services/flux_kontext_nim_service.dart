@@ -1,16 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show SocketException;
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 
+import 'http_error.dart';
 import 'image_backend.dart';
 
 const kBackendFluxKontextNim = 'flux_kontext_nim';
 
-/// Calls the async FLUX.1-Kontext NIM wrapper in image-api.
+/// Calls the async FLUX.1-Kontext NIM wrapper in nim-kontext-proxy.
 ///
 /// POST /nim/flux-kontext/v1/infer → 202 + job_id (returns before the NIM
 /// finishes, so the Cloudflare 100 s edge timeout is never hit).
@@ -56,9 +58,14 @@ class FluxKontextNimService implements ImageBackend {
   @override
   String get label => 'FLUX Kontext';
 
+  /// FLUX.1-Kontext is an img2img-only model — the NIM API requires an `image`
+  /// field in every request. txt2img is not supported.
   @override
   Stream<GenEvent> generate({required String prompt, required int n}) async* {
-    yield* _infer(prompt: prompt, imageB64: null, n: n);
+    yield const GenFailed(
+      '[FLUX Kontext] tento model vyžaduje vstupní obrázek (img2img pouze). '
+      'Pro generování z textu použijte FLUX Schnell nebo ComfyUI.',
+    );
   }
 
   // Dimensions supported by the Kontext TRT buffer. Input images must use
@@ -78,8 +85,12 @@ class FluxKontextNimService implements ImageBackend {
     final sw = _snap(decoded.width);
     final sh = _snap(decoded.height);
     if (sw == decoded.width && sh == decoded.height) return bytes;
-    final resized = img.copyResize(decoded, width: sw, height: sh,
-        interpolation: img.Interpolation.cubic);
+    final resized = img.copyResize(
+      decoded,
+      width: sw,
+      height: sh,
+      interpolation: img.Interpolation.cubic,
+    );
     return Uint8List.fromList(img.encodePng(resized));
   }
 
@@ -89,28 +100,32 @@ class FluxKontextNimService implements ImageBackend {
     required String prompt,
     required int n,
   }) async* {
-    yield* _infer(prompt: prompt, imageB64: base64Encode(_snapImage(image)), n: n);
+    yield* _infer(
+      prompt: prompt,
+      imageB64: base64Encode(_snapImage(image)),
+      n: n,
+    );
   }
 
   Stream<GenEvent> _infer({
     required String prompt,
-    required String? imageB64,
+    required String imageB64,
     required int n,
   }) async* {
     final images = <Uint8List>[];
     for (var i = 0; i < n; i++) {
+      var step = 'submit';
+      var currentTimeout = _submitTimeout;
       try {
         // ── 1. Submit ──────────────────────────────────────────
         final bodyMap = <String, dynamic>{
           'prompt': prompt,
-          'aspect_ratio': imageB64 != null ? 'match_input_image' : '1:1',
+          'image': 'data:image/png;base64,$imageB64',
+          'aspect_ratio': 'match_input_image',
           'cfg_scale': 3.5,
           'steps': 30,
           'seed': Random().nextInt(1 << 31),
         };
-        if (imageB64 != null) {
-          bodyMap['image'] = 'data:image/png;base64,$imageB64';
-        }
 
         final submitResp = await _client
             .post(
@@ -121,7 +136,13 @@ class FluxKontextNimService implements ImageBackend {
             .timeout(_submitTimeout);
 
         if (submitResp.statusCode != 202) {
-          yield GenFailed('Kontext NIM chyba ${submitResp.statusCode}: ${submitResp.body}');
+          yield GenFailed(HttpLayerError.parse(
+            statusCode: submitResp.statusCode,
+            body: submitResp.body,
+            headers: submitResp.headers,
+            step: 'submit',
+            service: 'flux-kontext',
+          ).toString());
           return;
         }
 
@@ -131,6 +152,8 @@ class FluxKontextNimService implements ImageBackend {
         yield GenQueued(submitted['queue_position'] as int? ?? 0);
 
         // ── 2. Poll until done ─────────────────────────────────
+        step = 'poll';
+        currentTimeout = _pollTimeout;
         while (true) {
           await Future.delayed(_pollInterval);
 
@@ -142,7 +165,13 @@ class FluxKontextNimService implements ImageBackend {
               .timeout(_pollTimeout);
 
           if (pollResp.statusCode != 200) {
-            yield GenFailed('Kontext NIM poll chyba ${pollResp.statusCode}');
+            yield GenFailed(HttpLayerError.parse(
+              statusCode: pollResp.statusCode,
+              body: pollResp.body,
+              headers: pollResp.headers,
+              step: 'poll',
+              service: 'flux-kontext',
+            ).toString());
             return;
           }
 
@@ -152,18 +181,21 @@ class FluxKontextNimService implements ImageBackend {
           if (status == 'queued') {
             yield GenQueued(p['queue_position'] as int? ?? 0);
           } else if (status == 'running') {
-            final step = p['step'] as int? ?? 0;
+            final runStep = p['step'] as int? ?? 0;
             final total = p['total'] as int? ?? 0;
-            yield GenRunning(step, total);
+            yield GenRunning(runStep, total);
           } else if (status == 'done') {
             break;
           } else if (status == 'error') {
-            yield GenFailed('Kontext NIM chyba: ${p['error']}');
+            final jobErr = (p['error'] as String?) ?? 'neznámá chyba';
+            yield GenFailed(HttpLayerError.parseJobError(jobErr));
             return;
           }
         }
 
         // ── 3. Download result ─────────────────────────────────
+        step = 'download';
+        currentTimeout = _downloadTimeout;
         yield GenDownloading(i, n);
         final resultResp = await _client
             .get(
@@ -173,12 +205,35 @@ class FluxKontextNimService implements ImageBackend {
             .timeout(_downloadTimeout);
 
         if (resultResp.statusCode != 200) {
-          yield GenFailed('Kontext NIM stahování chyba ${resultResp.statusCode}');
+          yield GenFailed(HttpLayerError.parse(
+            statusCode: resultResp.statusCode,
+            body: resultResp.body,
+            headers: resultResp.headers,
+            step: 'download',
+            service: 'flux-kontext',
+          ).toString());
           return;
         }
         images.add(resultResp.bodyBytes);
+      } on TimeoutException catch (e) {
+        yield GenFailed(
+          HttpLayerError.fromException(
+            e,
+            step,
+            'flux-kontext',
+            timeout: currentTimeout,
+          ).toString(),
+        );
+        return;
+      } on SocketException catch (e) {
+        yield GenFailed(
+          HttpLayerError.fromException(e, step, 'flux-kontext').toString(),
+        );
+        return;
       } catch (e) {
-        yield GenFailed('Kontext NIM chyba: $e');
+        yield GenFailed(
+          HttpLayerError.fromException(e, step, 'flux-kontext').toString(),
+        );
         return;
       }
     }
@@ -188,6 +243,8 @@ class FluxKontextNimService implements ImageBackend {
   @override
   Stream<GenEvent> follow(String jobId) async* {
     yield GenSubmitted(jobId);
+    var step = 'poll';
+    var currentTimeout = _pollTimeout;
     while (true) {
       await Future.delayed(_pollInterval);
       try {
@@ -199,11 +256,19 @@ class FluxKontextNimService implements ImageBackend {
             .timeout(_pollTimeout);
 
         if (pollResp.statusCode == 404) {
-          yield const GenFailed('Job expiroval nebo nebyl nalezen');
+          yield const GenFailed(
+            '[nim-proxy] job nenalezen – proxy byl restartován? Zkus generovat znovu.',
+          );
           return;
         }
         if (pollResp.statusCode != 200) {
-          yield GenFailed('Kontext NIM poll chyba ${pollResp.statusCode}');
+          yield GenFailed(HttpLayerError.parse(
+            statusCode: pollResp.statusCode,
+            body: pollResp.body,
+            headers: pollResp.headers,
+            step: 'poll',
+            service: 'flux-kontext',
+          ).toString());
           return;
         }
 
@@ -213,10 +278,12 @@ class FluxKontextNimService implements ImageBackend {
         if (status == 'queued') {
           yield GenQueued(p['queue_position'] as int? ?? 0);
         } else if (status == 'running') {
-          final step = p['step'] as int? ?? 0;
+          final runStep = p['step'] as int? ?? 0;
           final total = p['total'] as int? ?? 0;
-          yield GenRunning(step, total);
+          yield GenRunning(runStep, total);
         } else if (status == 'done') {
+          step = 'download';
+          currentTimeout = _downloadTimeout;
           final resultResp = await _client
               .get(
                 Uri.parse('$_baseUrl/nim/flux-kontext/jobs/$jobId/result'),
@@ -224,17 +291,41 @@ class FluxKontextNimService implements ImageBackend {
               )
               .timeout(_downloadTimeout);
           if (resultResp.statusCode != 200) {
-            yield GenFailed('Kontext NIM stahování chyba ${resultResp.statusCode}');
+            yield GenFailed(HttpLayerError.parse(
+              statusCode: resultResp.statusCode,
+              body: resultResp.body,
+              headers: resultResp.headers,
+              step: 'download',
+              service: 'flux-kontext',
+            ).toString());
             return;
           }
           yield GenComplete([resultResp.bodyBytes]);
           return;
         } else if (status == 'error') {
-          yield GenFailed('Kontext NIM chyba: ${p['error']}');
+          final jobErr = (p['error'] as String?) ?? 'neznámá chyba';
+          yield GenFailed(HttpLayerError.parseJobError(jobErr));
           return;
         }
+      } on TimeoutException catch (e) {
+        yield GenFailed(
+          HttpLayerError.fromException(
+            e,
+            step,
+            'flux-kontext',
+            timeout: currentTimeout,
+          ).toString(),
+        );
+        return;
+      } on SocketException catch (e) {
+        yield GenFailed(
+          HttpLayerError.fromException(e, step, 'flux-kontext').toString(),
+        );
+        return;
       } catch (e) {
-        yield GenFailed('Kontext NIM chyba: $e');
+        yield GenFailed(
+          HttpLayerError.fromException(e, step, 'flux-kontext').toString(),
+        );
         return;
       }
     }

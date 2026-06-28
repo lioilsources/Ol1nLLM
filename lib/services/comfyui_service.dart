@@ -8,6 +8,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
+import 'http_error.dart';
 import 'image_backend.dart';
 
 /// Which ComfyUI workflow (and model family) to use.
@@ -143,8 +144,8 @@ class ComfyUIService implements ImageBackend {
     // check the WS try/catch swallows the auth error and _pollUntilDone retries
     // forever.
     if (_cfId.isEmpty || _cfSecret.isEmpty) {
-      yield GenFailed(
-        'CF Access credentials not configured. '
+      yield const GenFailed(
+        '[ComfyUI] CF Access credentials not configured. '
         'Rebuild with --dart-define=CF_ACCESS_CLIENT_ID=... --dart-define=CF_ACCESS_CLIENT_SECRET=...',
       );
       return;
@@ -287,7 +288,7 @@ class ComfyUIService implements ImageBackend {
   }) async* {
     hist ??= await _history(promptId);
     if (hist == null) {
-      yield const GenFailed('ComfyUI: výsledek nenalezen (history prázdná)');
+      yield const GenFailed('[ComfyUI] výsledek nenalezen (history prázdná)');
       return;
     }
     final outputs =
@@ -302,7 +303,7 @@ class ComfyUIService implements ImageBackend {
       }
     }
     if (refs.isEmpty) {
-      yield const GenFailed('ComfyUI: žádné výstupní obrázky ve workflow');
+      yield const GenFailed('[ComfyUI] žádné výstupní obrázky ve workflow');
       return;
     }
 
@@ -329,13 +330,20 @@ class ComfyUIService implements ImageBackend {
           headers: _jsonHeaders,
           body: jsonEncode({'prompt': workflow, 'client_id': _clientId}),
         )
-        .timeout(_submitTimeout);
+        .timeout(_submitTimeout, onTimeout: () {
+      throw Exception(
+        '[ComfyUI] timeout při odesílání workflow (${_submitTimeout.inSeconds}s)',
+      );
+    });
     debugPrint('[comfy] POST /prompt → ${resp.statusCode}');
     if (resp.statusCode != 200) {
-      throw Exception(
-        'ComfyUI /prompt HTTP ${resp.statusCode}: '
-        '${_snippet(resp.body)}',
-      );
+      throw Exception(HttpLayerError.parse(
+        statusCode: resp.statusCode,
+        body: resp.body,
+        headers: resp.headers,
+        step: 'submit',
+        service: 'ComfyUI',
+      ).toString());
     }
     final json = jsonDecode(resp.body) as Map<String, dynamic>;
     final nodeErrors = json['node_errors'];
@@ -381,13 +389,23 @@ class ComfyUIService implements ImageBackend {
     );
     final resp = await _client
         .get(uri, headers: _authHeaders)
-        .timeout(_downloadTimeout);
+        .timeout(_downloadTimeout, onTimeout: () {
+      throw Exception(
+        '[ComfyUI] timeout při stahování $filename (${_downloadTimeout.inSeconds}s)',
+      );
+    });
     debugPrint(
       '[comfy] GET /view $filename → ${resp.statusCode} '
       '(${resp.bodyBytes.length} bytes)',
     );
     if (resp.statusCode != 200) {
-      throw Exception('ComfyUI /view HTTP ${resp.statusCode} for $filename');
+      throw Exception(HttpLayerError.parse(
+        statusCode: resp.statusCode,
+        body: resp.body,
+        headers: resp.headers,
+        step: 'download',
+        service: 'ComfyUI',
+      ).toString());
     }
     return resp.bodyBytes;
   }
@@ -405,14 +423,24 @@ class ComfyUIService implements ImageBackend {
                   'ol1n_input_${DateTime.now().millisecondsSinceEpoch}.png',
             ),
           );
-    final streamed = await _client.send(req).timeout(_submitTimeout);
+    final streamed = await _client.send(req).timeout(
+      _submitTimeout,
+      onTimeout: () {
+        throw Exception(
+          '[ComfyUI] timeout při nahrávání obrázku (${_submitTimeout.inSeconds}s)',
+        );
+      },
+    );
     final resp = await http.Response.fromStream(streamed);
     debugPrint('[comfy] POST /upload/image → ${resp.statusCode}');
     if (resp.statusCode != 200) {
-      throw Exception(
-        'ComfyUI /upload/image HTTP ${resp.statusCode}: '
-        '${_snippet(resp.body)}',
-      );
+      throw Exception(HttpLayerError.parse(
+        statusCode: resp.statusCode,
+        body: resp.body,
+        headers: resp.headers,
+        step: 'upload',
+        service: 'ComfyUI',
+      ).toString());
     }
     final json = jsonDecode(resp.body) as Map<String, dynamic>;
     final name = json['name'] as String;
@@ -567,7 +595,7 @@ class ComfyUIService implements ImageBackend {
     final type = data['exception_type'] ?? '';
     final msg = data['exception_message'] ?? data['node_type'] ?? 'unknown';
     final prefix = type.toString().isEmpty ? '' : '$type: ';
-    return 'ComfyUI chyba — $prefix$msg';
+    return '[ComfyUI] chyba — $prefix$msg';
   }
 
   String _historyErrorMessage(Map<String, dynamic> hist) {
@@ -575,10 +603,10 @@ class ComfyUIService implements ImageBackend {
         ((hist['status'] as Map?)?['messages'] as List?) ?? const [];
     for (final m in messages.reversed) {
       if (m is List && m.isNotEmpty && '${m[0]}'.contains('error')) {
-        return 'ComfyUI chyba — ${jsonEncode(m.length > 1 ? m[1] : m[0])}';
+        return '[ComfyUI] chyba — ${jsonEncode(m.length > 1 ? m[1] : m[0])}';
       }
     }
-    return 'ComfyUI: generování selhalo';
+    return '[ComfyUI] generování selhalo';
   }
 
   String _snippet(String body) {

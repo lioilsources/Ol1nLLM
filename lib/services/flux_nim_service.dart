@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show SocketException;
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import 'http_error.dart';
 import 'image_backend.dart';
 
 /// Calls the FLUX NIM native API at POST /v1/infer.
@@ -69,7 +71,13 @@ class FluxNimService implements ImageBackend {
             .timeout(_generateTimeout);
 
         if (resp.statusCode != 200) {
-          yield GenFailed('NIM chyba ${resp.statusCode}: ${resp.body}');
+          yield GenFailed(HttpLayerError.parse(
+            statusCode: resp.statusCode,
+            body: resp.body,
+            headers: resp.headers,
+            step: 'generate',
+            service: 'flux-nim',
+          ).toString());
           return;
         }
 
@@ -79,12 +87,29 @@ class FluxNimService implements ImageBackend {
             ? (artifacts.first as Map<String, dynamic>)['base64'] as String?
             : null;
         if (b64 == null || b64.isEmpty) {
-          yield const GenFailed('NIM: prázdná odpověď');
+          yield const GenFailed('[flux-nim] NIM: prázdná odpověď (žádné artifacts)');
           return;
         }
         images.add(base64Decode(b64));
+      } on TimeoutException catch (e) {
+        yield GenFailed(
+          HttpLayerError.fromException(
+            e,
+            'generate',
+            'flux-nim',
+            timeout: _generateTimeout,
+          ).toString(),
+        );
+        return;
+      } on SocketException catch (e) {
+        yield GenFailed(
+          HttpLayerError.fromException(e, 'generate', 'flux-nim').toString(),
+        );
+        return;
       } catch (e) {
-        yield GenFailed('NIM chyba: $e');
+        yield GenFailed(
+          HttpLayerError.fromException(e, 'generate', 'flux-nim').toString(),
+        );
         return;
       }
     }
@@ -97,12 +122,12 @@ class FluxNimService implements ImageBackend {
     required String prompt,
     required int n,
   }) async* {
-    yield const GenFailed('FLUX NIM nepodporuje img2img');
+    yield const GenFailed('[flux-nim] FLUX Schnell nepodporuje img2img');
   }
 
   @override
   Stream<GenEvent> follow(String jobId) async* {
-    yield const GenFailed('NIM job nelze obnovit');
+    yield const GenFailed('[flux-nim] job nelze obnovit');
   }
 
   @override
