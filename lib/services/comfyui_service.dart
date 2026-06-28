@@ -242,8 +242,13 @@ class ComfyUIService implements ImageBackend {
 
   // ── HTTP polling fallback ───────────────────────────────────
   Stream<GenEvent> _pollUntilDone(String promptId) async* {
+    final deadline = DateTime.now().add(const Duration(minutes: 10));
     while (true) {
       await Future.delayed(_pollInterval);
+      if (DateTime.now().isAfter(deadline)) {
+        yield const GenFailed('[ComfyUI] timeout – generování trvá příliš dlouho (>10 min)');
+        return;
+      }
 
       Map<String, dynamic>? hist;
       try {

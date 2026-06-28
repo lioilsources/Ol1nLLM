@@ -7,14 +7,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/conversation.dart';
 import '../models/message.dart';
-import '../services/comfyui_service.dart';
-import '../services/image_backend.dart';
 import '../services/media_service.dart';
 import '../services/vllm_service.dart';
 import '../services/persona_service.dart';
 
 const _uuid = Uuid();
-const _pendingJobKey = 'pending_image_job';
 
 class ChatState {
   final List<Conversation> conversations;
@@ -60,10 +57,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   final VllmService _service = VllmService();
   final MediaService _mediaService = MediaService(); // OCR only
-  final ComfyUIService _comfyui = ComfyUIService(); // image generation/editing
   final PersonaService _personaService;
   StreamSubscription<ChatEvent>? _streamSub;
-  StreamSubscription<GenEvent>? _imageSub;
 
   ChatNotifier(this._personaService) : super(const ChatState()) {
     _load();
@@ -86,7 +81,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
     } catch (e) {
       debugPrint('ChatNotifier load error: $e');
     }
-    await _resumePendingJob();
   }
 
   Future<void> _save() async {
@@ -95,49 +89,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
       _key,
       jsonEncode(state.conversations.map((c) => c.toJson()).toList()),
     );
-  }
-
-  // ── Job persistence ───────────────────────────────────────────────────────
-
-  Future<void> _persistJob({
-    required String jobId,
-    required String convId,
-    required String placeholderId,
-  }) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _pendingJobKey,
-      jsonEncode({
-        'job_id': jobId,
-        'conv_id': convId,
-        'placeholder_id': placeholderId,
-      }),
-    );
-  }
-
-  Future<void> _clearPendingJob() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_pendingJobKey);
-  }
-
-  Future<void> _resumePendingJob() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_pendingJobKey);
-    if (raw == null) return;
-
-    final data = jsonDecode(raw) as Map<String, dynamic>;
-    final jobId = data['job_id'] as String;
-    final convId = data['conv_id'] as String;
-    final placeholderId = data['placeholder_id'] as String;
-
-    final conv = state.conversations.where((c) => c.id == convId).firstOrNull;
-    if (conv == null || !conv.messages.any((m) => m.id == placeholderId)) {
-      await _clearPendingJob();
-      return;
-    }
-
-    state = state.copyWith(isStreaming: true);
-    _consumeImageStream(_comfyui.follow(jobId), convId, placeholderId);
   }
 
   // ── Conversation management ───────────────────────────────────────────────
@@ -301,39 +252,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
   }
 
-  // ── Media (async job model) ───────────────────────────────────────────────
-
-  Future<void> generateImage(String prompt) async {
-    final text = prompt.trim();
-    if (text.isEmpty || state.isStreaming) return;
-    await _runMediaAsync(
-      userMsg: Message(
-        id: _uuid.v4(),
-        role: MessageRole.user,
-        content: text,
-        createdAt: DateTime.now(),
-      ),
-      titleSeed: text,
-      run: () => _comfyui.generate(prompt: text, n: 1),
-    );
-  }
-
-  Future<void> editImage(String imageBase64, String prompt) async {
-    final text = prompt.trim();
-    if (text.isEmpty || imageBase64.isEmpty || state.isStreaming) return;
-    await _runMediaAsync(
-      userMsg: Message(
-        id: _uuid.v4(),
-        role: MessageRole.user,
-        content: text,
-        createdAt: DateTime.now(),
-        images: [imageBase64],
-      ),
-      titleSeed: text,
-      run: () =>
-          _comfyui.edit(image: base64Decode(imageBase64), prompt: text, n: 1),
-    );
-  }
+  // ── OCR ──────────────────────────────────────────────────────────────────
 
   Future<void> runOcr(String imageBase64, {String? prompt}) async {
     if (imageBase64.isEmpty || state.isStreaming) return;
@@ -358,168 +277,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
           createdAt: DateTime.now(),
         );
       },
-    );
-  }
-
-  /// Start an image job (ComfyUI) then stream it, updating the placeholder
-  /// message in place. The server-assigned id is persisted on [GenSubmitted] so
-  /// the job can be resumed after an app restart.
-  Future<void> _runMediaAsync({
-    required Message userMsg,
-    required String titleSeed,
-    required Stream<GenEvent> Function() run,
-  }) async {
-    var conv = state.active;
-    if (conv == null) {
-      conv = Conversation.create();
-      state = state.copyWith(
-        conversations: [conv, ...state.conversations],
-        activeId: conv.id,
-      );
-    }
-
-    final user = userMsg.copyWith(parentId: conv.activeLeafId);
-    final placeholderId = _uuid.v4();
-    final placeholder = Message(
-      id: placeholderId,
-      parentId: user.id,
-      role: MessageRole.assistant,
-      content: '',
-      createdAt: DateTime.now(),
-    );
-
-    final newTitle = conv.messages.isEmpty
-        ? (titleSeed.length > 60 ? '${titleSeed.substring(0, 60)}…' : titleSeed)
-        : conv.title;
-    conv = conv.copyWith(
-      messages: [...conv.messages, user, placeholder],
-      title: newTitle,
-      updatedAt: DateTime.now(),
-      activeLeafId: placeholderId,
-    );
-    _replaceConversation(conv);
-    state = state.copyWith(
-      isStreaming: true,
-      clearError: true,
-      pendingContinuation: false,
-    );
-    await _save();
-
-    _consumeImageStream(run(), conv.id, placeholderId);
-  }
-
-  /// Consume a backend [GenEvent] stream to its terminal event, updating the
-  /// placeholder in place. Shared by fresh jobs and resumed ([_resumePendingJob])
-  /// ones.
-  void _consumeImageStream(
-    Stream<GenEvent> stream,
-    String convId,
-    String placeholderId,
-  ) {
-    _imageSub?.cancel();
-    _imageSub = stream.listen(
-      (event) {
-        switch (event) {
-          case GenSubmitted(:final jobId):
-            unawaited(
-              _persistJob(
-                jobId: jobId,
-                convId: convId,
-                placeholderId: placeholderId,
-              ),
-            );
-          case GenQueued(:final position):
-            final text = position > 0
-                ? '⏳ Ve frontě – pozice $position'
-                : '⚙️ Spouštím…';
-            _updatePlaceholder(convId, placeholderId, text);
-          case GenRunning(:final fraction):
-            final text = fraction == null
-                ? '⚙️ Generuji…'
-                : '⚙️ Generuji ${(fraction * 100).round()} %';
-            _updatePlaceholder(convId, placeholderId, text);
-          case GenDownloading(:final done, :final total):
-            _updatePlaceholder(
-              convId,
-              placeholderId,
-              '⬇️ Stahování ${done + 1}/$total',
-            );
-          case GenComplete(:final images):
-            _clearPendingJob();
-            _finishImages(convId, placeholderId, images);
-          case GenFailed(:final message):
-            _clearPendingJob();
-            _removePlaceholder(convId, placeholderId);
-            state = state.copyWith(isStreaming: false, error: message);
-        }
-      },
-      onError: (e) {
-        debugPrint('image gen error: $e');
-        _clearPendingJob();
-        _removePlaceholder(convId, placeholderId);
-        state = state.copyWith(isStreaming: false, error: _errorMessage(e));
-      },
-      cancelOnError: true,
-    );
-  }
-
-  void _updatePlaceholder(String convId, String placeholderId, String content) {
-    final conv = state.conversations.where((c) => c.id == convId).firstOrNull;
-    if (conv == null) return;
-    _replaceConversation(
-      conv.copyWith(
-        messages: conv.messages
-            .map(
-              (m) => m.id == placeholderId ? m.copyWith(content: content) : m,
-            )
-            .toList(),
-      ),
-    );
-  }
-
-  void _finishImages(
-    String convId,
-    String placeholderId,
-    List<Uint8List> images,
-  ) {
-    final conv = state.conversations.where((c) => c.id == convId).firstOrNull;
-    if (conv == null) return;
-    // Reuse the placeholder's id (and parent link) so activeLeafId stays valid.
-    _replaceConversation(
-      conv.copyWith(
-        messages: conv.messages
-            .map(
-              (m) => m.id == placeholderId
-                  ? m.copyWith(
-                      content: '',
-                      images: [for (final bytes in images) base64Encode(bytes)],
-                    )
-                  : m,
-            )
-            .toList(),
-        updatedAt: DateTime.now(),
-      ),
-    );
-    state = state.copyWith(isStreaming: false);
-    unawaited(_save());
-  }
-
-  void _removePlaceholder(String convId, String placeholderId) {
-    final conv = state.conversations.where((c) => c.id == convId).firstOrNull;
-    if (conv == null) return;
-    // Drop the placeholder and pull the branch tip back to its parent so the
-    // user can retry from the same point.
-    final placeholder = conv.messages
-        .where((m) => m.id == placeholderId)
-        .firstOrNull;
-    final newLeaf = conv.activeLeafId == placeholderId
-        ? placeholder?.parentId
-        : conv.activeLeafId;
-    _replaceConversation(
-      conv.copyWith(
-        messages: conv.messages.where((m) => m.id != placeholderId).toList(),
-        activeLeafId: newLeaf,
-      ),
     );
   }
 
@@ -613,6 +370,25 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
   }
 
+  void _removePlaceholder(String convId, String placeholderId) {
+    final conv = state.conversations.where((c) => c.id == convId).firstOrNull;
+    if (conv == null) return;
+    // Drop the placeholder and pull the branch tip back to its parent so the
+    // user can retry from the same point.
+    final placeholder = conv.messages
+        .where((m) => m.id == placeholderId)
+        .firstOrNull;
+    final newLeaf = conv.activeLeafId == placeholderId
+        ? placeholder?.parentId
+        : conv.activeLeafId;
+    _replaceConversation(
+      conv.copyWith(
+        messages: conv.messages.where((m) => m.id != placeholderId).toList(),
+        activeLeafId: newLeaf,
+      ),
+    );
+  }
+
   void _replaceConversation(Conversation updated) {
     final list = state.conversations
         .map((c) => c.id == updated.id ? updated : c)
@@ -624,10 +400,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
   @override
   void dispose() {
     _cancelStream();
-    _imageSub?.cancel();
     _service.dispose();
     _mediaService.dispose();
-    _comfyui.dispose();
     super.dispose();
   }
 }

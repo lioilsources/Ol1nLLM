@@ -10,31 +10,25 @@ import '../models/persona.dart';
 import '../providers/chat_provider.dart';
 import '../services/persona_service.dart';
 
-enum InputMode { chat, generateImage, editImage, ocr }
+enum InputMode { chat, ocr }
 
 extension on InputMode {
   IconData get icon => switch (this) {
     InputMode.chat => Icons.chat_bubble_outline,
-    InputMode.generateImage => Icons.auto_awesome,
-    InputMode.editImage => Icons.brush_outlined,
     InputMode.ocr => Icons.document_scanner_outlined,
   };
 
   String get label => switch (this) {
     InputMode.chat => 'Chat',
-    InputMode.generateImage => 'Generate image',
-    InputMode.editImage => 'Edit image',
     InputMode.ocr => 'OCR',
   };
 
   String get hint => switch (this) {
     InputMode.chat => 'Message lab…',
-    InputMode.generateImage => 'Describe an image to generate…',
-    InputMode.editImage => 'Describe the edit…',
     InputMode.ocr => 'Optional instruction…',
   };
 
-  bool get needsImage => this == InputMode.editImage || this == InputMode.ocr;
+  bool get needsImage => this == InputMode.ocr;
 }
 
 class ChatInputBar extends ConsumerStatefulWidget {
@@ -74,8 +68,6 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
     final hasImage = _imageBytes != null;
     return switch (_mode) {
       InputMode.chat => hasText,
-      InputMode.generateImage => hasText,
-      InputMode.editImage => hasText && hasImage,
       InputMode.ocr => hasImage,
     };
   }
@@ -121,14 +113,6 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
         _focusNode.requestFocus();
         setState(() => _personaOverride = null);
         await notifier.sendMessage(text, personaId: personaId);
-      case InputMode.generateImage:
-        _controller.clear();
-        await notifier.generateImage(text);
-      case InputMode.editImage:
-        final image = _imageBase64!;
-        _controller.clear();
-        _clearImage();
-        await notifier.editImage(image, text);
       case InputMode.ocr:
         final image = _imageBase64!;
         _controller.clear();
