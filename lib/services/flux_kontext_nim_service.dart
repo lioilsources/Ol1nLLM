@@ -11,15 +11,14 @@ import 'image_backend.dart';
 
 const kBackendFluxKontextNim = 'flux_kontext_nim';
 
-/// Calls the async FLUX.1-Kontext NIM wrapper in nim-kontext-proxy.
+/// Calls the async FLUX.1-Kontext NIM wrapper in gen-queue.
 ///
 /// POST /nim/flux-kontext/v1/infer → 202 + job_id (returns before the NIM
 /// finishes, so the Cloudflare 100 s edge timeout is never hit).
 /// Client then polls GET /nim/flux-kontext/jobs/{id} and downloads the PNG from
 /// GET /nim/flux-kontext/jobs/{id}/result once status == "done".
 ///
-/// The Cloudflare tunnel must route llm.ol1n.com/nim/flux-kontext/* to
-/// nim-kontext-proxy:8004 (not directly to the NIM container).
+/// The Cloudflare tunnel must route llm.ol1n.com/nim/* to gen-queue:8091.
 class FluxKontextNimService implements ImageBackend {
   FluxKontextNimService();
 
@@ -175,7 +174,7 @@ class FluxKontextNimService implements ImageBackend {
           if (pollResp.statusCode == 404) {
             debugPrint('[kontext] 404 — job=$jobId not found');
             yield const GenFailed(
-              '[nim-proxy] job nenalezen – proxy byl restartován? Zkus generovat znovu.',
+              '[gen-queue] job nenalezen – queue byl restartován? Zkus generovat znovu.',
             );
             return;
           }
@@ -284,7 +283,7 @@ class FluxKontextNimService implements ImageBackend {
         if (pollResp.statusCode == 404) {
           debugPrint('[kontext/follow] 404 — job=$jobId not found (TTL expired or proxy restart)');
           yield const GenFailed(
-            '[nim-proxy] job nenalezen – proxy byl restartován? Zkus generovat znovu.',
+            '[gen-queue] job nenalezen – queue byl restartován? Zkus generovat znovu.',
           );
           return;
         }

@@ -121,51 +121,58 @@ class HttpLayerError {
 
     return switch (statusCode) {
       404 => HttpLayerError(
-          layer: 'nim-proxy',
+          layer: 'gen-queue',
           code: 404,
           message: detailStr.contains('job not found')
               ? 'job nenalezen – proxy byl restartován? Zkus generovat znovu.'
               : 'nenalezeno: $detailStr',
         ),
       409 => HttpLayerError(
-          layer: 'nim-proxy',
+          layer: 'gen-queue',
           code: 409,
           message: 'výsledek ještě není připraven: $detailStr',
         ),
       422 => HttpLayerError(
-          layer: 'nim-proxy',
+          layer: 'gen-queue',
           code: 422,
           message: 'neplatný request: $detailStr',
         ),
       _ => HttpLayerError(
-          layer: 'nim-proxy',
+          layer: 'gen-queue',
           code: statusCode,
           message: 'chyba $statusCode: $detailStr',
         ),
     };
   }
 
-  // ── Job error string from nim-kontext-proxy ────────────────────────────────
+  // ── Job error string from gen-queue ───────────────────────────────────────
 
-  /// Parses the `error` field from a nim-kontext-proxy job status response
-  /// (format: "ExceptionType: message") into a layer-identified error string.
+  /// Parses the `error` field from a gen-queue job status response into a
+  /// layer-identified error string.
+  /// gen-queue error format: "non-retryable: HTTP 4xx: <body>" or plain Go errors.
   static String parseJobError(String jobError) {
-    if (jobError.contains('HTTPError: 422')) {
+    // 4xx from NIM (non-retryable: HTTP 422: {...})
+    if (jobError.contains('non-retryable: HTTP 422') ||
+        jobError.contains('non-retryable: HTTP 400')) {
       return '[NIM] neplatný request – chybí pole `image` nebo neplatné parametry';
     }
-    if (jobError.contains('NIM returned no artifacts') ||
-        jobError.contains('NIM artifact missing base64')) {
-      return '[NIM] inference nevrátil výsledek (prázdná odpověď)';
+    // Empty or unparseable artifacts
+    if (jobError.contains('empty artifacts') ||
+        jobError.contains('parse NIM response') ||
+        jobError.contains('decode base64')) {
+      return '[NIM] inference nevrátil výsledek (prázdná nebo poškozená odpověď)';
     }
-    if (RegExp(r'HTTPError:\s*5\d\d').hasMatch(jobError)) {
+    // 5xx from NIM
+    if (RegExp(r'HTTP\s+5\d\d').hasMatch(jobError)) {
       return '[NIM] inference selhal: ${_excerpt(jobError)}';
     }
-    if (jobError.contains('ConnectionError') ||
-        jobError.contains('ConnectionRefusedError') ||
-        jobError.contains('ConnectTimeout')) {
+    // Network / container unreachable (Go errors)
+    if (jobError.contains('connection refused') ||
+        jobError.contains('no such host') ||
+        jobError.contains('context deadline exceeded')) {
       return '[NIM] container nedostupný – zkontroluj `docker ps`';
     }
-    return '[nim-proxy→NIM] ${_excerpt(jobError)}';
+    return '[gen-queue→NIM] ${_excerpt(jobError)}';
   }
 
   // ── Exception parsing ──────────────────────────────────────────────────────
