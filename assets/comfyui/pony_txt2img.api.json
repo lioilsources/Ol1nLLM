@@ -8,7 +8,7 @@
     "class_type": "CLIPTextEncode",
     "_meta": { "title": "Positive prompt" },
     "inputs": {
-      "text": "__PROMPT__",
+      "text": "score_9, score_8_up, score_7_up, score_6_up, __PROMPT__",
       "clip": ["1", 1]
     }
   },

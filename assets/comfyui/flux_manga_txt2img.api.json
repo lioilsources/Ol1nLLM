@@ -3,8 +3,8 @@
     "class_type": "UNETLoader",
     "_meta": { "title": "Load FLUX UNET" },
     "inputs": {
-      "unet_name": "flux1-dev-kontext_fp8_scaled.safetensors",
-      "weight_dtype": "fp8_e4m3fn"
+      "unet_name": "flux1-dev.safetensors",
+      "weight_dtype": "default"
     }
   },
   "11": {

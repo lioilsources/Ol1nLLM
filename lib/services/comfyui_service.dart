@@ -519,8 +519,9 @@ class ComfyUIService implements ImageBackend {
       if (inputs == null) continue;
 
       inputs.forEach((key, value) {
-        if (value == '__PROMPT__') inputs[key] = prompt;
-        if (value == '__IMAGE__' && imageName != null) inputs[key] = imageName;
+        if (value is! String) return;
+        if (value.contains('__PROMPT__')) inputs[key] = value.replaceAll('__PROMPT__', prompt);
+        if (imageName != null && value.contains('__IMAGE__')) inputs[key] = value.replaceAll('__IMAGE__', imageName);
       });
 
       switch (cls) {

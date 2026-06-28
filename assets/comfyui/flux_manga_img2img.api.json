@@ -1,7 +1,7 @@
 {
   "10": {
     "class_type": "UNETLoader",
-    "_meta": { "title": "Load FLUX UNET" },
+    "_meta": { "title": "Load FLUX Kontext UNET" },
     "inputs": {
       "unet_name": "flux1-dev-kontext_fp8_scaled.safetensors",
       "weight_dtype": "fp8_e4m3fn"
@@ -54,35 +54,51 @@
     }
   },
   "31": {
-    "class_type": "VAEEncode",
-    "_meta": { "title": "VAE Encode (img2img)" },
+    "class_type": "FluxKontextImageScale",
+    "_meta": { "title": "Scale to Kontext-optimal resolution" },
     "inputs": {
-      "pixels": ["30", 0],
-      "vae": ["12", 0]
+      "image": ["30", 0]
     }
   },
   "32": {
-    "class_type": "RepeatLatentBatch",
-    "_meta": { "title": "Repeat latent → batch" },
+    "class_type": "VAEEncode",
+    "_meta": { "title": "Encode reference image" },
     "inputs": {
-      "amount": 4,
-      "samples": ["31", 0]
+      "pixels": ["31", 0],
+      "vae": ["12", 0]
+    }
+  },
+  "33": {
+    "class_type": "ReferenceLatent",
+    "_meta": { "title": "Attach reference to conditioning" },
+    "inputs": {
+      "conditioning": ["16", 0],
+      "latent": ["32", 0]
+    }
+  },
+  "34": {
+    "class_type": "EmptySD3LatentImage",
+    "_meta": { "title": "Target latent (batch)" },
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 4
     }
   },
   "18": {
     "class_type": "KSampler",
-    "_meta": { "title": "KSampler (denoise < 1)" },
+    "_meta": { "title": "KSampler (Kontext: full denoise, reference guides output)" },
     "inputs": {
       "seed": 0,
-      "steps": 20,
+      "steps": 28,
       "cfg": 1.0,
       "sampler_name": "euler",
       "scheduler": "simple",
-      "denoise": 0.72,
+      "denoise": 1.0,
       "model": ["10", 0],
-      "positive": ["16", 0],
+      "positive": ["33", 0],
       "negative": ["15", 0],
-      "latent_image": ["32", 0]
+      "latent_image": ["34", 0]
     }
   },
   "19": {
