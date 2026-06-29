@@ -208,6 +208,12 @@ class FluxNimService implements ImageBackend {
         );
         return;
       } catch (e) {
+        // iOS suspend kills the socket as http.ClientException / HttpException
+        // (not Socket/Timeout). With a known jobId it's resumable, not fatal.
+        if (currentJobId != null) {
+          yield GenInterrupted(currentJobId);
+          return;
+        }
         yield GenFailed(
           HttpLayerError.fromException(e, step, 'flux-nim').toString(),
         );
@@ -220,7 +226,6 @@ class FluxNimService implements ImageBackend {
   @override
   Stream<GenEvent> follow(String jobId) async* {
     yield GenSubmitted(jobId);
-    var step = 'poll';
     while (true) {
       await Future.delayed(_pollInterval);
       try {
@@ -256,7 +261,6 @@ class FluxNimService implements ImageBackend {
         } else if (status == 'running') {
           yield const GenRunning(0, 0);
         } else if (status == 'done') {
-          step = 'download';
           final resultResp = await _client
               .get(
                 Uri.parse('$_baseUrl/nim/flux-schnell/jobs/$jobId/result'),
@@ -280,17 +284,10 @@ class FluxNimService implements ImageBackend {
           yield GenFailed(HttpLayerError.parseJobError(jobErr));
           return;
         }
-      } on TimeoutException catch (_) {
-        // Resumable: job keeps running server-side across a suspend/blip.
+      } catch (_) {
+        // Any transport error (Socket/Timeout/ClientException on iOS suspend):
+        // the job keeps running server-side, so resume instead of failing.
         yield GenInterrupted(jobId);
-        return;
-      } on SocketException catch (_) {
-        yield GenInterrupted(jobId);
-        return;
-      } catch (e) {
-        yield GenFailed(
-          HttpLayerError.fromException(e, step, 'flux-nim').toString(),
-        );
         return;
       }
     }

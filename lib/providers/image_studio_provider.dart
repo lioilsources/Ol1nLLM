@@ -534,6 +534,33 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       state = state.copyWith(error: msg);
     }
 
+    // Transient drop (iOS suspend / network blip): keep the node alive (status
+    // stays generating), persist so resume/restart can re-attach, tear down the
+    // dead stream, and re-attach after a backoff. No red error.
+    void handleInterruption(String jobId) {
+      _patch(
+        nodeId,
+        (n) => n.copyWith(
+          jobId: jobId,
+          clearProgress: true,
+          progressLabel: 'Spojení přerušeno, obnovuji…',
+        ),
+      );
+      unawaited(_save());
+      _activeSub = null;
+      if (_activeNodeId == nodeId) _activeNodeId = null;
+      finish();
+      if (_interruptRetries++ < _maxInterruptRetries) {
+        // Re-attach after a short backoff (covers foreground blips; the
+        // resumed lifecycle hook also triggers this on wake-up).
+        Future.delayed(_interruptBackoff, () {
+          if (mounted) _resumeInFlightJob();
+        });
+      } else {
+        fail('[ImageStudio] nepodařilo se obnovit spojení – zkus to znovu');
+      }
+    }
+
     _activeSub = run().listen(
       (event) {
         switch (event) {
@@ -598,33 +625,19 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           case GenFailed(:final message):
             fail(message);
           case GenInterrupted(:final jobId):
-            // Transient drop (iOS suspend / network blip). Keep the node alive
-            // (status stays generating), persist so resume/restart can re-attach,
-            // and tear down this dead stream without surfacing a red error.
-            _patch(
-              nodeId,
-              (n) => n.copyWith(
-                jobId: jobId,
-                clearProgress: true,
-                progressLabel: 'Spojení přerušeno, obnovuji…',
-              ),
-            );
-            unawaited(_save());
-            _activeSub = null;
-            if (_activeNodeId == nodeId) _activeNodeId = null;
-            finish();
-            if (_interruptRetries++ < _maxInterruptRetries) {
-              // Re-attach after a short backoff (covers foreground blips; the
-              // resumed lifecycle hook also triggers this on wake-up).
-              Future.delayed(_interruptBackoff, () {
-                if (mounted) _resumeInFlightJob();
-              });
-            } else {
-              fail('[ImageStudio] nepodařilo se obnovit spojení – zkus to znovu');
-            }
+            handleInterruption(jobId);
         }
       },
       onError: (Object e) {
+        // A stray error reached the stream (should be rare — backends classify
+        // transport errors as GenInterrupted). If the job is still alive, treat
+        // it as a resumable interruption rather than nuking the jobId.
+        final node = _nodeById(nodeId);
+        final jobId = node?.jobId;
+        if (node?.status == GenStatus.generating && jobId != null) {
+          handleInterruption(jobId);
+          return;
+        }
         final msg = e is Exception
             ? e.toString().replaceFirst('Exception: ', '')
             : e.toString();

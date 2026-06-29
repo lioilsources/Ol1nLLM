@@ -265,6 +265,12 @@ class FluxKontextNimService implements ImageBackend {
         return;
       } catch (e) {
         debugPrint('[kontext] exception step=$step: $e');
+        // iOS suspend kills the socket as http.ClientException / HttpException
+        // (not Socket/Timeout). With a known jobId it's resumable, not fatal.
+        if (currentJobId != null) {
+          yield GenInterrupted(currentJobId);
+          return;
+        }
         yield GenFailed(
           HttpLayerError.fromException(e, step, 'flux-kontext').toString(),
         );
@@ -361,10 +367,10 @@ class FluxKontextNimService implements ImageBackend {
         yield GenInterrupted(jobId);
         return;
       } catch (e) {
-        debugPrint('[kontext/follow] exception step=$step: $e');
-        yield GenFailed(
-          HttpLayerError.fromException(e, step, 'flux-kontext').toString(),
-        );
+        // Any transport error (Socket/Timeout/ClientException on iOS suspend):
+        // the job keeps running server-side, so resume instead of failing.
+        debugPrint('[kontext/follow] exception step=$step: $e — interrupted, will resume');
+        yield GenInterrupted(jobId);
         return;
       }
     }
