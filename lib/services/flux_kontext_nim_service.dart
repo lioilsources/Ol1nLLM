@@ -117,6 +117,7 @@ class FluxKontextNimService implements ImageBackend {
     for (var i = 0; i < n; i++) {
       var step = 'submit';
       var currentTimeout = _submitTimeout;
+      String? currentJobId;
       try {
         // ── 1. Submit ──────────────────────────────────────────
         final bodyMap = <String, dynamic>{
@@ -152,6 +153,7 @@ class FluxKontextNimService implements ImageBackend {
 
         final submitted = jsonDecode(submitResp.body) as Map<String, dynamic>;
         final jobId = submitted['id'] as String;
+        currentJobId = jobId;
         final qpos = submitted['queue_position'] as int? ?? 0;
         debugPrint('[kontext] job=$jobId queue_position=$qpos');
         yield GenSubmitted(jobId);
@@ -237,6 +239,11 @@ class FluxKontextNimService implements ImageBackend {
         images.add(resultResp.bodyBytes);
       } on TimeoutException catch (e) {
         debugPrint('[kontext] TIMEOUT step=$step after ${currentTimeout.inSeconds}s');
+        // Suspend/network blip mid-poll: job is still alive server-side.
+        if (currentJobId != null) {
+          yield GenInterrupted(currentJobId);
+          return;
+        }
         yield GenFailed(
           HttpLayerError.fromException(
             e,
@@ -248,6 +255,10 @@ class FluxKontextNimService implements ImageBackend {
         return;
       } on SocketException catch (e) {
         debugPrint('[kontext] SocketException step=$step: $e');
+        if (currentJobId != null) {
+          yield GenInterrupted(currentJobId);
+          return;
+        }
         yield GenFailed(
           HttpLayerError.fromException(e, step, 'flux-kontext').toString(),
         );
@@ -340,22 +351,14 @@ class FluxKontextNimService implements ImageBackend {
           yield GenFailed(HttpLayerError.parseJobError(jobErr));
           return;
         }
-      } on TimeoutException catch (e) {
-        debugPrint('[kontext/follow] TIMEOUT step=$step after ${currentTimeout.inSeconds}s');
-        yield GenFailed(
-          HttpLayerError.fromException(
-            e,
-            step,
-            'flux-kontext',
-            timeout: currentTimeout,
-          ).toString(),
-        );
+      } on TimeoutException catch (_) {
+        debugPrint('[kontext/follow] TIMEOUT step=$step after ${currentTimeout.inSeconds}s — interrupted, will resume');
+        // Resumable: job keeps running server-side across a suspend/blip.
+        yield GenInterrupted(jobId);
         return;
       } on SocketException catch (e) {
-        debugPrint('[kontext/follow] SocketException step=$step: $e');
-        yield GenFailed(
-          HttpLayerError.fromException(e, step, 'flux-kontext').toString(),
-        );
+        debugPrint('[kontext/follow] SocketException step=$step: $e — interrupted, will resume');
+        yield GenInterrupted(jobId);
         return;
       } catch (e) {
         debugPrint('[kontext/follow] exception step=$step: $e');

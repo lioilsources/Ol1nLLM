@@ -246,6 +246,11 @@ class ComfyUIService implements ImageBackend {
   // ── HTTP polling fallback ───────────────────────────────────
   Stream<GenEvent> _pollUntilDone(String promptId) async* {
     final deadline = DateTime.now().add(const Duration(minutes: 10));
+    // Consecutive transient poll failures (network blip / iOS suspend). After
+    // a few in a row we bail out with GenInterrupted so the provider re-attaches
+    // via follow() on resume — instead of silently spinning for 10 minutes.
+    var consecutiveErrors = 0;
+    const maxConsecutiveErrors = 3;
     while (true) {
       await Future.delayed(_pollInterval);
       if (DateTime.now().isAfter(deadline)) {
@@ -258,6 +263,11 @@ class ComfyUIService implements ImageBackend {
         hist = await _history(promptId);
       } catch (e) {
         debugPrint('[comfy] poll /history error ($e) — retrying');
+        if (++consecutiveErrors >= maxConsecutiveErrors) {
+          debugPrint('[comfy] $consecutiveErrors consecutive poll errors — interrupting, will resume');
+          yield GenInterrupted(promptId);
+          return;
+        }
         continue;
       }
 
@@ -270,6 +280,9 @@ class ComfyUIService implements ImageBackend {
         yield* _downloadOutputs(promptId, hist: hist);
         return;
       }
+
+      // /history reached the server (job just not finished yet) → reset counter.
+      consecutiveErrors = 0;
 
       // Not in history yet → still queued or running. Surface a coarse status.
       try {

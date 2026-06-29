@@ -59,6 +59,15 @@ class GenFailed extends GenEvent {
   const GenFailed(this.message);
 }
 
+/// Transient interruption (network blip / iOS suspend) while a job with a
+/// known [jobId] is still alive server-side. NOT a terminal failure: the
+/// provider keeps the node generating, preserves the jobId, and re-attaches
+/// via [ImageBackend.follow] once the app resumes or the network recovers.
+class GenInterrupted extends GenEvent {
+  final String jobId;
+  const GenInterrupted(this.jobId);
+}
+
 /// A pluggable image generation/editing backend.
 ///
 /// Implementations turn a prompt (or an image + edit instruction) into a

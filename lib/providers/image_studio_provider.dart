@@ -160,6 +160,12 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   static const _legacyBoxName = 'image_sessions';
   static const _key = 'all';
 
+  /// Backoff before re-attaching to a job after a transient interruption
+  /// (suspend / network blip), and the cap on consecutive resume attempts
+  /// before we give up and surface a real error.
+  static const _interruptBackoff = Duration(seconds: 4);
+  static const _maxInterruptRetries = 5;
+
   final ComfyUIService _comfyui = ComfyUIService();
   final FluxNimService _fluxNim = FluxNimService();
   final FluxKontextNimService _fluxKontextNim = FluxKontextNimService();
@@ -167,6 +173,10 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   StreamSubscription<GenEvent>? _activeSub;
   String? _activeNodeId;
   Completer<void>? _activeCompleter;
+
+  /// Consecutive transient interruptions while trying to finish one job. Reset
+  /// on any real progress; capped by [_maxInterruptRetries].
+  int _interruptRetries = 0;
 
   late final Future<Directory> _dirFuture = _initDir();
 
@@ -358,6 +368,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   Future<void> generate(String prompt) async {
     final text = prompt.trim();
     if (text.isEmpty || state.isBusy) return;
+    _interruptRetries = 0;
     final node = GenNode.create(prompt: text);
     state = state.copyWith(
       nodes: [...state.nodes, node],
@@ -398,6 +409,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     final text = prompt.trim();
     final base = _imageById(state.selectedImageId);
     if (text.isEmpty || base == null || state.isBusy) return;
+    _interruptRetries = 0;
     final node = GenNode.create(
       parentId: state.currentNodeId,
       sourceImageId: base.id,
@@ -424,6 +436,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     if (state.isBusy) return;
     final node = _nodeById(nodeId);
     if (node == null || node.status == GenStatus.generating) return;
+    _interruptRetries = 0;
     _patch(
       nodeId,
       (n) => n.copyWith(
@@ -465,6 +478,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     _activeSub?.cancel();
     _activeSub = null;
     _activeNodeId = null;
+    _interruptRetries = 0;
     unawaited(_backend.interrupt());
     if (id != null) {
       final node = _nodeById(id);
@@ -478,6 +492,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
             clearJobId: true,
           ),
         );
+        // Persist so the cancellation sticks across an app restart instead of
+        // resuming from a stale generating snapshot.
+        unawaited(_save());
       }
     }
     // Cancelling a subscription fires neither onDone nor onError, so release
@@ -511,6 +528,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           clearJobId: true,
         ),
       );
+      // Persist the terminal error so a restart doesn't resurrect a dead job
+      // from a stale (still-generating) Hive snapshot.
+      unawaited(_save());
       state = state.copyWith(error: msg);
     }
 
@@ -522,6 +542,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
             _patch(nodeId, (n) => n.copyWith(jobId: jobId));
             unawaited(_save());
           case GenQueued(:final position):
+            // A successful queue-position poll ⇒ the connection is healthy.
+            _interruptRetries = 0;
             _patch(
               nodeId,
               (n) => n.copyWith(
@@ -532,6 +554,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
               ),
             );
           case GenRunning(:final fraction):
+            // Real progress ⇒ the connection is healthy again.
+            _interruptRetries = 0;
             _patch(
               nodeId,
               (n) => n.copyWith(
@@ -573,6 +597,31 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
             }());
           case GenFailed(:final message):
             fail(message);
+          case GenInterrupted(:final jobId):
+            // Transient drop (iOS suspend / network blip). Keep the node alive
+            // (status stays generating), persist so resume/restart can re-attach,
+            // and tear down this dead stream without surfacing a red error.
+            _patch(
+              nodeId,
+              (n) => n.copyWith(
+                jobId: jobId,
+                clearProgress: true,
+                progressLabel: 'Spojení přerušeno, obnovuji…',
+              ),
+            );
+            unawaited(_save());
+            _activeSub = null;
+            if (_activeNodeId == nodeId) _activeNodeId = null;
+            finish();
+            if (_interruptRetries++ < _maxInterruptRetries) {
+              // Re-attach after a short backoff (covers foreground blips; the
+              // resumed lifecycle hook also triggers this on wake-up).
+              Future.delayed(_interruptBackoff, () {
+                if (mounted) _resumeInFlightJob();
+              });
+            } else {
+              fail('[ImageStudio] nepodařilo se obnovit spojení – zkus to znovu');
+            }
         }
       },
       onError: (Object e) {

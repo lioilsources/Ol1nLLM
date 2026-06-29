@@ -76,6 +76,7 @@ class FluxNimService implements ImageBackend {
     for (var i = 0; i < n; i++) {
       var step = 'submit';
       var currentTimeout = _submitTimeout;
+      String? currentJobId;
       try {
         // ── 1. Submit ──────────────────────────────────────────
         final bodyMap = {
@@ -107,6 +108,7 @@ class FluxNimService implements ImageBackend {
 
         final submitted = jsonDecode(submitResp.body) as Map<String, dynamic>;
         final jobId = submitted['id'] as String;
+        currentJobId = jobId;
         final qpos  = submitted['queue_position'] as int? ?? 0;
         yield GenSubmitted(jobId);
         yield GenQueued(qpos);
@@ -181,6 +183,12 @@ class FluxNimService implements ImageBackend {
         }
         images.add(resultResp.bodyBytes);
       } on TimeoutException catch (e) {
+        // Suspend/network blip mid-poll: the job is still alive server-side,
+        // so signal a resumable interruption instead of a hard failure.
+        if (currentJobId != null) {
+          yield GenInterrupted(currentJobId);
+          return;
+        }
         yield GenFailed(
           HttpLayerError.fromException(
             e,
@@ -191,6 +199,10 @@ class FluxNimService implements ImageBackend {
         );
         return;
       } on SocketException catch (e) {
+        if (currentJobId != null) {
+          yield GenInterrupted(currentJobId);
+          return;
+        }
         yield GenFailed(
           HttpLayerError.fromException(e, step, 'flux-nim').toString(),
         );
@@ -209,7 +221,6 @@ class FluxNimService implements ImageBackend {
   Stream<GenEvent> follow(String jobId) async* {
     yield GenSubmitted(jobId);
     var step = 'poll';
-    var currentTimeout = _pollTimeout;
     while (true) {
       await Future.delayed(_pollInterval);
       try {
@@ -246,7 +257,6 @@ class FluxNimService implements ImageBackend {
           yield const GenRunning(0, 0);
         } else if (status == 'done') {
           step = 'download';
-          currentTimeout = _downloadTimeout;
           final resultResp = await _client
               .get(
                 Uri.parse('$_baseUrl/nim/flux-schnell/jobs/$jobId/result'),
@@ -270,20 +280,12 @@ class FluxNimService implements ImageBackend {
           yield GenFailed(HttpLayerError.parseJobError(jobErr));
           return;
         }
-      } on TimeoutException catch (e) {
-        yield GenFailed(
-          HttpLayerError.fromException(
-            e,
-            step,
-            'flux-nim',
-            timeout: currentTimeout,
-          ).toString(),
-        );
+      } on TimeoutException catch (_) {
+        // Resumable: job keeps running server-side across a suspend/blip.
+        yield GenInterrupted(jobId);
         return;
-      } on SocketException catch (e) {
-        yield GenFailed(
-          HttpLayerError.fromException(e, step, 'flux-nim').toString(),
-        );
+      } on SocketException catch (_) {
+        yield GenInterrupted(jobId);
         return;
       } catch (e) {
         yield GenFailed(
