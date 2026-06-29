@@ -34,8 +34,8 @@ lib/
     image_session.dart         # ImageSession persistence
   services/
     comfyui_service.dart       # ComfyUI WebSocket + HTTP polling backend
-    flux_kontext_nim_service.dart  # NIM async job queue (poll-based)
-    flux_nim_service.dart      # NIM synchronní request (flux-schnell)
+    flux_kontext_nim_service.dart  # gen-queue async job queue — flux-kontext (img2img)
+    flux_nim_service.dart      # gen-queue async job queue — flux-schnell (txt2img)
     image_backend.dart         # ImageBackend interface + GenEvent sealed class
   screens/
     image_studio_screen.dart
@@ -53,6 +53,8 @@ Každý backend implementuje:
 - `interrupt()` — zrušení
 
 `GenEvent` je sealed class: `GenSubmitted(jobId)` → `GenQueued(pos)` → `GenRunning(step, total)` → `GenDownloading(done, total)` → `GenComplete(images)` | `GenFailed(msg)`.
+
+`GenInterrupted(jobId)` je **neterminální** událost: signalizuje přechodný výpadek (iOS suspend / síťový blip), kdy job na serveru dál žije. Provider nechá node ve stavu `generating`, zachová `jobId` (a uloží ho do Hive) a po krátkém backoffu se znovu napojí přes `follow()`. Viz „Resume po iOS suspenzi".
 
 ### ComfyUI (`comfyui.ol1n.com`)
 
@@ -75,63 +77,78 @@ Pokud WS selže (CF Access blokuje upgrade): fallback na HTTP polling `/history`
 
 **`follow(promptId)`**: přeskočí enqueue, jde rovnou do polling fallbacku (WS je ztracený po suspenzi). Výsledky na serveru přežívají restart ComfyUI? Ne — history se resetuje. TTL: neomezené do restartu serveru.
 
+Po **3 po sobě jdoucích** chybách pollu (typicky uspání / síťový výpadek) `_pollUntilDone` vrátí `GenInterrupted(promptId)` místo tichého opakování až do 10min deadlinu — provider se pak znovu napojí.
+
 Workflow jsou JSON assety v `assets/comfyui/`, patchované před odesláním (`__PROMPT__`, `__IMAGE__`, batch_size, seed, LoRA inject).
 
-### NIM Kontext Proxy (`llm.ol1n.com/nim/flux-kontext/*`)
+### gen-queue — NIM async job queue (`llm.ol1n.com/nim/*`)
 
-**Async job queue přes HTTP polling, navrženo pro obejití Cloudflare 100s edge timeoutu:**
-
-```
-POST /nim/flux-kontext/v1/infer     →  202 + {id, queue_position}   (vrátí okamžitě)
-GET  /nim/flux-kontext/jobs/{id}    →  {status, step, total}         (poll každé 3s)
-GET  /nim/flux-kontext/jobs/{id}/result  →  PNG bytes               (po status=done)
-```
-
-Status hodnoty: `queued` (s `queue_position`), `running` (s `step`/`total`), `done`, `error`.
-
-`n > 1` se řeší **n sekvenčními requesty** — backend podporuje jen n=1 na call. kVariantCount=4 → 4× celý cyklus submit→poll→download.
-
-**`follow(jobId)`**: plně funkční — poll do done, stáhnout result. Používá se při iOS suspenzi.
-
-TTL výsledků: **1 hodina od completion**. Po TTL → 404.
-
-**img2img only** — FLUX Kontext je edit model, `generate()` vrací GenFailed.
-
-### FLUX Schnell NIM (`llm.ol1n.com/nim/flux-schnell/*`)
-
-**Synchronní request bez job queue:**
+Go služba `gen-queue` (AiStack, port 8091) obsluhuje **oba** FLUX NIM modely
+jednotným async protokolem přes HTTP polling. Cloudflare routuje
+`llm.ol1n.com/nim/*` přímo sem — návrh obchází Cloudflare 100s edge timeout
+(submit vrátí job_id okamžitě) a job přežije iOS suspenzi (`follow()`).
+Nahrazuje původní Python `nim-kontext-proxy`.
 
 ```
-POST /nim/flux-schnell/v1/infer  →  200 + {artifacts: [{base64: "..."}]}
+POST /nim/{model}/v1/infer          →  202 + {id, queue_position}   (vrátí okamžitě)
+GET  /nim/{model}/jobs/{id}         →  {status, ...}                (poll každé 3s)
+GET  /nim/{model}/jobs/{id}/result  →  PNG bytes                    (po status=done)
 ```
 
-Timeout 120s — blokující HTTP request, server vrátí obrázek až po dokončení inference.
+`{model}` = `flux-schnell` (txt2img) nebo `flux-kontext` (img2img).
 
-`n > 1`: n sekvenčních requestů (každý blokuje).
+Status hodnoty: `queued` (s `queue_position`), `running`, `done`, `error` (s `error`).
+gen-queue volá NIM synchronně ve worker poolu, retry na 5xx (3 pokusy: 0/5/10s),
+4xx je non-retryable. Chybová těla jsou JSON `{"error":"..."}`.
 
-**`follow()`**: nepodporováno (vrací GenFailed) — po suspenzi nelze obnovit.
+**TTL výsledků: 1 hodina od completion.** Po TTL se evictuje výsledek **i
+job-status** současně → `/jobs/{id}` i `/result` pak vrací `404 {"error":"..."}`
+(klient to mapuje na „queue restartován, generuj znovu"). Proto po dlouhé
+suspenzi (>1 h) job zmizí úplně, ne jen jeho výsledek.
 
-**txt2img only**, žádný img2img.
+`n > 1` se řeší **n sekvenčními requesty** — backend zpracuje 1 obrázek na call,
+`variantCount` u NIM = 1.
+
+**`follow(jobId)`** (oba modely): plně funkční — poll do done, stáhnout result.
+Páteř resume po iOS suspenzi.
+
+- **flux-schnell** — txt2img only, `edit()` vrací GenFailed. ~4 kroky, rychlé.
+- **flux-kontext** — img2img only, `generate()` vrací GenFailed. Vyžaduje `image`
+  pole; klient snapuje rozměry na podporované hodnoty (672–1568) kvůli TRT bufferu.
 
 ### Srovnání
 
-| Vlastnost | ComfyUI | NIM Kontext | FLUX Schnell |
+| Vlastnost | ComfyUI | gen-queue / flux-kontext | gen-queue / flux-schnell |
 |---|---|---|---|
-| Job model | async queue | async queue | synchronní |
-| Progress | WebSocket (per-step) | HTTP poll (3s) | žádný |
+| Job model | async queue | async queue | async queue |
+| Progress | WebSocket (per-step) | HTTP poll (3s) | HTTP poll (3s) |
 | WS fallback | HTTP poll | — | — |
 | n>1 | batch nativně | n × request | n × request |
 | Cancel | POST /interrupt | ✗ | ✗ |
-| follow() | ✓ (poll fallback) | ✓ | ✗ |
-| TTL výsledků | do restartu serveru | 1h od completion | — |
+| follow() | ✓ (poll fallback) | ✓ | ✓ |
+| TTL výsledků | do restartu serveru | 1h (job i result) | 1h (job i result) |
 | Mod | txt2img + img2img | img2img only | txt2img only |
-| CF timeout | není problém (WS) | proxy vrátí job_id hned | blokuje 120s |
+| CF timeout | není problém (WS) | gen-queue vrátí job_id hned | gen-queue vrátí job_id hned |
+| Suspend/blip | GenInterrupted po 3 chybách | GenInterrupted (Socket/Timeout) | GenInterrupted (Socket/Timeout) |
 
 ### Resume po iOS suspenzi
 
-`ImageStudioNotifier` implementuje `WidgetsBindingObserver`. Při `AppLifecycleState.resumed` volá `_resumeInFlightJob()`, která najde generating node s `jobId != null` a zavolá `backend.follow(jobId)`.
+Přechodný výpadek (uspání appky, síťový blip) **není** trvalé selhání. NIM služby
+i ComfyUI při něm (Socket/Timeout, příp. 3× chyba pollu) emitují
+`GenInterrupted(jobId)` místo `GenFailed`. Provider node nechá ve stavu
+`generating`, zachová `jobId`, **uloží do Hive** (paměť = Hive) a strhne mrtvý
+stream — bez červené chyby. `GenSubmitted(jobId)` ukládá jobId do `GenNode`.
 
-`GenSubmitted(jobId)` ukládá jobId do `GenNode` (persistováno v Hive). Na startu `_load()` obnoví sessions a pokud najde generating node s jobId, rovněž zavolá `_resumeInFlightJob()`.
+Znovu-napojení spustí kterýkoli z těchto bodů:
+- `AppLifecycleState.resumed` → `_resumeInFlightJob()` (`WidgetsBindingObserver`),
+- backoff ~4 s po `GenInterrupted` (pokrývá foreground bliky), strop 5 pokusů,
+- start appky: `_load()` obnoví sessions a pro generating node s jobId zavolá
+  `_resumeInFlightJob()`.
+
+`_resumeInFlightJob()` najde první node `status == generating && jobId != null`
+a zavolá `backend.follow(jobId)`. Čítač pokusů se nuluje při reálném progresu
+(`queued`/`running`); po vyčerpání → měkká chyba. Skutečné selhání (`GenFailed`)
+i `cancel()` se **persistují**, takže restart už mrtvý/zrušený job neobnovuje.
 
 ## Persistence (Hive)
 
