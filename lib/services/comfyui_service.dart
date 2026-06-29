@@ -92,8 +92,11 @@ class ComfyUIService implements ImageBackend {
   @override
   String get label => 'ComfyUI';
 
+  // 2 variants per round: flux-dev on GB10 runs ~79 s/image, so batch 4 was
+  // ~278 s (and pushed long jobs toward the client poll deadline). Batch 2 ≈
+  // 140 s keeps a real choice without the wait. _prepare() patches batch_size.
   @override
-  int get variantCount => 4;
+  int get variantCount => 2;
 
   // ── Auth headers ────────────────────────────────────────────
   Map<String, String> get _authHeaders {
@@ -245,7 +248,7 @@ class ComfyUIService implements ImageBackend {
 
   // ── HTTP polling fallback ───────────────────────────────────
   Stream<GenEvent> _pollUntilDone(String promptId) async* {
-    final deadline = DateTime.now().add(const Duration(minutes: 10));
+    final deadline = DateTime.now().add(const Duration(minutes: 15));
     // Consecutive transient poll failures (network blip / iOS suspend). After
     // a few in a row we bail out with GenInterrupted so the provider re-attaches
     // via follow() on resume — instead of silently spinning for 10 minutes.
@@ -254,7 +257,7 @@ class ComfyUIService implements ImageBackend {
     while (true) {
       await Future.delayed(_pollInterval);
       if (DateTime.now().isAfter(deadline)) {
-        yield const GenFailed('[ComfyUI] timeout – generování trvá příliš dlouho (>10 min)');
+        yield const GenFailed('[ComfyUI] timeout – generování trvá příliš dlouho (>15 min)');
         return;
       }
 
