@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gal/gal.dart';
 import 'package:image_picker/image_picker.dart';
@@ -12,6 +13,16 @@ import '../services/flux_kontext_nim_service.dart' show kBackendFluxKontextNim;
 import '../services/image_backend.dart' show kBackendComfyUI, kBackendFluxNim;
 import '../widgets/image_session_drawer.dart';
 
+/// Copy [text] to the clipboard and confirm with a brief snackbar. No-op for
+/// empty text. Used by long-press handlers on error messages and prompts.
+void _copyToClipboard(BuildContext context, String text, String what) {
+  if (text.trim().isEmpty) return;
+  Clipboard.setData(ClipboardData(text: text));
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text('$what zkopírován do schránky'), duration: const Duration(seconds: 2)),
+  );
+}
+
 /// Iterative image studio: generate 4 candidates from a prompt, pick one,
 /// describe a change, and get 4 refinements of it — repeat to converge.
 class ImageStudioScreen extends ConsumerWidget {
@@ -21,11 +32,17 @@ class ImageStudioScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen(imageStudioProvider, (prev, next) {
       if (next.error != null && next.error != prev?.error) {
+        final errText = next.error!;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(next.error!),
+            content: Text(errText),
             backgroundColor: Colors.red[700],
             duration: const Duration(seconds: 8),
+            action: SnackBarAction(
+              label: 'Kopírovat',
+              textColor: Colors.white,
+              onPressed: () => Clipboard.setData(ClipboardData(text: errText)),
+            ),
           ),
         );
         ref.read(imageStudioProvider.notifier).clearError();
@@ -435,10 +452,18 @@ class _NodeGrid extends ConsumerWidget {
                 color: AppTheme.textSecondary,
               ),
               const SizedBox(height: 12),
-              Text(
-                node.error ?? 'Generation failed',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppTheme.textSecondary),
+              // Long-press copies the full error text (handy for reporting).
+              GestureDetector(
+                onLongPress: () => _copyToClipboard(
+                  context,
+                  node.error ?? 'Generation failed',
+                  'Chyba',
+                ),
+                child: Text(
+                  node.error ?? 'Generation failed',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppTheme.textSecondary),
+                ),
               ),
               const SizedBox(height: 16),
               FilledButton.icon(
@@ -488,6 +513,9 @@ class _NodeGrid extends ConsumerWidget {
               ref.read(imageStudioProvider.notifier).selectImage(img.id),
           onExpand: () => _showFullscreen(context, img),
           onSave: () => _saveImage(context, img),
+          // Long-press copies the prompt that produced this node's images,
+          // so it can be reused.
+          onLongPress: () => _copyToClipboard(context, node.prompt, 'Prompt'),
         );
       },
     );
@@ -544,6 +572,7 @@ class _ImageTile extends StatelessWidget {
     required this.onSelect,
     required this.onExpand,
     required this.onSave,
+    this.onLongPress,
   });
 
   final GenImage image;
@@ -551,11 +580,13 @@ class _ImageTile extends StatelessWidget {
   final VoidCallback onSelect;
   final VoidCallback onExpand;
   final VoidCallback onSave;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onSelect,
+      onLongPress: onLongPress,
       child: Stack(
         fit: StackFit.expand,
         children: [
