@@ -959,7 +959,7 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
 
   Future<void> _send() async {
     final text = _controller.text.trim();
-    if (text.isEmpty || widget.state.isBusy) return;
+    if (text.isEmpty) return;
     final notifier = ref.read(imageStudioProvider.notifier);
 
     if (!_hasRoot) {
@@ -981,7 +981,7 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
   @override
   Widget build(BuildContext context) {
     final isBusy = widget.state.isBusy;
-    final canSend = !isBusy && _controller.text.trim().isNotEmpty;
+    final canSend = _controller.text.trim().isNotEmpty;
 
     final loras = widget.state.availableLoras;
     final selectedLora = widget.state.selectedLora;
@@ -1083,13 +1083,12 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                       child: TextField(
                         controller: _controller,
                         focusNode: _focusNode,
-                        enabled: !isBusy,
                         maxLines: null,
                         minLines: 1,
                         keyboardType: TextInputType.multiline,
                         textCapitalization: TextCapitalization.sentences,
                         onChanged: (_) => setState(() {}),
-                        onSubmitted: isBusy ? null : (_) => _send(),
+                        onSubmitted: (_) => _send(),
                         style: const TextStyle(
                           color: AppTheme.textPrimary,
                           fontSize: 15,

@@ -9,8 +9,6 @@ import 'package:http/http.dart' as http;
 import 'http_error.dart';
 import 'image_backend.dart';
 
-const kBackendFluxNim = 'flux_nim';
-
 /// Calls the FLUX Schnell async job queue exposed by gen-queue at
 /// /nim/flux-schnell/v1/infer (202 + job_id), polls status, and downloads
 /// the PNG result when done.

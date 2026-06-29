@@ -170,9 +170,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   final FluxNimService _fluxNim = FluxNimService();
   final FluxKontextNimService _fluxKontextNim = FluxKontextNimService();
 
-  StreamSubscription<GenEvent>? _activeSub;
-  String? _activeNodeId;
-  Completer<void>? _activeCompleter;
+  final Map<String, StreamSubscription<GenEvent>> _activeSubs = {};
+  final Map<String, Completer<void>> _activeCompleters = {};
 
   /// Consecutive transient interruptions while trying to finish one job. Reset
   /// on any real progress; capped by [_maxInterruptRetries].
@@ -193,23 +192,19 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     _ => _comfyui,
   };
 
-  /// Re-attach to an in-flight job after iOS suspension or app restart.
-  ///
-  /// Looks for the first generating node that has a persisted [GenNode.jobId]
-  /// and calls the appropriate backend's [ImageBackend.follow]. A no-op if
-  /// a generation is already active or no resumable node exists.
+  /// Re-attach to in-flight jobs after iOS suspension or app restart.
   void _resumeInFlightJob() {
-    if (_activeSub != null) return;
-    final node = state.nodes
-        .where((n) => n.status == GenStatus.generating && n.jobId != null)
-        .firstOrNull;
-    if (node == null) return;
     final backend = switch (state.backendId) {
       kBackendFluxNim => _fluxNim,
       kBackendFluxKontextNim => _fluxKontextNim,
       _ => _comfyui,
     };
-    unawaited(_runAsync(node.id, () => backend.follow(node.jobId!)));
+    for (final node in state.nodes.where(
+      (n) => n.status == GenStatus.generating && n.jobId != null,
+    )) {
+      if (_activeSubs.containsKey(node.id)) continue;
+      unawaited(_runAsync(node.id, () => backend.follow(node.jobId!)));
+    }
   }
 
   void setBackend(String id) => state = state.copyWith(backendId: id);
@@ -221,9 +216,14 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       state = state.copyWith(currentNodeId: nodeId, clearSelected: true);
 
   void newSession() {
-    _activeSub?.cancel();
-    _activeSub = null;
-    _activeNodeId = null;
+    for (final sub in _activeSubs.values) {
+      sub.cancel();
+    }
+    _activeSubs.clear();
+    for (final c in _activeCompleters.values) {
+      if (!c.isCompleted) c.complete();
+    }
+    _activeCompleters.clear();
     state = ImageStudioState(
       sessions: state.sessions,
       backendId: state.backendId,
@@ -367,7 +367,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   /// Round 1: [kVariantCount] text→image candidates from [prompt].
   Future<void> generate(String prompt) async {
     final text = prompt.trim();
-    if (text.isEmpty || state.isBusy) return;
+    if (text.isEmpty) return;
     _interruptRetries = 0;
     final node = GenNode.create(prompt: text);
     state = state.copyWith(
@@ -388,7 +388,6 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   /// (img2img) — i.e. the photo is uploaded to ComfyUI only once the user
   /// describes a change.
   Future<void> startFromImage(Uint8List bytes) async {
-    if (state.isBusy) return;
     final dir = await _dirFuture;
     final image = await GenImage.save(bytes, dir);
     final node = GenNode.create(prompt: '').copyWith(
@@ -408,7 +407,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   Future<void> refine(String prompt) async {
     final text = prompt.trim();
     final base = _imageById(state.selectedImageId);
-    if (text.isEmpty || base == null || state.isBusy) return;
+    if (text.isEmpty || base == null) return;
     _interruptRetries = 0;
     final node = GenNode.create(
       parentId: state.currentNodeId,
@@ -433,7 +432,6 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
 
   /// Re-run a failed (or finished) node with its original prompt.
   Future<void> retry(String nodeId) async {
-    if (state.isBusy) return;
     final node = _nodeById(nodeId);
     if (node == null || node.status == GenStatus.generating) return;
     _interruptRetries = 0;
@@ -474,13 +472,12 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   /// Cancel the in-flight generation: stop consuming events, ask the backend
   /// to interrupt server-side (ComfyUI supports this), and mark the node.
   void cancel() {
-    final id = _activeNodeId;
-    _activeSub?.cancel();
-    _activeSub = null;
-    _activeNodeId = null;
     _interruptRetries = 0;
-    unawaited(_backend.interrupt());
-    if (id != null) {
+    final ids = List<String>.from(_activeSubs.keys);
+    for (final id in ids) {
+      _activeSubs.remove(id)?.cancel();
+      final c = _activeCompleters.remove(id);
+      if (!(c?.isCompleted ?? true)) c!.complete();
       final node = _nodeById(id);
       if (node?.status == GenStatus.generating) {
         _patch(
@@ -497,19 +494,12 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         unawaited(_save());
       }
     }
-    // Cancelling a subscription fires neither onDone nor onError, so release
-    // the awaited future ourselves.
-    if (!(_activeCompleter?.isCompleted ?? true)) _activeCompleter!.complete();
-    _activeCompleter = null;
+    unawaited(_backend.interrupt());
   }
 
-  /// Consume a backend [GenEvent] stream, updating [nodeId] in place until a
-  /// terminal event. Stored as the active subscription so [cancel] can stop it.
   Future<void> _runAsync(String nodeId, Stream<GenEvent> Function() run) async {
-    await _activeSub?.cancel();
-    _activeNodeId = nodeId;
     final completer = Completer<void>();
-    _activeCompleter = completer;
+    _activeCompleters[nodeId] = completer;
     // Set to true when GenComplete schedules its async save so onDone skips
     // the redundant finish() call — the async save calls finish() itself.
     bool completedByEvent = false;
@@ -547,12 +537,10 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         ),
       );
       unawaited(_save());
-      _activeSub = null;
-      if (_activeNodeId == nodeId) _activeNodeId = null;
+      _activeSubs.remove(nodeId);
+      _activeCompleters.remove(nodeId);
       finish();
       if (_interruptRetries++ < _maxInterruptRetries) {
-        // Re-attach after a short backoff (covers foreground blips; the
-        // resumed lifecycle hook also triggers this on wake-up).
         Future.delayed(_interruptBackoff, () {
           if (mounted) _resumeInFlightJob();
         });
@@ -561,7 +549,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       }
     }
 
-    _activeSub = run().listen(
+    _activeSubs[nodeId] = run().listen(
       (event) {
         switch (event) {
           case GenSubmitted(:final jobId):
@@ -642,14 +630,13 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
             ? e.toString().replaceFirst('Exception: ', '')
             : e.toString();
         fail(msg);
-        // cancelOnError stops the stream without an onDone — clean up here.
-        _activeSub = null;
-        if (_activeNodeId == nodeId) _activeNodeId = null;
+        _activeSubs.remove(nodeId);
+        _activeCompleters.remove(nodeId);
         finish();
       },
       onDone: () {
-        _activeSub = null;
-        if (_activeNodeId == nodeId) _activeNodeId = null;
+        _activeSubs.remove(nodeId);
+        _activeCompleters.remove(nodeId);
         if (!completedByEvent) finish();
       },
       cancelOnError: true,
@@ -687,7 +674,10 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _activeSub?.cancel();
+    for (final sub in _activeSubs.values) {
+      sub.cancel();
+    }
+    _activeSubs.clear();
     _comfyui.dispose();
     _fluxNim.dispose();
     _fluxKontextNim.dispose();
