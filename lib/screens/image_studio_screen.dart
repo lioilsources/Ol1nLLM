@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -54,6 +55,16 @@ class ImageStudioScreen extends ConsumerWidget {
 
     final notifier = ref.read(imageStudioProvider.notifier);
 
+    // Progress banner: prefer the node the user is looking at; if it isn't
+    // generating, fall back to the first other in-flight node so background
+    // work (parallel generations) is still visible. othersGenerating tells the
+    // banner how many more are running so it can show "+N na pozadí".
+    final generating =
+        state.nodes.where((n) => n.status == GenStatus.generating).toList();
+    final bannerNode = current?.status == GenStatus.generating
+        ? current
+        : (generating.isNotEmpty ? generating.first : null);
+
     return Scaffold(
       drawer: const ImageSessionDrawer(),
       appBar: AppBar(
@@ -87,8 +98,13 @@ class ImageStudioScreen extends ConsumerWidget {
                 ? const _EmptyHint()
                 : _NodeGrid(node: current, selectedId: state.selectedImageId),
           ),
-          if (current?.status == GenStatus.generating)
-            _ProgressBanner(node: current!),
+          if (bannerNode != null)
+            _ProgressBanner(
+              key: ValueKey(bannerNode.id),
+              node: bannerNode,
+              othersGenerating:
+                  generating.where((n) => n.id != bannerNode.id).length,
+            ),
           _StudioInputBar(state: state),
         ],
       ),
@@ -124,20 +140,103 @@ class _EmptyHint extends StatelessWidget {
 }
 
 /// Thin progress strip shown under the grid while a round is generating.
-class _ProgressBanner extends StatelessWidget {
-  const _ProgressBanner({required this.node});
+///
+/// Identifies which node it's reporting on (truncated prompt) and how many
+/// other nodes generate in parallel. For NIM backends, which report no per-step
+/// progress (`node.progress == null`), it appends a live elapsed timer so the
+/// "Generování…" state visibly ticks instead of looking stuck.
+class _ProgressBanner extends StatefulWidget {
+  const _ProgressBanner({
+    super.key,
+    required this.node,
+    this.othersGenerating = 0,
+  });
 
   final GenNode node;
+  final int othersGenerating;
+
+  @override
+  State<_ProgressBanner> createState() => _ProgressBannerState();
+}
+
+class _ProgressBannerState extends State<_ProgressBanner> {
+  final DateTime _start = DateTime.now();
+  Timer? _ticker;
+  Duration _elapsed = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    // Only an indeterminate (NIM) run needs the ticking elapsed clock.
+    if (widget.node.progress == null) {
+      _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() => _elapsed = DateTime.now().difference(_start));
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  static String _fmt(Duration d) {
+    final m = d.inMinutes;
+    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  static String _shortPrompt(String prompt) {
+    final p = prompt.trim();
+    if (p.isEmpty) return '(úprava obrázku)';
+    return p.length > 40 ? '${p.substring(0, 40)}…' : p;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final label = node.progressLabel ?? 'Generování…';
+    final node = widget.node;
+    // Base label comes from the provider (Ve frontě / Stahování / Generování…).
+    // For the indeterminate "Generování…" case, append the live elapsed time.
+    var label = node.progressLabel ?? 'Generování…';
+    if (node.progress == null && label.startsWith('Generování')) {
+      label = 'Generování… (${_fmt(_elapsed)})';
+    }
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       color: AppTheme.background,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _shortPrompt(node.prompt),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+              if (widget.othersGenerating > 0)
+                Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Text(
+                    '+${widget.othersGenerating} na pozadí',
+                    style: const TextStyle(
+                      color: AppTheme.accent,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 2),
           Text(
             label,
             style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
