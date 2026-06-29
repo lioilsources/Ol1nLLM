@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show WebSocket;
+import 'dart:io' show SocketException, WebSocket;
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -434,42 +434,65 @@ class ComfyUIService implements ImageBackend {
     return resp.bodyBytes;
   }
 
+  /// Number of upload attempts before giving up. Flaky Wi-Fi throws transient
+  /// `Failed host lookup` / `Connection reset` / timeouts mid-upload; a couple
+  /// of quick retries usually rides over the blip instead of failing the edit.
+  static const _uploadMaxAttempts = 3;
+
   Future<String> _uploadImage(Uint8List bytes) async {
-    final req =
-        http.MultipartRequest('POST', Uri.parse('$_baseUrl/upload/image'))
-          ..headers.addAll(_authHeaders)
-          ..fields['overwrite'] = 'true'
-          ..files.add(
-            http.MultipartFile.fromBytes(
-              'image',
-              bytes,
-              filename:
-                  'ol1n_input_${DateTime.now().millisecondsSinceEpoch}.png',
-            ),
-          );
-    final streamed = await _client.send(req).timeout(
-      _submitTimeout,
-      onTimeout: () {
-        throw Exception(
-          '[ComfyUI] timeout při nahrávání obrázku (${_submitTimeout.inSeconds}s)',
+    Object? lastErr;
+    for (var attempt = 1; attempt <= _uploadMaxAttempts; attempt++) {
+      try {
+        // MultipartRequest is single-use (its body stream is consumed on send),
+        // so a fresh request must be built for each attempt.
+        final req =
+            http.MultipartRequest('POST', Uri.parse('$_baseUrl/upload/image'))
+              ..headers.addAll(_authHeaders)
+              ..fields['overwrite'] = 'true'
+              ..files.add(
+                http.MultipartFile.fromBytes(
+                  'image',
+                  bytes,
+                  filename:
+                      'ol1n_input_${DateTime.now().millisecondsSinceEpoch}.png',
+                ),
+              );
+        final streamed = await _client.send(req).timeout(_submitTimeout);
+        final resp = await http.Response.fromStream(streamed);
+        debugPrint(
+          '[comfy] POST /upload/image → ${resp.statusCode} (pokus $attempt/$_uploadMaxAttempts)',
         );
-      },
-    );
-    final resp = await http.Response.fromStream(streamed);
-    debugPrint('[comfy] POST /upload/image → ${resp.statusCode}');
-    if (resp.statusCode != 200) {
-      throw Exception(HttpLayerError.parse(
-        statusCode: resp.statusCode,
-        body: resp.body,
-        headers: resp.headers,
-        step: 'upload',
-        service: 'ComfyUI',
-      ).toString());
+        // A non-200 is a server-side rejection — retrying won't help, fail now.
+        if (resp.statusCode != 200) {
+          throw Exception(HttpLayerError.parse(
+            statusCode: resp.statusCode,
+            body: resp.body,
+            headers: resp.headers,
+            step: 'upload',
+            service: 'ComfyUI',
+          ).toString());
+        }
+        final json = jsonDecode(resp.body) as Map<String, dynamic>;
+        final name = json['name'] as String;
+        final subfolder = json['subfolder'] as String? ?? '';
+        return subfolder.isEmpty ? name : '$subfolder/$name';
+      } on SocketException catch (e) {
+        lastErr = e; // Failed host lookup / Connection reset — transient
+      } on TimeoutException catch (e) {
+        lastErr = e; // upload didn't finish within _submitTimeout
+      } on http.ClientException catch (e) {
+        lastErr = e; // connection closed mid-flight, etc.
+      }
+      debugPrint('[comfy] upload pokus $attempt selhal: $lastErr');
+      if (attempt < _uploadMaxAttempts) {
+        // Linear backoff: 1 s, then 2 s — short enough to stay responsive.
+        await Future.delayed(Duration(seconds: attempt));
+      }
     }
-    final json = jsonDecode(resp.body) as Map<String, dynamic>;
-    final name = json['name'] as String;
-    final subfolder = json['subfolder'] as String? ?? '';
-    return subfolder.isEmpty ? name : '$subfolder/$name';
+    throw Exception(
+      '[ComfyUI] nahrání obrázku selhalo po $_uploadMaxAttempts pokusech '
+      '(síť/Wi-Fi): $lastErr',
+    );
   }
 
   @override
