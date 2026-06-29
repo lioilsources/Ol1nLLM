@@ -10,6 +10,9 @@ DART_DEFINES = \
 run:
 	flutter run --release $(DART_DEFINES)
 
+debug:
+	flutter run $(DART_DEFINES)
+
 build-ios:
 	flutter build ipa --release \
 		--export-options-plist=ios/ExportOptions.plist \
