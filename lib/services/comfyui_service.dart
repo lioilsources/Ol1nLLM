@@ -656,11 +656,6 @@ class ComfyUIService implements ImageBackend {
     return '[ComfyUI] generování selhalo';
   }
 
-  String _snippet(String body) {
-    final s = body.replaceAll(RegExp(r'\s+'), ' ').trim();
-    return s.length > 160 ? '${s.substring(0, 160)}…' : s;
-  }
-
   @override
   void dispose() => _client.close();
 }
