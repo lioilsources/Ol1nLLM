@@ -24,6 +24,12 @@ jobs:
           channel: stable
           cache: true
 
+      # Ol1nLLM pulls in a plugin that trips Flutter's Swift Package Manager path on
+      # macos-26 (release build fails: "Xcode failed to resolve SPM dependencies ...
+      # project damaged"). Force the CocoaPods integration, which builds reliably.
+      - name: Use CocoaPods (disable Swift Package Manager)
+        run: flutter config --no-enable-swift-package-manager
+
       - name: Install dependencies
         working-directory: .
         run: flutter pub get
