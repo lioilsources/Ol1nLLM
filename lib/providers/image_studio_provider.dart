@@ -134,8 +134,17 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   ImageStudioNotifier() : super(const ImageStudioState()) {
     WidgetsBinding.instance.addObserver(this);
     _loadLoras();
-    _load();
+    unawaited(_init());
     unawaited(_deleteLegacyBox());
+  }
+
+  /// Resolve the image directory and publish it to [GenImage.baseDir] before
+  /// loading sessions, so the first render of restored history resolves file
+  /// paths against the current launch's container prefix.
+  Future<void> _init() async {
+    final dir = await _dirFuture;
+    GenImage.baseDir = dir.path;
+    await _load();
   }
 
   @override

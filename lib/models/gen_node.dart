@@ -11,13 +11,29 @@ enum GenStatus { generating, ready, error }
 /// One produced image stored as a PNG file on disk.
 ///
 /// Keeping full PNG bytes inside the Hive session box caused OOM when reading
-/// back large multi-session blobs. The box now stores only the file path.
+/// back large multi-session blobs. The box now stores only the file name.
+///
+/// We store the *relative* file name, not an absolute path: on iOS the app's
+/// data-container prefix (`…/Containers/Data/Application/<UUID>/…`) changes on
+/// every reinstall and on device restore/migration, so persisting an absolute
+/// path would make the whole history point at a dead container after the next
+/// launch. The absolute path is rebuilt at runtime against [baseDir].
 class GenImage {
+  /// Absolute path of the `image_studio` directory for the *current* launch.
+  /// Set once at startup from getApplicationSupportDirectory() before any
+  /// loaded image is rendered (see ImageStudioNotifier._init).
+  static late String baseDir;
+
   final String id;
-  final String filePath;
+
+  /// Relative file name, e.g. `<uuid>.png`.
+  final String fileName;
   Uint8List? _bytes;
 
-  GenImage({required this.id, required this.filePath});
+  GenImage({required this.id, required this.fileName});
+
+  /// Absolute path to the PNG for the current launch.
+  String get filePath => '$baseDir/$fileName';
 
   /// PNG bytes, read from [filePath] and cached for the lifetime of this
   /// instance so repeated accesses (e.g. Gal save) skip the disk read.
@@ -27,15 +43,22 @@ class GenImage {
   /// to the new file. The bytes are cached so the first [bytes] call is free.
   static Future<GenImage> save(Uint8List bytes, Directory dir) async {
     final id = _uuid.v4();
-    final file = File('${dir.path}/$id.png');
+    final fileName = '$id.png';
+    final file = File('${dir.path}/$fileName');
     await file.writeAsBytes(bytes, flush: true);
-    return GenImage(id: id, filePath: file.path).._bytes = bytes;
+    return GenImage(id: id, fileName: fileName).._bytes = bytes;
   }
 
-  Map<String, dynamic> toJson() => {'id': id, 'filePath': filePath};
+  Map<String, dynamic> toJson() => {'id': id, 'fileName': fileName};
 
-  factory GenImage.fromJson(Map<String, dynamic> json) =>
-      GenImage(id: json['id'] as String, filePath: json['filePath'] as String);
+  factory GenImage.fromJson(Map<String, dynamic> json) {
+    // Backward compat: legacy boxes stored an absolute 'filePath'. Derive the
+    // relative name from its basename so old sessions self-heal on the same
+    // install (where the files still exist).
+    final fileName = (json['fileName'] as String?) ??
+        (json['filePath'] as String).split('/').last;
+    return GenImage(id: json['id'] as String, fileName: fileName);
+  }
 }
 
 /// One round in the refinement tree.

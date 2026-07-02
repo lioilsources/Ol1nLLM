@@ -1,156 +1,117 @@
-name: Release iOS (TestFlight)
+name: Release iOS
 
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Release version (e.g. v0.1.0-alpha)'
-        required: true
 
 permissions:
   contents: write
 
-env:
-  FLUTTER_VERSION: '3.41.x'
-  BUNDLE_ID: com.ol1n.ol1nLlm
-
 jobs:
   build-ios:
-    name: Build & Upload to TestFlight
-    runs-on: macos-15
+    name: Build & Release iOS
+    runs-on: macos-26
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
 
-      - name: Resolve version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ inputs.version }}"
-          else
-            TAG="${GITHUB_REF_NAME}"
-          fi
-          VERSION="${TAG#v}"
-          # Strip pre-release suffix for CFBundleShortVersionString (e.g. 0.1.0-alpha -> 0.1.0)
-          SHORT_VERSION="${VERSION%%-*}"
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "name=${SHORT_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "number=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
-
       - name: Install dependencies
+        working-directory: .
         run: flutter pub get
 
+      - name: Bump build number
+        working-directory: .
+        run: |
+          BASE=$(grep '^version:' pubspec.yaml | sed -E 's/^version: ([0-9.]+).*/\1/')
+          NEW="${BASE}+${{ github.run_number }}"
+          sed -i.bak -E "s/^version: .*/version: ${NEW}/" pubspec.yaml
+          rm -f pubspec.yaml.bak
+          echo "Build version: ${NEW}"
+
       - name: Install CocoaPods dependencies
-        working-directory: ios
-        run: pod install --repo-update
+        working-directory: ./ios
+        run: pod install
 
       - name: Import signing certificate
         env:
-          IOS_P12_BASE64: ${{ secrets.IOS_P12_BASE64 }}
-          IOS_P12_PASSWORD: ${{ secrets.IOS_P12_PASSWORD }}
-          IOS_KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
+          CERTIFICATE_P12_BASE64: ${{ secrets.IOS_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.IOS_P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
         run: |
-          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
-          CERT_PATH="$RUNNER_TEMP/cert.p12"
-
-          echo -n "$IOS_P12_BASE64" | base64 --decode > "$CERT_PATH"
-
-          security create-keychain -p "$IOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$IOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security import "$CERT_PATH" -P "$IOS_P12_PASSWORD" \
-            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
-          security set-key-partition-list \
-            -S apple-tool:,apple: -k "$IOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security list-keychain -d user -s "$KEYCHAIN_PATH" \
-            $(security list-keychains -d user | tr -d '"')
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          echo -n "$CERTIFICATE_P12_BASE64" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security import $RUNNER_TEMP/certificate.p12 -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          echo "=== Imported certificates ==="
+          security find-identity -v -p codesigning $KEYCHAIN_PATH
 
       - name: Install provisioning profile
-        id: profile
         env:
-          IOS_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+          PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
         run: |
-          PP_PATH="$RUNNER_TEMP/profile.mobileprovision"
-          echo -n "$IOS_PROVISION_PROFILE_BASE64" | base64 --decode > "$PP_PATH"
+          PP_PATH=$RUNNER_TEMP/profile.mobileprovision
+          echo -n "$PROVISIONING_PROFILE_BASE64" | base64 --decode > $PP_PATH
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          DECODED=$(security cms -D -i "$PP_PATH")
+          UUID=$(echo "$DECODED" | plutil -extract UUID raw -)
+          PROFILE_NAME=$(echo "$DECODED" | plutil -extract Name raw -)
+          BUNDLE_ID=$(echo "$DECODED" | plutil -extract Entitlements.application-identifier raw - | sed 's/^[^.]*\.//')
+          EXPIRY=$(echo "$DECODED" | plutil -extract ExpirationDate raw -)
+          PROFILE_TYPE=$(echo "$DECODED" | plutil -extract ProvisionsAllDevices raw - 2>/dev/null && echo "Enterprise" || (echo "$DECODED" | plutil -extract Entitlements.get-task-allow raw - 2>/dev/null | grep -q true && echo "Development" || echo "Distribution/AppStore"))
+          echo "=== Provisioning profile info ==="
+          echo "Profile name:      $PROFILE_NAME"
+          echo "Profile UUID:      $UUID"
+          echo "Profile bundle ID: $BUNDLE_ID"
+          echo "Profile expires:   $EXPIRY"
+          echo "Profile type:      $PROFILE_TYPE"
+          cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/"$UUID".mobileprovision
+          echo "PROFILE_NAME=$PROFILE_NAME" >> $GITHUB_ENV
+          echo "PROFILE_UUID=$UUID" >> $GITHUB_ENV
 
-          PP_UUID=$(security cms -D -i "$PP_PATH" | plutil -extract UUID raw -)
-          PP_NAME=$(security cms -D -i "$PP_PATH" | plutil -extract Name raw -)
+      - name: Inject profile name into project
+        run: |
+          sed -i '' "s/CI_PROFILE_NAME/\"$PROFILE_NAME\"/g" ./ios/Runner.xcodeproj/project.pbxproj
+          grep PROVISIONING_PROFILE_SPECIFIER ./ios/Runner.xcodeproj/project.pbxproj
 
-          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-          cp "$PP_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/${PP_UUID}.mobileprovision"
+      - name: Build Flutter iOS (no codesign)
+        working-directory: .
+        run: flutter build ios --release --no-codesign --dart-define=CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }} --dart-define=CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }}
 
-          echo "uuid=$PP_UUID" >> "$GITHUB_OUTPUT"
-          echo "name=$PP_NAME" >> "$GITHUB_OUTPUT"
-
-      - name: Generate ExportOptions.plist
+      - name: Archive with manual signing
         env:
           TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
-          PROFILE_NAME: ${{ steps.profile.outputs.name }}
+        working-directory: .
         run: |
-          cat > ios/ExportOptions.plist <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store</string>
-            <key>destination</key>
-            <string>export</string>
-            <key>teamID</key>
-            <string>${TEAM_ID}</string>
-            <key>signingStyle</key>
-            <string>manual</string>
-            <key>signingCertificate</key>
-            <string>Apple Distribution</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>${{ env.BUNDLE_ID }}</key>
-              <string>${PROFILE_NAME}</string>
-            </dict>
-            <key>uploadBitcode</key>
-            <false/>
-            <key>compileBitcode</key>
-            <false/>
-            <key>uploadSymbols</key>
-            <true/>
-            <key>stripSwiftSymbols</key>
-            <true/>
-          </dict>
-          </plist>
-          EOF
+          xcodebuild archive \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -archivePath $RUNNER_TEMP/Runner.xcarchive \
+            DEVELOPMENT_TEAM=$TEAM_ID
 
-      - name: Build IPA
+      - name: Export IPA
+        env:
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
         run: |
-          flutter build ipa --release \
-            --build-name="${{ steps.version.outputs.name }}" \
-            --build-number="${{ steps.version.outputs.number }}" \
-            --export-options-plist=ios/ExportOptions.plist \
-            --dart-define=CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }} \
-            --dart-define=CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-
-      - name: Locate IPA
-        id: ipa
-        run: |
-          IPA_PATH=$(find build/ios/ipa -name "*.ipa" | head -1)
-          if [ -z "$IPA_PATH" ]; then
-            echo "::error::No IPA produced"
-            exit 1
-          fi
-          RENAMED="ol1n-llm-${{ steps.version.outputs.tag }}.ipa"
-          cp "$IPA_PATH" "$RENAMED"
-          echo "path=$IPA_PATH" >> "$GITHUB_OUTPUT"
-          echo "renamed=$RENAMED" >> "$GITHUB_OUTPUT"
+          /usr/libexec/PlistBuddy -c "Set :teamID $TEAM_ID" ./ios/ExportOptions.plist
+          /usr/libexec/PlistBuddy -c "Set :provisioningProfiles:com.ol1n.ol1nLlm $PROFILE_NAME" ./ios/ExportOptions.plist
+          xcodebuild -exportArchive \
+            -archivePath $RUNNER_TEMP/Runner.xcarchive \
+            -exportOptionsPlist ./ios/ExportOptions.plist \
+            -exportPath $RUNNER_TEMP/ipa
 
       - name: Upload to TestFlight
         env:
@@ -158,35 +119,26 @@ jobs:
           API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
           API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
         run: |
-          mkdir -p "$HOME/.appstoreconnect/private_keys"
-          echo -n "$API_KEY_BASE64" | base64 --decode \
-            > "$HOME/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8"
-
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo -n "$API_KEY_BASE64" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8
           xcrun altool --upload-app \
             --type ios \
-            --file "${{ steps.ipa.outputs.path }}" \
+            --file "$(ls $RUNNER_TEMP/ipa/*.ipa)" \
             --apiKey "$API_KEY_ID" \
             --apiIssuer "$API_ISSUER_ID"
 
-      - name: Upload IPA artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ol1n-llm-ipa
-          path: ${{ steps.ipa.outputs.renamed }}
-          retention-days: 30
-
       - name: Upload IPA to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.ipa.outputs.renamed }}
-          name: Ol1nLLM ${{ steps.version.outputs.tag }}
-          tag_name: ${{ steps.version.outputs.tag }}
+          files: ${{ runner.temp }}/ipa/*.ipa
+          name: Ol1nLLM ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
           generate_release_notes: true
-          prerelease: ${{ contains(steps.version.outputs.tag, 'alpha') || contains(steps.version.outputs.tag, 'beta') || contains(steps.version.outputs.tag, 'rc') }}
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
 
-      - name: Clean up keychain & API key
+      - name: Clean up keychain
         if: always()
         run: |
-          security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" 2>/dev/null || true
-          rm -f "$HOME/.appstoreconnect/private_keys/AuthKey_"*.p8
+          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db 2>/dev/null || true
+          rm -f ~/.appstoreconnect/private_keys/AuthKey_*.p8
