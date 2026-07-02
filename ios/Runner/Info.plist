@@ -30,6 +30,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Used to take a photo to start or refine an image in Image Studio.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Microphone access is required by the media picker. Ol1nLLM does not record audio.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Used to save generated images to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
