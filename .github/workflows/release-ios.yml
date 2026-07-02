@@ -24,12 +24,6 @@ jobs:
           channel: stable
           cache: true
 
-      # Ol1nLLM pulls in a plugin that trips Flutter's Swift Package Manager path on
-      # macos-26 (release build fails: "Xcode failed to resolve SPM dependencies ...
-      # project damaged"). Force the CocoaPods integration, which builds reliably.
-      - name: Use CocoaPods (disable Swift Package Manager)
-        run: flutter config --no-enable-swift-package-manager
-
       - name: Install dependencies
         working-directory: .
         run: flutter pub get
@@ -87,9 +81,15 @@ jobs:
           echo "PROFILE_NAME=$PROFILE_NAME" >> $GITHUB_ENV
           echo "PROFILE_UUID=$UUID" >> $GITHUB_ENV
 
-      - name: Inject profile name into project
+      - name: Inject profile UUID into project
         run: |
-          sed -i '' "s/CI_PROFILE_NAME/\"$PROFILE_NAME\"/g" ./ios/Runner.xcodeproj/project.pbxproj
+          # Two expressions cover both quoted ("CI_PROFILE_NAME") and unquoted
+          # (CI_PROFILE_NAME) forms — a single-expression sed double-quotes the
+          # already-quoted placeholder and corrupts the pbxproj ("project damaged").
+          sed -i '' \
+            -e "s/\"CI_PROFILE_NAME\"/\"$PROFILE_UUID\"/g" \
+            -e "s/CI_PROFILE_NAME/\"$PROFILE_UUID\"/g" \
+            ./ios/Runner.xcodeproj/project.pbxproj
           grep PROVISIONING_PROFILE_SPECIFIER ./ios/Runner.xcodeproj/project.pbxproj
 
       - name: Build Flutter iOS (no codesign)
