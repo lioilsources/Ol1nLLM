@@ -31,14 +31,14 @@ jobs:
         working-directory: .
         run: flutter pub get
 
-      - name: Build Windows (debug)
+      - name: Build Windows (release)
         working-directory: .
-        run: flutter build windows --debug --dart-define=CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }} --dart-define=CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: flutter build windows --release --dart-define=CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }} --dart-define=CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }}
 
       - name: Package as ZIP
         shell: pwsh
         run: |
-          $src = ".\build\windows\x64\runner\Debug"
+          $src = ".\build\windows\x64\runner\Release"
           $dest = "Ol1nLLM-${{ github.ref_name }}-Windows.zip"
           Compress-Archive -Path "$src\*" -DestinationPath $dest
 
