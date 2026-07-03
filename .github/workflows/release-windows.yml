@@ -34,6 +34,8 @@ jobs:
       - name: Build Windows (release)
         working-directory: .
         run: flutter build windows --release --dart-define=CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }} --dart-define=CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        env:
+          CL: /D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS
 
       - name: Package as ZIP
         shell: pwsh
