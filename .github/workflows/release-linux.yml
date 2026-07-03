@@ -39,21 +39,21 @@ jobs:
         working-directory: .
         run: flutter pub get
 
-      - name: Build Linux (debug)
+      - name: Build Linux (release)
         working-directory: .
-        run: flutter build linux --debug --dart-define=CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }} --dart-define=CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: flutter build linux --release --dart-define=CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }} --dart-define=CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }}
 
       - name: Package as tar.gz
         run: |
           tar -czf "Ol1nLLM-${{ github.ref_name }}-Linux.tar.gz" \
-            -C ./build/linux/x64/debug/bundle .
+            -C ./build/linux/x64/release/bundle .
 
       - name: Package as AppImage (icon + .desktop)
         run: |
           set -e
           APP_DIR="."
           APP_NAME="Ol1nLLM"
-          BUNDLE="$APP_DIR/build/linux/x64/debug/bundle"
+          BUNDLE="$APP_DIR/build/linux/x64/release/bundle"
           BIN=$(grep -m1 'set(BINARY_NAME' "$APP_DIR/linux/CMakeLists.txt" | sed -E 's/.*"([^"]+)".*/\1/')
           echo "Binary: $BIN"
 

@@ -28,13 +28,13 @@ jobs:
         working-directory: .
         run: flutter pub get
 
-      - name: Build macOS (debug)
+      - name: Build macOS (release)
         working-directory: .
-        run: flutter build macos --debug --dart-define=CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }} --dart-define=CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: flutter build macos --release --dart-define=CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }} --dart-define=CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }}
 
       - name: Package as ZIP
         run: |
-          cd "./build/macos/Build/Products/Debug"
+          cd "./build/macos/Build/Products/Release"
           zip -r "$OLDPWD/Ol1nLLM-${{ github.ref_name }}-macOS.zip" "ol1n_llm.app"
 
       - name: Upload to GitHub Release
