@@ -3,6 +3,7 @@ import 'dart:typed_data';
 /// Stable ids for the image backends the studio supports.
 const kBackendComfyUI = 'comfyui';
 const kBackendFluxNim = 'flux_nim';
+const kBackendFluxKontextNim = 'flux_kontext_nim';
 
 /// A single progress/result event from any image backend.
 ///

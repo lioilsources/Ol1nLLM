@@ -8,11 +8,9 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
+import '../models/image_model.dart';
 import 'http_error.dart';
 import 'image_backend.dart';
-
-/// Which ComfyUI workflow (and model family) to use.
-enum ComfyWorkflow { flux, pony }
 
 /// Talks to a ComfyUI instance behind Cloudflare Access at comfyui.ol1n.com,
 /// reusing the same CF service-token credentials as the chat/diffusers paths.
@@ -32,15 +30,13 @@ enum ComfyWorkflow { flux, pony }
 class ComfyUIService implements ImageBackend {
   ComfyUIService();
 
-  static const _baseUrl = 'https://comfyui.ol1n.com';
-  static const _wsUrl = 'wss://comfyui.ol1n.com/ws';
+  static const _baseUrl = String.fromEnvironment(
+    'COMFYUI_URL',
+    defaultValue: 'https://comfyui.ol1n.com',
+  );
+  static final _wsUrl = '${_baseUrl.replaceFirst('http', 'ws')}/ws';
   static const _cfId = String.fromEnvironment('CF_ACCESS_CLIENT_ID');
   static const _cfSecret = String.fromEnvironment('CF_ACCESS_CLIENT_SECRET');
-
-  static const _fluxTxt2img = 'assets/comfyui/flux_manga_txt2img.api.json';
-  static const _fluxImg2img = 'assets/comfyui/flux_manga_img2img.api.json';
-  static const _ponyTxt2img = 'assets/comfyui/pony_txt2img.api.json';
-  static const _ponyImg2img = 'assets/comfyui/pony_img2img.api.json';
 
   static const _submitTimeout = Duration(seconds: 30);
   static const _pollTimeout = Duration(seconds: 15);
@@ -53,15 +49,13 @@ class ComfyUIService implements ImageBackend {
   final Map<String, Map<String, dynamic>> _templateCache = {};
 
   String? _activeLora;
-  ComfyWorkflow _workflow = ComfyWorkflow.flux;
+  ComfyPreset _preset = imageModelById(kDefaultImageModelId).preset!;
 
   void setLora(String? loraName) => _activeLora = loraName;
-  void setWorkflow(ComfyWorkflow wf) => _workflow = wf;
+  void setPreset(ComfyPreset preset) => _preset = preset;
 
-  String get _txt2imgAsset =>
-      _workflow == ComfyWorkflow.pony ? _ponyTxt2img : _fluxTxt2img;
-  String get _img2imgAsset =>
-      _workflow == ComfyWorkflow.pony ? _ponyImg2img : _fluxImg2img;
+  String get _txt2imgAsset => _preset.txt2imgAsset;
+  String get _img2imgAsset => _preset.img2imgAsset;
 
   Future<List<String>> fetchLoras() async {
     try {
@@ -541,9 +535,14 @@ class ComfyUIService implements ImageBackend {
   /// the shipped workflows can be edited freely as long as they keep:
   ///   • a `__PROMPT__` sentinel in the positive prompt text
   ///   • an `__IMAGE__` sentinel in the LoadImage input (img2img only)
+  ///   • `__CKPT__` / `__NEGATIVE__` sentinels (generic templates only)
   ///   • a latent batch node (EmptySD3LatentImage / EmptyLatentImage /
   ///     RepeatLatentBatch) whose batch size = number of variants
   ///   • a sampler node carrying `seed` / `noise_seed`
+  ///
+  /// Sampler/latent parameters are patched from the active [ComfyPreset] only
+  /// for generic-template models (ckptName != null) — dedicated workflows like
+  /// flux-manga keep their baked-in values.
   Map<String, dynamic> _prepare(
     Map<String, dynamic> template, {
     required String prompt,
@@ -553,6 +552,10 @@ class ComfyUIService implements ImageBackend {
     final wf = jsonDecode(jsonEncode(template)) as Map<String, dynamic>;
     final seed = Random().nextInt(1 << 31);
     final lora = _activeLora;
+    final preset = _preset;
+    final fullPrompt = preset.positivePrefix.isEmpty
+        ? prompt
+        : '${preset.positivePrefix}, $prompt';
 
     // Inject a LoraLoader and re-route model/clip references. Works for both
     // Flux (UNETLoader + DualCLIPLoader) and Pony (CheckpointLoaderSimple).
@@ -595,16 +598,33 @@ class ComfyUIService implements ImageBackend {
 
       inputs.forEach((key, value) {
         if (value is! String) return;
-        if (value.contains('__PROMPT__')) inputs[key] = value.replaceAll('__PROMPT__', prompt);
-        if (imageName != null && value.contains('__IMAGE__')) inputs[key] = value.replaceAll('__IMAGE__', imageName);
+        var v = value;
+        if (v.contains('__PROMPT__')) v = v.replaceAll('__PROMPT__', fullPrompt);
+        if (v.contains('__NEGATIVE__')) v = v.replaceAll('__NEGATIVE__', preset.negativePrompt);
+        if (v.contains('__CKPT__') && preset.ckptName != null) v = v.replaceAll('__CKPT__', preset.ckptName!);
+        if (imageName != null && v.contains('__IMAGE__')) v = v.replaceAll('__IMAGE__', imageName);
+        if (!identical(v, value)) inputs[key] = v;
       });
 
       switch (cls) {
         case 'EmptySD3LatentImage':
         case 'EmptyLatentImage':
           if (inputs.containsKey('batch_size')) inputs['batch_size'] = batch;
+          if (preset.ckptName != null) {
+            inputs['width'] = preset.width;
+            inputs['height'] = preset.height;
+          }
         case 'RepeatLatentBatch':
           if (inputs.containsKey('amount')) inputs['amount'] = batch;
+        case 'KSampler':
+          if (preset.ckptName != null) {
+            inputs['steps'] = preset.steps;
+            inputs['cfg'] = preset.cfg;
+            inputs['sampler_name'] = preset.samplerName;
+            inputs['scheduler'] = preset.scheduler;
+            inputs['denoise'] =
+                imageName == null ? 1.0 : preset.img2imgDenoise;
+          }
       }
       if (inputs.containsKey('seed')) inputs['seed'] = seed;
       if (inputs.containsKey('noise_seed')) inputs['noise_seed'] = seed;

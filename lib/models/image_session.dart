@@ -1,7 +1,6 @@
 import 'package:uuid/uuid.dart';
 import 'gen_node.dart';
-import '../services/comfyui_service.dart' show ComfyWorkflow;
-import '../services/image_backend.dart' show kBackendComfyUI;
+import 'image_model.dart';
 
 const _uuid = Uuid();
 
@@ -12,9 +11,8 @@ class ImageSession {
     required this.nodes,
     this.currentNodeId,
     this.selectedLora,
-    required this.workflow,
+    required this.modelId,
     required this.updatedAt,
-    this.backendId = kBackendComfyUI,
   });
 
   final String id;
@@ -22,9 +20,10 @@ class ImageSession {
   final List<GenNode> nodes;
   final String? currentNodeId;
   final String? selectedLora;
-  final ComfyWorkflow workflow;
+
+  /// [ImageModelSpec.id] the session was generated with (implies the backend).
+  final String modelId;
   final DateTime updatedAt;
-  final String backendId;
 
   String? get thumbnailFilePath {
     for (final n in nodes) {
@@ -40,8 +39,7 @@ class ImageSession {
     required List<GenNode> nodes,
     String? currentNodeId,
     String? selectedLora,
-    required ComfyWorkflow workflow,
-    String backendId = kBackendComfyUI,
+    required String modelId,
   }) {
     GenNode? root;
     for (final n in nodes) {
@@ -63,9 +61,8 @@ class ImageSession {
       nodes: List.unmodifiable(nodes),
       currentNodeId: currentNodeId,
       selectedLora: selectedLora,
-      workflow: workflow,
+      modelId: modelId,
       updatedAt: DateTime.now(),
-      backendId: backendId,
     );
   }
 
@@ -75,9 +72,8 @@ class ImageSession {
     'nodes': nodes.map((n) => n.toJson()).toList(),
     if (currentNodeId != null) 'currentNodeId': currentNodeId,
     if (selectedLora != null) 'selectedLora': selectedLora,
-    'workflow': workflow.name,
+    'modelId': modelId,
     'updatedAt': updatedAt.toIso8601String(),
-    'backendId': backendId,
   };
 
   factory ImageSession.fromJson(Map<String, dynamic> json) => ImageSession(
@@ -88,8 +84,21 @@ class ImageSession {
         .toList(),
     currentNodeId: json['currentNodeId'] as String?,
     selectedLora: json['selectedLora'] as String?,
-    workflow: ComfyWorkflow.values.byName(json['workflow'] as String),
+    modelId: json['modelId'] as String? ??
+        _legacyModelId(
+          json['backendId'] as String?,
+          json['workflow'] as String?,
+        ),
     updatedAt: DateTime.parse(json['updatedAt'] as String),
-    backendId: json['backendId'] as String? ?? kBackendComfyUI,
   );
+
+  /// Sessions written before the unified model picker stored a backendId +
+  /// ComfyWorkflow name pair; map them onto the equivalent model id so old
+  /// history (including in-flight jobs awaiting follow()) keeps working.
+  static String _legacyModelId(String? backendId, String? workflow) =>
+      switch (backendId) {
+        'flux_nim' => 'flux-schnell',
+        'flux_kontext_nim' => 'flux-kontext',
+        _ => workflow == 'pony' ? 'pony' : kDefaultImageModelId,
+      };
 }

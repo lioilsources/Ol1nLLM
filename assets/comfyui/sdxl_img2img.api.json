@@ -1,14 +1,14 @@
 {
   "1": {
     "class_type": "CheckpointLoaderSimple",
-    "_meta": { "title": "Load Pony Checkpoint" },
-    "inputs": { "ckpt_name": "ponyDiffusionV6XL_v6StartWithThisOne.safetensors" }
+    "_meta": { "title": "Load Checkpoint" },
+    "inputs": { "ckpt_name": "__CKPT__" }
   },
   "2": {
     "class_type": "CLIPTextEncode",
     "_meta": { "title": "Edit instruction (positive)" },
     "inputs": {
-      "text": "score_9, score_8_up, score_7_up, score_6_up, __PROMPT__",
+      "text": "__PROMPT__",
       "clip": ["1", 1]
     }
   },
@@ -16,7 +16,7 @@
     "class_type": "CLIPTextEncode",
     "_meta": { "title": "Negative prompt" },
     "inputs": {
-      "text": "score_4, score_5, score_6, bad quality, worst quality, low quality, jpeg artifacts, blurry, ugly, watermark",
+      "text": "__NEGATIVE__",
       "clip": ["1", 1]
     }
   },
@@ -72,7 +72,7 @@
     "class_type": "SaveImage",
     "_meta": { "title": "Save Image" },
     "inputs": {
-      "filename_prefix": "ol1n_pony_edit",
+      "filename_prefix": "ol1n_sdxl_edit",
       "images": ["8", 0]
     }
   }

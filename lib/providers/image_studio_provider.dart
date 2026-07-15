@@ -9,6 +9,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/gen_node.dart';
+import '../models/image_model.dart';
 import '../models/image_session.dart';
 import '../services/comfyui_service.dart';
 import '../services/flux_kontext_nim_service.dart';
@@ -34,18 +35,14 @@ class ImageStudioState {
   /// Image selected within the current node — the base for the next refine.
   final String? selectedImageId;
 
-  /// Active image backend id (always kBackendComfyUI — kept for forward
-  /// compatibility if more backends return later).
-  final String backendId;
+  /// Active image model id (see [kImageModels]) — implies the backend.
+  final String modelId;
 
-  /// LoRAs available on the ComfyUI server.
+  /// LoRAs available on the ComfyUI server (unfiltered).
   final List<String> availableLoras;
 
   /// Currently selected LoRA name, or null for no LoRA.
   final String? selectedLora;
-
-  /// Active ComfyUI workflow / model family.
-  final ComfyWorkflow workflow;
 
   /// Last error surfaced to the user (for a one-shot snackbar).
   final String? error;
@@ -60,14 +57,19 @@ class ImageStudioState {
     this.nodes = const [],
     this.currentNodeId,
     this.selectedImageId,
-    this.backendId = kBackendComfyUI,
+    this.modelId = kDefaultImageModelId,
     this.availableLoras = const [],
     this.selectedLora,
-    this.workflow = ComfyWorkflow.flux,
     this.error,
     this.sessions = const [],
     this.activeSessionId,
   });
+
+  ImageModelSpec get model => imageModelById(modelId);
+
+  /// LoRAs compatible with the active model's family.
+  List<String> get filteredLoras =>
+      lorasForFamily(availableLoras, model.loraFamily);
 
   GenNode? get current {
     final id = currentNodeId;
@@ -101,11 +103,10 @@ class ImageStudioState {
     String? currentNodeId,
     String? selectedImageId,
     bool clearSelected = false,
-    String? backendId,
+    String? modelId,
     List<String>? availableLoras,
     String? selectedLora,
     bool clearLora = false,
-    ComfyWorkflow? workflow,
     String? error,
     bool clearError = false,
     List<ImageSession>? sessions,
@@ -117,10 +118,9 @@ class ImageStudioState {
     selectedImageId: clearSelected
         ? null
         : (selectedImageId ?? this.selectedImageId),
-    backendId: backendId ?? this.backendId,
+    modelId: modelId ?? this.modelId,
     availableLoras: availableLoras ?? this.availableLoras,
     selectedLora: clearLora ? null : (selectedLora ?? this.selectedLora),
-    workflow: workflow ?? this.workflow,
     error: clearError ? null : (error ?? this.error),
     sessions: sessions ?? this.sessions,
     activeSessionId: clearActiveSessionId
@@ -195,19 +195,15 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     return dir;
   }
 
-  ImageBackend get _backend => switch (state.backendId) {
-    kBackendFluxNim => _fluxNim,
-    kBackendFluxKontextNim => _fluxKontextNim,
-    _ => _comfyui,
+  ImageBackend get _backend => switch (state.model.kind) {
+    ImageBackendKind.fluxNim => _fluxNim,
+    ImageBackendKind.fluxKontextNim => _fluxKontextNim,
+    ImageBackendKind.comfyUi => _comfyui,
   };
 
   /// Re-attach to in-flight jobs after iOS suspension or app restart.
   void _resumeInFlightJob() {
-    final backend = switch (state.backendId) {
-      kBackendFluxNim => _fluxNim,
-      kBackendFluxKontextNim => _fluxKontextNim,
-      _ => _comfyui,
-    };
+    final backend = _backend;
     for (final node in state.nodes.where(
       (n) => n.status == GenStatus.generating && n.jobId != null,
     )) {
@@ -216,7 +212,30 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     }
   }
 
-  void setBackend(String id) => state = state.copyWith(backendId: id);
+  /// Push a model's ComfyUI preset + LoRA down to the service. LoRAs that
+  /// don't belong to the model's family are dropped (returned as null).
+  /// Family membership is judged by name so it also works before the server
+  /// LoRA list has loaded (session restore).
+  String? _applyModelToServices(String modelId, String? lora) {
+    final spec = imageModelById(modelId);
+    final keepLora =
+        lora != null && lorasForFamily([lora], spec.loraFamily).isNotEmpty;
+    final applied = keepLora ? lora : null;
+    if (spec.kind == ImageBackendKind.comfyUi) {
+      _comfyui.setPreset(spec.preset!);
+    }
+    _comfyui.setLora(applied);
+    return applied;
+  }
+
+  void setModel(String id) {
+    final applied = _applyModelToServices(id, state.selectedLora);
+    state = state.copyWith(
+      modelId: id,
+      selectedLora: applied,
+      clearLora: applied == null,
+    );
+  }
 
   void selectImage(String imageId) =>
       state = state.copyWith(selectedImageId: imageId);
@@ -235,25 +254,22 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     _activeCompleters.clear();
     state = ImageStudioState(
       sessions: state.sessions,
-      backendId: state.backendId,
+      modelId: state.modelId,
       availableLoras: state.availableLoras,
-      workflow: state.workflow,
       selectedLora: state.selectedLora,
     );
   }
 
   void selectSession(String id) {
     final session = state.sessions.firstWhere((s) => s.id == id);
-    _comfyui.setLora(session.selectedLora);
-    _comfyui.setWorkflow(session.workflow);
+    final lora = _applyModelToServices(session.modelId, session.selectedLora);
     state = ImageStudioState(
       sessions: state.sessions,
       activeSessionId: id,
       nodes: session.nodes.toList(),
       currentNodeId: session.currentNodeId,
-      selectedLora: session.selectedLora,
-      workflow: session.workflow,
-      backendId: session.backendId,
+      selectedLora: lora,
+      modelId: session.modelId,
       availableLoras: state.availableLoras,
     );
   }
@@ -271,24 +287,21 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     if (state.activeSessionId == id) {
       final next = updated.isNotEmpty ? updated.first : null;
       if (next != null) {
-        _comfyui.setLora(next.selectedLora);
-        _comfyui.setWorkflow(next.workflow);
+        final lora = _applyModelToServices(next.modelId, next.selectedLora);
         state = ImageStudioState(
           sessions: updated,
           activeSessionId: next.id,
           nodes: next.nodes.toList(),
           currentNodeId: next.currentNodeId,
-          selectedLora: next.selectedLora,
-          workflow: next.workflow,
-          backendId: next.backendId,
+          selectedLora: lora,
+          modelId: next.modelId,
           availableLoras: state.availableLoras,
         );
       } else {
         state = ImageStudioState(
           sessions: const [],
-          backendId: state.backendId,
+          modelId: state.modelId,
           availableLoras: state.availableLoras,
-          workflow: state.workflow,
         );
       }
     } else {
@@ -308,16 +321,14 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       if (sessions.isNotEmpty) {
         final latest = sessions.first;
-        _comfyui.setLora(latest.selectedLora);
-        _comfyui.setWorkflow(latest.workflow);
+        final lora = _applyModelToServices(latest.modelId, latest.selectedLora);
         state = ImageStudioState(
           sessions: sessions,
           activeSessionId: latest.id,
           nodes: latest.nodes.toList(),
           currentNodeId: latest.currentNodeId,
-          selectedLora: latest.selectedLora,
-          workflow: latest.workflow,
-          backendId: latest.backendId,
+          selectedLora: lora,
+          modelId: latest.modelId,
           availableLoras: state.availableLoras,
         );
         _resumeInFlightJob();
@@ -336,8 +347,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       nodes: state.nodes,
       currentNodeId: state.currentNodeId,
       selectedLora: state.selectedLora,
-      workflow: state.workflow,
-      backendId: state.backendId,
+      modelId: state.modelId,
     );
     final updated = [
       session,
@@ -361,11 +371,6 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   void setLora(String? loraName) {
     _comfyui.setLora(loraName);
     state = state.copyWith(selectedLora: loraName, clearLora: loraName == null);
-  }
-
-  void setWorkflow(ComfyWorkflow wf) {
-    _comfyui.setWorkflow(wf);
-    state = state.copyWith(workflow: wf);
   }
 
   Future<void> _loadLoras() async {

@@ -31,7 +31,8 @@ lib/
     chat_provider.dart
   models/
     gen_node.dart              # GenImage (filePath), GenNode (jobId), GenStatus
-    image_session.dart         # ImageSession persistence
+    image_model.dart           # registr modelů: ImageModelSpec + ComfyPreset + kImageModels
+    image_session.dart         # ImageSession persistence (modelId; legacy backendId/workflow mapping)
   services/
     comfyui_service.dart       # ComfyUI WebSocket + HTTP polling backend
     flux_kontext_nim_service.dart  # gen-queue async job queue — flux-kontext (img2img)
@@ -80,6 +81,18 @@ Pokud WS selže (CF Access blokuje upgrade): fallback na HTTP polling `/history`
 Po **3 po sobě jdoucích** chybách pollu (typicky uspání / síťový výpadek) `_pollUntilDone` vrátí `GenInterrupted(promptId)` místo tichého opakování až do 10min deadlinu — provider se pak znovu napojí.
 
 Workflow jsou JSON assety v `assets/comfyui/`, patchované před odesláním (`__PROMPT__`, `__IMAGE__`, batch_size, seed, LoRA inject).
+
+**Registr modelů (`lib/models/image_model.dart`)**: UI má jeden model picker
+(`_ModelChip` bottom sheet); `ImageModelSpec.id` (persistuje se v session jako
+`modelId`) určuje backend (`ImageBackendKind`) i ComfyUI preset. SDXL-rodina
+(pony, juggernaut-xl, illustrious-xl, atomix-pony-anime, sd15) jede na
+generických template `sdxl_txt2img/sdxl_img2img.api.json` se sentinely
+`__CKPT__` / `__NEGATIVE__`; sampler/steps/cfg/rozměry patchuje `_prepare()`
+z `ComfyPreset`. Flux-manga má dedikované JSONy (UNETLoader graf, hodnoty
+baked-in, `ckptName == null` ⇒ sampler se nepatchuje). Positive prefix (score
+tagy) se skládá v Dartu. LoRA se filtrují podle `LoraFamily` (heuristika:
+'flux' v názvu). ComfyUI URL jde přepnout přes `--dart-define=COMFYUI_URL=...`
+(např. LAN `http://192.168.88.66:8188` pro testování bez CF).
 
 ### gen-queue — NIM async job queue (`llm.ol1n.com/nim/*`)
 

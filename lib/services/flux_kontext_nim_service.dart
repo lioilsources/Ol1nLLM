@@ -9,8 +9,6 @@ import 'package:image/image.dart' as img;
 import 'http_error.dart';
 import 'image_backend.dart';
 
-const kBackendFluxKontextNim = 'flux_kontext_nim';
-
 /// Calls the async FLUX.1-Kontext NIM wrapper in gen-queue.
 ///
 /// POST /nim/flux-kontext/v1/infer → 202 + job_id (returns before the NIM

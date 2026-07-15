@@ -1,0 +1,240 @@
+import 'package:flutter/material.dart';
+
+/// Which service instance handles a model's requests.
+enum ImageBackendKind { comfyUi, fluxNim, fluxKontextNim }
+
+/// LoRA compatibility family. The server hosts a mixed pile of FLUX and
+/// SDXL/Pony LoRAs with no manifest, so models declare which family applies
+/// and the list is filtered by name heuristic (see [lorasForFamily]).
+enum LoraFamily { flux, sdxl, none }
+
+/// ComfyUI generation parameters for one model.
+///
+/// [ckptName] == null means the model ships dedicated workflow JSONs with all
+/// values baked in (flux-manga's UNETLoader graph) — only the __PROMPT__ /
+/// __IMAGE__ sentinels and batch/seed get patched. With a ckptName the model
+/// runs on the generic sdxl_* templates and every field here is patched in.
+class ComfyPreset {
+  const ComfyPreset({
+    required this.txt2imgAsset,
+    required this.img2imgAsset,
+    this.ckptName,
+    this.positivePrefix = '',
+    this.negativePrompt = '',
+    this.width = 1024,
+    this.height = 1024,
+    this.steps = 30,
+    this.cfg = 6.0,
+    this.samplerName = 'dpmpp_2m',
+    this.scheduler = 'karras',
+    this.img2imgDenoise = 0.72,
+  });
+
+  final String txt2imgAsset;
+  final String img2imgAsset;
+  final String? ckptName;
+  final String positivePrefix;
+  final String negativePrompt;
+  final int width;
+  final int height;
+  final int steps;
+  final double cfg;
+  final String samplerName;
+  final String scheduler;
+  final double img2imgDenoise;
+}
+
+/// One selectable entry in the unified model picker. [id] is stable — it is
+/// persisted in sessions, so never rename existing ids.
+class ImageModelSpec {
+  const ImageModelSpec({
+    required this.id,
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.kind,
+    required this.txt2img,
+    required this.img2img,
+    this.loraFamily = LoraFamily.none,
+    this.preset,
+  });
+
+  final String id;
+  final String label;
+  final IconData icon;
+  final Color color;
+  final ImageBackendKind kind;
+  final bool txt2img;
+  final bool img2img;
+  final LoraFamily loraFamily;
+  final ComfyPreset? preset;
+
+  String get capabilityLabel => switch ((txt2img, img2img)) {
+    (true, true) => 'txt2img + img2img',
+    (true, false) => 'txt2img',
+    _ => 'img2img',
+  };
+}
+
+const kDefaultImageModelId = 'flux-manga';
+
+const _sdxlTxt2img = 'assets/comfyui/sdxl_txt2img.api.json';
+const _sdxlImg2img = 'assets/comfyui/sdxl_img2img.api.json';
+
+const _ponyScoreTags = 'score_9, score_8_up, score_7_up, score_6_up';
+const _ponyNegative =
+    'score_4, score_5, score_6, bad quality, worst quality, low quality, '
+    'jpeg artifacts, blurry, ugly, watermark';
+
+const kImageModels = <ImageModelSpec>[
+  ImageModelSpec(
+    id: 'flux-schnell',
+    label: 'FLUX Schnell',
+    icon: Icons.bolt,
+    color: Color(0xFF10A37F),
+    kind: ImageBackendKind.fluxNim,
+    txt2img: true,
+    img2img: false,
+  ),
+  ImageModelSpec(
+    id: 'flux-kontext',
+    label: 'FLUX Kontext',
+    icon: Icons.auto_fix_high,
+    color: Colors.orange,
+    kind: ImageBackendKind.fluxKontextNim,
+    txt2img: false,
+    img2img: true,
+  ),
+  ImageModelSpec(
+    id: 'flux-manga',
+    label: 'FLUX manga',
+    icon: Icons.brush_outlined,
+    color: Color(0xFF7E9CD8),
+    kind: ImageBackendKind.comfyUi,
+    txt2img: true,
+    img2img: true,
+    loraFamily: LoraFamily.flux,
+    preset: ComfyPreset(
+      txt2imgAsset: 'assets/comfyui/flux_manga_txt2img.api.json',
+      img2imgAsset: 'assets/comfyui/flux_manga_img2img.api.json',
+    ),
+  ),
+  ImageModelSpec(
+    id: 'pony',
+    label: 'Pony V6',
+    icon: Icons.palette_outlined,
+    color: Color(0xFFC678DD),
+    kind: ImageBackendKind.comfyUi,
+    txt2img: true,
+    img2img: true,
+    loraFamily: LoraFamily.sdxl,
+    preset: ComfyPreset(
+      txt2imgAsset: _sdxlTxt2img,
+      img2imgAsset: _sdxlImg2img,
+      ckptName: 'ponyDiffusionV6XL_v6StartWithThisOne.safetensors',
+      positivePrefix: _ponyScoreTags,
+      negativePrompt: _ponyNegative,
+    ),
+  ),
+  ImageModelSpec(
+    id: 'juggernaut-xl',
+    label: 'Juggernaut XL',
+    icon: Icons.photo_camera_outlined,
+    color: Color(0xFFE5C07B),
+    kind: ImageBackendKind.comfyUi,
+    txt2img: true,
+    img2img: true,
+    loraFamily: LoraFamily.sdxl,
+    preset: ComfyPreset(
+      txt2imgAsset: _sdxlTxt2img,
+      img2imgAsset: _sdxlImg2img,
+      ckptName: 'Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors',
+      negativePrompt:
+          'bad quality, worst quality, low quality, jpeg artifacts, blurry, '
+          'watermark, deformed, disfigured, bad anatomy, bad hands',
+      cfg: 5.0,
+    ),
+  ),
+  ImageModelSpec(
+    id: 'illustrious-xl',
+    label: 'Illustrious XL',
+    icon: Icons.draw_outlined,
+    color: Color(0xFF61AFEF),
+    kind: ImageBackendKind.comfyUi,
+    txt2img: true,
+    img2img: true,
+    loraFamily: LoraFamily.sdxl,
+    preset: ComfyPreset(
+      txt2imgAsset: _sdxlTxt2img,
+      img2imgAsset: _sdxlImg2img,
+      ckptName: 'Illustrious-XL-v2.0.safetensors',
+      positivePrefix: 'masterpiece, best quality',
+      negativePrompt:
+          'lowres, bad anatomy, bad hands, worst quality, low quality, '
+          'jpeg artifacts, blurry, watermark, signature',
+      steps: 28,
+      samplerName: 'euler_ancestral',
+      scheduler: 'normal',
+    ),
+  ),
+  ImageModelSpec(
+    id: 'atomix-pony-anime',
+    label: 'Atomix Pony Anime',
+    icon: Icons.animation,
+    color: Color(0xFFE06C75),
+    kind: ImageBackendKind.comfyUi,
+    txt2img: true,
+    img2img: true,
+    loraFamily: LoraFamily.sdxl,
+    preset: ComfyPreset(
+      txt2imgAsset: _sdxlTxt2img,
+      img2imgAsset: _sdxlImg2img,
+      ckptName: 'atomixPonyAnimeXL_v30.safetensors',
+      positivePrefix: _ponyScoreTags,
+      negativePrompt: _ponyNegative,
+      steps: 28,
+      cfg: 6.5,
+      samplerName: 'euler_ancestral',
+      scheduler: 'normal',
+    ),
+  ),
+  ImageModelSpec(
+    id: 'sd15',
+    label: 'SD 1.5',
+    icon: Icons.history_edu_outlined,
+    color: Color(0xFF98C379),
+    kind: ImageBackendKind.comfyUi,
+    txt2img: true,
+    img2img: true,
+    preset: ComfyPreset(
+      txt2imgAsset: _sdxlTxt2img,
+      img2imgAsset: _sdxlImg2img,
+      ckptName: 'v1-5-pruned-emaonly-fp16.safetensors',
+      negativePrompt: 'bad quality, worst quality, blurry, watermark',
+      width: 512,
+      height: 512,
+      steps: 25,
+      cfg: 7.0,
+      img2imgDenoise: 0.70,
+    ),
+  ),
+];
+
+/// Lookup by persisted id, falling back to the default model so sessions
+/// written by future/older builds still open.
+ImageModelSpec imageModelById(String id) => kImageModels.firstWhere(
+  (m) => m.id == id,
+  orElse: () =>
+      kImageModels.firstWhere((m) => m.id == kDefaultImageModelId),
+);
+
+/// Name heuristic: FLUX-trained LoRAs on the server all carry 'flux' in the
+/// filename ('flux-lora-…', 'sldr_flux_…'); everything else is SDXL/Pony.
+bool _isFluxLora(String name) => name.toLowerCase().contains('flux');
+
+List<String> lorasForFamily(List<String> all, LoraFamily family) =>
+    switch (family) {
+      LoraFamily.flux => all.where(_isFluxLora).toList(),
+      LoraFamily.sdxl => all.where((n) => !_isFluxLora(n)).toList(),
+      LoraFamily.none => const [],
+    };

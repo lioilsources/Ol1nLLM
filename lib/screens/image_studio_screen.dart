@@ -8,10 +8,8 @@ import 'package:gal/gal.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/constants/theme.dart';
 import '../models/gen_node.dart';
+import '../models/image_model.dart';
 import '../providers/image_studio_provider.dart';
-import '../services/comfyui_service.dart' show ComfyWorkflow;
-import '../services/flux_kontext_nim_service.dart' show kBackendFluxKontextNim;
-import '../services/image_backend.dart' show kBackendComfyUI, kBackendFluxNim;
 import '../widgets/image_session_drawer.dart';
 
 /// Copy [text] to the clipboard and confirm with a brief snackbar. No-op for
@@ -895,100 +893,127 @@ class _LoraChip extends StatelessWidget {
   }
 }
 
-class _BackendChip extends StatelessWidget {
-  const _BackendChip({required this.backendId, required this.onChanged});
+class _ModelChip extends StatelessWidget {
+  const _ModelChip({
+    required this.modelId,
+    required this.needsTxt2Img,
+    required this.needsImg2Img,
+    required this.onChanged,
+  });
 
-  final String backendId;
+  final String modelId;
+
+  /// True when the next send would be a fresh text→image generation.
+  final bool needsTxt2Img;
+
+  /// True when the next send would refine the selected image (img2img).
+  final bool needsImg2Img;
   final ValueChanged<String> onChanged;
 
-  static const _cycle = [
-    kBackendComfyUI,
-    kBackendFluxNim,
-    kBackendFluxKontextNim,
-  ];
+  bool _isUsable(ImageModelSpec spec) =>
+      !(needsTxt2Img && !spec.txt2img) && !(needsImg2Img && !spec.img2img);
 
-  @override
-  Widget build(BuildContext context) {
-    final idx = _cycle.indexOf(backendId);
-    final next = _cycle[(idx + 1) % _cycle.length];
-
-    final (Color color, IconData icon, String label) = switch (backendId) {
-      kBackendFluxNim => (AppTheme.accent, Icons.bolt, 'FLUX Schnell'),
-      kBackendFluxKontextNim => (Colors.orange, Icons.auto_fix_high, 'FLUX Kontext'),
-      _ => (AppTheme.textSecondary, Icons.hub_outlined, 'ComfyUI'),
-    };
-    final isActive = backendId != kBackendComfyUI;
-
-    return GestureDetector(
-      onTap: () => onChanged(next),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: isActive ? color.withValues(alpha: 0.15) : AppTheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isActive ? color : Colors.white24,
-            width: 0.5,
-          ),
-        ),
-        child: Row(
+  void _pick(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(fontSize: 12, color: color),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                'Vybrat model',
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: kImageModels.length,
+                itemBuilder: (_, i) {
+                  final spec = kImageModels[i];
+                  final isSel = spec.id == modelId;
+                  final usable = _isUsable(spec);
+                  final hint = usable
+                      ? spec.capabilityLabel
+                      : spec.img2img
+                          ? '${spec.capabilityLabel} — vyžaduje obrázek'
+                          : '${spec.capabilityLabel} — jen nové generování';
+                  return Opacity(
+                    opacity: usable ? 1.0 : 0.38,
+                    child: ListTile(
+                      enabled: usable,
+                      leading: Icon(spec.icon, color: spec.color, size: 22),
+                      title: Text(
+                        spec.label,
+                        style: TextStyle(
+                          color:
+                              isSel ? AppTheme.accent : AppTheme.textPrimary,
+                        ),
+                      ),
+                      subtitle: Text(
+                        hint,
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                      trailing: Icon(
+                        isSel
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                        color:
+                            isSel ? AppTheme.accent : AppTheme.textSecondary,
+                        size: 20,
+                      ),
+                      onTap: () {
+                        onChanged(spec.id);
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  );
+                },
+              ),
             ),
           ],
         ),
       ),
     );
   }
-}
-
-class _WorkflowChip extends StatelessWidget {
-  const _WorkflowChip({
-    required this.current,
-    required this.onChanged,
-  });
-
-  final ComfyWorkflow current;
-  final ValueChanged<ComfyWorkflow> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final isPony = current == ComfyWorkflow.pony;
+    final spec = imageModelById(modelId);
     return GestureDetector(
-      onTap: () => onChanged(isPony ? ComfyWorkflow.flux : ComfyWorkflow.pony),
+      onTap: () => _pick(context),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: isPony
-              ? AppTheme.accent.withValues(alpha: 0.15)
-              : AppTheme.surface,
+          color: spec.color.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isPony ? AppTheme.accent : Colors.white24,
-            width: 0.5,
-          ),
+          border: Border.all(color: spec.color, width: 0.5),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.auto_fix_high_outlined,
-              size: 14,
-              color: isPony ? AppTheme.accent : AppTheme.textSecondary,
-            ),
+            Icon(spec.icon, size: 14, color: spec.color),
             const SizedBox(width: 5),
             Text(
-              isPony ? 'Pony' : 'Flux',
-              style: TextStyle(
-                fontSize: 12,
-                color: isPony ? AppTheme.accent : AppTheme.textSecondary,
-              ),
+              spec.label,
+              style: TextStyle(fontSize: 12, color: spec.color),
             ),
+            const SizedBox(width: 3),
+            Icon(Icons.expand_more, size: 14, color: spec.color),
           ],
         ),
       ),
@@ -1092,6 +1117,25 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
     if (text.isEmpty) return;
     final notifier = ref.read(imageStudioProvider.notifier);
 
+    // Predictable mismatch (e.g. FLUX Schnell can't refine) → snackbar instead
+    // of a doomed error node; the backends' GenFailed stays as the last net.
+    final spec = widget.state.model;
+    final wantsTxt2Img = !_hasRoot;
+    final wantsImg2Img = _hasRoot && _isRefineMode;
+    if ((wantsTxt2Img && !spec.txt2img) || (wantsImg2Img && !spec.img2img)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            wantsTxt2Img
+                ? '${spec.label} umí jen upravovat obrázky — vyber jiný model.'
+                : '${spec.label} neumí img2img — vyber jiný model.',
+          ),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
     if (!_hasRoot) {
       _controller.clear();
       await notifier.generate(text);
@@ -1113,12 +1157,9 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
     final isBusy = widget.state.isBusy;
     final canSend = _controller.text.trim().isNotEmpty;
 
-    final loras = widget.state.availableLoras;
+    final spec = widget.state.model;
+    final loras = widget.state.filteredLoras;
     final selectedLora = widget.state.selectedLora;
-    final workflow = widget.state.workflow;
-    final backendId = widget.state.backendId;
-    final isNim =
-        backendId == kBackendFluxNim || backendId == kBackendFluxKontextNim;
 
     // The current node's own prompt shown as context (the text→image prompt
     // for a root, or the edit instruction that produced this refinement).
@@ -1143,27 +1184,21 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
               padding: const EdgeInsets.only(bottom: 6),
               child: Row(
                 children: [
-                  _BackendChip(
-                    backendId: backendId,
+                  _ModelChip(
+                    modelId: spec.id,
+                    needsTxt2Img: !_hasRoot,
+                    needsImg2Img: _isRefineMode,
                     onChanged: (id) =>
-                        ref.read(imageStudioProvider.notifier).setBackend(id),
+                        ref.read(imageStudioProvider.notifier).setModel(id),
                   ),
-                  if (!isNim) ...[
+                  if (loras.isNotEmpty) ...[
                     const SizedBox(width: 8),
-                    _WorkflowChip(
-                      current: workflow,
-                      onChanged: (wf) =>
-                          ref.read(imageStudioProvider.notifier).setWorkflow(wf),
+                    _LoraChip(
+                      loras: loras,
+                      selected: selectedLora,
+                      onChanged: (v) =>
+                          ref.read(imageStudioProvider.notifier).setLora(v),
                     ),
-                    if (loras.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      _LoraChip(
-                        loras: loras,
-                        selected: selectedLora,
-                        onChanged: (v) =>
-                            ref.read(imageStudioProvider.notifier).setLora(v),
-                      ),
-                    ],
                   ],
                 ],
               ),
