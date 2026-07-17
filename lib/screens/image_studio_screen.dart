@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import '../core/constants/theme.dart';
 import '../models/gen_node.dart';
 import '../models/image_model.dart';
+import '../models/pose_template.dart';
 import '../providers/image_studio_provider.dart';
 import '../widgets/image_session_drawer.dart';
 
@@ -893,6 +894,150 @@ class _LoraChip extends StatelessWidget {
   }
 }
 
+class _PoseChip extends StatelessWidget {
+  const _PoseChip({required this.selected, required this.onChanged});
+
+  final String? selected;
+  final ValueChanged<String?> onChanged;
+
+  void _pick(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 2),
+              child: Text(
+                'Vybrat pózu',
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                'Aplikuje se jen na nové generování (ne na úpravy).',
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+              ),
+            ),
+            ListTile(
+              leading: Icon(
+                selected == null
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_unchecked,
+                color: selected == null
+                    ? AppTheme.accent
+                    : AppTheme.textSecondary,
+                size: 20,
+              ),
+              title: const Text(
+                'Žádná póza',
+                style: TextStyle(color: AppTheme.textPrimary),
+              ),
+              onTap: () {
+                onChanged(null);
+                Navigator.of(context).pop();
+              },
+            ),
+            const Divider(height: 1, color: Colors.white12),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: GridView.count(
+                crossAxisCount: 4,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 2 / 3,
+                children: [
+                  for (final pose in kPoseTemplates)
+                    GestureDetector(
+                      onTap: () {
+                        onChanged(pose.id);
+                        Navigator.of(context).pop();
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: pose.id == selected
+                                ? AppTheme.accent
+                                : Colors.white24,
+                            width: pose.id == selected ? 2 : 0.5,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(7),
+                          child: Image.asset(pose.asset, fit: BoxFit.cover),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = poseById(selected)?.label;
+    return GestureDetector(
+      onTap: () => _pick(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: label != null
+              ? AppTheme.accent.withValues(alpha: 0.15)
+              : AppTheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: label != null ? AppTheme.accent : Colors.white24,
+            width: 0.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.accessibility_new,
+              size: 14,
+              color: label != null ? AppTheme.accent : AppTheme.textSecondary,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label ?? 'Póza',
+              style: TextStyle(
+                fontSize: 12,
+                color:
+                    label != null ? AppTheme.accent : AppTheme.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 3),
+            Icon(
+              Icons.expand_more,
+              size: 14,
+              color: label != null ? AppTheme.accent : AppTheme.textSecondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ModelChip extends StatelessWidget {
   const _ModelChip({
     required this.modelId,
@@ -1198,6 +1343,14 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                       selected: selectedLora,
                       onChanged: (v) =>
                           ref.read(imageStudioProvider.notifier).setLora(v),
+                    ),
+                  ],
+                  if (spec.supportsPose) ...[
+                    const SizedBox(width: 8),
+                    _PoseChip(
+                      selected: widget.state.selectedPoseId,
+                      onChanged: (v) =>
+                          ref.read(imageStudioProvider.notifier).setPose(v),
                     ),
                   ],
                 ],

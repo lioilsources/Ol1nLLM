@@ -56,6 +56,7 @@ class ImageModelSpec {
     required this.txt2img,
     required this.img2img,
     this.loraFamily = LoraFamily.none,
+    this.supportsPose = false,
     this.preset,
   });
 
@@ -67,6 +68,12 @@ class ImageModelSpec {
   final bool txt2img;
   final bool img2img;
   final LoraFamily loraFamily;
+
+  /// OpenPose ControlNet pose templates apply to this model. Explicit flag,
+  /// not derived from ckptName: the installed ControlNet is SDXL-only, so
+  /// SD 1.5 (which also runs the generic templates) must stay false.
+  final bool supportsPose;
+
   final ComfyPreset? preset;
 
   String get capabilityLabel => switch ((txt2img, img2img)) {
@@ -128,6 +135,7 @@ const kImageModels = <ImageModelSpec>[
     txt2img: true,
     img2img: true,
     loraFamily: LoraFamily.sdxl,
+    supportsPose: true,
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
@@ -145,6 +153,7 @@ const kImageModels = <ImageModelSpec>[
     txt2img: true,
     img2img: true,
     loraFamily: LoraFamily.sdxl,
+    supportsPose: true,
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
@@ -164,6 +173,7 @@ const kImageModels = <ImageModelSpec>[
     txt2img: true,
     img2img: true,
     loraFamily: LoraFamily.sdxl,
+    supportsPose: true,
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
@@ -186,6 +196,7 @@ const kImageModels = <ImageModelSpec>[
     txt2img: true,
     img2img: true,
     loraFamily: LoraFamily.sdxl,
+    supportsPose: true,
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,

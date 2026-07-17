@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/gen_node.dart';
 import '../models/image_model.dart';
 import '../models/image_session.dart';
+import '../models/pose_template.dart';
 import '../services/comfyui_service.dart';
 import '../services/flux_kontext_nim_service.dart';
 import '../services/flux_nim_service.dart';
@@ -44,6 +45,9 @@ class ImageStudioState {
   /// Currently selected LoRA name, or null for no LoRA.
   final String? selectedLora;
 
+  /// Selected ControlNet pose template id (see [kPoseTemplates]), or null.
+  final String? selectedPoseId;
+
   /// Last error surfaced to the user (for a one-shot snackbar).
   final String? error;
 
@@ -60,6 +64,7 @@ class ImageStudioState {
     this.modelId = kDefaultImageModelId,
     this.availableLoras = const [],
     this.selectedLora,
+    this.selectedPoseId,
     this.error,
     this.sessions = const [],
     this.activeSessionId,
@@ -107,6 +112,8 @@ class ImageStudioState {
     List<String>? availableLoras,
     String? selectedLora,
     bool clearLora = false,
+    String? selectedPoseId,
+    bool clearPose = false,
     String? error,
     bool clearError = false,
     List<ImageSession>? sessions,
@@ -121,6 +128,7 @@ class ImageStudioState {
     modelId: modelId ?? this.modelId,
     availableLoras: availableLoras ?? this.availableLoras,
     selectedLora: clearLora ? null : (selectedLora ?? this.selectedLora),
+    selectedPoseId: clearPose ? null : (selectedPoseId ?? this.selectedPoseId),
     error: clearError ? null : (error ?? this.error),
     sessions: sessions ?? this.sessions,
     activeSessionId: clearActiveSessionId
@@ -212,28 +220,38 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     }
   }
 
-  /// Push a model's ComfyUI preset + LoRA down to the service. LoRAs that
-  /// don't belong to the model's family are dropped (returned as null).
+  /// Push a model's ComfyUI preset + LoRA + pose down to the service. LoRAs
+  /// that don't belong to the model's family are dropped (returned as null).
   /// Family membership is judged by name so it also works before the server
-  /// LoRA list has loaded (session restore).
-  String? _applyModelToServices(String modelId, String? lora) {
+  /// LoRA list has loaded (session restore). Poses are dropped for models
+  /// without OpenPose ControlNet support (NIM backends, flux-manga, SD 1.5).
+  (String? lora, String? poseId) _applyModelToServices(
+    String modelId,
+    String? lora,
+    String? poseId,
+  ) {
     final spec = imageModelById(modelId);
     final keepLora =
         lora != null && lorasForFamily([lora], spec.loraFamily).isNotEmpty;
-    final applied = keepLora ? lora : null;
+    final appliedLora = keepLora ? lora : null;
+    final pose = spec.supportsPose ? poseById(poseId) : null;
     if (spec.kind == ImageBackendKind.comfyUi) {
       _comfyui.setPreset(spec.preset!);
     }
-    _comfyui.setLora(applied);
-    return applied;
+    _comfyui.setLora(appliedLora);
+    _comfyui.setPose(pose?.asset);
+    return (appliedLora, pose?.id);
   }
 
   void setModel(String id) {
-    final applied = _applyModelToServices(id, state.selectedLora);
+    final (lora, poseId) =
+        _applyModelToServices(id, state.selectedLora, state.selectedPoseId);
     state = state.copyWith(
       modelId: id,
-      selectedLora: applied,
-      clearLora: applied == null,
+      selectedLora: lora,
+      clearLora: lora == null,
+      selectedPoseId: poseId,
+      clearPose: poseId == null,
     );
   }
 
@@ -257,18 +275,24 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       modelId: state.modelId,
       availableLoras: state.availableLoras,
       selectedLora: state.selectedLora,
+      selectedPoseId: state.selectedPoseId,
     );
   }
 
   void selectSession(String id) {
     final session = state.sessions.firstWhere((s) => s.id == id);
-    final lora = _applyModelToServices(session.modelId, session.selectedLora);
+    final (lora, poseId) = _applyModelToServices(
+      session.modelId,
+      session.selectedLora,
+      session.selectedPoseId,
+    );
     state = ImageStudioState(
       sessions: state.sessions,
       activeSessionId: id,
       nodes: session.nodes.toList(),
       currentNodeId: session.currentNodeId,
       selectedLora: lora,
+      selectedPoseId: poseId,
       modelId: session.modelId,
       availableLoras: state.availableLoras,
     );
@@ -287,13 +311,18 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     if (state.activeSessionId == id) {
       final next = updated.isNotEmpty ? updated.first : null;
       if (next != null) {
-        final lora = _applyModelToServices(next.modelId, next.selectedLora);
+        final (lora, poseId) = _applyModelToServices(
+          next.modelId,
+          next.selectedLora,
+          next.selectedPoseId,
+        );
         state = ImageStudioState(
           sessions: updated,
           activeSessionId: next.id,
           nodes: next.nodes.toList(),
           currentNodeId: next.currentNodeId,
           selectedLora: lora,
+          selectedPoseId: poseId,
           modelId: next.modelId,
           availableLoras: state.availableLoras,
         );
@@ -321,13 +350,18 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       if (sessions.isNotEmpty) {
         final latest = sessions.first;
-        final lora = _applyModelToServices(latest.modelId, latest.selectedLora);
+        final (lora, poseId) = _applyModelToServices(
+          latest.modelId,
+          latest.selectedLora,
+          latest.selectedPoseId,
+        );
         state = ImageStudioState(
           sessions: sessions,
           activeSessionId: latest.id,
           nodes: latest.nodes.toList(),
           currentNodeId: latest.currentNodeId,
           selectedLora: lora,
+          selectedPoseId: poseId,
           modelId: latest.modelId,
           availableLoras: state.availableLoras,
         );
@@ -347,6 +381,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       nodes: state.nodes,
       currentNodeId: state.currentNodeId,
       selectedLora: state.selectedLora,
+      selectedPoseId: state.selectedPoseId,
       modelId: state.modelId,
     );
     final updated = [
@@ -371,6 +406,15 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   void setLora(String? loraName) {
     _comfyui.setLora(loraName);
     state = state.copyWith(selectedLora: loraName, clearLora: loraName == null);
+  }
+
+  void setPose(String? poseId) {
+    final pose = poseById(poseId);
+    _comfyui.setPose(pose?.asset);
+    state = state.copyWith(
+      selectedPoseId: pose?.id,
+      clearPose: pose == null,
+    );
   }
 
   Future<void> _loadLoras() async {

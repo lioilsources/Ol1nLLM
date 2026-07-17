@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
 import '../models/image_model.dart';
+import '../models/pose_template.dart';
 import 'http_error.dart';
 import 'image_backend.dart';
 
@@ -49,10 +50,26 @@ class ComfyUIService implements ImageBackend {
   final Map<String, Map<String, dynamic>> _templateCache = {};
 
   String? _activeLora;
+  String? _activePoseAsset;
   ComfyPreset _preset = imageModelById(kDefaultImageModelId).preset!;
 
+  /// Pose asset → server-side filename, so each skeleton uploads at most once
+  /// per app run (uploads use overwrite=true, so a re-upload is harmless).
+  final Map<String, String> _poseUploadCache = {};
+
   void setLora(String? loraName) => _activeLora = loraName;
+  void setPose(String? poseAsset) => _activePoseAsset = poseAsset;
   void setPreset(ComfyPreset preset) => _preset = preset;
+
+  // OpenPose ControlNet applied when a pose template is active. The model is
+  // SDXL-only — callers must not set a pose for non-SDXL presets.
+  static const _openPoseControlNet =
+      'controlnet-openpose-sdxl-xinsir.safetensors';
+  // Full strength for the whole schedule: at 0.9/0.8 the xinsir ControlNet
+  // lost against prompts that imply a different pose (verified on server).
+  static const _poseStrength = 1.0;
+  static const _poseStartPercent = 0.0;
+  static const _poseEndPercent = 1.0;
 
   String get _txt2imgAsset => _preset.txt2imgAsset;
   String get _img2imgAsset => _preset.img2imgAsset;
@@ -111,8 +128,17 @@ class ComfyUIService implements ImageBackend {
   // ── Public backend API ──────────────────────────────────────
   @override
   Stream<GenEvent> generate({required String prompt, required int n}) async* {
+    final pose = _activePoseAsset;
+    final poseImageName = (pose != null && _preset.ckptName != null)
+        ? await _ensurePoseUploaded(pose)
+        : null;
     final tpl = await _template(_txt2imgAsset);
-    final wf = _prepare(tpl, prompt: prompt, batch: n);
+    final wf = _prepare(
+      tpl,
+      prompt: prompt,
+      batch: n,
+      poseImageName: poseImageName,
+    );
     yield* _run(wf);
   }
 
@@ -433,7 +459,21 @@ class ComfyUIService implements ImageBackend {
   /// of quick retries usually rides over the blip instead of failing the edit.
   static const _uploadMaxAttempts = 3;
 
-  Future<String> _uploadImage(Uint8List bytes) async {
+  /// Upload a bundled pose skeleton and remember its server-side name. The
+  /// deterministic filename + overwrite=true make this idempotent across app
+  /// runs; the cache just skips the round-trip within one run.
+  Future<String> _ensurePoseUploaded(String asset) async {
+    final cached = _poseUploadCache[asset];
+    if (cached != null) return cached;
+    final bytes = (await rootBundle.load(asset)).buffer.asUint8List();
+    final name = await _uploadImage(
+      bytes,
+      filename: 'ol1n_pose_${asset.split('/').last}',
+    );
+    return _poseUploadCache[asset] = name;
+  }
+
+  Future<String> _uploadImage(Uint8List bytes, {String? filename}) async {
     Object? lastErr;
     for (var attempt = 1; attempt <= _uploadMaxAttempts; attempt++) {
       try {
@@ -447,7 +487,7 @@ class ComfyUIService implements ImageBackend {
                 http.MultipartFile.fromBytes(
                   'image',
                   bytes,
-                  filename:
+                  filename: filename ??
                       'ol1n_input_${DateTime.now().millisecondsSinceEpoch}.png',
                 ),
               );
@@ -548,6 +588,7 @@ class ComfyUIService implements ImageBackend {
     required String prompt,
     required int batch,
     String? imageName,
+    String? poseImageName,
   }) {
     final wf = jsonDecode(jsonEncode(template)) as Map<String, dynamic>;
     final seed = Random().nextInt(1 << 31);
@@ -590,6 +631,13 @@ class ComfyUIService implements ImageBackend {
       }
     }
 
+    // Splice an OpenPose ControlNet between the prompt encoders and the
+    // sampler. Orthogonal to the LoRA injection above: LoRA rewires
+    // model/clip edges, this rewires positive/negative conditioning edges.
+    if (poseImageName != null) {
+      _injectPoseControlNet(wf, poseImageName);
+    }
+
     for (final entry in wf.values) {
       final node = (entry as Map).cast<String, dynamic>();
       final cls = node['class_type'] as String?;
@@ -611,8 +659,11 @@ class ComfyUIService implements ImageBackend {
         case 'EmptyLatentImage':
           if (inputs.containsKey('batch_size')) inputs['batch_size'] = batch;
           if (preset.ckptName != null) {
-            inputs['width'] = preset.width;
-            inputs['height'] = preset.height;
+            // Pose skeletons are 2:3 portrait — generate in a matching
+            // bucket instead of the preset's default so they don't distort.
+            inputs['width'] = poseImageName != null ? kPoseWidth : preset.width;
+            inputs['height'] =
+                poseImageName != null ? kPoseHeight : preset.height;
           }
         case 'RepeatLatentBatch':
           if (inputs.containsKey('amount')) inputs['amount'] = batch;
@@ -630,6 +681,51 @@ class ComfyUIService implements ImageBackend {
       if (inputs.containsKey('noise_seed')) inputs['noise_seed'] = seed;
     }
     return wf;
+  }
+
+  // ── ControlNet pose injection ───────────────────────────────
+  // Splices LoadImage → ControlNetLoader → ControlNetApplyAdvanced between
+  // the CLIPTextEncode outputs and the sampler. Reads the sampler's current
+  // positive/negative refs instead of hard-coding node ids, so it stays
+  // template-agnostic like the sentinel patching.
+  void _injectPoseControlNet(Map<String, dynamic> wf, String poseImageName) {
+    Map<String, dynamic>? sampler;
+    for (final e in wf.entries) {
+      if ((e.value as Map)['class_type'] == 'KSampler') {
+        sampler = (e.value as Map).cast<String, dynamic>();
+        break;
+      }
+    }
+    final inputs = (sampler?['inputs'] as Map?)?.cast<String, dynamic>();
+    final positive = inputs?['positive'];
+    final negative = inputs?['negative'];
+    if (inputs == null || positive is! List || negative is! List) return;
+
+    wf['__pose_image__'] = {
+      'class_type': 'LoadImage',
+      '_meta': {'title': 'Pose: $poseImageName'},
+      'inputs': {'image': poseImageName, 'upload': 'image'},
+    };
+    wf['__pose_cn__'] = {
+      'class_type': 'ControlNetLoader',
+      '_meta': {'title': 'OpenPose ControlNet'},
+      'inputs': {'control_net_name': _openPoseControlNet},
+    };
+    wf['__pose_apply__'] = {
+      'class_type': 'ControlNetApplyAdvanced',
+      '_meta': {'title': 'Apply pose'},
+      'inputs': {
+        'positive': positive,
+        'negative': negative,
+        'control_net': ['__pose_cn__', 0],
+        'image': ['__pose_image__', 0],
+        'strength': _poseStrength,
+        'start_percent': _poseStartPercent,
+        'end_percent': _poseEndPercent,
+      },
+    };
+    inputs['positive'] = ['__pose_apply__', 0];
+    inputs['negative'] = ['__pose_apply__', 1];
   }
 
   // ── LoRA source detection ───────────────────────────────────

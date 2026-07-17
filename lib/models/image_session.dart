@@ -11,6 +11,7 @@ class ImageSession {
     required this.nodes,
     this.currentNodeId,
     this.selectedLora,
+    this.selectedPoseId,
     required this.modelId,
     required this.updatedAt,
   });
@@ -20,6 +21,7 @@ class ImageSession {
   final List<GenNode> nodes;
   final String? currentNodeId;
   final String? selectedLora;
+  final String? selectedPoseId;
 
   /// [ImageModelSpec.id] the session was generated with (implies the backend).
   final String modelId;
@@ -39,6 +41,7 @@ class ImageSession {
     required List<GenNode> nodes,
     String? currentNodeId,
     String? selectedLora,
+    String? selectedPoseId,
     required String modelId,
   }) {
     GenNode? root;
@@ -61,6 +64,7 @@ class ImageSession {
       nodes: List.unmodifiable(nodes),
       currentNodeId: currentNodeId,
       selectedLora: selectedLora,
+      selectedPoseId: selectedPoseId,
       modelId: modelId,
       updatedAt: DateTime.now(),
     );
@@ -72,6 +76,7 @@ class ImageSession {
     'nodes': nodes.map((n) => n.toJson()).toList(),
     if (currentNodeId != null) 'currentNodeId': currentNodeId,
     if (selectedLora != null) 'selectedLora': selectedLora,
+    if (selectedPoseId != null) 'selectedPoseId': selectedPoseId,
     'modelId': modelId,
     'updatedAt': updatedAt.toIso8601String(),
   };
@@ -84,6 +89,7 @@ class ImageSession {
         .toList(),
     currentNodeId: json['currentNodeId'] as String?,
     selectedLora: json['selectedLora'] as String?,
+    selectedPoseId: json['selectedPoseId'] as String?,
     modelId: json['modelId'] as String? ??
         _legacyModelId(
           json['backendId'] as String?,

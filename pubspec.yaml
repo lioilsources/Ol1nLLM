@@ -82,6 +82,7 @@ flutter:
   assets:
     - assets/personas/
     - assets/comfyui/
+    - assets/poses/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

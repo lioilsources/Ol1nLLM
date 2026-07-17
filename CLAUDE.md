@@ -94,6 +94,20 @@ tagy) se skládá v Dartu. LoRA se filtrují podle `LoraFamily` (heuristika:
 'flux' v názvu). ComfyUI URL jde přepnout přes `--dart-define=COMFYUI_URL=...`
 (např. LAN `http://192.168.88.66:8188` pro testování bez CF).
 
+**ControlNet pózy (`lib/models/pose_template.dart`)**: 8 OpenPose skeleton
+šablon v `assets/poses/` (512×768). Výběr přes `_PoseChip` (grid bottom
+sheet), viditelný jen pro modely s `supportsPose: true` (SDXL rodina — sd15
+ne, openpose-xinsir ControlNet je SDXL-only). Aplikuje se **jen na txt2img**;
+`edit()` pózu ignoruje. Šablona se při generování nahraje přes
+`/upload/image` (deterministické jméno `ol1n_pose_*.png`, overwrite, cache
+per běh) a `_injectPoseControlNet()` v `_prepare()` vloží do grafu
+`LoadImage → ControlNetLoader → ControlNetApplyAdvanced` mezi CLIPTextEncode
+a KSampler (synthetic klíče `__pose_*__`, stejný princip jako LoRA injekce —
+ortogonální hrany, komponují bez konfliktu). Při aktivní póze se latent
+přepne na 832×1216 (portrét bucket, šablony jsou 2:3). Strength 1.0 /
+end_percent 1.0 — slabší hodnoty prohrávaly s promptem (ověřeno).
+`selectedPoseId` se persistuje v session jako `selectedLora`.
+
 ### gen-queue — NIM async job queue (`llm.ol1n.com/nim/*`)
 
 Go služba `gen-queue` (AiStack, port 8091) obsluhuje **oba** FLUX NIM modely
