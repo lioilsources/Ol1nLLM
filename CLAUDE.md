@@ -35,6 +35,7 @@ lib/
     image_session.dart         # ImageSession persistence (modelId; legacy backendId/workflow mapping)
   services/
     comfyui_service.dart       # ComfyUI WebSocket + HTTP polling backend
+    finetune_export_service.dart   # export session → FINETUNE gallery (NAS)
     flux_kontext_nim_service.dart  # gen-queue async job queue — flux-kontext (img2img)
     flux_nim_service.dart      # gen-queue async job queue — flux-schnell (txt2img)
     image_backend.dart         # ImageBackend interface + GenEvent sealed class
@@ -48,10 +49,15 @@ lib/
 ### Společný interface (`ImageBackend`)
 
 Každý backend implementuje:
-- `generate(prompt, n)` → `Stream<GenEvent>` — txt2img
-- `edit(image, prompt, n)` → `Stream<GenEvent>` — img2img
+- `generate(prompt, n, seed)` → `Stream<GenEvent>` — txt2img
+- `edit(image, prompt, n, seed)` → `Stream<GenEvent>` — img2img
 - `follow(jobId)` → `Stream<GenEvent>` — resume přerušeného jobu
 - `interrupt()` — zrušení
+
+`seed` vlastní provider (`_newSeed()`), ne backendy — losuje se před voláním a
+ukládá na `GenNode`, takže výsledky jsou atribuovatelné/reprodukovatelné.
+ComfyUI batch sdílí jeden seed (varianty = batch index); NIM posílá `seed + i`
+pro i-tý sekvenční request.
 
 `GenEvent` je sealed class: `GenSubmitted(jobId)` → `GenQueued(pos)` → `GenRunning(step, total)` → `GenDownloading(done, total)` → `GenComplete(images)` | `GenFailed(msg)`.
 
@@ -176,6 +182,35 @@ Znovu-napojení spustí kterýkoli z těchto bodů:
 a zavolá `backend.follow(jobId)`. Čítač pokusů se nuluje při reálném progresu
 (`queued`/`running`); po vyčerpání → měkká chyba. Skutečné selhání (`GenFailed`)
 i `cancel()` se **persistují**, takže restart už mrtvý/zrušený job neobnovuje.
+
+## FINETUNE gallery export
+
+Tlačítko exportu (AppBar + per-session v draweru) posílá session (strom nodů +
+PNG) na Go backend na NAS (`FINETUNE_URL`, default `https://finetune.ol1n.com`,
+repo `finetune-gallery`), kde se výstupy hodnotí a staví LoRA datasety.
+
+**Per-node metadata**: `GenNode` od této verze snapshotuje při vzniku modelId,
+loraName, poseId, seed, negativePrompt, positivePrefix, width/height,
+steps/cfg/denoise, sampler/scheduler, createdAt, origin (`'upload'` pro foto
+roots). Sampler pole se ukládají jen pro generic-template ComfyUI modely
+(`ckptName != null`) — flux-manga a NIM mají hodnoty baked-in/konstantní,
+dohledatelné z modelId. Vše nullable → staré Hive sessions validní bez migrace.
+`retry()` přegeneruje snapshot podle aktuálního modelu (běží na aktuálním
+backendu) + nový seed.
+
+**Protokol** (`finetune_export_service.dart`) — dvoufázový, content-addressed,
+idempotentní (re-export pošle jen nové obrázky):
+1. `POST /api/ingest/manifest` — session + ready nody + per-image
+   `{id, sha256, size, idx}` → `{"needed": [sha…]}`
+2. `PUT /api/ingest/images/{sha256}` — raw PNG, retry vzorem ComfyUI uploadu
+   (3 pokusy, lineární backoff, 60 s timeout)
+3. `POST /api/ingest/sessions/{id}/finalize` → `{"images": N, "newBlobs": M}`
+
+Session ukládá `exportedAt` + `exportedImageCount`; staleness = počet ready
+obrázků ≠ exportovaný počet (ne `updatedAt`, ten se bumpá i navigací). Ikona
+v draweru: cloud_upload (neexportováno/stale) / cloud_done (aktuální) /
+progress ring. Chyby jdou přes standardní error snackbar, úspěch přes
+`state.info`.
 
 ## Persistence (Hive)
 

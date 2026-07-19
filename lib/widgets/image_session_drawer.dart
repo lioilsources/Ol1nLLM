@@ -80,6 +80,16 @@ class ImageSessionDrawer extends ConsumerWidget {
                                 fontSize: 11,
                               ),
                             ),
+                            trailing: _ExportIcon(
+                              session: session,
+                              exporting:
+                                  state.exportingSessionId == session.id,
+                              progress: state.exportProgress,
+                              enabled: state.exportingSessionId == null &&
+                                  session.readyImageCount > 0,
+                              onTap: () =>
+                                  notifier.exportSession(session.id),
+                            ),
                             onTap: () {
                               notifier.selectSession(session.id);
                               Navigator.pop(context);
@@ -104,6 +114,54 @@ class ImageSessionDrawer extends ConsumerWidget {
     if (diff == 1) return 'včera';
     final yearSuffix = dt.year != now.year ? ' ${dt.year}' : '';
     return '${dt.day}. ${dt.month}.$yearSuffix';
+  }
+}
+
+/// Per-session FINETUNE export trigger + status: upload icon (never exported
+/// or new images since), green check (up to date), or a progress ring while
+/// this session is being exported.
+class _ExportIcon extends StatelessWidget {
+  const _ExportIcon({
+    required this.session,
+    required this.exporting,
+    required this.progress,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final ImageSession session;
+  final bool exporting;
+  final double? progress;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (exporting) {
+      return SizedBox(
+        width: 40,
+        height: 40,
+        child: Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(value: progress, strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+    final upToDate = !session.isExportStale;
+    return IconButton(
+      icon: Icon(
+        upToDate ? Icons.cloud_done_outlined : Icons.cloud_upload_outlined,
+        size: 20,
+        color: upToDate ? Colors.greenAccent : AppTheme.textSecondary,
+      ),
+      tooltip: upToDate
+          ? 'Exportováno do FINETUNE gallery'
+          : 'Exportovat do FINETUNE gallery',
+      onPressed: enabled ? onTap : null,
+    );
   }
 }
 

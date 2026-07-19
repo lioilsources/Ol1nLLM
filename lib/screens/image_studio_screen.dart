@@ -47,6 +47,15 @@ class ImageStudioScreen extends ConsumerWidget {
         );
         ref.read(imageStudioProvider.notifier).clearError();
       }
+      if (next.info != null && next.info != prev?.info) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next.info!),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        ref.read(imageStudioProvider.notifier).clearInfo();
+      }
     });
 
     final state = ref.watch(imageStudioProvider);
@@ -81,6 +90,31 @@ class ImageStudioScreen extends ConsumerWidget {
               icon: const Icon(Icons.stop_circle_outlined),
               tooltip: 'Zrušit generování',
               onPressed: notifier.cancel,
+            ),
+          if (state.exportingSessionId != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    value: state.exportProgress,
+                    strokeWidth: 2,
+                  ),
+                ),
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.cloud_upload_outlined),
+              tooltip: 'Export do FINETUNE gallery',
+              onPressed: !state.isBusy &&
+                      state.activeSessionId != null &&
+                      state.nodes.any((n) =>
+                          n.status == GenStatus.ready && n.images.isNotEmpty)
+                  ? () => notifier.exportSession(state.activeSessionId!)
+                  : null,
             ),
           IconButton(
             icon: const Icon(Icons.add_photo_alternate_outlined),

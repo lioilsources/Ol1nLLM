@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show SocketException;
-import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -56,8 +55,12 @@ class FluxNimService implements ImageBackend {
   int get variantCount => 1;
 
   @override
-  Stream<GenEvent> generate({required String prompt, required int n}) async* {
-    yield* _infer(prompt: prompt, n: n);
+  Stream<GenEvent> generate({
+    required String prompt,
+    required int n,
+    required int seed,
+  }) async* {
+    yield* _infer(prompt: prompt, n: n, seed: seed);
   }
 
   @override
@@ -65,11 +68,16 @@ class FluxNimService implements ImageBackend {
     required Uint8List image,
     required String prompt,
     required int n,
+    required int seed,
   }) async* {
     yield const GenFailed('[FLUX NIM] tento model podporuje pouze txt2img. Pro img2img použijte FLUX Kontext nebo ComfyUI.');
   }
 
-  Stream<GenEvent> _infer({required String prompt, required int n}) async* {
+  Stream<GenEvent> _infer({
+    required String prompt,
+    required int n,
+    required int seed,
+  }) async* {
     final images = <Uint8List>[];
     for (var i = 0; i < n; i++) {
       var step = 'submit';
@@ -82,7 +90,9 @@ class FluxNimService implements ImageBackend {
           'width': 1024,
           'height': 1024,
           'steps': 4,
-          'seed': Random().nextInt(1 << 31),
+          // Provider-owned base seed; request i uses seed+i so each variant
+          // is distinct yet attributable to the node's stored seed.
+          'seed': seed + i,
         };
 
         final submitResp = await _client

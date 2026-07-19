@@ -6,7 +6,8 @@ DART_DEFINES = \
 	--dart-define=CF_ACCESS_CLIENT_ID=$(CF_ACCESS_CLIENT_ID) \
 	--dart-define=CF_ACCESS_CLIENT_SECRET=$(CF_ACCESS_CLIENT_SECRET) \
 	$(if $(FLUX_NIM_URL),--dart-define=FLUX_NIM_URL=$(FLUX_NIM_URL),) \
-	$(if $(COMFYUI_URL),--dart-define=COMFYUI_URL=$(COMFYUI_URL),)
+	$(if $(COMFYUI_URL),--dart-define=COMFYUI_URL=$(COMFYUI_URL),) \
+	$(if $(FINETUNE_URL),--dart-define=FINETUNE_URL=$(FINETUNE_URL),)
 
 run:
 	flutter run --release $(DART_DEFINES)

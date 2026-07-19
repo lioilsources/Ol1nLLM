@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show SocketException, WebSocket;
-import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
@@ -127,7 +126,11 @@ class ComfyUIService implements ImageBackend {
 
   // ── Public backend API ──────────────────────────────────────
   @override
-  Stream<GenEvent> generate({required String prompt, required int n}) async* {
+  Stream<GenEvent> generate({
+    required String prompt,
+    required int n,
+    required int seed,
+  }) async* {
     final pose = _activePoseAsset;
     final poseImageName = (pose != null && _preset.ckptName != null)
         ? await _ensurePoseUploaded(pose)
@@ -137,6 +140,7 @@ class ComfyUIService implements ImageBackend {
       tpl,
       prompt: prompt,
       batch: n,
+      seed: seed,
       poseImageName: poseImageName,
     );
     yield* _run(wf);
@@ -147,10 +151,17 @@ class ComfyUIService implements ImageBackend {
     required Uint8List image,
     required String prompt,
     required int n,
+    required int seed,
   }) async* {
     final imageName = await _uploadImage(image);
     final tpl = await _template(_img2imgAsset);
-    final wf = _prepare(tpl, prompt: prompt, batch: n, imageName: imageName);
+    final wf = _prepare(
+      tpl,
+      prompt: prompt,
+      batch: n,
+      seed: seed,
+      imageName: imageName,
+    );
     yield* _run(wf);
   }
 
@@ -587,11 +598,11 @@ class ComfyUIService implements ImageBackend {
     Map<String, dynamic> template, {
     required String prompt,
     required int batch,
+    required int seed,
     String? imageName,
     String? poseImageName,
   }) {
     final wf = jsonDecode(jsonEncode(template)) as Map<String, dynamic>;
-    final seed = Random().nextInt(1 << 31);
     final lora = _activeLora;
     final preset = _preset;
     final fullPrompt = preset.positivePrefix.isEmpty

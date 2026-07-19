@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
@@ -13,6 +14,7 @@ import '../models/image_model.dart';
 import '../models/image_session.dart';
 import '../models/pose_template.dart';
 import '../services/comfyui_service.dart';
+import '../services/finetune_export_service.dart';
 import '../services/flux_kontext_nim_service.dart';
 import '../services/flux_nim_service.dart';
 import '../services/image_backend.dart';
@@ -51,11 +53,19 @@ class ImageStudioState {
   /// Last error surfaced to the user (for a one-shot snackbar).
   final String? error;
 
+  /// One-shot info message (e.g. export success snackbar).
+  final String? info;
+
   /// All persisted sessions (sorted newest-first).
   final List<ImageSession> sessions;
 
   /// ID of the session currently being edited (null = unsaved new session).
   final String? activeSessionId;
+
+  /// Session currently being exported to the FINETUNE gallery, and blob-upload
+  /// progress in 0..1 (null = manifest phase / indeterminate).
+  final String? exportingSessionId;
+  final double? exportProgress;
 
   const ImageStudioState({
     this.nodes = const [],
@@ -66,8 +76,11 @@ class ImageStudioState {
     this.selectedLora,
     this.selectedPoseId,
     this.error,
+    this.info,
     this.sessions = const [],
     this.activeSessionId,
+    this.exportingSessionId,
+    this.exportProgress,
   });
 
   ImageModelSpec get model => imageModelById(modelId);
@@ -116,9 +129,14 @@ class ImageStudioState {
     bool clearPose = false,
     String? error,
     bool clearError = false,
+    String? info,
+    bool clearInfo = false,
     List<ImageSession>? sessions,
     String? activeSessionId,
     bool clearActiveSessionId = false,
+    String? exportingSessionId,
+    double? exportProgress,
+    bool clearExporting = false,
   }) => ImageStudioState(
     nodes: nodes ?? this.nodes,
     currentNodeId: currentNodeId ?? this.currentNodeId,
@@ -130,10 +148,17 @@ class ImageStudioState {
     selectedLora: clearLora ? null : (selectedLora ?? this.selectedLora),
     selectedPoseId: clearPose ? null : (selectedPoseId ?? this.selectedPoseId),
     error: clearError ? null : (error ?? this.error),
+    info: clearInfo ? null : (info ?? this.info),
     sessions: sessions ?? this.sessions,
     activeSessionId: clearActiveSessionId
         ? null
         : (activeSessionId ?? this.activeSessionId),
+    exportingSessionId: clearExporting
+        ? null
+        : (exportingSessionId ?? this.exportingSessionId),
+    exportProgress: clearExporting
+        ? null
+        : (exportProgress ?? this.exportProgress),
   );
 }
 
@@ -186,6 +211,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   final ComfyUIService _comfyui = ComfyUIService();
   final FluxNimService _fluxNim = FluxNimService();
   final FluxKontextNimService _fluxKontextNim = FluxKontextNimService();
+  final FinetuneExportService _finetuneExport = FinetuneExportService();
 
   final Map<String, StreamSubscription<GenEvent>> _activeSubs = {};
   final Map<String, Completer<void>> _activeCompleters = {};
@@ -376,6 +402,12 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
 
   Future<void> _save() async {
     if (state.nodes.isEmpty) return;
+    // Carry export bookkeeping over from the stored session — _save() rebuilds
+    // the session object, and losing exportedAt would mark every saved session
+    // as never-exported.
+    final existing = state.sessions
+        .where((s) => s.id == state.activeSessionId)
+        .firstOrNull;
     final session = ImageSession.create(
       id: state.activeSessionId,
       nodes: state.nodes,
@@ -383,6 +415,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       selectedLora: state.selectedLora,
       selectedPoseId: state.selectedPoseId,
       modelId: state.modelId,
+      exportedAt: existing?.exportedAt,
+      exportedImageCount: existing?.exportedImageCount,
     );
     final updated = [
       session,
@@ -403,6 +437,61 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
 
   void clearError() => state = state.copyWith(clearError: true);
 
+  void clearInfo() => state = state.copyWith(clearInfo: true);
+
+  /// Export a session to the FINETUNE gallery backend. One export at a time;
+  /// success stamps exportedAt/exportedImageCount on the session (persisted),
+  /// failure surfaces through the standard error snackbar.
+  Future<void> exportSession(String sessionId) async {
+    if (state.exportingSessionId != null) return;
+    // Exporting the live session: persist first so the stored session object
+    // reflects the newest nodes.
+    if (sessionId == state.activeSessionId) await _save();
+    final session =
+        state.sessions.where((s) => s.id == sessionId).firstOrNull;
+    if (session == null) return;
+    final imageCount = session.readyImageCount;
+    if (imageCount == 0) {
+      state = state.copyWith(error: 'Není co exportovat – žádné hotové obrázky');
+      return;
+    }
+    state = state.copyWith(exportingSessionId: sessionId, clearError: true);
+    try {
+      final summary = await _finetuneExport.exportSession(
+        session,
+        onProgress: (done, total) {
+          if (!mounted) return;
+          state = state.copyWith(
+            exportProgress: total == 0 ? 1.0 : done / total,
+          );
+        },
+      );
+      if (!mounted) return;
+      final updated = [
+        for (final s in state.sessions)
+          s.id == sessionId
+              ? s.copyWithExport(
+                  exportedAt: DateTime.now(),
+                  exportedImageCount: imageCount,
+                )
+              : s,
+      ];
+      state = state.copyWith(
+        sessions: updated,
+        clearExporting: true,
+        info: 'Exportováno ${summary.images} obrázků '
+            '(${summary.newBlobs} nových)',
+      );
+      await _persistSessions(updated);
+    } catch (e) {
+      if (!mounted) return;
+      state = state.copyWith(
+        clearExporting: true,
+        error: e.toString().replaceFirst('Exception: ', ''),
+      );
+    }
+  }
+
   void setLora(String? loraName) {
     _comfyui.setLora(loraName);
     state = state.copyWith(selectedLora: loraName, clearLora: loraName == null);
@@ -422,12 +511,62 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     state = state.copyWith(availableLoras: loras);
   }
 
+  /// Fresh base seed for one generation round. Owned by the provider (not the
+  /// backends) so it can be persisted on the node before the request starts.
+  static int _newSeed() => Random().nextInt(1 << 31);
+
+  /// Build a generating node with a snapshot of everything the request will
+  /// actually use. Sampler/latent fields are recorded only for generic-template
+  /// ComfyUI models (ckptName != null) — dedicated workflows (flux-manga) and
+  /// NIM services use baked-in/constant values recoverable from [modelId], so
+  /// echoing preset defaults here would record values that were never applied.
+  GenNode _createNodeWithMeta({
+    String? id,
+    String? parentId,
+    String? sourceImageId,
+    required String prompt,
+    required int seed,
+    required bool isImg2img,
+  }) {
+    final spec = state.model;
+    final preset = spec.preset;
+    final patched = preset?.ckptName != null;
+    // Poses apply to txt2img only — edit() ignores them (see ComfyUIService).
+    final poseId = isImg2img ? null : state.selectedPoseId;
+    final poseActive = poseId != null && patched;
+    return GenNode.create(
+      id: id,
+      parentId: parentId,
+      sourceImageId: sourceImageId,
+      prompt: prompt,
+      modelId: spec.id,
+      loraName: state.selectedLora,
+      poseId: poseId,
+      seed: seed,
+      negativePrompt: patched && preset!.negativePrompt.isNotEmpty
+          ? preset.negativePrompt
+          : null,
+      positivePrefix:
+          preset != null && preset.positivePrefix.isNotEmpty
+              ? preset.positivePrefix
+              : null,
+      width: patched ? (poseActive ? kPoseWidth : preset!.width) : null,
+      height: patched ? (poseActive ? kPoseHeight : preset!.height) : null,
+      steps: patched ? preset!.steps : null,
+      cfg: patched ? preset!.cfg : null,
+      denoise: patched ? (isImg2img ? preset!.img2imgDenoise : 1.0) : null,
+      samplerName: patched ? preset!.samplerName : null,
+      scheduler: patched ? preset!.scheduler : null,
+    );
+  }
+
   /// Round 1: [kVariantCount] text→image candidates from [prompt].
   Future<void> generate(String prompt) async {
     final text = prompt.trim();
     if (text.isEmpty) return;
     _interruptRetries = 0;
-    final node = GenNode.create(prompt: text);
+    final seed = _newSeed();
+    final node = _createNodeWithMeta(prompt: text, seed: seed, isImg2img: false);
     state = state.copyWith(
       nodes: [...state.nodes, node],
       currentNodeId: node.id,
@@ -436,7 +575,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     );
     await _runAsync(
       node.id,
-      () => _backend.generate(prompt: text, n: _backend.variantCount),
+      () => _backend.generate(prompt: text, n: _backend.variantCount, seed: seed),
     );
   }
 
@@ -448,7 +587,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   Future<void> startFromImage(Uint8List bytes) async {
     final dir = await _dirFuture;
     final image = await GenImage.save(bytes, dir);
-    final node = GenNode.create(prompt: '').copyWith(
+    final node = GenNode.create(prompt: '', origin: 'upload').copyWith(
       status: GenStatus.ready,
       images: [image],
     );
@@ -467,10 +606,13 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     final base = _imageById(state.selectedImageId);
     if (text.isEmpty || base == null) return;
     _interruptRetries = 0;
-    final node = GenNode.create(
+    final seed = _newSeed();
+    final node = _createNodeWithMeta(
       parentId: state.currentNodeId,
       sourceImageId: base.id,
       prompt: text,
+      seed: seed,
+      isImg2img: true,
     );
     state = state.copyWith(
       nodes: [...state.nodes, node],
@@ -484,27 +626,39 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         image: base.bytes,
         prompt: text,
         n: _backend.variantCount,
+        seed: seed,
       ),
     );
   }
 
   /// Re-run a failed (or finished) node with its original prompt.
+  ///
+  /// The retry runs against the *current* model/LoRA/pose (they may have
+  /// changed since the node was created), so the node's metadata snapshot is
+  /// rebuilt too — keeping it truthful — while id/parent links and any old
+  /// images are preserved.
   Future<void> retry(String nodeId) async {
     final node = _nodeById(nodeId);
     if (node == null || node.status == GenStatus.generating) return;
     _interruptRetries = 0;
-    _patch(
-      nodeId,
-      (n) => n.copyWith(
-        status: GenStatus.generating,
-        clearError: true,
-        clearProgress: true,
-      ),
-    );
+    final seed = _newSeed();
+    final refreshed = _createNodeWithMeta(
+      id: node.id,
+      parentId: node.parentId,
+      sourceImageId: node.sourceImageId,
+      prompt: node.prompt,
+      seed: seed,
+      isImg2img: !node.isRoot,
+    ).copyWith(images: node.images);
+    _patch(nodeId, (_) => refreshed);
     if (node.isRoot) {
       await _runAsync(
         nodeId,
-        () => _backend.generate(prompt: node.prompt, n: _backend.variantCount),
+        () => _backend.generate(
+          prompt: node.prompt,
+          n: _backend.variantCount,
+          seed: seed,
+        ),
       );
     } else {
       final base = _imageById(node.sourceImageId);
@@ -522,6 +676,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           image: base.bytes,
           prompt: node.prompt,
           n: _backend.variantCount,
+          seed: seed,
         ),
       );
     }
@@ -739,6 +894,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     _comfyui.dispose();
     _fluxNim.dispose();
     _fluxKontextNim.dispose();
+    _finetuneExport.dispose();
     super.dispose();
   }
 }

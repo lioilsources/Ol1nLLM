@@ -92,6 +92,36 @@ class GenNode {
   /// provider can call [ImageBackend.follow] after an app suspension/restart.
   final String? jobId;
 
+  // ── Generation metadata (nullable — nodes written before this existed
+  //    stay valid; NIM models leave preset-derived fields null because their
+  //    values are service constants recoverable from [modelId]) ──
+  /// [ImageModelSpec.id] this node was actually generated with. Session-level
+  /// modelId only reflects the *latest* choice, so it's snapshotted here.
+  final String? modelId;
+  final String? loraName;
+  final String? poseId;
+
+  /// Base RNG seed passed to the backend. ComfyUI batches share one seed
+  /// (variants differ by batch index); NIM sends seed+i for request i.
+  final int? seed;
+  final String? negativePrompt;
+
+  /// Score-tag/style prefix prepended to [prompt] at generation time.
+  /// Effective positive prompt = '$positivePrefix, $prompt'.
+  final String? positivePrefix;
+  final int? width;
+  final int? height;
+  final int? steps;
+  final double? cfg;
+  final double? denoise;
+  final String? samplerName;
+  final String? scheduler;
+  final DateTime? createdAt;
+
+  /// 'upload' for user-photo roots (never training outputs), null/'generated'
+  /// for model outputs. Only persisted when 'upload'.
+  final String? origin;
+
   const GenNode({
     required this.id,
     required this.parentId,
@@ -103,20 +133,65 @@ class GenNode {
     this.progress,
     this.progressLabel,
     this.jobId,
+    this.modelId,
+    this.loraName,
+    this.poseId,
+    this.seed,
+    this.negativePrompt,
+    this.positivePrefix,
+    this.width,
+    this.height,
+    this.steps,
+    this.cfg,
+    this.denoise,
+    this.samplerName,
+    this.scheduler,
+    this.createdAt,
+    this.origin,
   });
 
   bool get isRoot => parentId == null;
 
   factory GenNode.create({
+    String? id,
     String? parentId,
     String? sourceImageId,
     required String prompt,
+    String? modelId,
+    String? loraName,
+    String? poseId,
+    int? seed,
+    String? negativePrompt,
+    String? positivePrefix,
+    int? width,
+    int? height,
+    int? steps,
+    double? cfg,
+    double? denoise,
+    String? samplerName,
+    String? scheduler,
+    String? origin,
   }) => GenNode(
-    id: _uuid.v4(),
+    id: id ?? _uuid.v4(),
     parentId: parentId,
     sourceImageId: sourceImageId,
     prompt: prompt,
     status: GenStatus.generating,
+    modelId: modelId,
+    loraName: loraName,
+    poseId: poseId,
+    seed: seed,
+    negativePrompt: negativePrompt,
+    positivePrefix: positivePrefix,
+    width: width,
+    height: height,
+    steps: steps,
+    cfg: cfg,
+    denoise: denoise,
+    samplerName: samplerName,
+    scheduler: scheduler,
+    createdAt: DateTime.now(),
+    origin: origin,
   );
 
   Map<String, dynamic> toJson() => {
@@ -128,6 +203,21 @@ class GenNode {
     'images': images.map((i) => i.toJson()).toList(),
     if (error != null) 'error': error,
     if (jobId != null) 'jobId': jobId,
+    if (modelId != null) 'modelId': modelId,
+    if (loraName != null) 'loraName': loraName,
+    if (poseId != null) 'poseId': poseId,
+    if (seed != null) 'seed': seed,
+    if (negativePrompt != null) 'negativePrompt': negativePrompt,
+    if (positivePrefix != null) 'positivePrefix': positivePrefix,
+    if (width != null) 'width': width,
+    if (height != null) 'height': height,
+    if (steps != null) 'steps': steps,
+    if (cfg != null) 'cfg': cfg,
+    if (denoise != null) 'denoise': denoise,
+    if (samplerName != null) 'samplerName': samplerName,
+    if (scheduler != null) 'scheduler': scheduler,
+    if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
+    if (origin == 'upload') 'origin': origin,
   };
 
   factory GenNode.fromJson(Map<String, dynamic> json) {
@@ -151,6 +241,23 @@ class GenNode {
           ? (json['error'] as String? ?? 'Generování přerušeno')
           : null,
       jobId: jobId,
+      modelId: json['modelId'] as String?,
+      loraName: json['loraName'] as String?,
+      poseId: json['poseId'] as String?,
+      seed: json['seed'] as int?,
+      negativePrompt: json['negativePrompt'] as String?,
+      positivePrefix: json['positivePrefix'] as String?,
+      width: json['width'] as int?,
+      height: json['height'] as int?,
+      steps: json['steps'] as int?,
+      cfg: (json['cfg'] as num?)?.toDouble(),
+      denoise: (json['denoise'] as num?)?.toDouble(),
+      samplerName: json['samplerName'] as String?,
+      scheduler: json['scheduler'] as String?,
+      createdAt: json['createdAt'] == null
+          ? null
+          : DateTime.tryParse(json['createdAt'] as String),
+      origin: json['origin'] as String?,
     );
   }
 
@@ -178,5 +285,20 @@ class GenNode {
     progress: clearProgress ? null : (progress ?? this.progress),
     progressLabel: progressLabel ?? this.progressLabel,
     jobId: clearJobId ? null : (jobId ?? this.jobId),
+    modelId: modelId,
+    loraName: loraName,
+    poseId: poseId,
+    seed: seed,
+    negativePrompt: negativePrompt,
+    positivePrefix: positivePrefix,
+    width: width,
+    height: height,
+    steps: steps,
+    cfg: cfg,
+    denoise: denoise,
+    samplerName: samplerName,
+    scheduler: scheduler,
+    createdAt: createdAt,
+    origin: origin,
   );
 }

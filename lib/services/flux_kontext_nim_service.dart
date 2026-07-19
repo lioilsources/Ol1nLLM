@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show SocketException;
-import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
@@ -60,7 +59,11 @@ class FluxKontextNimService implements ImageBackend {
   /// FLUX.1-Kontext is an img2img-only model — the NIM API requires an `image`
   /// field in every request. txt2img is not supported.
   @override
-  Stream<GenEvent> generate({required String prompt, required int n}) async* {
+  Stream<GenEvent> generate({
+    required String prompt,
+    required int n,
+    required int seed,
+  }) async* {
     yield const GenFailed(
       '[FLUX Kontext] tento model vyžaduje vstupní obrázek (img2img pouze). '
       'Pro generování z textu použijte FLUX Schnell nebo ComfyUI.',
@@ -98,11 +101,13 @@ class FluxKontextNimService implements ImageBackend {
     required Uint8List image,
     required String prompt,
     required int n,
+    required int seed,
   }) async* {
     yield* _infer(
       prompt: prompt,
       imageB64: base64Encode(_snapImage(image)),
       n: n,
+      seed: seed,
     );
   }
 
@@ -110,6 +115,7 @@ class FluxKontextNimService implements ImageBackend {
     required String prompt,
     required String imageB64,
     required int n,
+    required int seed,
   }) async* {
     final images = <Uint8List>[];
     for (var i = 0; i < n; i++) {
@@ -124,7 +130,9 @@ class FluxKontextNimService implements ImageBackend {
           'aspect_ratio': 'match_input_image',
           'cfg_scale': 3.5,
           'steps': 30,
-          'seed': Random().nextInt(1 << 31),
+          // Provider-owned base seed; request i uses seed+i so each variant
+          // is distinct yet attributable to the node's stored seed.
+          'seed': seed + i,
         };
 
         debugPrint('[kontext] #${i + 1}/$n submit → POST /nim/flux-kontext/v1/infer');

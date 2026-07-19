@@ -14,6 +14,8 @@ class ImageSession {
     this.selectedPoseId,
     required this.modelId,
     required this.updatedAt,
+    this.exportedAt,
+    this.exportedImageCount,
   });
 
   final String id;
@@ -27,6 +29,12 @@ class ImageSession {
   final String modelId;
   final DateTime updatedAt;
 
+  /// When this session was last exported to the FINETUNE gallery, and how many
+  /// ready images the export covered. Staleness is judged against the image
+  /// count, not [updatedAt] — that bumps on mere navigation too.
+  final DateTime? exportedAt;
+  final int? exportedImageCount;
+
   String? get thumbnailFilePath {
     for (final n in nodes) {
       if (n.status == GenStatus.ready && n.images.isNotEmpty) {
@@ -36,6 +44,35 @@ class ImageSession {
     return null;
   }
 
+  /// Images an export would cover (ready nodes only).
+  int get readyImageCount {
+    var count = 0;
+    for (final n in nodes) {
+      if (n.status == GenStatus.ready) count += n.images.length;
+    }
+    return count;
+  }
+
+  /// True when there is something new to export.
+  bool get isExportStale =>
+      exportedAt == null || exportedImageCount != readyImageCount;
+
+  ImageSession copyWithExport({
+    required DateTime exportedAt,
+    required int exportedImageCount,
+  }) => ImageSession(
+    id: id,
+    title: title,
+    nodes: nodes,
+    currentNodeId: currentNodeId,
+    selectedLora: selectedLora,
+    selectedPoseId: selectedPoseId,
+    modelId: modelId,
+    updatedAt: updatedAt,
+    exportedAt: exportedAt,
+    exportedImageCount: exportedImageCount,
+  );
+
   factory ImageSession.create({
     String? id,
     required List<GenNode> nodes,
@@ -43,6 +80,8 @@ class ImageSession {
     String? selectedLora,
     String? selectedPoseId,
     required String modelId,
+    DateTime? exportedAt,
+    int? exportedImageCount,
   }) {
     GenNode? root;
     for (final n in nodes) {
@@ -67,6 +106,8 @@ class ImageSession {
       selectedPoseId: selectedPoseId,
       modelId: modelId,
       updatedAt: DateTime.now(),
+      exportedAt: exportedAt,
+      exportedImageCount: exportedImageCount,
     );
   }
 
@@ -79,6 +120,8 @@ class ImageSession {
     if (selectedPoseId != null) 'selectedPoseId': selectedPoseId,
     'modelId': modelId,
     'updatedAt': updatedAt.toIso8601String(),
+    if (exportedAt != null) 'exportedAt': exportedAt!.toIso8601String(),
+    if (exportedImageCount != null) 'exportedImageCount': exportedImageCount,
   };
 
   factory ImageSession.fromJson(Map<String, dynamic> json) => ImageSession(
@@ -96,6 +139,10 @@ class ImageSession {
           json['workflow'] as String?,
         ),
     updatedAt: DateTime.parse(json['updatedAt'] as String),
+    exportedAt: json['exportedAt'] == null
+        ? null
+        : DateTime.tryParse(json['exportedAt'] as String),
+    exportedImageCount: json['exportedImageCount'] as int?,
   );
 
   /// Sessions written before the unified model picker stored a backendId +
