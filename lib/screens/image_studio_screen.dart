@@ -1225,7 +1225,7 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
   bool get _hasRoot => widget.state.nodes.isNotEmpty;
 
   String get _hint {
-    if (!_hasRoot) return 'Describe an image to generate…';
+    if (!_hasRoot) return 'Describe an image… (ALL CAPS = negative prompt)';
     if (_isRefineMode) return 'Describe the change to the selected image…';
     return 'Pick an image to refine, or tap ＋ for a new one';
   }

@@ -13,6 +13,7 @@ import '../models/gen_node.dart';
 import '../models/image_model.dart';
 import '../models/image_session.dart';
 import '../models/pose_template.dart';
+import '../models/prompt_negatives.dart';
 import '../services/comfyui_service.dart';
 import '../services/finetune_export_service.dart';
 import '../services/flux_kontext_nim_service.dart';
@@ -527,6 +528,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     required String prompt,
     required int seed,
     required bool isImg2img,
+    String userNegative = '',
   }) {
     final spec = state.model;
     final preset = spec.preset;
@@ -534,6 +536,13 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     // Poses apply to txt2img only — edit() ignores them (see ComfyUIService).
     final poseId = isImg2img ? null : state.selectedPoseId;
     final poseActive = poseId != null && patched;
+    // Effective negative = preset negative + user ALL-CAPS tags. Recorded only
+    // for generic-template models — elsewhere no negative is actually applied.
+    final negative = patched
+        ? [preset!.negativePrompt, userNegative]
+            .where((s) => s.isNotEmpty)
+            .join(', ')
+        : '';
     return GenNode.create(
       id: id,
       parentId: parentId,
@@ -543,9 +552,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       loraName: state.selectedLora,
       poseId: poseId,
       seed: seed,
-      negativePrompt: patched && preset!.negativePrompt.isNotEmpty
-          ? preset.negativePrompt
-          : null,
+      negativePrompt: negative.isNotEmpty ? negative : null,
       positivePrefix:
           preset != null && preset.positivePrefix.isNotEmpty
               ? preset.positivePrefix
@@ -560,13 +567,21 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     );
   }
 
-  /// Round 1: [kVariantCount] text→image candidates from [prompt].
+  /// Round 1: [kVariantCount] text→image candidates from [prompt]. ALL-CAPS
+  /// tags/words are routed to the negative prompt (see [splitPromptNegatives]);
+  /// the node keeps the original text so retry/UI stay faithful to the input.
   Future<void> generate(String prompt) async {
     final text = prompt.trim();
     if (text.isEmpty) return;
     _interruptRetries = 0;
+    final parts = splitPromptNegatives(text);
     final seed = _newSeed();
-    final node = _createNodeWithMeta(prompt: text, seed: seed, isImg2img: false);
+    final node = _createNodeWithMeta(
+      prompt: text,
+      seed: seed,
+      isImg2img: false,
+      userNegative: parts.negative,
+    );
     state = state.copyWith(
       nodes: [...state.nodes, node],
       currentNodeId: node.id,
@@ -575,7 +590,12 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     );
     await _runAsync(
       node.id,
-      () => _backend.generate(prompt: text, n: _backend.variantCount, seed: seed),
+      () => _backend.generate(
+        prompt: parts.positive,
+        n: _backend.variantCount,
+        seed: seed,
+        negativePrompt: parts.negative.isEmpty ? null : parts.negative,
+      ),
     );
   }
 
@@ -606,6 +626,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     final base = _imageById(state.selectedImageId);
     if (text.isEmpty || base == null) return;
     _interruptRetries = 0;
+    final parts = splitPromptNegatives(text);
     final seed = _newSeed();
     final node = _createNodeWithMeta(
       parentId: state.currentNodeId,
@@ -613,6 +634,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       prompt: text,
       seed: seed,
       isImg2img: true,
+      userNegative: parts.negative,
     );
     state = state.copyWith(
       nodes: [...state.nodes, node],
@@ -624,9 +646,10 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       node.id,
       () => _backend.edit(
         image: base.bytes,
-        prompt: text,
+        prompt: parts.positive,
         n: _backend.variantCount,
         seed: seed,
+        negativePrompt: parts.negative.isEmpty ? null : parts.negative,
       ),
     );
   }
@@ -641,6 +664,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     final node = _nodeById(nodeId);
     if (node == null || node.status == GenStatus.generating) return;
     _interruptRetries = 0;
+    final parts = splitPromptNegatives(node.prompt);
     final seed = _newSeed();
     final refreshed = _createNodeWithMeta(
       id: node.id,
@@ -649,15 +673,17 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       prompt: node.prompt,
       seed: seed,
       isImg2img: !node.isRoot,
+      userNegative: parts.negative,
     ).copyWith(images: node.images);
     _patch(nodeId, (_) => refreshed);
     if (node.isRoot) {
       await _runAsync(
         nodeId,
         () => _backend.generate(
-          prompt: node.prompt,
+          prompt: parts.positive,
           n: _backend.variantCount,
           seed: seed,
+          negativePrompt: parts.negative.isEmpty ? null : parts.negative,
         ),
       );
     } else {
@@ -674,9 +700,10 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         nodeId,
         () => _backend.edit(
           image: base.bytes,
-          prompt: node.prompt,
+          prompt: parts.positive,
           n: _backend.variantCount,
           seed: seed,
+          negativePrompt: parts.negative.isEmpty ? null : parts.negative,
         ),
       );
     }

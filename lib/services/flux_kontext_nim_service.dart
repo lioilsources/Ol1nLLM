@@ -63,6 +63,7 @@ class FluxKontextNimService implements ImageBackend {
     required String prompt,
     required int n,
     required int seed,
+    String? negativePrompt,
   }) async* {
     yield const GenFailed(
       '[FLUX Kontext] tento model vyžaduje vstupní obrázek (img2img pouze). '
@@ -96,12 +97,14 @@ class FluxKontextNimService implements ImageBackend {
     return Uint8List.fromList(img.encodePng(resized));
   }
 
+  // FLUX Kontext has no negative conditioning — [negativePrompt] is ignored.
   @override
   Stream<GenEvent> edit({
     required Uint8List image,
     required String prompt,
     required int n,
     required int seed,
+    String? negativePrompt,
   }) async* {
     yield* _infer(
       prompt: prompt,

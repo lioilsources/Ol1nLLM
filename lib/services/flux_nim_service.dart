@@ -54,11 +54,13 @@ class FluxNimService implements ImageBackend {
   @override
   int get variantCount => 1;
 
+  // FLUX Schnell has no negative conditioning — [negativePrompt] is ignored.
   @override
   Stream<GenEvent> generate({
     required String prompt,
     required int n,
     required int seed,
+    String? negativePrompt,
   }) async* {
     yield* _infer(prompt: prompt, n: n, seed: seed);
   }
@@ -69,6 +71,7 @@ class FluxNimService implements ImageBackend {
     required String prompt,
     required int n,
     required int seed,
+    String? negativePrompt,
   }) async* {
     yield const GenFailed('[FLUX NIM] tento model podporuje pouze txt2img. Pro img2img použijte FLUX Kontext nebo ComfyUI.');
   }
