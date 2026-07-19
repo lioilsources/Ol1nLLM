@@ -130,6 +130,7 @@ class ComfyUIService implements ImageBackend {
     required String prompt,
     required int n,
     required int seed,
+    String? negativePrompt,
   }) async* {
     final pose = _activePoseAsset;
     final poseImageName = (pose != null && _preset.ckptName != null)
@@ -142,6 +143,7 @@ class ComfyUIService implements ImageBackend {
       batch: n,
       seed: seed,
       poseImageName: poseImageName,
+      userNegative: negativePrompt,
     );
     yield* _run(wf);
   }
@@ -152,6 +154,7 @@ class ComfyUIService implements ImageBackend {
     required String prompt,
     required int n,
     required int seed,
+    String? negativePrompt,
   }) async* {
     final pose = _activePoseAsset;
     final poseImageName = (pose != null && _preset.ckptName != null)
@@ -166,6 +169,7 @@ class ComfyUIService implements ImageBackend {
       seed: seed,
       imageName: imageName,
       poseImageName: poseImageName,
+      userNegative: negativePrompt,
     );
     yield* _run(wf);
   }
@@ -606,6 +610,7 @@ class ComfyUIService implements ImageBackend {
     required int seed,
     String? imageName,
     String? poseImageName,
+    String? userNegative,
   }) {
     final wf = jsonDecode(jsonEncode(template)) as Map<String, dynamic>;
     final lora = _activeLora;
@@ -613,6 +618,13 @@ class ComfyUIService implements ImageBackend {
     final fullPrompt = preset.positivePrefix.isEmpty
         ? prompt
         : '${preset.positivePrefix}, $prompt';
+    // Preset negative + user ALL-CAPS negatives. Only applied where the
+    // template carries a __NEGATIVE__ sentinel (generic SDXL workflows);
+    // dedicated flux workflows run cfg=1 and have no usable negative input.
+    final fullNegative = [
+      preset.negativePrompt,
+      if (userNegative != null) userNegative,
+    ].where((s) => s.trim().isNotEmpty).join(', ');
 
     // Inject a LoraLoader and re-route model/clip references. Works for both
     // Flux (UNETLoader + DualCLIPLoader) and Pony (CheckpointLoaderSimple).
@@ -664,7 +676,7 @@ class ComfyUIService implements ImageBackend {
         if (value is! String) return;
         var v = value;
         if (v.contains('__PROMPT__')) v = v.replaceAll('__PROMPT__', fullPrompt);
-        if (v.contains('__NEGATIVE__')) v = v.replaceAll('__NEGATIVE__', preset.negativePrompt);
+        if (v.contains('__NEGATIVE__')) v = v.replaceAll('__NEGATIVE__', fullNegative);
         if (v.contains('__CKPT__') && preset.ckptName != null) v = v.replaceAll('__CKPT__', preset.ckptName!);
         if (imageName != null && v.contains('__IMAGE__')) v = v.replaceAll('__IMAGE__', imageName);
         if (!identical(v, value)) inputs[key] = v;

@@ -112,6 +112,19 @@ tagy) se skládá v Dartu. LoRA se filtrují podle `LoraFamily` (heuristika:
 'flux' v názvu). ComfyUI URL jde přepnout přes `--dart-define=COMFYUI_URL=...`
 (např. LAN `http://192.168.88.66:8188` pro testování bez CF).
 
+**Negativní prompty (`lib/models/prompt_negatives.dart`)**: UI má jediné
+vstupní pole — tagy/slova psané celé VELKÝMI písmeny (≥2 velká písmena, žádné
+malé; `8K`/`I` zůstávají pozitivní) se přesunou do negativního promptu
+(lowercase), po sobě jdoucí velká slova tvoří jeden tag (`BAD HANDS` → `bad
+hands`). Split dělá `splitPromptNegatives()` v provideru
+(generate/refine/retry); `node.prompt` ukládá původní text, takže retry split
+zopakuje. Negativ jde do backendů přes `negativePrompt` parametr
+`generate()`/`edit()`: ComfyUI generic template ho spojí s preset negativem do
+`__NEGATIVE__`, flux-manga (cfg 1, bez sentinelu) a NIM backendy ho ignorují
+(velká písmena se z pozitivního promptu odstraní i tam). Snapshot
+`GenNode.negativePrompt` ukládá efektivní (preset + user) negativ jen tam, kde
+se skutečně aplikuje.
+
 **ControlNet pózy (`lib/models/pose_template.dart`)**: 8 OpenPose skeleton
 šablon v `assets/poses/` (512×768). Výběr přes `_PoseChip` (grid bottom
 sheet), viditelný jen pro modely s `supportsPose: true` (SDXL rodina — sd15

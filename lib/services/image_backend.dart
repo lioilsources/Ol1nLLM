@@ -87,10 +87,16 @@ abstract class ImageBackend {
   /// and persisted on the node so results are attributable/reproducible.
   /// ComfyUI applies it to the whole batch; NIM backends use seed+i for the
   /// i-th sequential request.
+  ///
+  /// [negativePrompt] carries user-supplied negative tags (the ALL-CAPS part
+  /// of the input, see `splitPromptNegatives`). Backends that support negative
+  /// conditioning append it to their preset negative; FLUX backends (cfg 1 /
+  /// no negative conditioning) ignore it.
   Stream<GenEvent> generate({
     required String prompt,
     required int n,
     required int seed,
+    String? negativePrompt,
   });
 
   Stream<GenEvent> edit({
@@ -98,6 +104,7 @@ abstract class ImageBackend {
     required String prompt,
     required int n,
     required int seed,
+    String? negativePrompt,
   });
 
   /// Re-attach to an already-submitted job (by the [GenSubmitted.jobId] a
