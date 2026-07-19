@@ -609,30 +609,29 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     await _save();
   }
 
-  /// Effective img2img prompt: prompts of the ancestors (root→parent) that
-  /// were generated with the *same model* as the current one, then [text].
-  /// Other models' prompts are skipped so their style (score tags, edit
-  /// instructions) can't leak into an incompatible model; empty prompts
-  /// (photo roots) and exact duplicates are dropped. Nodes keep only their
-  /// own [text] — the chain is recomposed at request time.
+  /// Effective img2img prompt: [text] first, then ancestor prompts walking
+  /// parent→root — newest to oldest. Earlier tokens carry more CLIP weight,
+  /// so the new instruction has the highest priority and can override what
+  /// older rounds asked for. Only ancestors generated with the *same model*
+  /// as the current one are included (other models' prompt styles are
+  /// incompatible); empty prompts (photo roots) and exact duplicates are
+  /// dropped, a duplicate keeping its newest (earliest) position. Nodes keep
+  /// only their own [text] — the chain is recomposed at request time.
   String _chainedPrompt(String? parentId, String text) {
     final byId = {for (final n in state.nodes) n.id: n};
-    final ancestors = <GenNode>[];
+    final parts = <String>[];
+    final seen = <String>{};
+    final own = text.trim();
+    if (own.isNotEmpty && seen.add(own)) parts.add(own);
     GenNode? node = parentId == null ? null : byId[parentId];
     while (node != null) {
-      ancestors.insert(0, node);
+      final p = node.prompt.trim();
+      if (p.isNotEmpty && node.modelId == state.modelId && seen.add(p)) {
+        parts.add(p);
+      }
       final pid = node.parentId;
       node = pid == null ? null : byId[pid];
     }
-    final parts = <String>[];
-    final seen = <String>{};
-    for (final n in ancestors) {
-      final p = n.prompt.trim();
-      if (p.isEmpty || n.modelId != state.modelId) continue;
-      if (seen.add(p)) parts.add(p);
-    }
-    final own = text.trim();
-    if (own.isNotEmpty && seen.add(own)) parts.add(own);
     return parts.join(', ');
   }
 

@@ -60,13 +60,16 @@ ComfyUI batch sdílí jeden seed (varianty = batch index); NIM posílá `seed + 
 pro i-tý sekvenční request.
 
 **Prompt chaining (img2img)**: efektivní prompt pro `edit()` skládá provider
-(`_chainedPrompt()` v `refine()`/`retry()`): prompty předků root→parent, ale
-**jen z nodů se stejným `modelId`** jako aktuální model (jiný styl promptů by
-byl nekompatibilní), + vlastní text na konci. Prázdné prompty (foto rooty) a
-přesné duplicity se přeskočí, join `', '`. `GenNode.prompt` drží **jen vlastní
-text** — chain se přepočítává při requestu (a je deterministicky odvoditelný ze
-stromu, žádné nové persistované pole). Backendy prompt jen propouštějí, takže
-chaining funguje shodně pro ComfyUI i flux-kontext.
+(`_chainedPrompt()` v `refine()`/`retry()`): **vlastní text první**, pak
+prompty předků parent→root (od nejnovějšího k nejstaršímu) — dřívější tokeny
+mají větší CLIP váhu, takže nová instrukce může overridnout starší kola.
+Řetězí se **jen nody se stejným `modelId`** jako aktuální model (jiný styl
+promptů by byl nekompatibilní). Prázdné prompty (foto rooty) a přesné
+duplicity se přeskočí (duplicita drží novější pozici), join `', '`.
+`GenNode.prompt` drží **jen vlastní text** — chain se přepočítává při
+requestu (a je deterministicky odvoditelný ze stromu, žádné nové persistované
+pole). Backendy prompt jen propouštějí, takže chaining funguje shodně pro
+ComfyUI i flux-kontext.
 
 `GenEvent` je sealed class: `GenSubmitted(jobId)` → `GenQueued(pos)` → `GenRunning(step, total)` → `GenDownloading(done, total)` → `GenComplete(images)` | `GenFailed(msg)`.
 
