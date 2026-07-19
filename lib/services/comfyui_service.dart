@@ -153,6 +153,10 @@ class ComfyUIService implements ImageBackend {
     required int n,
     required int seed,
   }) async* {
+    final pose = _activePoseAsset;
+    final poseImageName = (pose != null && _preset.ckptName != null)
+        ? await _ensurePoseUploaded(pose)
+        : null;
     final imageName = await _uploadImage(image);
     final tpl = await _template(_img2imgAsset);
     final wf = _prepare(
@@ -161,6 +165,7 @@ class ComfyUIService implements ImageBackend {
       batch: n,
       seed: seed,
       imageName: imageName,
+      poseImageName: poseImageName,
     );
     yield* _run(wf);
   }
@@ -684,8 +689,13 @@ class ComfyUIService implements ImageBackend {
             inputs['cfg'] = preset.cfg;
             inputs['sampler_name'] = preset.samplerName;
             inputs['scheduler'] = preset.scheduler;
-            inputs['denoise'] =
-                imageName == null ? 1.0 : preset.img2imgDenoise;
+            // Pose during an edit needs high denoise, otherwise the source
+            // structure overrides the ControlNet skeleton.
+            inputs['denoise'] = imageName == null
+                ? 1.0
+                : (poseImageName != null
+                    ? kPoseEditDenoise
+                    : preset.img2imgDenoise);
           }
       }
       if (inputs.containsKey('seed')) inputs['seed'] = seed;

@@ -531,8 +531,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     final spec = state.model;
     final preset = spec.preset;
     final patched = preset?.ckptName != null;
-    // Poses apply to txt2img only — edit() ignores them (see ComfyUIService).
-    final poseId = isImg2img ? null : state.selectedPoseId;
+    final poseId = state.selectedPoseId;
     final poseActive = poseId != null && patched;
     return GenNode.create(
       id: id,
@@ -550,11 +549,21 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           preset != null && preset.positivePrefix.isNotEmpty
               ? preset.positivePrefix
               : null,
-      width: patched ? (poseActive ? kPoseWidth : preset!.width) : null,
-      height: patched ? (poseActive ? kPoseHeight : preset!.height) : null,
+      // img2img latents come from VAEEncode of the source image, so recorded
+      // dimensions stay null (source-derived) even when a pose is active.
+      width: patched && !isImg2img
+          ? (poseActive ? kPoseWidth : preset!.width)
+          : null,
+      height: patched && !isImg2img
+          ? (poseActive ? kPoseHeight : preset!.height)
+          : null,
       steps: patched ? preset!.steps : null,
       cfg: patched ? preset!.cfg : null,
-      denoise: patched ? (isImg2img ? preset!.img2imgDenoise : 1.0) : null,
+      denoise: patched
+          ? (isImg2img
+              ? (poseActive ? kPoseEditDenoise : preset!.img2imgDenoise)
+              : 1.0)
+          : null,
       samplerName: patched ? preset!.samplerName : null,
       scheduler: patched ? preset!.scheduler : null,
     );
@@ -600,6 +609,33 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     await _save();
   }
 
+  /// Effective img2img prompt: prompts of the ancestors (root→parent) that
+  /// were generated with the *same model* as the current one, then [text].
+  /// Other models' prompts are skipped so their style (score tags, edit
+  /// instructions) can't leak into an incompatible model; empty prompts
+  /// (photo roots) and exact duplicates are dropped. Nodes keep only their
+  /// own [text] — the chain is recomposed at request time.
+  String _chainedPrompt(String? parentId, String text) {
+    final byId = {for (final n in state.nodes) n.id: n};
+    final ancestors = <GenNode>[];
+    GenNode? node = parentId == null ? null : byId[parentId];
+    while (node != null) {
+      ancestors.insert(0, node);
+      final pid = node.parentId;
+      node = pid == null ? null : byId[pid];
+    }
+    final parts = <String>[];
+    final seen = <String>{};
+    for (final n in ancestors) {
+      final p = n.prompt.trim();
+      if (p.isEmpty || n.modelId != state.modelId) continue;
+      if (seen.add(p)) parts.add(p);
+    }
+    final own = text.trim();
+    if (own.isNotEmpty && seen.add(own)) parts.add(own);
+    return parts.join(', ');
+  }
+
   /// Round 2+: [kVariantCount] edits of the selected image.
   Future<void> refine(String prompt) async {
     final text = prompt.trim();
@@ -607,6 +643,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     if (text.isEmpty || base == null) return;
     _interruptRetries = 0;
     final seed = _newSeed();
+    final chained = _chainedPrompt(state.currentNodeId, text);
     final node = _createNodeWithMeta(
       parentId: state.currentNodeId,
       sourceImageId: base.id,
@@ -624,7 +661,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       node.id,
       () => _backend.edit(
         image: base.bytes,
-        prompt: text,
+        prompt: chained,
         n: _backend.variantCount,
         seed: seed,
       ),
@@ -670,11 +707,14 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         );
         return;
       }
+      // Recomposed against the *current* model, consistent with the metadata
+      // snapshot rebuild above.
+      final chained = _chainedPrompt(node.parentId, node.prompt);
       await _runAsync(
         nodeId,
         () => _backend.edit(
           image: base.bytes,
-          prompt: node.prompt,
+          prompt: chained,
           n: _backend.variantCount,
           seed: seed,
         ),
