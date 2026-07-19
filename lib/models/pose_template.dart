@@ -22,6 +22,11 @@ class PoseTemplate {
 const kPoseWidth = 832;
 const kPoseHeight = 1216;
 
+/// Denoise used for img2img when a pose is active. The preset's img2imgDenoise
+/// (~0.72) keeps too much of the source structure for limbs to move; 0.9 lets
+/// the ControlNet pose win while retaining the source's palette/identity.
+const kPoseEditDenoise = 0.9;
+
 const kPoseTemplates = <PoseTemplate>[
   PoseTemplate(id: 'ol1', label: 'Póza 1', asset: 'assets/poses/ol1.png'),
   PoseTemplate(id: 'ol2', label: 'Póza 2', asset: 'assets/poses/ol2.png'),

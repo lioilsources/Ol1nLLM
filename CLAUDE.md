@@ -59,6 +59,18 @@ ukládá na `GenNode`, takže výsledky jsou atribuovatelné/reprodukovatelné.
 ComfyUI batch sdílí jeden seed (varianty = batch index); NIM posílá `seed + i`
 pro i-tý sekvenční request.
 
+**Prompt chaining (img2img)**: efektivní prompt pro `edit()` skládá provider
+(`_chainedPrompt()` v `refine()`/`retry()`): **vlastní text první**, pak
+prompty předků parent→root (od nejnovějšího k nejstaršímu) — dřívější tokeny
+mají větší CLIP váhu, takže nová instrukce může overridnout starší kola.
+Řetězí se **jen nody se stejným `modelId`** jako aktuální model (jiný styl
+promptů by byl nekompatibilní). Prázdné prompty (foto rooty) a přesné
+duplicity se přeskočí (duplicita drží novější pozici), join `', '`.
+`GenNode.prompt` drží **jen vlastní text** — chain se přepočítává při
+requestu (a je deterministicky odvoditelný ze stromu, žádné nové persistované
+pole). Backendy prompt jen propouštějí, takže chaining funguje shodně pro
+ComfyUI i flux-kontext.
+
 `GenEvent` je sealed class: `GenSubmitted(jobId)` → `GenQueued(pos)` → `GenRunning(step, total)` → `GenDownloading(done, total)` → `GenComplete(images)` | `GenFailed(msg)`.
 
 `GenInterrupted(jobId)` je **neterminální** událost: signalizuje přechodný výpadek (iOS suspend / síťový blip), kdy job na serveru dál žije. Provider nechá node ve stavu `generating`, zachová `jobId` (a uloží ho do Hive) a po krátkém backoffu se znovu napojí přes `follow()`. Viz „Resume po iOS suspenzi".
@@ -103,14 +115,17 @@ tagy) se skládá v Dartu. LoRA se filtrují podle `LoraFamily` (heuristika:
 **ControlNet pózy (`lib/models/pose_template.dart`)**: 8 OpenPose skeleton
 šablon v `assets/poses/` (512×768). Výběr přes `_PoseChip` (grid bottom
 sheet), viditelný jen pro modely s `supportsPose: true` (SDXL rodina — sd15
-ne, openpose-xinsir ControlNet je SDXL-only). Aplikuje se **jen na txt2img**;
-`edit()` pózu ignoruje. Šablona se při generování nahraje přes
+ne, openpose-xinsir ControlNet je SDXL-only). Aplikuje se na **txt2img i
+img2img** — při `edit()` s aktivní pózou se denoise zvedne z presetového
+`img2imgDenoise` (~0.72) na `kPoseEditDenoise` (0.9), jinak by struktura
+zdrojového obrázku pózu přebila. Šablona se při generování nahraje přes
 `/upload/image` (deterministické jméno `ol1n_pose_*.png`, overwrite, cache
 per běh) a `_injectPoseControlNet()` v `_prepare()` vloží do grafu
 `LoadImage → ControlNetLoader → ControlNetApplyAdvanced` mezi CLIPTextEncode
 a KSampler (synthetic klíče `__pose_*__`, stejný princip jako LoRA injekce —
-ortogonální hrany, komponují bez konfliktu). Při aktivní póze se latent
-přepne na 832×1216 (portrét bucket, šablony jsou 2:3). Strength 1.0 /
+ortogonální hrany, komponují bez konfliktu). Při aktivní póze se txt2img
+latent přepne na 832×1216 (portrét bucket, šablony jsou 2:3); img2img latent
+zůstává odvozený ze zdrojového obrázku (VAEEncode). Strength 1.0 /
 end_percent 1.0 — slabší hodnoty prohrávaly s promptem (ověřeno).
 `selectedPoseId` se persistuje v session jako `selectedLora`.
 
