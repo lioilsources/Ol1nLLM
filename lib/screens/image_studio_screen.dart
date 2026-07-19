@@ -960,7 +960,7 @@ class _PoseChip extends StatelessWidget {
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Text(
-                'Aplikuje se jen na nové generování (ne na úpravy).',
+                'Aplikuje se na generování i úpravy (při úpravě s vyšším denoise).',
                 style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
               ),
             ),

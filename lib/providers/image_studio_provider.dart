@@ -533,8 +533,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     final spec = state.model;
     final preset = spec.preset;
     final patched = preset?.ckptName != null;
-    // Poses apply to txt2img only — edit() ignores them (see ComfyUIService).
-    final poseId = isImg2img ? null : state.selectedPoseId;
+    final poseId = state.selectedPoseId;
     final poseActive = poseId != null && patched;
     // Effective negative = preset negative + user ALL-CAPS tags. Recorded only
     // for generic-template models — elsewhere no negative is actually applied.
@@ -557,11 +556,21 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           preset != null && preset.positivePrefix.isNotEmpty
               ? preset.positivePrefix
               : null,
-      width: patched ? (poseActive ? kPoseWidth : preset!.width) : null,
-      height: patched ? (poseActive ? kPoseHeight : preset!.height) : null,
+      // img2img latents come from VAEEncode of the source image, so recorded
+      // dimensions stay null (source-derived) even when a pose is active.
+      width: patched && !isImg2img
+          ? (poseActive ? kPoseWidth : preset!.width)
+          : null,
+      height: patched && !isImg2img
+          ? (poseActive ? kPoseHeight : preset!.height)
+          : null,
       steps: patched ? preset!.steps : null,
       cfg: patched ? preset!.cfg : null,
-      denoise: patched ? (isImg2img ? preset!.img2imgDenoise : 1.0) : null,
+      denoise: patched
+          ? (isImg2img
+              ? (poseActive ? kPoseEditDenoise : preset!.img2imgDenoise)
+              : 1.0)
+          : null,
       samplerName: patched ? preset!.samplerName : null,
       scheduler: patched ? preset!.scheduler : null,
     );
@@ -620,6 +629,37 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     await _save();
   }
 
+  /// Effective img2img prompt: [text] first, then ancestor prompts walking
+  /// parent→root — newest to oldest. Earlier tokens carry more CLIP weight,
+  /// so the new instruction has the highest priority and can override what
+  /// older rounds asked for. Only ancestors generated with the *same model*
+  /// as the current one are included (other models' prompt styles are
+  /// incompatible); empty prompts (photo roots) and exact duplicates are
+  /// dropped, a duplicate keeping its newest (earliest) position. Nodes keep
+  /// only their own [text] — the chain is recomposed at request time.
+  ///
+  /// ALL-CAPS negative tags are stripped from every segment ([text] and each
+  /// ancestor prompt) via [splitPromptNegatives], so the chained positive never
+  /// carries negatives; the caller passes the current text's negatives to the
+  /// backend separately.
+  String _chainedPrompt(String? parentId, String text) {
+    final byId = {for (final n in state.nodes) n.id: n};
+    final parts = <String>[];
+    final seen = <String>{};
+    final own = splitPromptNegatives(text).positive.trim();
+    if (own.isNotEmpty && seen.add(own)) parts.add(own);
+    GenNode? node = parentId == null ? null : byId[parentId];
+    while (node != null) {
+      final p = splitPromptNegatives(node.prompt).positive.trim();
+      if (p.isNotEmpty && node.modelId == state.modelId && seen.add(p)) {
+        parts.add(p);
+      }
+      final pid = node.parentId;
+      node = pid == null ? null : byId[pid];
+    }
+    return parts.join(', ');
+  }
+
   /// Round 2+: [kVariantCount] edits of the selected image.
   Future<void> refine(String prompt) async {
     final text = prompt.trim();
@@ -628,6 +668,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     _interruptRetries = 0;
     final parts = splitPromptNegatives(text);
     final seed = _newSeed();
+    final chained = _chainedPrompt(state.currentNodeId, text);
     final node = _createNodeWithMeta(
       parentId: state.currentNodeId,
       sourceImageId: base.id,
@@ -646,7 +687,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       node.id,
       () => _backend.edit(
         image: base.bytes,
-        prompt: parts.positive,
+        prompt: chained,
         n: _backend.variantCount,
         seed: seed,
         negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -696,11 +737,14 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         );
         return;
       }
+      // Recomposed against the *current* model, consistent with the metadata
+      // snapshot rebuild above.
+      final chained = _chainedPrompt(node.parentId, node.prompt);
       await _runAsync(
         nodeId,
         () => _backend.edit(
           image: base.bytes,
-          prompt: parts.positive,
+          prompt: chained,
           n: _backend.variantCount,
           seed: seed,
           negativePrompt: parts.negative.isEmpty ? null : parts.negative,
