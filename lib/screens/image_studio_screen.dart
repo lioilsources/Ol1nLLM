@@ -1075,12 +1075,16 @@ class _PoseChip extends StatelessWidget {
 class _ModelChip extends StatelessWidget {
   const _ModelChip({
     required this.modelId,
+    required this.models,
     required this.needsTxt2Img,
     required this.needsImg2Img,
     required this.onChanged,
   });
 
   final String modelId;
+
+  /// Models installed on the server (see [ImageStudioState.availableModels]).
+  final List<ImageModelSpec> models;
 
   /// True when the next send would be a fresh text→image generation.
   final bool needsTxt2Img;
@@ -1118,9 +1122,9 @@ class _ModelChip extends StatelessWidget {
             Flexible(
               child: ListView.builder(
                 shrinkWrap: true,
-                itemCount: kImageModels.length,
+                itemCount: models.length,
                 itemBuilder: (_, i) {
-                  final spec = kImageModels[i];
+                  final spec = models[i];
                   final isSel = spec.id == modelId;
                   final usable = _isUsable(spec);
                   final hint = usable
@@ -1365,6 +1369,7 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                 children: [
                   _ModelChip(
                     modelId: spec.id,
+                    models: widget.state.availableModels,
                     needsTxt2Img: !_hasRoot,
                     needsImg2Img: _isRefineMode,
                     onChanged: (id) =>

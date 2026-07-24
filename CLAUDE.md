@@ -103,14 +103,31 @@ Workflow jsou JSON assety v `assets/comfyui/`, patchované před odesláním (`_
 **Registr modelů (`lib/models/image_model.dart`)**: UI má jeden model picker
 (`_ModelChip` bottom sheet); `ImageModelSpec.id` (persistuje se v session jako
 `modelId`) určuje backend (`ImageBackendKind`) i ComfyUI preset. SDXL-rodina
-(pony, juggernaut-xl, illustrious-xl, atomix-pony-anime, sd15) jede na
-generických template `sdxl_txt2img/sdxl_img2img.api.json` se sentinely
+(pony, juggernaut-xl, juggernaut-xl-lightning, illustrious-xl,
+atomix-pony-anime, sd15) jede na generických template
+`sdxl_txt2img/sdxl_img2img.api.json` se sentinely
 `__CKPT__` / `__NEGATIVE__`; sampler/steps/cfg/rozměry patchuje `_prepare()`
 z `ComfyPreset`. Flux-manga má dedikované JSONy (UNETLoader graf, hodnoty
 baked-in, `ckptName == null` ⇒ sampler se nepatchuje). Positive prefix (score
 tagy) se skládá v Dartu. LoRA se filtrují podle `LoraFamily` (heuristika:
 'flux' v názvu). ComfyUI URL jde přepnout přes `--dart-define=COMFYUI_URL=...`
 (např. LAN `http://192.168.88.66:8188` pro testování bez CF).
+
+**Katalog ze serveru** (`_loadServerCatalog()` v provideru, jednou při startu):
+`ComfyUiService.fetchLoras()` / `fetchCheckpoints()` čtou
+`GET /object_info/{LoraLoader,CheckpointLoaderSimple}` a berou options
+combo-widgetu. LoRA seznam je tím pádem plně dynamický; checkpointy jen
+**prořezávají** kurátorský `kImageModels` — `imageModelsFor()` zahodí ComfyUI
+model, jehož `ckptName` na serveru není, takže picker nenabídne něco, co spadne
+až při enqueue. Prázdný seznam = „neznámo" (offline / chyba fetche) ⇒ ukáže se
+vše jako dřív; aktivní model (`keepId`) se nefiltruje nikdy, aby session
+s odinstalovaným checkpointem měla koherentní výběr.
+
+**Nový model na serveru se v appce neobjeví sám** — musí dostat
+`ImageModelSpec` v `kImageModels`, protože ze jména `.safetensors` nejde
+odvodit sampler/steps/cfg/negativ ani rodinu LoRA. Např.
+juggernaut-xl-lightning (distilovaný 4-step ckpt) potřebuje 6 kroků a cfg 2.0
+(`dpmpp_sde`/`karras`) — s generickými 30/6.0 by dal smetí.
 
 **Negativní prompty (`lib/models/prompt_negatives.dart`)**: UI má jediné
 vstupní pole — tagy/slova psané celé VELKÝMI písmeny (≥2 velká písmena, žádné

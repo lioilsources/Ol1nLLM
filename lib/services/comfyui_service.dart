@@ -73,20 +73,26 @@ class ComfyUIService implements ImageBackend {
   String get _txt2imgAsset => _preset.txt2imgAsset;
   String get _img2imgAsset => _preset.img2imgAsset;
 
-  Future<List<String>> fetchLoras() async {
+  Future<List<String>> fetchLoras() =>
+      _fetchComboOptions('LoraLoader', 'lora_name');
+
+  /// Checkpoints installed on the server. Used to hide models whose .safetensors
+  /// is gone; an empty result (offline / error) means "unknown", not "none".
+  Future<List<String>> fetchCheckpoints() =>
+      _fetchComboOptions('CheckpointLoaderSimple', 'ckpt_name');
+
+  /// Reads one combo-widget's option list out of `/object_info/{node}`. ComfyUI
+  /// nests it as `{node: {input: {required: {field: [[…options], {…meta}]}}}}` —
+  /// the per-node endpoint keeps this cheap (the full /object_info is megabytes).
+  Future<List<String>> _fetchComboOptions(String node, String field) async {
     try {
       final resp = await _client
-          .get(
-            Uri.parse('$_baseUrl/object_info/LoraLoader'),
-            headers: _authHeaders,
-          )
+          .get(Uri.parse('$_baseUrl/object_info/$node'), headers: _authHeaders)
           .timeout(_pollTimeout);
       if (resp.statusCode != 200) return const [];
       final json = jsonDecode(resp.body) as Map<String, dynamic>;
       final names =
-          ((json['LoraLoader']?['input']?['required']?['lora_name'] as List?)
-                      ?.first
-                  as List?)
+          ((json[node]?['input']?['required']?[field] as List?)?.first as List?)
               ?.cast<String>();
       return names ?? const [];
     } catch (_) {

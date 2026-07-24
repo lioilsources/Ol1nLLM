@@ -43,7 +43,14 @@ class ImageStudioState {
   final String modelId;
 
   /// LoRAs available on the ComfyUI server (unfiltered).
+  ///
+  /// This and [availableCheckpoints] are app-scoped, not session-scoped: every
+  /// site that rebuilds the state from scratch (new/select/delete session,
+  /// restore) has to carry both over by hand, or the chips silently empty out.
   final List<String> availableLoras;
+
+  /// Checkpoints installed on the ComfyUI server. Empty = not (yet) known.
+  final List<String> availableCheckpoints;
 
   /// Currently selected LoRA name, or null for no LoRA.
   final String? selectedLora;
@@ -74,6 +81,7 @@ class ImageStudioState {
     this.selectedImageId,
     this.modelId = kDefaultImageModelId,
     this.availableLoras = const [],
+    this.availableCheckpoints = const [],
     this.selectedLora,
     this.selectedPoseId,
     this.error,
@@ -85,6 +93,11 @@ class ImageStudioState {
   });
 
   ImageModelSpec get model => imageModelById(modelId);
+
+  /// Models offerable in the picker — curated registry minus entries whose
+  /// checkpoint is missing on the server (the active one always stays).
+  List<ImageModelSpec> get availableModels =>
+      imageModelsFor(availableCheckpoints, keepId: modelId);
 
   /// LoRAs compatible with the active model's family.
   List<String> get filteredLoras =>
@@ -124,6 +137,7 @@ class ImageStudioState {
     bool clearSelected = false,
     String? modelId,
     List<String>? availableLoras,
+    List<String>? availableCheckpoints,
     String? selectedLora,
     bool clearLora = false,
     String? selectedPoseId,
@@ -146,6 +160,7 @@ class ImageStudioState {
         : (selectedImageId ?? this.selectedImageId),
     modelId: modelId ?? this.modelId,
     availableLoras: availableLoras ?? this.availableLoras,
+    availableCheckpoints: availableCheckpoints ?? this.availableCheckpoints,
     selectedLora: clearLora ? null : (selectedLora ?? this.selectedLora),
     selectedPoseId: clearPose ? null : (selectedPoseId ?? this.selectedPoseId),
     error: clearError ? null : (error ?? this.error),
@@ -167,7 +182,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     with WidgetsBindingObserver {
   ImageStudioNotifier() : super(const ImageStudioState()) {
     WidgetsBinding.instance.addObserver(this);
-    _loadLoras();
+    unawaited(_loadServerCatalog());
     unawaited(_init());
     unawaited(_deleteLegacyBox());
   }
@@ -301,6 +316,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       sessions: state.sessions,
       modelId: state.modelId,
       availableLoras: state.availableLoras,
+      availableCheckpoints: state.availableCheckpoints,
       selectedLora: state.selectedLora,
       selectedPoseId: state.selectedPoseId,
     );
@@ -322,6 +338,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       selectedPoseId: poseId,
       modelId: session.modelId,
       availableLoras: state.availableLoras,
+      availableCheckpoints: state.availableCheckpoints,
     );
   }
 
@@ -352,12 +369,14 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           selectedPoseId: poseId,
           modelId: next.modelId,
           availableLoras: state.availableLoras,
+          availableCheckpoints: state.availableCheckpoints,
         );
       } else {
         state = ImageStudioState(
           sessions: const [],
           modelId: state.modelId,
           availableLoras: state.availableLoras,
+          availableCheckpoints: state.availableCheckpoints,
         );
       }
     } else {
@@ -391,6 +410,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           selectedPoseId: poseId,
           modelId: latest.modelId,
           availableLoras: state.availableLoras,
+          availableCheckpoints: state.availableCheckpoints,
         );
         _resumeInFlightJob();
       } else {
@@ -507,9 +527,28 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     );
   }
 
-  Future<void> _loadLoras() async {
+  /// What the ComfyUI server currently has installed, read once at startup:
+  /// LoRAs feed the LoRA chip, checkpoints prune the model picker. Both fetches
+  /// swallow their errors and yield an empty list, which every consumer reads
+  /// as "unknown" — an offline start keeps the full registry rather than an
+  /// empty picker.
+  ///
+  /// Sequential, and each result is published on its own: LoRAs must not share
+  /// a fate with the checkpoint list. Under one `Future.wait` a hiccup on the
+  /// second request (two parallel CF Access handshakes are enough) delayed or
+  /// took down the LoRA chip that used to load on its own.
+  /// Each result is awaited into a local before touching [state]: in
+  /// `state = state.copyWith(x: await f())` Dart evaluates the receiver first,
+  /// so the write would land on the pre-await snapshot and silently undo
+  /// whatever _load() restored while the request was in flight.
+  Future<void> _loadServerCatalog() async {
     final loras = await _comfyui.fetchLoras();
     state = state.copyWith(availableLoras: loras);
+    debugPrint('ComfyUI catalog: ${loras.length} LoRAs');
+
+    final checkpoints = await _comfyui.fetchCheckpoints();
+    state = state.copyWith(availableCheckpoints: checkpoints);
+    debugPrint('ComfyUI catalog: ${checkpoints.length} checkpoints');
   }
 
   /// Fresh base seed for one generation round. Owned by the provider (not the

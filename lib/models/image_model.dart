@@ -165,6 +165,33 @@ const kImageModels = <ImageModelSpec>[
     ),
   ),
   ImageModelSpec(
+    id: 'juggernaut-xl-lightning',
+    label: 'Juggernaut XL Lightning',
+    icon: Icons.speed,
+    color: Color(0xFF56B6C2),
+    kind: ImageBackendKind.comfyUi,
+    txt2img: true,
+    img2img: true,
+    loraFamily: LoraFamily.sdxl,
+    supportsPose: true,
+    // Distilled 4-step checkpoint: RunDiffusion's own guidance is 4–6 steps at
+    // cfg 1.5–2. 6 steps keeps img2img usable (denoise 0.72 ⇒ ~4 real steps)
+    // and cfg 2.0 is the top of the range, where the negative still bites —
+    // at cfg 1 it would be ignored outright.
+    preset: ComfyPreset(
+      txt2imgAsset: _sdxlTxt2img,
+      img2imgAsset: _sdxlImg2img,
+      ckptName: 'Juggernaut-XL-Lightning_4Steps.safetensors',
+      negativePrompt:
+          'bad quality, worst quality, low quality, jpeg artifacts, blurry, '
+          'watermark, deformed, disfigured, bad anatomy, bad hands',
+      steps: 6,
+      cfg: 2.0,
+      samplerName: 'dpmpp_sde',
+      scheduler: 'karras',
+    ),
+  ),
+  ImageModelSpec(
     id: 'illustrious-xl',
     label: 'Illustrious XL',
     icon: Icons.draw_outlined,
@@ -238,6 +265,33 @@ ImageModelSpec imageModelById(String id) => kImageModels.firstWhere(
   orElse: () =>
       kImageModels.firstWhere((m) => m.id == kDefaultImageModelId),
 );
+
+/// The subset of [kImageModels] the server can actually run: a ComfyUI entry
+/// whose checkpoint is not installed is dropped, so the picker never offers a
+/// model that would fail at enqueue time. Presets stay curated in Dart — a new
+/// checkpoint on the server shows up only once it gets an [ImageModelSpec]
+/// here, because the filename alone says nothing about sampler/steps/cfg.
+///
+/// An empty [installedCheckpoints] means the list is unknown (offline, or the
+/// fetch failed) — then everything stays visible, i.e. the pre-fetch behaviour.
+/// [keepId] is never filtered out, so a session restored with a since-removed
+/// model still shows its own entry as the selected one.
+List<ImageModelSpec> imageModelsFor(
+  List<String> installedCheckpoints, {
+  String? keepId,
+}) {
+  if (installedCheckpoints.isEmpty) return kImageModels;
+  final installed = installedCheckpoints.toSet();
+  return [
+    for (final m in kImageModels)
+      // preset == null (NIM) and ckptName == null (flux-manga's UNETLoader
+      // graph) load no checkpoint, so nothing to check.
+      if (m.id == keepId ||
+          m.preset?.ckptName == null ||
+          installed.contains(m.preset!.ckptName))
+        m,
+  ];
+}
 
 /// Name heuristic: FLUX-trained LoRAs on the server all carry 'flux' in the
 /// filename ('flux-lora-…', 'sldr_flux_…'); everything else is SDXL/Pony.
