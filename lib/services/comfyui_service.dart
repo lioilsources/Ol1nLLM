@@ -50,6 +50,7 @@ class ComfyUIService implements ImageBackend {
 
   String? _activeLora;
   String? _activePoseAsset;
+  bool _autoPose = false;
   ComfyPreset _preset = imageModelById(kDefaultImageModelId).preset!;
 
   /// Pose asset → server-side filename, so each skeleton uploads at most once
@@ -58,12 +59,33 @@ class ComfyUIService implements ImageBackend {
 
   void setLora(String? loraName) => _activeLora = loraName;
   void setPose(String? poseAsset) => _activePoseAsset = poseAsset;
+
+  /// Whether img2img should carry the source image's own structure over via a
+  /// depth→ControlNet splice, so the user doesn't have to describe the pose.
+  /// Set to the active model's `supportsPose` (the ControlNet is SDXL-only). A
+  /// pose picked from a template ([setPose]) overrides this — see [edit].
+  ///
+  /// Depth (not OpenPose) for the source path on purpose: a stick-figure
+  /// skeleton drops the facing direction, so refining a front-facing photo can
+  /// flip the subject around; the depth map keeps orientation, proportions and
+  /// stance while the prompt still restyles freely (verified on the server).
+  void setAutoPose(bool enabled) => _autoPose = enabled;
   void setPreset(ComfyPreset preset) => _preset = preset;
 
-  // OpenPose ControlNet applied when a pose template is active. The model is
-  // SDXL-only — callers must not set a pose for non-SDXL presets.
+  // OpenPose ControlNet for the template-override path (pre-made skeletons).
+  // SDXL-only — callers must not set a template pose for non-SDXL presets.
   static const _openPoseControlNet =
       'controlnet-openpose-sdxl-xinsir.safetensors';
+
+  // Auto source-structure path: DepthAnything v2 → xinsir Union ControlNet in
+  // depth mode. 0.7 keeps the source stance without pinning it so hard the
+  // prompt can't restyle (verified end-to-end on the server).
+  static const _depthPreprocessorCkpt = 'depth_anything_v2_vitl.pth';
+  static const _depthResolution = 768;
+  static const _unionControlNet =
+      'controlnet-union-sdxl-promax-xinsir.safetensors';
+  static const _depthStrength = 0.7;
+
   // Full strength for the whole schedule: at 0.9/0.8 the xinsir ControlNet
   // lost against prompts that imply a different pose (verified on server).
   static const _poseStrength = 1.0;
@@ -167,6 +189,10 @@ class ComfyUIService implements ImageBackend {
         ? await _ensurePoseUploaded(pose)
         : null;
     final imageName = await _uploadImage(image);
+    // Carry the source's own structure over via depth ControlNet, unless a
+    // template pose was picked (that overrides) — see [setAutoPose].
+    final sourceDepth =
+        poseImageName == null && _autoPose && _preset.ckptName != null;
     final tpl = await _template(_img2imgAsset);
     final wf = _prepare(
       tpl,
@@ -175,6 +201,7 @@ class ComfyUIService implements ImageBackend {
       seed: seed,
       imageName: imageName,
       poseImageName: poseImageName,
+      sourceDepth: sourceDepth,
       userNegative: negativePrompt,
     );
     yield* _run(wf);
@@ -609,6 +636,30 @@ class ComfyUIService implements ImageBackend {
   /// Sampler/latent parameters are patched from the active [ComfyPreset] only
   /// for generic-template models (ckptName != null) — dedicated workflows like
   /// flux-manga keep their baked-in values.
+  /// Test seam: exposes the private [_prepare] graph transform so tests can
+  /// assert LoRA/pose injection against the real workflow assets. Set the
+  /// preset/lora/pose via the public setters first.
+  @visibleForTesting
+  Map<String, dynamic> prepareForTest(
+    Map<String, dynamic> template, {
+    required String prompt,
+    required int batch,
+    required int seed,
+    String? imageName,
+    String? poseImageName,
+    bool sourceDepth = false,
+    String? userNegative,
+  }) => _prepare(
+    template,
+    prompt: prompt,
+    batch: batch,
+    seed: seed,
+    imageName: imageName,
+    poseImageName: poseImageName,
+    sourceDepth: sourceDepth,
+    userNegative: userNegative,
+  );
+
   Map<String, dynamic> _prepare(
     Map<String, dynamic> template, {
     required String prompt,
@@ -616,6 +667,7 @@ class ComfyUIService implements ImageBackend {
     required int seed,
     String? imageName,
     String? poseImageName,
+    bool sourceDepth = false,
     String? userNegative,
   }) {
     final wf = jsonDecode(jsonEncode(template)) as Map<String, dynamic>;
@@ -665,11 +717,15 @@ class ComfyUIService implements ImageBackend {
       }
     }
 
-    // Splice an OpenPose ControlNet between the prompt encoders and the
-    // sampler. Orthogonal to the LoRA injection above: LoRA rewires
-    // model/clip edges, this rewires positive/negative conditioning edges.
+    // Splice a ControlNet between the prompt encoders and the sampler.
+    // Orthogonal to the LoRA injection above: LoRA rewires model/clip edges,
+    // this rewires positive/negative conditioning edges. A picked template
+    // pose (OpenPose skeleton) wins; otherwise img2img keeps the source's own
+    // structure via a depth map. Mutually exclusive — only one runs.
     if (poseImageName != null) {
       _injectPoseControlNet(wf, poseImageName);
+    } else if (sourceDepth && imageName != null) {
+      _injectSourceDepthControlNet(wf, imageName);
     }
 
     for (final entry in wf.values) {
@@ -722,12 +778,86 @@ class ComfyUIService implements ImageBackend {
     return wf;
   }
 
-  // ── ControlNet pose injection ───────────────────────────────
-  // Splices LoadImage → ControlNetLoader → ControlNetApplyAdvanced between
-  // the CLIPTextEncode outputs and the sampler. Reads the sampler's current
-  // positive/negative refs instead of hard-coding node ids, so it stays
-  // template-agnostic like the sentinel patching.
+  // ── ControlNet injection ────────────────────────────────────
+  // Two flavours splice a ControlNet between the CLIPTextEncode outputs and
+  // the sampler, sharing [_spliceControlNet] for the sampler lookup + edge
+  // rewiring (template-agnostic, like the sentinel patching):
+  //   • template pose  — a pre-made OpenPose skeleton, fed straight in
+  //   • source depth   — a depth map derived from the img2img source photo
+
+  /// Template-override path: a pre-skeletonised OpenPose image → xinsir CN.
   void _injectPoseControlNet(Map<String, dynamic> wf, String poseImageName) {
+    wf['__pose_image__'] = {
+      'class_type': 'LoadImage',
+      '_meta': {'title': 'Pose: $poseImageName'},
+      'inputs': {'image': poseImageName, 'upload': 'image'},
+    };
+    wf['__pose_cn__'] = {
+      'class_type': 'ControlNetLoader',
+      '_meta': {'title': 'OpenPose ControlNet'},
+      'inputs': {'control_net_name': _openPoseControlNet},
+    };
+    _spliceControlNet(
+      wf,
+      controlNet: ['__pose_cn__', 0],
+      controlImage: ['__pose_image__', 0],
+      strength: _poseStrength,
+    );
+  }
+
+  /// Auto img2img path: DepthAnything v2 on the source photo → xinsir Union CN
+  /// in depth mode. Keeps the source's stance/orientation without the user
+  /// describing it; [setPose] overrides this. [sourceImageName] is the already
+  /// uploaded img2img source — loaded again here so the injector stays
+  /// independent of which node the template wires the source through.
+  void _injectSourceDepthControlNet(
+    Map<String, dynamic> wf,
+    String sourceImageName,
+  ) {
+    wf['__depth_src__'] = {
+      'class_type': 'LoadImage',
+      '_meta': {'title': 'Depth source: $sourceImageName'},
+      'inputs': {'image': sourceImageName, 'upload': 'image'},
+    };
+    wf['__depth_pre__'] = {
+      'class_type': 'DepthAnythingV2Preprocessor',
+      '_meta': {'title': 'Depth map from source'},
+      'inputs': {
+        'image': ['__depth_src__', 0],
+        'ckpt_name': _depthPreprocessorCkpt,
+        'resolution': _depthResolution,
+      },
+    };
+    wf['__depth_cn__'] = {
+      'class_type': 'ControlNetLoader',
+      '_meta': {'title': 'Union ControlNet'},
+      'inputs': {'control_net_name': _unionControlNet},
+    };
+    wf['__depth_type__'] = {
+      'class_type': 'SetUnionControlNetType',
+      '_meta': {'title': 'Union type: depth'},
+      'inputs': {
+        'control_net': ['__depth_cn__', 0],
+        'type': 'depth',
+      },
+    };
+    _spliceControlNet(
+      wf,
+      controlNet: ['__depth_type__', 0],
+      controlImage: ['__depth_pre__', 0],
+      strength: _depthStrength,
+    );
+  }
+
+  /// Inserts a ControlNetApplyAdvanced reading the sampler's current
+  /// positive/negative conditioning, then rewires the sampler through it. No-op
+  /// if the graph has no KSampler with List positive/negative refs.
+  void _spliceControlNet(
+    Map<String, dynamic> wf, {
+    required List<dynamic> controlNet,
+    required List<dynamic> controlImage,
+    required double strength,
+  }) {
     Map<String, dynamic>? sampler;
     for (final e in wf.entries) {
       if ((e.value as Map)['class_type'] == 'KSampler') {
@@ -740,31 +870,21 @@ class ComfyUIService implements ImageBackend {
     final negative = inputs?['negative'];
     if (inputs == null || positive is! List || negative is! List) return;
 
-    wf['__pose_image__'] = {
-      'class_type': 'LoadImage',
-      '_meta': {'title': 'Pose: $poseImageName'},
-      'inputs': {'image': poseImageName, 'upload': 'image'},
-    };
-    wf['__pose_cn__'] = {
-      'class_type': 'ControlNetLoader',
-      '_meta': {'title': 'OpenPose ControlNet'},
-      'inputs': {'control_net_name': _openPoseControlNet},
-    };
-    wf['__pose_apply__'] = {
+    wf['__cn_apply__'] = {
       'class_type': 'ControlNetApplyAdvanced',
-      '_meta': {'title': 'Apply pose'},
+      '_meta': {'title': 'Apply ControlNet'},
       'inputs': {
         'positive': positive,
         'negative': negative,
-        'control_net': ['__pose_cn__', 0],
-        'image': ['__pose_image__', 0],
-        'strength': _poseStrength,
+        'control_net': controlNet,
+        'image': controlImage,
+        'strength': strength,
         'start_percent': _poseStartPercent,
         'end_percent': _poseEndPercent,
       },
     };
-    inputs['positive'] = ['__pose_apply__', 0];
-    inputs['negative'] = ['__pose_apply__', 1];
+    inputs['positive'] = ['__cn_apply__', 0];
+    inputs['negative'] = ['__cn_apply__', 1];
   }
 
   // ── LoRA source detection ───────────────────────────────────

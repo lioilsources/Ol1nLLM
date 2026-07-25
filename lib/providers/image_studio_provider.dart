@@ -282,6 +282,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     }
     _comfyui.setLora(appliedLora);
     _comfyui.setPose(pose?.asset);
+    // img2img carries the source's own structure over via depth ControlNet for
+    // pose-capable (SDXL) models; a template pose picked above overrides it.
+    _comfyui.setAutoPose(spec.supportsPose);
     return (appliedLora, pose?.id);
   }
 

@@ -159,6 +159,24 @@ zůstává odvozený ze zdrojového obrázku (VAEEncode). Strength 1.0 /
 end_percent 1.0 — slabší hodnoty prohrávaly s promptem (ověřeno).
 `selectedPoseId` se persistuje v session jako `selectedLora`.
 
+**Auto póza ze zdroje (img2img)**: když u pose-capable modelu (SDXL,
+`supportsPose`) běží `edit()` **bez** vybrané šablony, `_prepare()` protáhne
+zdrojový obrázek přes `_injectSourceDepthControlNet()` — `LoadImage(zdroj) →
+DepthAnythingV2Preprocessor → ControlNetLoader(union-promax-xinsir) →
+SetUnionControlNetType(depth) → ControlNetApplyAdvanced` (synthetic klíče
+`__depth_*__`, sdílený splice tail `_spliceControlNet()` s template-pose
+cestou). Uživatel tak nemusí opisovat pózu — drží se ze zdroje sama. **Depth,
+ne OpenPose záměrně**: skeleton zahazuje směr pohledu (čelní foto se otočí
+zády), depth mapa udrží orientaci i proporce (ověřeno end-to-end na serveru).
+Strength 0.7 (drží postoj, ale prompt pořád přebarví). Precedence:
+**ruční šablona z pickeru > auto depth > nic** — šablona je override
+(`poseImageName != null` vyhraje větev). Denoise zůstává na presetovém
+`img2imgDenoise` (zdroj pózu nese sám, na rozdíl od šablony). Gate:
+`_autoPose` (= `spec.supportsPose`, nastavuje provider v
+`_applyModelToServices`) + `_preset.ckptName != null`. Auto stav se
+nepersistuje — je deterministicky odvoditelný (img2img + SDXL model + bez
+poseId).
+
 ### gen-queue — NIM async job queue (`llm.ol1n.com/nim/*`)
 
 Go služba `gen-queue` (AiStack, port 8091) obsluhuje **oba** FLUX NIM modely
