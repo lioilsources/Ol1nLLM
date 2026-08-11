@@ -1,0 +1,261 @@
+{
+  "10": {
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load FLUX Fill UNET"
+    },
+    "inputs": {
+      "unet_name": "flux1-fill-dev-fp8.safetensors",
+      "weight_dtype": "fp8_e4m3fn"
+    }
+  },
+  "11": {
+    "class_type": "DualCLIPLoader",
+    "_meta": {
+      "title": "Load FLUX CLIP (T5 + CLIP-L)"
+    },
+    "inputs": {
+      "clip_name1": "t5xxl_fp16.safetensors",
+      "clip_name2": "clip_l.safetensors",
+      "type": "flux"
+    }
+  },
+  "12": {
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load FLUX VAE"
+    },
+    "inputs": {
+      "vae_name": "ae.safetensors"
+    }
+  },
+  "14": {
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Inpaint instruction (positive)"
+    },
+    "inputs": {
+      "text": "__PROMPT__",
+      "clip": [
+        "11",
+        0
+      ]
+    }
+  },
+  "15": {
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Negative (unused on FLUX, kept for CFG=1)"
+    },
+    "inputs": {
+      "text": "",
+      "clip": [
+        "11",
+        0
+      ]
+    }
+  },
+  "16": {
+    "class_type": "FluxGuidance",
+    "_meta": {
+      "title": "FLUX Guidance (Fill wants 30)"
+    },
+    "inputs": {
+      "guidance": 30.0,
+      "conditioning": [
+        "14",
+        0
+      ]
+    }
+  },
+  "30": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load source image"
+    },
+    "inputs": {
+      "image": "__IMAGE__",
+      "upload": "image"
+    }
+  },
+  "40": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load mask (white = repaint)"
+    },
+    "inputs": {
+      "image": "__MASK__",
+      "upload": "image"
+    }
+  },
+  "41": {
+    "class_type": "ImageToMask",
+    "_meta": {
+      "title": "Mask PNG → MASK (red channel)"
+    },
+    "inputs": {
+      "image": [
+        "40",
+        0
+      ],
+      "channel": "red"
+    }
+  },
+  "42": {
+    "class_type": "InpaintModelConditioning",
+    "_meta": {
+      "title": "Fill conditioning (image + mask)"
+    },
+    "inputs": {
+      "positive": [
+        "16",
+        0
+      ],
+      "negative": [
+        "15",
+        0
+      ],
+      "vae": [
+        "12",
+        0
+      ],
+      "pixels": [
+        "90",
+        1
+      ],
+      "mask": [
+        "90",
+        2
+      ],
+      "noise_mask": true
+    }
+  },
+  "43": {
+    "class_type": "RepeatLatentBatch",
+    "_meta": {
+      "title": "Repeat latent → batch"
+    },
+    "inputs": {
+      "amount": 1,
+      "samples": [
+        "42",
+        2
+      ]
+    }
+  },
+  "18": {
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler (Fill: full denoise)"
+    },
+    "inputs": {
+      "seed": 0,
+      "steps": 28,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1.0,
+      "model": [
+        "10",
+        0
+      ],
+      "positive": [
+        "42",
+        0
+      ],
+      "negative": [
+        "42",
+        1
+      ],
+      "latent_image": [
+        "43",
+        0
+      ]
+    }
+  },
+  "19": {
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    },
+    "inputs": {
+      "samples": [
+        "18",
+        0
+      ],
+      "vae": [
+        "12",
+        0
+      ]
+    }
+  },
+  "20": {
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    },
+    "inputs": {
+      "filename_prefix": "ol1n_fill_inpaint",
+      "images": [
+        "91",
+        0
+      ]
+    }
+  },
+  "90": {
+    "class_type": "InpaintCropImproved",
+    "_meta": {
+      "title": "Crop around mask → native res"
+    },
+    "inputs": {
+      "image": [
+        "30",
+        0
+      ],
+      "mask": [
+        "41",
+        0
+      ],
+      "downscale_algorithm": "bilinear",
+      "upscale_algorithm": "bicubic",
+      "preresize": false,
+      "preresize_mode": "ensure minimum resolution",
+      "preresize_min_width": 1024,
+      "preresize_min_height": 1024,
+      "preresize_max_width": 16384,
+      "preresize_max_height": 16384,
+      "mask_fill_holes": true,
+      "mask_expand_pixels": 0,
+      "mask_invert": false,
+      "mask_blend_pixels": 32,
+      "mask_hipass_filter": 0.1,
+      "extend_for_outpainting": false,
+      "extend_up_factor": 1.0,
+      "extend_down_factor": 1.0,
+      "extend_left_factor": 1.0,
+      "extend_right_factor": 1.0,
+      "context_from_mask_extend_factor": 1.2,
+      "output_resize_to_target_size": true,
+      "output_target_width": 1024,
+      "output_target_height": 1024,
+      "output_padding": "32",
+      "device_mode": "cpu (compatible)"
+    }
+  },
+  "91": {
+    "class_type": "InpaintStitchImproved",
+    "_meta": {
+      "title": "Stitch inpainted crop back"
+    },
+    "inputs": {
+      "stitcher": [
+        "90",
+        0
+      ],
+      "inpainted_image": [
+        "19",
+        0
+      ]
+    }
+  }
+}

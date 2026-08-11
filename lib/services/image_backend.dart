@@ -99,12 +99,22 @@ abstract class ImageBackend {
     String? negativePrompt,
   });
 
+  /// [mask] turns the edit into an inpaint: a black/white PNG at the source
+  /// image's resolution (white = repaint, black = keep). Only ComfyUI models
+  /// with [ImageModelSpec.inpaint] support it; other backends must be handed
+  /// mask == null (the provider guards on the spec, backends assert).
+  ///
+  /// [refImage] (only meaningful with [mask]) adds a reference whose
+  /// appearance guides the repaint (IPAdapter) — requires
+  /// [ImageModelSpec.inpaintRef].
   Stream<GenEvent> edit({
     required Uint8List image,
     required String prompt,
     required int n,
     required int seed,
     String? negativePrompt,
+    Uint8List? mask,
+    Uint8List? refImage,
   });
 
   /// Re-attach to an already-submitted job (by the [GenSubmitted.jobId] a

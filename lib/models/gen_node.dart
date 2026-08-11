@@ -92,6 +92,16 @@ class GenNode {
   /// provider can call [ImageBackend.follow] after an app suspension/restart.
   final String? jobId;
 
+  /// Relative file name of the inpaint mask PNG (same directory scheme as
+  /// [GenImage.fileName]; white = repainted area). Non-null marks this node
+  /// as an inpaint round: retry re-sends the mask and prompt chaining is
+  /// skipped. Nullable — nodes written before this existed stay valid.
+  final String? maskFileName;
+
+  /// Relative file name of the inpaint reference PNG (IPAdapter appearance
+  /// donor), or null for text-only inpaint. Only set when [maskFileName] is.
+  final String? refFileName;
+
   // ── Generation metadata (nullable — nodes written before this existed
   //    stay valid; NIM models leave preset-derived fields null because their
   //    values are service constants recoverable from [modelId]) ──
@@ -133,6 +143,8 @@ class GenNode {
     this.progress,
     this.progressLabel,
     this.jobId,
+    this.maskFileName,
+    this.refFileName,
     this.modelId,
     this.loraName,
     this.poseId,
@@ -157,6 +169,8 @@ class GenNode {
     String? parentId,
     String? sourceImageId,
     required String prompt,
+    String? maskFileName,
+    String? refFileName,
     String? modelId,
     String? loraName,
     String? poseId,
@@ -177,6 +191,8 @@ class GenNode {
     sourceImageId: sourceImageId,
     prompt: prompt,
     status: GenStatus.generating,
+    maskFileName: maskFileName,
+    refFileName: refFileName,
     modelId: modelId,
     loraName: loraName,
     poseId: poseId,
@@ -203,6 +219,8 @@ class GenNode {
     'images': images.map((i) => i.toJson()).toList(),
     if (error != null) 'error': error,
     if (jobId != null) 'jobId': jobId,
+    if (maskFileName != null) 'maskFileName': maskFileName,
+    if (refFileName != null) 'refFileName': refFileName,
     if (modelId != null) 'modelId': modelId,
     if (loraName != null) 'loraName': loraName,
     if (poseId != null) 'poseId': poseId,
@@ -241,6 +259,8 @@ class GenNode {
           ? (json['error'] as String? ?? 'Generování přerušeno')
           : null,
       jobId: jobId,
+      maskFileName: json['maskFileName'] as String?,
+      refFileName: json['refFileName'] as String?,
       modelId: json['modelId'] as String?,
       loraName: json['loraName'] as String?,
       poseId: json['poseId'] as String?,
@@ -285,6 +305,8 @@ class GenNode {
     progress: clearProgress ? null : (progress ?? this.progress),
     progressLabel: progressLabel ?? this.progressLabel,
     jobId: clearJobId ? null : (jobId ?? this.jobId),
+    maskFileName: maskFileName,
+    refFileName: refFileName,
     modelId: modelId,
     loraName: loraName,
     poseId: poseId,

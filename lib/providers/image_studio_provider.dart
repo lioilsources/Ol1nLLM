@@ -571,11 +571,16 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     required int seed,
     required bool isImg2img,
     String userNegative = '',
+    String? maskFileName,
+    String? refFileName,
   }) {
     final spec = state.model;
     final preset = spec.preset;
     final patched = preset?.ckptName != null;
-    final poseId = state.selectedPoseId;
+    final isInpaint = maskFileName != null;
+    // Pose/depth ControlNet never applies to inpaint rounds (see
+    // ComfyUIService._inpaint) — don't record a pose that won't run.
+    final poseId = isInpaint ? null : state.selectedPoseId;
     final poseActive = poseId != null && patched;
     // Effective negative = preset negative + user ALL-CAPS tags. Recorded only
     // for generic-template models — elsewhere no negative is actually applied.
@@ -589,8 +594,13 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       parentId: parentId,
       sourceImageId: sourceImageId,
       prompt: prompt,
+      maskFileName: maskFileName,
+      refFileName: refFileName,
       modelId: spec.id,
-      loraName: state.selectedLora,
+      // flux-fill: LoRA is banned for the dedicated Fill workflow (M5
+      // experiment pending) — mirror what the service actually applies.
+      loraName:
+          isInpaint && !patched ? null : state.selectedLora,
       poseId: poseId,
       seed: seed,
       negativePrompt: negative.isNotEmpty ? negative : null,
@@ -608,8 +618,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           : null,
       steps: patched ? preset!.steps : null,
       cfg: patched ? preset!.cfg : null,
+      // Inpaint always samples at full denoise — the mask limits the change.
       denoise: patched
-          ? (isImg2img
+          ? (isImg2img && !isInpaint
               ? (poseActive ? kPoseEditDenoise : preset!.img2imgDenoise)
               : 1.0)
           : null,
@@ -737,15 +748,93 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     );
   }
 
+  /// Masked edit of the selected image: repaint only where [maskPng] is white.
+  ///
+  /// Unlike [refine], the prompt is NOT chained with ancestors — it describes
+  /// only the masked region, and inherited whole-image tokens would drag the
+  /// repaint elsewhere. With [refPng] the appearance of the reference guides
+  /// the repaint (IPAdapter, SDXL models only). Mask and reference are
+  /// persisted next to the session images so retry can re-send them and the
+  /// UI can badge the node.
+  Future<void> inpaint(String prompt, Uint8List maskPng,
+      {Uint8List? refPng}) async {
+    final text = prompt.trim();
+    final base = _imageById(state.selectedImageId);
+    if (text.isEmpty || base == null) return;
+    if (!state.model.inpaint) {
+      state = state.copyWith(
+        error: 'Model ${state.model.label} nepodporuje inpaint.',
+      );
+      return;
+    }
+    if (refPng != null && !state.model.inpaintRef) {
+      state = state.copyWith(
+        error:
+            'Model ${state.model.label} nepodporuje referenční inpaint.',
+      );
+      return;
+    }
+    _interruptRetries = 0;
+    final parts = splitPromptNegatives(text);
+    final seed = _newSeed();
+    final dir = await _dirFuture;
+    final maskImage = await GenImage.save(maskPng, dir);
+    final refImage = refPng == null ? null : await GenImage.save(refPng, dir);
+    final node = _createNodeWithMeta(
+      parentId: state.currentNodeId,
+      sourceImageId: base.id,
+      prompt: text,
+      seed: seed,
+      isImg2img: true,
+      userNegative: parts.negative,
+      maskFileName: maskImage.fileName,
+      refFileName: refImage?.fileName,
+    );
+    state = state.copyWith(
+      nodes: [...state.nodes, node],
+      currentNodeId: node.id,
+      clearSelected: true,
+      clearError: true,
+    );
+    await _runAsync(
+      node.id,
+      () => _backend.edit(
+        image: base.bytes,
+        prompt: parts.positive,
+        n: _backend.variantCount,
+        seed: seed,
+        negativePrompt: parts.negative.isEmpty ? null : parts.negative,
+        mask: maskPng,
+        refImage: refPng,
+      ),
+    );
+  }
+
   /// Re-run a failed (or finished) node with its original prompt.
   ///
   /// The retry runs against the *current* model/LoRA/pose (they may have
   /// changed since the node was created), so the node's metadata snapshot is
   /// rebuilt too — keeping it truthful — while id/parent links and any old
-  /// images are preserved.
+  /// images are preserved. Inpaint nodes re-send their persisted mask; if the
+  /// current model can't inpaint the retry fails instead of silently running
+  /// an unmasked edit.
   Future<void> retry(String nodeId) async {
     final node = _nodeById(nodeId);
     if (node == null || node.status == GenStatus.generating) return;
+    if (node.maskFileName != null &&
+        (!state.model.inpaint ||
+            (node.refFileName != null && !state.model.inpaintRef))) {
+      _patch(
+        nodeId,
+        (n) => n.copyWith(
+          status: GenStatus.error,
+          error: node.refFileName != null
+              ? 'Model ${state.model.label} nepodporuje referenční inpaint.'
+              : 'Model ${state.model.label} nepodporuje inpaint.',
+        ),
+      );
+      return;
+    }
     _interruptRetries = 0;
     final parts = splitPromptNegatives(node.prompt);
     final seed = _newSeed();
@@ -757,6 +846,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       seed: seed,
       isImg2img: !node.isRoot,
       userNegative: parts.negative,
+      maskFileName: node.maskFileName,
+      refFileName: node.refFileName,
     ).copyWith(images: node.images);
     _patch(nodeId, (_) => refreshed);
     if (node.isRoot) {
@@ -779,9 +870,34 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         );
         return;
       }
+      // Inpaint retry: re-send the persisted mask (and reference, when the
+      // round had one); the prompt stays unchained (it describes only the
+      // masked region — see [inpaint]).
+      Uint8List? mask;
+      Uint8List? refImage;
+      if (node.maskFileName != null) {
+        try {
+          mask = await File(
+            '${GenImage.baseDir}/${node.maskFileName}',
+          ).readAsBytes();
+          if (node.refFileName != null) {
+            refImage = await File(
+              '${GenImage.baseDir}/${node.refFileName}',
+            ).readAsBytes();
+          }
+        } catch (_) {
+          _patch(
+            nodeId,
+            (n) => n.copyWith(status: GenStatus.error, error: 'Maska ztracena'),
+          );
+          return;
+        }
+      }
       // Recomposed against the *current* model, consistent with the metadata
       // snapshot rebuild above.
-      final chained = _chainedPrompt(node.parentId, node.prompt);
+      final chained = mask != null
+          ? parts.positive
+          : _chainedPrompt(node.parentId, node.prompt);
       await _runAsync(
         nodeId,
         () => _backend.edit(
@@ -790,6 +906,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           n: _backend.variantCount,
           seed: seed,
           negativePrompt: parts.negative.isEmpty ? null : parts.negative,
+          mask: mask,
+          refImage: refImage,
         ),
       );
     }

@@ -1,0 +1,302 @@
+{
+  "1": {
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Load Checkpoint"
+    },
+    "inputs": {
+      "ckpt_name": "__CKPT__"
+    }
+  },
+  "2": {
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Inpaint instruction (positive)"
+    },
+    "inputs": {
+      "text": "__PROMPT__",
+      "clip": [
+        "1",
+        1
+      ]
+    }
+  },
+  "3": {
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Negative prompt"
+    },
+    "inputs": {
+      "text": "__NEGATIVE__",
+      "clip": [
+        "1",
+        1
+      ]
+    }
+  },
+  "4": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load source image"
+    },
+    "inputs": {
+      "image": "__IMAGE__",
+      "upload": "image"
+    }
+  },
+  "40": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load mask (white = repaint)"
+    },
+    "inputs": {
+      "image": "__MASK__",
+      "upload": "image"
+    }
+  },
+  "41": {
+    "class_type": "ImageToMask",
+    "_meta": {
+      "title": "Mask PNG → MASK (red channel)"
+    },
+    "inputs": {
+      "image": [
+        "40",
+        0
+      ],
+      "channel": "red"
+    }
+  },
+  "70": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load reference image (appearance donor)"
+    },
+    "inputs": {
+      "image": "__REF__",
+      "upload": "image"
+    }
+  },
+  "71": {
+    "class_type": "IPAdapterUnifiedLoader",
+    "_meta": {
+      "title": "IPAdapter loader (PLUS)"
+    },
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "preset": "PLUS (high strength)"
+    }
+  },
+  "72": {
+    "class_type": "IPAdapterAdvanced",
+    "_meta": {
+      "title": "IPAdapter — appearance from reference, masked"
+    },
+    "inputs": {
+      "model": [
+        "71",
+        0
+      ],
+      "ipadapter": [
+        "71",
+        1
+      ],
+      "image": [
+        "70",
+        0
+      ],
+      "weight": 0.85,
+      "weight_type": "linear",
+      "combine_embeds": "concat",
+      "start_at": 0.0,
+      "end_at": 0.9,
+      "embeds_scaling": "V only",
+      "attn_mask": [
+        "90",
+        2
+      ]
+    }
+  },
+  "50": {
+    "class_type": "INPAINT_LoadFooocusInpaint",
+    "_meta": {
+      "title": "Load Fooocus inpaint patch"
+    },
+    "inputs": {
+      "head": "fooocus_inpaint_head.pth",
+      "patch": "inpaint_v26.fooocus.patch"
+    }
+  },
+  "5": {
+    "class_type": "VAEEncodeForInpaint",
+    "_meta": {
+      "title": "VAE Encode (inpaint, grow mask)"
+    },
+    "inputs": {
+      "pixels": [
+        "90",
+        1
+      ],
+      "vae": [
+        "1",
+        2
+      ],
+      "mask": [
+        "90",
+        2
+      ],
+      "grow_mask_by": 16
+    }
+  },
+  "6": {
+    "class_type": "RepeatLatentBatch",
+    "_meta": {
+      "title": "Repeat latent → batch"
+    },
+    "inputs": {
+      "amount": 1,
+      "samples": [
+        "5",
+        0
+      ]
+    }
+  },
+  "51": {
+    "class_type": "INPAINT_ApplyFooocusInpaint",
+    "_meta": {
+      "title": "Apply Fooocus inpaint (on IPAdapter model)"
+    },
+    "inputs": {
+      "model": [
+        "72",
+        0
+      ],
+      "patch": [
+        "50",
+        0
+      ],
+      "latent": [
+        "5",
+        0
+      ]
+    }
+  },
+  "7": {
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler (inpaint: full denoise)"
+    },
+    "inputs": {
+      "seed": 0,
+      "steps": 30,
+      "cfg": 6.0,
+      "sampler_name": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 1.0,
+      "model": [
+        "51",
+        0
+      ],
+      "positive": [
+        "2",
+        0
+      ],
+      "negative": [
+        "3",
+        0
+      ],
+      "latent_image": [
+        "6",
+        0
+      ]
+    }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    },
+    "inputs": {
+      "samples": [
+        "7",
+        0
+      ],
+      "vae": [
+        "1",
+        2
+      ]
+    }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    },
+    "inputs": {
+      "filename_prefix": "ol1n_sdxl_inpaint_ref",
+      "images": [
+        "91",
+        0
+      ]
+    }
+  },
+  "90": {
+    "class_type": "InpaintCropImproved",
+    "_meta": {
+      "title": "Crop around mask → native res"
+    },
+    "inputs": {
+      "image": [
+        "4",
+        0
+      ],
+      "mask": [
+        "41",
+        0
+      ],
+      "downscale_algorithm": "bilinear",
+      "upscale_algorithm": "bicubic",
+      "preresize": false,
+      "preresize_mode": "ensure minimum resolution",
+      "preresize_min_width": 1024,
+      "preresize_min_height": 1024,
+      "preresize_max_width": 16384,
+      "preresize_max_height": 16384,
+      "mask_fill_holes": true,
+      "mask_expand_pixels": 0,
+      "mask_invert": false,
+      "mask_blend_pixels": 32,
+      "mask_hipass_filter": 0.1,
+      "extend_for_outpainting": false,
+      "extend_up_factor": 1.0,
+      "extend_down_factor": 1.0,
+      "extend_left_factor": 1.0,
+      "extend_right_factor": 1.0,
+      "context_from_mask_extend_factor": 1.2,
+      "output_resize_to_target_size": true,
+      "output_target_width": 1024,
+      "output_target_height": 1024,
+      "output_padding": "32",
+      "device_mode": "cpu (compatible)"
+    }
+  },
+  "91": {
+    "class_type": "InpaintStitchImproved",
+    "_meta": {
+      "title": "Stitch inpainted crop back"
+    },
+    "inputs": {
+      "stitcher": [
+        "90",
+        0
+      ],
+      "inpainted_image": [
+        "8",
+        0
+      ]
+    }
+  }
+}

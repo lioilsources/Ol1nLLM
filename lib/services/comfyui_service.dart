@@ -183,7 +183,21 @@ class ComfyUIService implements ImageBackend {
     required int n,
     required int seed,
     String? negativePrompt,
+    Uint8List? mask,
+    Uint8List? refImage,
   }) async* {
+    if (mask != null) {
+      yield* _inpaint(
+        image: image,
+        mask: mask,
+        refImage: refImage,
+        prompt: prompt,
+        n: n,
+        seed: seed,
+        negativePrompt: negativePrompt,
+      );
+      return;
+    }
     final pose = _activePoseAsset;
     final poseImageName = (pose != null && _preset.ckptName != null)
         ? await _ensurePoseUploaded(pose)
@@ -206,6 +220,51 @@ class ComfyUIService implements ImageBackend {
     );
     yield* _run(wf);
   }
+
+  /// Masked edit: repaint only where [mask] is white (see the inpaint assets).
+  /// With [refImage] the ref-guided template runs instead — IPAdapter feeds
+  /// the reference's appearance into the masked region (attn_mask-limited).
+  /// No pose/depth ControlNet — the mask already pins everything outside it,
+  /// and constraining the repainted region would defeat the point.
+  Stream<GenEvent> _inpaint({
+    required Uint8List image,
+    required Uint8List mask,
+    Uint8List? refImage,
+    required String prompt,
+    required int n,
+    required int seed,
+    String? negativePrompt,
+  }) async* {
+    final asset =
+        refImage != null ? _preset.inpaintRefAsset : _preset.inpaintAsset;
+    if (asset == null) {
+      yield GenFailed(
+        refImage != null
+            ? '[ComfyUI] Aktivní model nepodporuje referenční inpaint.'
+            : '[ComfyUI] Aktivní model nepodporuje inpaint.',
+      );
+      return;
+    }
+    final imageName = await _uploadImage(image);
+    final maskName = await _uploadImage(mask, filename: 'mask_${_uuidV4()}.png');
+    final refName = refImage == null
+        ? null
+        : await _uploadImage(refImage, filename: 'ref_${_uuidV4()}.png');
+    final tpl = await _template(asset);
+    final wf = _prepare(
+      tpl,
+      prompt: prompt,
+      batch: n,
+      seed: seed,
+      imageName: imageName,
+      maskName: maskName,
+      refName: refName,
+      userNegative: negativePrompt,
+    );
+    yield* _run(wf);
+  }
+
+  static String _uuidV4() => const Uuid().v4();
 
   @override
   Stream<GenEvent> follow(String jobId) => _run(null, promptId: jobId);
@@ -646,6 +705,8 @@ class ComfyUIService implements ImageBackend {
     required int batch,
     required int seed,
     String? imageName,
+    String? maskName,
+    String? refName,
     String? poseImageName,
     bool sourceDepth = false,
     String? userNegative,
@@ -655,6 +716,8 @@ class ComfyUIService implements ImageBackend {
     batch: batch,
     seed: seed,
     imageName: imageName,
+    maskName: maskName,
+    refName: refName,
     poseImageName: poseImageName,
     sourceDepth: sourceDepth,
     userNegative: userNegative,
@@ -666,6 +729,8 @@ class ComfyUIService implements ImageBackend {
     required int batch,
     required int seed,
     String? imageName,
+    String? maskName,
+    String? refName,
     String? poseImageName,
     bool sourceDepth = false,
     String? userNegative,
@@ -686,7 +751,11 @@ class ComfyUIService implements ImageBackend {
 
     // Inject a LoraLoader and re-route model/clip references. Works for both
     // Flux (UNETLoader + DualCLIPLoader) and Pony (CheckpointLoaderSimple).
-    if (lora != null) {
+    // Skipped for dedicated inpaint workflows (flux-fill): Fill + style LoRA
+    // produces artefacts — pending the M5 experiment it stays banned. SDXL
+    // inpaint (ckptName != null) keeps LoRA support.
+    final loraAllowed = maskName == null || preset.ckptName != null;
+    if (lora != null && loraAllowed) {
       final src = _findModelClipSources(wf);
       if (src != null) {
         const loraId = '__lora__';
@@ -741,6 +810,8 @@ class ComfyUIService implements ImageBackend {
         if (v.contains('__NEGATIVE__')) v = v.replaceAll('__NEGATIVE__', fullNegative);
         if (v.contains('__CKPT__') && preset.ckptName != null) v = v.replaceAll('__CKPT__', preset.ckptName!);
         if (imageName != null && v.contains('__IMAGE__')) v = v.replaceAll('__IMAGE__', imageName);
+        if (maskName != null && v.contains('__MASK__')) v = v.replaceAll('__MASK__', maskName);
+        if (refName != null && v.contains('__REF__')) v = v.replaceAll('__REF__', refName);
         if (!identical(v, value)) inputs[key] = v;
       });
 
@@ -756,6 +827,7 @@ class ComfyUIService implements ImageBackend {
                 poseImageName != null ? kPoseHeight : preset.height;
           }
         case 'RepeatLatentBatch':
+        case 'RepeatImageBatch':
           if (inputs.containsKey('amount')) inputs['amount'] = batch;
         case 'KSampler':
           if (preset.ckptName != null) {
@@ -763,9 +835,10 @@ class ComfyUIService implements ImageBackend {
             inputs['cfg'] = preset.cfg;
             inputs['sampler_name'] = preset.samplerName;
             inputs['scheduler'] = preset.scheduler;
-            // Pose during an edit needs high denoise, otherwise the source
-            // structure overrides the ControlNet skeleton.
-            inputs['denoise'] = imageName == null
+            // Inpaint always runs full denoise — the mask (not the denoise)
+            // limits the change. Pose during an edit needs high denoise,
+            // otherwise the source structure overrides the ControlNet skeleton.
+            inputs['denoise'] = imageName == null || maskName != null
                 ? 1.0
                 : (poseImageName != null
                     ? kPoseEditDenoise

@@ -18,6 +18,8 @@ class ComfyPreset {
   const ComfyPreset({
     required this.txt2imgAsset,
     required this.img2imgAsset,
+    this.inpaintAsset,
+    this.inpaintRefAsset,
     this.ckptName,
     this.positivePrefix = '',
     this.negativePrompt = '',
@@ -32,6 +34,15 @@ class ComfyPreset {
 
   final String txt2imgAsset;
   final String img2imgAsset;
+
+  /// Masked-edit workflow (null = model can't inpaint). Inpaint always runs
+  /// KSampler at denoise 1.0 — the mask, not the denoise, limits the change.
+  final String? inpaintAsset;
+
+  /// Reference-guided inpaint workflow: IPAdapter transfers the reference
+  /// image's appearance into the masked region (attn_mask-restricted). Null =
+  /// text-only inpaint (flux-fill has no reference path — needs Redux).
+  final String? inpaintRefAsset;
   final String? ckptName;
   final String positivePrefix;
   final String negativePrompt;
@@ -55,6 +66,7 @@ class ImageModelSpec {
     required this.kind,
     required this.txt2img,
     required this.img2img,
+    this.inpaint = false,
     this.loraFamily = LoraFamily.none,
     this.supportsPose = false,
     this.preset,
@@ -67,6 +79,13 @@ class ImageModelSpec {
   final ImageBackendKind kind;
   final bool txt2img;
   final bool img2img;
+
+  /// Masked edit (inpaint) rounds apply to this model. Requires
+  /// [ComfyPreset.inpaintAsset]; ComfyUI backend only.
+  final bool inpaint;
+
+  /// Whether an inpaint round can carry a reference image (IPAdapter).
+  bool get inpaintRef => inpaint && preset?.inpaintRefAsset != null;
   final LoraFamily loraFamily;
 
   /// OpenPose ControlNet pose templates apply to this model. Explicit flag,
@@ -76,17 +95,24 @@ class ImageModelSpec {
 
   final ComfyPreset? preset;
 
-  String get capabilityLabel => switch ((txt2img, img2img)) {
-    (true, true) => 'txt2img + img2img',
-    (true, false) => 'txt2img',
-    _ => 'img2img',
-  };
+  String get capabilityLabel {
+    final caps = [
+      if (txt2img) 'txt2img',
+      if (img2img) 'img2img',
+      if (inpaint) 'inpaint',
+    ];
+    return caps.join(' + ');
+  }
 }
 
 const kDefaultImageModelId = 'flux-manga';
 
 const _sdxlTxt2img = 'assets/comfyui/sdxl_txt2img.api.json';
 const _sdxlImg2img = 'assets/comfyui/sdxl_img2img.api.json';
+const _sdxlInpaint = 'assets/comfyui/sdxl_inpaint.api.json';
+const _sdxlInpaintRef = 'assets/comfyui/sdxl_inpaint_ref.api.json';
+const _fluxFillInpaint = 'assets/comfyui/flux_fill_inpaint.api.json';
+const _fluxFillInpaintRef = 'assets/comfyui/flux_fill_inpaint_ref.api.json';
 
 const _ponyScoreTags = 'score_9, score_8_up, score_7_up, score_6_up';
 const _ponyNegative =
@@ -127,6 +153,26 @@ const kImageModels = <ImageModelSpec>[
     ),
   ),
   ImageModelSpec(
+    id: 'flux-fill',
+    label: 'FLUX Fill',
+    icon: Icons.format_color_fill,
+    color: Color(0xFFD19A66),
+    kind: ImageBackendKind.comfyUi,
+    txt2img: false,
+    img2img: false,
+    inpaint: true,
+    // Dedicated inpaint-only workflow (UNETLoader graph, values baked in).
+    // txt2img/img2img assets are never used (both flags false) — the field
+    // type requires them, so they point at the same file.
+    preset: ComfyPreset(
+      txt2imgAsset: _fluxFillInpaint,
+      img2imgAsset: _fluxFillInpaint,
+      inpaintAsset: _fluxFillInpaint,
+      // Redux (SigLIP + style model) — reference-guided fill.
+      inpaintRefAsset: _fluxFillInpaintRef,
+    ),
+  ),
+  ImageModelSpec(
     id: 'pony',
     label: 'Pony V6',
     icon: Icons.palette_outlined,
@@ -134,11 +180,14 @@ const kImageModels = <ImageModelSpec>[
     kind: ImageBackendKind.comfyUi,
     txt2img: true,
     img2img: true,
+    inpaint: true,
     loraFamily: LoraFamily.sdxl,
     supportsPose: true,
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
+      inpaintAsset: _sdxlInpaint,
+      inpaintRefAsset: _sdxlInpaintRef,
       ckptName: 'ponyDiffusionV6XL_v6StartWithThisOne.safetensors',
       positivePrefix: _ponyScoreTags,
       negativePrompt: _ponyNegative,
@@ -152,11 +201,14 @@ const kImageModels = <ImageModelSpec>[
     kind: ImageBackendKind.comfyUi,
     txt2img: true,
     img2img: true,
+    inpaint: true,
     loraFamily: LoraFamily.sdxl,
     supportsPose: true,
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
+      inpaintAsset: _sdxlInpaint,
+      inpaintRefAsset: _sdxlInpaintRef,
       ckptName: 'Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors',
       negativePrompt:
           'bad quality, worst quality, low quality, jpeg artifacts, blurry, '
@@ -172,6 +224,7 @@ const kImageModels = <ImageModelSpec>[
     kind: ImageBackendKind.comfyUi,
     txt2img: true,
     img2img: true,
+    inpaint: true,
     loraFamily: LoraFamily.sdxl,
     supportsPose: true,
     // Distilled 4-step checkpoint: RunDiffusion's own guidance is 4–6 steps at
@@ -181,6 +234,8 @@ const kImageModels = <ImageModelSpec>[
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
+      inpaintAsset: _sdxlInpaint,
+      inpaintRefAsset: _sdxlInpaintRef,
       ckptName: 'Juggernaut-XL-Lightning_4Steps.safetensors',
       negativePrompt:
           'bad quality, worst quality, low quality, jpeg artifacts, blurry, '
@@ -199,11 +254,14 @@ const kImageModels = <ImageModelSpec>[
     kind: ImageBackendKind.comfyUi,
     txt2img: true,
     img2img: true,
+    inpaint: true,
     loraFamily: LoraFamily.sdxl,
     supportsPose: true,
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
+      inpaintAsset: _sdxlInpaint,
+      inpaintRefAsset: _sdxlInpaintRef,
       ckptName: 'Illustrious-XL-v2.0.safetensors',
       positivePrefix: 'masterpiece, best quality',
       negativePrompt:
@@ -222,11 +280,14 @@ const kImageModels = <ImageModelSpec>[
     kind: ImageBackendKind.comfyUi,
     txt2img: true,
     img2img: true,
+    inpaint: true,
     loraFamily: LoraFamily.sdxl,
     supportsPose: true,
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
+      inpaintAsset: _sdxlInpaint,
+      inpaintRefAsset: _sdxlInpaintRef,
       ckptName: 'atomixPonyAnimeXL_v30.safetensors',
       positivePrefix: _ponyScoreTags,
       negativePrompt: _ponyNegative,

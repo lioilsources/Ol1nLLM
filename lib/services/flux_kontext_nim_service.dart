@@ -98,6 +98,9 @@ class FluxKontextNimService implements ImageBackend {
   }
 
   // FLUX Kontext has no negative conditioning — [negativePrompt] is ignored.
+  // [mask] is unsupported (instruction-based editing only): the provider only
+  // routes inpaint to models with [ImageModelSpec.inpaint], so a non-null mask
+  // here is a programming error.
   @override
   Stream<GenEvent> edit({
     required Uint8List image,
@@ -105,7 +108,10 @@ class FluxKontextNimService implements ImageBackend {
     required int n,
     required int seed,
     String? negativePrompt,
+    Uint8List? mask,
+    Uint8List? refImage,
   }) async* {
+    assert(mask == null, 'FLUX Kontext NIM nepodporuje inpaint masku');
     yield* _infer(
       prompt: prompt,
       imageB64: base64Encode(_snapImage(image)),

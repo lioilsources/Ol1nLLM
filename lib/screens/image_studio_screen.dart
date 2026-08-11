@@ -12,6 +12,7 @@ import '../models/image_model.dart';
 import '../models/pose_template.dart';
 import '../providers/image_studio_provider.dart';
 import '../widgets/image_session_drawer.dart';
+import 'mask_editor_screen.dart';
 
 /// Copy [text] to the clipboard and confirm with a brief snackbar. No-op for
 /// empty text. Used by long-press handlers on error messages and prompts.
@@ -447,31 +448,100 @@ class _TreeNodeWidget extends StatelessWidget {
       );
     }
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
+    final circle = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: isCurrent
+            ? AppTheme.accent
+            : isParent
+                ? AppTheme.accent.withValues(alpha: 0.12)
+                : AppTheme.surface,
+        border: Border.all(
           color: isCurrent
               ? AppTheme.accent
               : isParent
-                  ? AppTheme.accent.withValues(alpha: 0.12)
-                  : AppTheme.surface,
-          border: Border.all(
-            color: isCurrent
-                ? AppTheme.accent
-                : isParent
-                    ? AppTheme.accent.withValues(alpha: 0.6)
-                    : Colors.white24,
-            width: isCurrent ? 2.5 : isParent ? 1.5 : 0.5,
-          ),
-          boxShadow: isCurrent
-              ? [BoxShadow(color: AppTheme.accent.withValues(alpha: 0.4), blurRadius: 8)]
-              : null,
+                  ? AppTheme.accent.withValues(alpha: 0.6)
+                  : Colors.white24,
+          width: isCurrent ? 2.5 : isParent ? 1.5 : 0.5,
         ),
-        child: Center(child: inner),
+        boxShadow: isCurrent
+            ? [BoxShadow(color: AppTheme.accent.withValues(alpha: 0.4), blurRadius: 8)]
+            : null,
+      ),
+      child: Center(child: inner),
+    );
+
+    return GestureDetector(
+      onTap: onTap,
+      child: node.maskFileName == null
+          ? circle
+          : Stack(
+              clipBehavior: Clip.none,
+              children: [
+                circle,
+                // Inpaint badge: tap previews the mask over the node's image.
+                Positioned(
+                  top: -3,
+                  right: -3,
+                  child: GestureDetector(
+                    onTap: () => _showMaskPreview(context, node),
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppTheme.surfaceAlt,
+                      ),
+                      child: const Icon(
+                        Icons.auto_fix_high,
+                        size: 10,
+                        color: AppTheme.accent,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  /// The node's first image with its inpaint mask blended on top — shows what
+  /// area that round repainted.
+  void _showMaskPreview(BuildContext context, GenNode node) {
+    final maskFile = node.maskFileName == null
+        ? null
+        : File('${GenImage.baseDir}/${node.maskFileName}');
+    if (maskFile == null || !maskFile.existsSync()) return;
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (context) => GestureDetector(
+        onTap: () => Navigator.of(context).pop(),
+        child: InteractiveViewer(
+          child: Center(
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                if (node.images.isNotEmpty)
+                  Image.file(
+                    File(node.images.first.filePath),
+                    fit: BoxFit.contain,
+                  ),
+                // The mask is white-on-black; modulate tints its white area
+                // accent and keeps black black, so at 0.7 opacity the
+                // repainted region glows while the rest dims.
+                Image.file(
+                  maskFile,
+                  fit: BoxFit.contain,
+                  color: AppTheme.accent.withValues(alpha: 0.55),
+                  colorBlendMode: BlendMode.modulate,
+                  opacity: const AlwaysStoppedAnimation(0.7),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -645,11 +715,57 @@ class _NodeGrid extends ConsumerWidget {
               ref.read(imageStudioProvider.notifier).selectImage(img.id),
           onExpand: () => _showFullscreen(context, img),
           onSave: () => _saveImage(context, img),
+          onInpaint: () => _startInpaint(context, ref, img),
           // Long-press copies the prompt that produced this node's images,
           // so it can be reused.
           onLongPress: () => _copyToClipboard(context, node.prompt, 'Prompt'),
         );
       },
+    );
+  }
+
+  /// Inpaint entry: open the mask editor; the inpaint model (FLUX Fill vs
+  /// the SDXL family) is chosen inside its prompt sheet, so there is no
+  /// pre-flight switching dialog. The tile's image becomes the selection —
+  /// same contract as refine, which also works on the selected image.
+  Future<void> _startInpaint(
+    BuildContext context,
+    WidgetRef ref,
+    GenImage img,
+  ) async {
+    final notifier = ref.read(imageStudioProvider.notifier);
+    final state = ref.read(imageStudioProvider);
+    final candidates =
+        state.availableModels.where((m) => m.inpaint).toList();
+    if (candidates.isEmpty) return;
+    // Pre-select the session's model when it can inpaint; FLUX Fill (the
+    // dedicated inpaint model) otherwise.
+    final initial = state.model.inpaint
+        ? state.model.id
+        : candidates
+            .firstWhere((m) => m.id == 'flux-fill',
+                orElse: () => candidates.first)
+            .id;
+    notifier.selectImage(img.id);
+    final result = await Navigator.of(context).push<MaskEditorResult>(
+      MaterialPageRoute(
+        builder: (context) => MaskEditorScreen(
+          imageBytes: img.bytes,
+          models: candidates,
+          initialModelId: initial,
+        ),
+      ),
+    );
+    if (result == null) return;
+    // The chosen model becomes the active one BEFORE the round runs, so the
+    // provider guard, node metadata and retry all see it consistently.
+    if (result.modelId != ref.read(imageStudioProvider).modelId) {
+      notifier.setModel(result.modelId);
+    }
+    await notifier.inpaint(
+      result.prompt,
+      result.maskPng,
+      refPng: result.refPng,
     );
   }
 
@@ -704,6 +820,7 @@ class _ImageTile extends StatelessWidget {
     required this.onSelect,
     required this.onExpand,
     required this.onSave,
+    required this.onInpaint,
     this.onLongPress,
   });
 
@@ -712,6 +829,7 @@ class _ImageTile extends StatelessWidget {
   final VoidCallback onSelect;
   final VoidCallback onExpand;
   final VoidCallback onSave;
+  final VoidCallback onInpaint;
   final VoidCallback? onLongPress;
 
   @override
@@ -745,6 +863,22 @@ class _ImageTile extends StatelessWidget {
                 child: Icon(Icons.check, size: 16, color: Colors.white),
               ),
             ),
+          Positioned(
+            bottom: 4,
+            right: 76,
+            child: Material(
+              color: Colors.black54,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onInpaint,
+                child: const Padding(
+                  padding: EdgeInsets.all(6),
+                  child: Icon(Icons.auto_fix_high, size: 18, color: Colors.white),
+                ),
+              ),
+            ),
+          ),
           Positioned(
             bottom: 4,
             right: 40,
@@ -1126,12 +1260,19 @@ class _ModelChip extends StatelessWidget {
                 itemBuilder: (_, i) {
                   final spec = models[i];
                   final isSel = spec.id == modelId;
-                  final usable = _isUsable(spec);
-                  final hint = usable
-                      ? spec.capabilityLabel
-                      : spec.img2img
-                          ? '${spec.capabilityLabel} — vyžaduje obrázek'
-                          : '${spec.capabilityLabel} — jen nové generování';
+                  // Inpaint-only models (flux-fill) can't be driven from the
+                  // input bar at all — the ✨ flow switches to them itself, so
+                  // manual selection would only lead to a dead end.
+                  final inpaintOnly =
+                      spec.inpaint && !spec.txt2img && !spec.img2img;
+                  final usable = !inpaintOnly && _isUsable(spec);
+                  final hint = inpaintOnly
+                      ? 'inpaint — spustíš ikonou ✨ na obrázku'
+                      : usable
+                          ? spec.capabilityLabel
+                          : spec.img2img
+                              ? '${spec.capabilityLabel} — vyžaduje obrázek'
+                              : '${spec.capabilityLabel} — jen nové generování';
                   return Opacity(
                     opacity: usable ? 1.0 : 0.38,
                     child: ListTile(
@@ -1303,6 +1444,20 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
     // Predictable mismatch (e.g. FLUX Schnell can't refine) → snackbar instead
     // of a doomed error node; the backends' GenFailed stays as the last net.
     final spec = widget.state.model;
+    // Inpaint-only model active (after an ✨ round): the input bar can't
+    // drive it — point at the flow instead of a generic "pick another model".
+    if (spec.inpaint && !spec.txt2img && !spec.img2img) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${spec.label} funguje přes ✨ na obrázku — zamaluj oblast '
+            'a popiš, co v ní má být. Pro běžné generování vyber jiný model.',
+          ),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
     final wantsTxt2Img = !_hasRoot;
     final wantsImg2Img = _hasRoot && _isRefineMode;
     if ((wantsTxt2Img && !spec.txt2img) || (wantsImg2Img && !spec.img2img)) {
