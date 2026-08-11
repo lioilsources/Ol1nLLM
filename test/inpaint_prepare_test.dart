@@ -90,6 +90,37 @@ void main() {
       expect(pulid['inputs']['weight'], 1.0);
       expect((pulid['inputs'] as Map).containsKey('attn_mask'), isFalse);
     });
+
+    test('Redux branch carries appearance next to PuLID identity', () {
+      final wf = prepare();
+      // Same reference feeds both encoders: InsightFace (identity) and
+      // SigLIP→Redux (appearance: hair, tones). Moderate strength so the
+      // prompt keeps a say (1.0 overrides it outright; see PLAN M8).
+      final apply = wf.values
+          .firstWhere((n) => n['class_type'] == 'StyleModelApply');
+      expect(apply['inputs']['strength'], 0.5);
+      final applyKey = wf.entries
+          .firstWhere(
+            (e) => (e.value as Map)['class_type'] == 'StyleModelApply',
+          )
+          .key;
+      final guidance =
+          wf.values.firstWhere((n) => n['class_type'] == 'FluxGuidance');
+      expect(guidance['inputs']['conditioning'], [applyKey, 0]);
+      // Both branches read the SAME LoadImage (the __REF__ node).
+      final refLoadKey = wf.entries
+          .firstWhere((e) =>
+              (e.value as Map)['class_type'] == 'LoadImage' &&
+              ((e.value as Map)['_meta']?['title'] as String? ?? '')
+                  .contains('FACE'))
+          .key;
+      final clipEncode =
+          wf.values.firstWhere((n) => n['class_type'] == 'CLIPVisionEncode');
+      final pulid2 =
+          wf.values.firstWhere((n) => n['class_type'] == 'ApplyPulidFlux');
+      expect(clipEncode['inputs']['image'], [refLoadKey, 0]);
+      expect(pulid2['inputs']['image'], [refLoadKey, 0]);
+    });
   });
 
   group('FLUX Fill + Redux reference template', () {

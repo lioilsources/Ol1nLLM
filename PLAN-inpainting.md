@@ -218,6 +218,21 @@ biometrický embedding + EVA-CLIP).
   s face podporou; přepnutí chipu na model bez ní režim vypne.
 - SDXL InstantID varianta zůstává jako možné rozšíření (vše na serveru je).
 
+## M8 — face režim: PuLID + Redux kombo ✅ 2026-08-11
+
+InsightFace embedding je záměrně invariantní k vlasům/stylingu (rozpoznávací
+technologie) → PuLID sám přenesl identitu, ale ne vlasy; uživatel čekal
+„vezmi to z reference". Řešení: do `flux_fill_inpaint_face.api.json` přidána
+**Redux větev ze stejné reference** (SigLIP → StyleModelApply,
+**strength 0.5** multiply — plná síla přebíjí prompt) vedle PuLID (1.0).
+Identita z InsightFace + vzhled (vlasy, pihy, tóny) ze SigLIP.
+
+Test s NEUTRÁLNÍM promptem („portrait photo, natural expression"): rusé
+kudrny + pihy + identita reference — vše z fotky, nic z promptu (114 s/b2).
+Zásadní podmínka zůstává: **maska musí dát vlasům prostor** — head-only
+maska s šedými nemaskovanými okraji vlasy nepřenese ani při silném
+conditioningu (ověřeno negativně). UI beze změn.
+
 ## Mimo scope
 
 - MangaPrompts (tgbot RMBG auto-masky) — samostatný plán později

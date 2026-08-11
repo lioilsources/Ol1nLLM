@@ -63,7 +63,7 @@
     "inputs": {
       "guidance": 30.0,
       "conditioning": [
-        "14",
+        "83",
         0
       ]
     }
@@ -322,6 +322,63 @@
       "weight": 1.0,
       "start_at": 0.0,
       "end_at": 1.0
+    }
+  },
+  "80": {
+    "class_type": "CLIPVisionLoader",
+    "_meta": {
+      "title": "Load SigLIP vision (Redux)"
+    },
+    "inputs": {
+      "clip_name": "sigclip_vision_patch14_384.safetensors"
+    }
+  },
+  "81": {
+    "class_type": "CLIPVisionEncode",
+    "_meta": {
+      "title": "Encode reference (appearance)"
+    },
+    "inputs": {
+      "clip_vision": [
+        "80",
+        0
+      ],
+      "image": [
+        "70",
+        0
+      ],
+      "crop": "center"
+    }
+  },
+  "82": {
+    "class_type": "StyleModelLoader",
+    "_meta": {
+      "title": "Load FLUX Redux"
+    },
+    "inputs": {
+      "style_model_name": "flux1-redux-dev.safetensors"
+    }
+  },
+  "83": {
+    "class_type": "StyleModelApply",
+    "_meta": {
+      "title": "Redux — appearance from reference (moderate)"
+    },
+    "inputs": {
+      "conditioning": [
+        "14",
+        0
+      ],
+      "style_model": [
+        "82",
+        0
+      ],
+      "clip_vision_output": [
+        "81",
+        0
+      ],
+      "strength": 0.5,
+      "strength_type": "multiply"
     }
   }
 }
