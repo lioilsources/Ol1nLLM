@@ -427,6 +427,37 @@ class _PromptSheetState extends State<_PromptSheet> {
     super.dispose();
   }
 
+  /// First face-capable model in the sheet, or null when none exists.
+  ImageModelSpec? get _faceCapable {
+    for (final m in widget.models) {
+      if (m.inpaintFace) return m;
+    }
+    return null;
+  }
+
+  /// Toggle face mode; when the selected model can't do it, switch to one
+  /// that can (FLUX Fill) and enable the mode in the same tap.
+  void _tapFaceToggle() {
+    if (_model.inpaintFace) {
+      setState(() => _refIsFace = !_refIsFace);
+      return;
+    }
+    final target = _faceCapable;
+    if (target == null) return;
+    setState(() {
+      _modelId = target.id;
+      _refIsFace = true;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Přepnuto na ${target.label} — přenese se identita tváře.',
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   Future<void> _pickReference() async {
     try {
       final file = await ImagePicker().pickImage(
@@ -548,17 +579,26 @@ class _PromptSheetState extends State<_PromptSheet> {
                           ),
                         ),
                       ),
-                      if (_model.inpaintFace)
+                      // Always visible so the feature is discoverable. On a
+                      // model without a face path the tap switches to one
+                      // that has it (instead of the icon silently not
+                      // existing); without any face-capable model it hides.
+                      if (_faceCapable != null)
                         IconButton(
-                          tooltip: 'Reference je obličej — zachovat identitu',
-                          onPressed: () =>
-                              setState(() => _refIsFace = !_refIsFace),
+                          tooltip:
+                              'Reference je obličej — zachovat identitu',
+                          onPressed: _tapFaceToggle,
                           icon: Icon(
-                            Icons.face_retouching_natural,
+                            _model.inpaintFace
+                                ? Icons.face_retouching_natural
+                                : Icons.face_retouching_off,
                             size: 22,
-                            color: _refIsFace
+                            color: _refIsFace && _model.inpaintFace
                                 ? AppTheme.accent
-                                : AppTheme.textSecondary,
+                                : _model.inpaintFace
+                                    ? AppTheme.textSecondary
+                                    : AppTheme.textSecondary
+                                        .withValues(alpha: 0.45),
                           ),
                         ),
                       IconButton(
