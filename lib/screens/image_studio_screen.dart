@@ -766,6 +766,7 @@ class _NodeGrid extends ConsumerWidget {
       result.prompt,
       result.maskPng,
       refPng: result.refPng,
+      refIsFace: result.refIsFace,
     );
   }
 

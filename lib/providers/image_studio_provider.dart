@@ -573,6 +573,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     String userNegative = '',
     String? maskFileName,
     String? refFileName,
+    bool refIsFace = false,
   }) {
     final spec = state.model;
     final preset = spec.preset;
@@ -596,6 +597,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       prompt: prompt,
       maskFileName: maskFileName,
       refFileName: refFileName,
+      refIsFace: refIsFace,
       modelId: spec.id,
       // flux-fill: LoRA is banned for the dedicated Fill workflow (M5
       // experiment pending) — mirror what the service actually applies.
@@ -757,7 +759,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   /// persisted next to the session images so retry can re-send them and the
   /// UI can badge the node.
   Future<void> inpaint(String prompt, Uint8List maskPng,
-      {Uint8List? refPng}) async {
+      {Uint8List? refPng, bool refIsFace = false}) async {
     final text = prompt.trim();
     final base = _imageById(state.selectedImageId);
     if (text.isEmpty || base == null) return;
@@ -771,6 +773,12 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       state = state.copyWith(
         error:
             'Model ${state.model.label} nepodporuje referenční inpaint.',
+      );
+      return;
+    }
+    if (refPng != null && refIsFace && !state.model.inpaintFace) {
+      state = state.copyWith(
+        error: 'Model ${state.model.label} nepodporuje face inpaint.',
       );
       return;
     }
@@ -789,6 +797,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       userNegative: parts.negative,
       maskFileName: maskImage.fileName,
       refFileName: refImage?.fileName,
+      refIsFace: refPng != null && refIsFace,
     );
     state = state.copyWith(
       nodes: [...state.nodes, node],
@@ -806,6 +815,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         negativePrompt: parts.negative.isEmpty ? null : parts.negative,
         mask: maskPng,
         refImage: refPng,
+        refIsFace: refPng != null && refIsFace,
       ),
     );
   }
@@ -823,7 +833,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     if (node == null || node.status == GenStatus.generating) return;
     if (node.maskFileName != null &&
         (!state.model.inpaint ||
-            (node.refFileName != null && !state.model.inpaintRef))) {
+            (node.refFileName != null && !state.model.inpaintRef) ||
+            (node.refIsFace && !state.model.inpaintFace))) {
       _patch(
         nodeId,
         (n) => n.copyWith(
@@ -848,6 +859,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       userNegative: parts.negative,
       maskFileName: node.maskFileName,
       refFileName: node.refFileName,
+      refIsFace: node.refIsFace,
     ).copyWith(images: node.images);
     _patch(nodeId, (_) => refreshed);
     if (node.isRoot) {
@@ -908,6 +920,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           negativePrompt: parts.negative.isEmpty ? null : parts.negative,
           mask: mask,
           refImage: refImage,
+          refIsFace: node.refIsFace,
         ),
       );
     }

@@ -106,7 +106,9 @@ abstract class ImageBackend {
   ///
   /// [refImage] (only meaningful with [mask]) adds a reference whose
   /// appearance guides the repaint (IPAdapter) — requires
-  /// [ImageModelSpec.inpaintRef].
+  /// [ImageModelSpec.inpaintRef]. With [refIsFace] the reference is treated
+  /// as a face whose identity must carry over (biometric encoder; requires
+  /// [ImageModelSpec.inpaintFace]).
   Stream<GenEvent> edit({
     required Uint8List image,
     required String prompt,
@@ -115,6 +117,7 @@ abstract class ImageBackend {
     String? negativePrompt,
     Uint8List? mask,
     Uint8List? refImage,
+    bool refIsFace = false,
   });
 
   /// Re-attach to an already-submitted job (by the [GenSubmitted.jobId] a

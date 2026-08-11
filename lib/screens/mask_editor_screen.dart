@@ -12,8 +12,13 @@ import '../models/image_model.dart';
 /// user's prompt for the masked region, an optional reference image whose
 /// appearance should guide the repaint, and the inpaint model chosen in the
 /// prompt sheet.
-typedef MaskEditorResult =
-    ({Uint8List maskPng, String prompt, Uint8List? refPng, String modelId});
+typedef MaskEditorResult = ({
+  Uint8List maskPng,
+  String prompt,
+  Uint8List? refPng,
+  bool refIsFace,
+  String modelId,
+});
 
 /// Fullscreen mask painting over a source image.
 ///
@@ -172,7 +177,7 @@ class _MaskEditorScreenState extends State<MaskEditorScreen> {
 
   Future<void> _confirm() async {
     final result = await showModalBottomSheet<
-        ({String prompt, Uint8List? refPng, String modelId})>(
+        ({String prompt, Uint8List? refPng, bool refIsFace, String modelId})>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppTheme.surface,
@@ -188,6 +193,7 @@ class _MaskEditorScreenState extends State<MaskEditorScreen> {
       maskPng: mask,
       prompt: result.prompt.trim(),
       refPng: result.refPng,
+      refIsFace: result.refIsFace,
       modelId: result.modelId,
     ));
   }
@@ -396,6 +402,10 @@ class _PromptSheetState extends State<_PromptSheet> {
   final _controller = TextEditingController();
   bool _hasText = false;
   Uint8List? _refPng;
+
+  /// Face-identity mode: the reference is a face whose identity must carry
+  /// over (PuLID). Only offered when [_model.inpaintFace].
+  bool _refIsFace = false;
   late String _modelId = widget.initialModelId;
 
   ImageModelSpec get _model =>
@@ -437,8 +447,12 @@ class _PromptSheetState extends State<_PromptSheet> {
   void _submit() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
-    Navigator.of(context)
-        .pop((prompt: text, refPng: _refPng, modelId: _model.id));
+    Navigator.of(context).pop((
+      prompt: text,
+      refPng: _refPng,
+      refIsFace: _refPng != null && _refIsFace && _model.inpaintFace,
+      modelId: _model.id,
+    ));
   }
 
   @override
@@ -486,8 +500,10 @@ class _PromptSheetState extends State<_PromptSheet> {
                     backgroundColor: AppTheme.surfaceAlt,
                     onSelected: (_) => setState(() {
                       _modelId = m.id;
-                      // A model without reference support drops a picked ref.
+                      // A model without reference support drops a picked ref;
+                      // one without a face path drops the face mode.
                       if (!m.inpaintRef) _refPng = null;
+                      if (!m.inpaintFace) _refIsFace = false;
                     }),
                   ),
                   const SizedBox(width: 6),
@@ -521,17 +537,33 @@ class _PromptSheetState extends State<_PromptSheet> {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'Maska převezme vzhled z reference',
-                          style: TextStyle(
+                          _refIsFace
+                              ? 'Přenese se IDENTITA obličeje z reference'
+                              : 'Maska převezme vzhled z reference',
+                          style: const TextStyle(
                             color: AppTheme.textSecondary,
                             fontSize: 12,
                           ),
                         ),
                       ),
+                      if (_model.inpaintFace)
+                        IconButton(
+                          tooltip: 'Reference je obličej — zachovat identitu',
+                          onPressed: () =>
+                              setState(() => _refIsFace = !_refIsFace),
+                          icon: Icon(
+                            Icons.face_retouching_natural,
+                            size: 22,
+                            color: _refIsFace
+                                ? AppTheme.accent
+                                : AppTheme.textSecondary,
+                          ),
+                        ),
                       IconButton(
-                        onPressed: () => setState(() => _refPng = null),
+                        onPressed: () => setState(
+                            () { _refPng = null; _refIsFace = false; }),
                         icon: const Icon(Icons.close,
                             size: 18, color: AppTheme.textSecondary),
                       ),

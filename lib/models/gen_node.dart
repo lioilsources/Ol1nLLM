@@ -102,6 +102,10 @@ class GenNode {
   /// donor), or null for text-only inpaint. Only set when [maskFileName] is.
   final String? refFileName;
 
+  /// True when [refFileName] ran in face-identity mode (PuLID) — retry must
+  /// replay the same mode. Persisted only when true.
+  final bool refIsFace;
+
   // ── Generation metadata (nullable — nodes written before this existed
   //    stay valid; NIM models leave preset-derived fields null because their
   //    values are service constants recoverable from [modelId]) ──
@@ -145,6 +149,7 @@ class GenNode {
     this.jobId,
     this.maskFileName,
     this.refFileName,
+    this.refIsFace = false,
     this.modelId,
     this.loraName,
     this.poseId,
@@ -171,6 +176,7 @@ class GenNode {
     required String prompt,
     String? maskFileName,
     String? refFileName,
+    bool refIsFace = false,
     String? modelId,
     String? loraName,
     String? poseId,
@@ -193,6 +199,7 @@ class GenNode {
     status: GenStatus.generating,
     maskFileName: maskFileName,
     refFileName: refFileName,
+    refIsFace: refIsFace,
     modelId: modelId,
     loraName: loraName,
     poseId: poseId,
@@ -221,6 +228,7 @@ class GenNode {
     if (jobId != null) 'jobId': jobId,
     if (maskFileName != null) 'maskFileName': maskFileName,
     if (refFileName != null) 'refFileName': refFileName,
+    if (refIsFace) 'refIsFace': true,
     if (modelId != null) 'modelId': modelId,
     if (loraName != null) 'loraName': loraName,
     if (poseId != null) 'poseId': poseId,
@@ -261,6 +269,7 @@ class GenNode {
       jobId: jobId,
       maskFileName: json['maskFileName'] as String?,
       refFileName: json['refFileName'] as String?,
+      refIsFace: json['refIsFace'] as bool? ?? false,
       modelId: json['modelId'] as String?,
       loraName: json['loraName'] as String?,
       poseId: json['poseId'] as String?,
@@ -307,6 +316,7 @@ class GenNode {
     jobId: clearJobId ? null : (jobId ?? this.jobId),
     maskFileName: maskFileName,
     refFileName: refFileName,
+    refIsFace: refIsFace,
     modelId: modelId,
     loraName: loraName,
     poseId: poseId,

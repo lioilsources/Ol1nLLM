@@ -43,6 +43,53 @@ void main() {
       );
       expect(imageModelById('sd15').inpaintRef, isFalse);
     });
+
+    test('face-identity mode is Fill-only (PuLID)', () {
+      expect(fill.inpaintFace, isTrue);
+      expect(
+        fill.preset!.inpaintFaceAsset,
+        'assets/comfyui/flux_fill_inpaint_face.api.json',
+      );
+      // SDXL has no face path (InstantID variant not wired) — the toggle
+      // must stay hidden there.
+      expect(pony.inpaintFace, isFalse);
+    });
+  });
+
+  group('FLUX Fill + PuLID face template', () {
+    Map<String, dynamic> prepare() {
+      final svc = ComfyUIService()..setPreset(fill.preset!);
+      return svc.prepareForTest(
+        _loadTemplate(fill.preset!.inpaintFaceAsset!),
+        prompt: 'a portrait',
+        batch: 2,
+        seed: 4,
+        imageName: 'src.png',
+        maskName: 'mask.png',
+        refName: 'face.png',
+      );
+    }
+
+    test('sentinels resolve; PuLID patches the sampler model', () {
+      final wf = prepare();
+      final s = _jsonOf(wf);
+      expect(s, isNot(contains('__REF__')));
+      expect(s, isNot(contains('__MASK__')));
+      expect(s, isNot(contains('__IMAGE__')));
+
+      final pulidKey = wf.entries
+          .firstWhere(
+            (e) => (e.value as Map)['class_type'] == 'ApplyPulidFlux',
+          )
+          .key;
+      final ks = wf.values.firstWhere((n) => n['class_type'] == 'KSampler');
+      expect(ks['inputs']['model'], [pulidKey, 0]);
+      // Tested server config: full identity strength, no attention mask
+      // (the crop already scopes the repaint; see PLAN M7).
+      final pulid = (wf[pulidKey] as Map).cast<String, dynamic>();
+      expect(pulid['inputs']['weight'], 1.0);
+      expect((pulid['inputs'] as Map).containsKey('attn_mask'), isFalse);
+    });
   });
 
   group('FLUX Fill + Redux reference template', () {

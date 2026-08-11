@@ -20,6 +20,7 @@ class ComfyPreset {
     required this.img2imgAsset,
     this.inpaintAsset,
     this.inpaintRefAsset,
+    this.inpaintFaceAsset,
     this.ckptName,
     this.positivePrefix = '',
     this.negativePrompt = '',
@@ -43,6 +44,11 @@ class ComfyPreset {
   /// image's appearance into the masked region (attn_mask-restricted). Null =
   /// text-only inpaint (flux-fill has no reference path — needs Redux).
   final String? inpaintRefAsset;
+
+  /// Face-identity variant of the reference workflow: a biometric encoder
+  /// (PuLID for FLUX) transfers WHO the reference face is, not just how it
+  /// looks. Null = the face toggle is hidden for this model.
+  final String? inpaintFaceAsset;
   final String? ckptName;
   final String positivePrefix;
   final String negativePrompt;
@@ -86,6 +92,9 @@ class ImageModelSpec {
 
   /// Whether an inpaint round can carry a reference image (IPAdapter).
   bool get inpaintRef => inpaint && preset?.inpaintRefAsset != null;
+
+  /// Whether the reference can run in face-identity mode.
+  bool get inpaintFace => inpaint && preset?.inpaintFaceAsset != null;
   final LoraFamily loraFamily;
 
   /// OpenPose ControlNet pose templates apply to this model. Explicit flag,
@@ -113,6 +122,7 @@ const _sdxlInpaint = 'assets/comfyui/sdxl_inpaint.api.json';
 const _sdxlInpaintRef = 'assets/comfyui/sdxl_inpaint_ref.api.json';
 const _fluxFillInpaint = 'assets/comfyui/flux_fill_inpaint.api.json';
 const _fluxFillInpaintRef = 'assets/comfyui/flux_fill_inpaint_ref.api.json';
+const _fluxFillInpaintFace = 'assets/comfyui/flux_fill_inpaint_face.api.json';
 
 const _ponyScoreTags = 'score_9, score_8_up, score_7_up, score_6_up';
 const _ponyNegative =
@@ -170,6 +180,8 @@ const kImageModels = <ImageModelSpec>[
       inpaintAsset: _fluxFillInpaint,
       // Redux (SigLIP + style model) — reference-guided fill.
       inpaintRefAsset: _fluxFillInpaintRef,
+      // PuLID (InsightFace + EVA-CLIP) — identity-preserving face reference.
+      inpaintFaceAsset: _fluxFillInpaintFace,
     ),
   ),
   ImageModelSpec(

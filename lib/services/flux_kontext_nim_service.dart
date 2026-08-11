@@ -110,6 +110,7 @@ class FluxKontextNimService implements ImageBackend {
     String? negativePrompt,
     Uint8List? mask,
     Uint8List? refImage,
+    bool refIsFace = false,
   }) async* {
     assert(mask == null, 'FLUX Kontext NIM nepodporuje inpaint masku');
     yield* _infer(

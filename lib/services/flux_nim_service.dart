@@ -74,6 +74,7 @@ class FluxNimService implements ImageBackend {
     String? negativePrompt,
     Uint8List? mask,
     Uint8List? refImage,
+    bool refIsFace = false,
   }) async* {
     yield const GenFailed('[FLUX NIM] tento model podporuje pouze txt2img. Pro img2img použijte FLUX Kontext nebo ComfyUI.');
   }

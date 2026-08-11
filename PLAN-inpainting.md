@@ -193,6 +193,31 @@ Fill ~0 (lepší než dřív — stitch vrací originál mimo výřez), SDXL ~1 
 vzorků = záměrný 32px blend pás švu. Vizuálně řádový skok v detailu.
 Appka beze změn (sentinely stejné).
 
+## M7 — face-identity inpaint (FLUX Fill + PuLID) ✅ 2026-08-11 (kód; zařízení viz M4)
+
+Redux/IPAdapter přenášejí jen sémantiku (CLIP), ne identitu → obličej
+z reference byl „podobný jen vzdáleně". Řešení: **PuLID-FLUX** (InsightFace
+biometrický embedding + EVA-CLIP).
+
+- Server: `ComfyUI_PuLID_Flux_ll` + `facexlib`, `facenet-pytorch --no-deps`
+  (jinak downgrade torch!); modely `pulid_flux_v0.9.1.safetensors` (1,1 GB,
+  models/pulid) + `EVA02_CLIP_L_336_psz14_s6B.pt` (857 MB, models/clip);
+  antelopev2 už byl. **Patch nodu**: `pulid_forward_orig` v PulidFluxHook.py
+  neznal `timestep_zero_index` (ComfyUI ≥ 0.19) — přidán param + `**kwargs`
+  (záloha `.bak-20260811`; pozor při `git pull` nodu).
+- `flux_fill_inpaint_face.api.json`: Fill crop&stitch + ApplyPulidFlux
+  (**weight 1.0, BEZ attn_mask** — crop repaint už scopuje maska; s attn_mask
+  a weight 0.9 identita neprorazila kontext). Test: identita reference
+  prokazatelně přenesena (99 s/batch 2).
+- **Maska musí pokrýt vše, co se má změnit** — vlasy mimo masku zůstanou
+  původní (ověřeno: velká maska přes hlavu = tvář reference, malá = jen
+  omlazení). Do UI hintu příště?
+- App: `inpaintFaceAsset`/`inpaintFace` (jen flux-fill), `refIsFace` napříč
+  edit()/GenNode (persistováno jen true)/provider/retry; face toggle ikona
+  (`face_retouching_natural`) u reference v prompt sheetu, jen pro modely
+  s face podporou; přepnutí chipu na model bez ní režim vypne.
+- SDXL InstantID varianta zůstává jako možné rozšíření (vše na serveru je).
+
 ## Mimo scope
 
 - MangaPrompts (tgbot RMBG auto-masky) — samostatný plán později

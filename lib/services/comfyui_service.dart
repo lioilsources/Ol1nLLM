@@ -185,12 +185,14 @@ class ComfyUIService implements ImageBackend {
     String? negativePrompt,
     Uint8List? mask,
     Uint8List? refImage,
+    bool refIsFace = false,
   }) async* {
     if (mask != null) {
       yield* _inpaint(
         image: image,
         mask: mask,
         refImage: refImage,
+        refIsFace: refIsFace,
         prompt: prompt,
         n: n,
         seed: seed,
@@ -230,18 +232,24 @@ class ComfyUIService implements ImageBackend {
     required Uint8List image,
     required Uint8List mask,
     Uint8List? refImage,
+    bool refIsFace = false,
     required String prompt,
     required int n,
     required int seed,
     String? negativePrompt,
   }) async* {
-    final asset =
-        refImage != null ? _preset.inpaintRefAsset : _preset.inpaintAsset;
+    final asset = refImage == null
+        ? _preset.inpaintAsset
+        : refIsFace
+            ? _preset.inpaintFaceAsset
+            : _preset.inpaintRefAsset;
     if (asset == null) {
       yield GenFailed(
-        refImage != null
-            ? '[ComfyUI] Aktivní model nepodporuje referenční inpaint.'
-            : '[ComfyUI] Aktivní model nepodporuje inpaint.',
+        refImage == null
+            ? '[ComfyUI] Aktivní model nepodporuje inpaint.'
+            : refIsFace
+                ? '[ComfyUI] Aktivní model nepodporuje face inpaint.'
+                : '[ComfyUI] Aktivní model nepodporuje referenční inpaint.',
       );
       return;
     }
