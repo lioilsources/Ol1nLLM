@@ -244,6 +244,18 @@ nekompatibilní volbu resetuje. Volba ze sheetu se přes `setLora` stává
 session volbou (metadata nodu + retry konzistentní). UI-only změna,
 service beze změn.
 
+## M10 — oprava: malá maska = černý/nesmyslný inpaint ✅ 2026-08-15
+
+Reálné joby z appky (maska ~2 % plochy): Illustrious+LoRA generoval v masce
+čistou čerň (jas 8/255), Juggernaut halucinoval. Příčina: crop&stitch
+s `context_from_mask_extend_factor: 1.2` dal modelu crop, kde maska tvořila
+~70 % plochy — 1024² plátno téměř bez okolního kontextu; Illustrious bez
+scénických tagů maluje černé pozadí. **Fix: faktor 3.0 ve všech 5 assetech**
+— ověřeno re-runem přesných grafů uživatele (jas 8→120, Jugger koherentní)
+i regresí střední masky (kachnička beze změn chování). Trade-off: velké
+masky se blíží full-canvas chování (crop se clampne), malé masky — hlavní
+cíl ostrosti — si drží ~2× upscale a nově i dost kontextu.
+
 ## Mimo scope
 
 - MangaPrompts (tgbot RMBG auto-masky) — samostatný plán později

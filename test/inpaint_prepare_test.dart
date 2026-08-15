@@ -264,6 +264,11 @@ void main() {
             (e) => (e.value as Map)['class_type'] == 'InpaintCropImproved',
           )
           .key;
+      // 3.0, ne 1.2: malá maska s minimem kontextu dávala modelu prázdné
+      // plátno — Illustrious maloval černou, Juggernaut halucinoval
+      // (diagnostikováno z reálných jobů 2026-08-15).
+      final crop = (wf[cropKey] as Map).cast<String, dynamic>();
+      expect(crop['inputs']['context_from_mask_extend_factor'], 3.0);
       // The sampler must work on the upscaled crop, not the full canvas.
       final enc = wf.values
           .firstWhere((n) => n['class_type'] == 'VAEEncodeForInpaint');

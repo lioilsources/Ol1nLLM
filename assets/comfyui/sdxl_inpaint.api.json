@@ -222,7 +222,7 @@
       "extend_down_factor": 1.0,
       "extend_left_factor": 1.0,
       "extend_right_factor": 1.0,
-      "context_from_mask_extend_factor": 1.2,
+      "context_from_mask_extend_factor": 3.0,
       "output_resize_to_target_size": true,
       "output_target_width": 1024,
       "output_target_height": 1024,
