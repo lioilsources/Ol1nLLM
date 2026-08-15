@@ -753,6 +753,8 @@ class _NodeGrid extends ConsumerWidget {
           imageBytes: img.bytes,
           models: candidates,
           initialModelId: initial,
+          availableLoras: state.availableLoras,
+          initialLora: state.selectedLora,
         ),
       ),
     );
@@ -762,6 +764,9 @@ class _NodeGrid extends ConsumerWidget {
     if (result.modelId != ref.read(imageStudioProvider).modelId) {
       notifier.setModel(result.modelId);
     }
+    // The sheet's LoRA choice wins for this round — setModel may have
+    // reconciled the session LoRA, so apply after it.
+    notifier.setLora(result.loraName);
     await notifier.inpaint(
       result.prompt,
       result.maskPng,

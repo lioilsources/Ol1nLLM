@@ -18,6 +18,7 @@ typedef MaskEditorResult = ({
   Uint8List? refPng,
   bool refIsFace,
   String modelId,
+  String? loraName,
 });
 
 /// Fullscreen mask painting over a source image.
@@ -36,6 +37,8 @@ class MaskEditorScreen extends StatefulWidget {
     required this.imageBytes,
     required this.models,
     required this.initialModelId,
+    this.availableLoras = const [],
+    this.initialLora,
   });
 
   final Uint8List imageBytes;
@@ -49,6 +52,16 @@ class MaskEditorScreen extends StatefulWidget {
   /// Pre-selected entry of [models] (the session's model when it can
   /// inpaint, otherwise the caller's fallback).
   final String initialModelId;
+
+  /// All LoRAs installed on the server (unfiltered) — the prompt sheet
+  /// narrows them per selected model via [lorasForFamily]. LoRA rounds are
+  /// SDXL-only (flux-fill's dedicated workflows ban LoRA), so the row hides
+  /// there.
+  final List<String> availableLoras;
+
+  /// Session's selected LoRA — pre-picked when compatible with the initial
+  /// model.
+  final String? initialLora;
 
   @override
   State<MaskEditorScreen> createState() => _MaskEditorScreenState();
@@ -177,13 +190,21 @@ class _MaskEditorScreenState extends State<MaskEditorScreen> {
 
   Future<void> _confirm() async {
     final result = await showModalBottomSheet<
-        ({String prompt, Uint8List? refPng, bool refIsFace, String modelId})>(
+        ({
+          String prompt,
+          Uint8List? refPng,
+          bool refIsFace,
+          String modelId,
+          String? loraName,
+        })>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppTheme.surface,
       builder: (context) => _PromptSheet(
         models: widget.models,
         initialModelId: widget.initialModelId,
+        availableLoras: widget.availableLoras,
+        initialLora: widget.initialLora,
       ),
     );
     if (result == null || result.prompt.trim().isEmpty || !mounted) return;
@@ -195,6 +216,7 @@ class _MaskEditorScreenState extends State<MaskEditorScreen> {
       refPng: result.refPng,
       refIsFace: result.refIsFace,
       modelId: result.modelId,
+      loraName: result.loraName,
     ));
   }
 
@@ -389,10 +411,14 @@ class _PromptSheet extends StatefulWidget {
   const _PromptSheet({
     required this.models,
     required this.initialModelId,
+    required this.availableLoras,
+    this.initialLora,
   });
 
   final List<ImageModelSpec> models;
   final String initialModelId;
+  final List<String> availableLoras;
+  final String? initialLora;
 
   @override
   State<_PromptSheet> createState() => _PromptSheetState();
@@ -407,14 +433,25 @@ class _PromptSheetState extends State<_PromptSheet> {
   /// over (PuLID). Only offered when [_model.inpaintFace].
   bool _refIsFace = false;
   late String _modelId = widget.initialModelId;
+  String? _lora;
 
   ImageModelSpec get _model =>
       widget.models.firstWhere((m) => m.id == _modelId,
           orElse: () => widget.models.first);
 
+  /// LoRAs usable with the selected model's inpaint round: family-filtered,
+  /// and only for generic (SDXL) templates — dedicated flux workflows ban
+  /// LoRA (see ComfyUIService._prepare).
+  List<String> get _compatibleLoras => _model.preset?.ckptName == null
+      ? const []
+      : lorasForFamily(widget.availableLoras, _model.loraFamily);
+
   @override
   void initState() {
     super.initState();
+    if (_compatibleLoras.contains(widget.initialLora)) {
+      _lora = widget.initialLora;
+    }
     _controller.addListener(() {
       final has = _controller.text.trim().isNotEmpty;
       if (has != _hasText) setState(() => _hasText = has);
@@ -483,6 +520,7 @@ class _PromptSheetState extends State<_PromptSheet> {
       refPng: _refPng,
       refIsFace: _refPng != null && _refIsFace && _model.inpaintFace,
       modelId: _model.id,
+      loraName: _compatibleLoras.contains(_lora) ? _lora : null,
     ));
   }
 
@@ -532,9 +570,11 @@ class _PromptSheetState extends State<_PromptSheet> {
                     onSelected: (_) => setState(() {
                       _modelId = m.id;
                       // A model without reference support drops a picked ref;
-                      // one without a face path drops the face mode.
+                      // one without a face path drops the face mode; an
+                      // incompatible LoRA gets dropped too.
                       if (!m.inpaintRef) _refPng = null;
                       if (!m.inpaintFace) _refIsFace = false;
+                      if (!_compatibleLoras.contains(_lora)) _lora = null;
                     }),
                   ),
                   const SizedBox(width: 6),
@@ -542,6 +582,51 @@ class _PromptSheetState extends State<_PromptSheet> {
               ],
             ),
           ),
+          if (_compatibleLoras.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.tune, size: 16, color: AppTheme.textSecondary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String?>(
+                      value: _lora,
+                      isExpanded: true,
+                      isDense: true,
+                      dropdownColor: AppTheme.surfaceAlt,
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 13,
+                      ),
+                      hint: const Text(
+                        'Bez LoRA',
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Bez LoRA'),
+                        ),
+                        for (final l in _compatibleLoras)
+                          DropdownMenuItem<String?>(
+                            value: l,
+                            child: Text(
+                              l.replaceAll('.safetensors', ''),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged: (v) => setState(() => _lora = v),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           if (_model.inpaintRef) ...[
             const SizedBox(height: 10),
             // Reference picker: thumbnail with a remove ×, or an add-button.

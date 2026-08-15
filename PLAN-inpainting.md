@@ -233,6 +233,17 @@ Zásadní podmínka zůstává: **maska musí dát vlasům prostor** — head-on
 maska s šedými nemaskovanými okraji vlasy nepřenese ani při silném
 conditioningu (ověřeno negativně). UI beze změn.
 
+## M9 — LoRA výběr v inpaint sheetu ✅ 2026-08-15
+
+LoRA šla v inpaintu aplikovat jen nepřímo (výběr v input baru se tiše
+propsal) — v prompt sheetu nebyla vidět ani volitelná. Přidán dropdown
+mezi model chipy a referenci: filtrovaný přes `lorasForFamily` podle
+zvoleného chipu, **skrytý pro flux-fill** (dedikované workflowy mají LoRA
+ban), předvybraný session LoRou je-li kompatibilní; přepnutí chipu
+nekompatibilní volbu resetuje. Volba ze sheetu se přes `setLora` stává
+session volbou (metadata nodu + retry konzistentní). UI-only změna,
+service beze změn.
+
 ## Mimo scope
 
 - MangaPrompts (tgbot RMBG auto-masky) — samostatný plán později
