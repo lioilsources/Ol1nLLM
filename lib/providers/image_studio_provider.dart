@@ -253,6 +253,10 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
 
   /// Re-attach to in-flight jobs after iOS suspension or app restart.
   void _resumeInFlightJob() {
+    // Fresh interruption budget on every wake: the previous budget typically
+    // burnt out during the ~30 s background grace period (rapid-fire socket
+    // errors while iOS was suspending us), which must not poison the resume.
+    _interruptRetries = 0;
     final backend = _backend;
     for (final node in state.nodes.where(
       (n) => n.status == GenStatus.generating && n.jobId != null,
@@ -1063,6 +1067,16 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         Future.delayed(_interruptBackoff, () {
           if (mounted) _resumeInFlightJob();
         });
+      } else if (_nodeById(nodeId)?.is3D == true) {
+        // A mesh job is durable server-side and recoverable from its output
+        // files at any time — never hard-fail it on a burnt retry budget.
+        // Keep the node generating with its jobId; the next app foreground
+        // (didChangeAppLifecycleState) re-attaches with a fresh budget.
+        _patch(
+          nodeId,
+          (n) => n.copyWith(progressLabel: 'Obnovím po návratu do aplikace…'),
+        );
+        unawaited(_save());
       } else {
         fail('[ImageStudio] nepodařilo se obnovit spojení – zkus to znovu');
       }

@@ -448,6 +448,13 @@ class ComfyUIService implements ImageBackend {
       } on SocketException {
         yield GenInterrupted('$promptId|$meshId');
         return;
+      } catch (_) {
+        // iOS suspend kills sockets as http.ClientException/HttpException
+        // (not Socket/Timeout) — same classification as the NIM backends:
+        // resumable interruption, not a failure. The job id is durable and
+        // followMesh can even complete from the output files later.
+        yield GenInterrupted('$promptId|$meshId');
+        return;
       }
     }
   }
