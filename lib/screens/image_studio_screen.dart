@@ -125,23 +125,31 @@ class ImageStudioScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          if (state.nodes.isNotEmpty) _TreeNavigator(state: state),
-          Expanded(
-            child: current == null
-                ? const _EmptyHint()
-                : _NodeGrid(node: current, selectedId: state.selectedImageId),
-          ),
-          if (bannerNode != null)
-            _ProgressBanner(
-              key: ValueKey(bannerNode.id),
-              node: bannerNode,
-              othersGenerating:
-                  generating.where((n) => n.id != bannerNode.id).length,
+      // Tap anywhere outside the prompt field to drop focus and dismiss the
+      // keyboard — small devices (iPhone mini) have no other way to reclaim
+      // the space it eats, and there is no hardware/keyboard "done" control
+      // for a plain (non-scrollable) body.
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Column(
+          children: [
+            if (state.nodes.isNotEmpty) _TreeNavigator(state: state),
+            Expanded(
+              child: current == null
+                  ? const _EmptyHint()
+                  : _NodeGrid(node: current, selectedId: state.selectedImageId),
             ),
-          _StudioInputBar(state: state),
-        ],
+            if (bannerNode != null)
+              _ProgressBanner(
+                key: ValueKey(bannerNode.id),
+                node: bannerNode,
+                othersGenerating:
+                    generating.where((n) => n.id != bannerNode.id).length,
+              ),
+            _StudioInputBar(state: state),
+          ],
+        ),
       ),
     );
   }
@@ -711,33 +719,48 @@ class _NodeGrid extends ConsumerWidget {
       final stl = node.stlFileName == null
           ? null
           : '${GenImage.baseDir}/${node.stlFileName}';
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.view_in_ar, size: 56, color: AppTheme.accent),
-            const SizedBox(height: 12),
-            const Text(
-              '3D model je hotový',
-              style: TextStyle(color: AppTheme.textPrimary, fontSize: 16),
+      // LayoutBuilder + a scroll view with a min-height constraint: centers
+      // when there's room, but on a squeezed viewport (keyboard open on a
+      // small phone) it scrolls instead of overflowing — an overflowing
+      // Center() paints its excess outside this box, where it silently ends
+      // up hidden behind whatever is painted after it (the model chips row /
+      // prompt bar), so the button becomes present but unreachable instead
+      // of just off-screen.
+      return LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.view_in_ar, size: 56, color: AppTheme.accent),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '3D model je hotový',
+                    style: TextStyle(color: AppTheme.textPrimary, fontSize: 16),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    style:
+                        FilledButton.styleFrom(backgroundColor: AppTheme.accent),
+                    onPressed: glb == null || stl == null
+                        ? null
+                        : () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => ModelViewerScreen(
+                                  glbPath: glb,
+                                  stlPath: stl,
+                                ),
+                              ),
+                            ),
+                    icon: const Icon(Icons.threed_rotation, size: 18),
+                    label: const Text('Otevřít a otáčet'),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: AppTheme.accent),
-              onPressed: glb == null || stl == null
-                  ? null
-                  : () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => ModelViewerScreen(
-                            glbPath: glb,
-                            stlPath: stl,
-                          ),
-                        ),
-                      ),
-              icon: const Icon(Icons.threed_rotation, size: 18),
-              label: const Text('Otevřít a otáčet'),
-            ),
-          ],
+          ),
         ),
       );
     }
