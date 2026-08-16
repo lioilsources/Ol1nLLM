@@ -380,11 +380,18 @@ class ComfyUIService implements ImageBackend {
           final running = (q['queue_running'] as List?) ?? const [];
           final pos = pending.indexWhere((e) => (e as List)[1] == promptId);
           if (pos >= 0) {
+            missingFromHistory = 0;
             yield GenQueued(pos + 1);
             continue;
           }
           if (running.any((e) => (e as List)[1] == promptId)) {
+            // Still executing. ComfyUI only writes the history entry AFTER
+            // completion, so the history check below would see "missing" for
+            // the whole (many-minute) run and falsely declare the job lost —
+            // skip it while the queue itself confirms the job is alive.
+            missingFromHistory = 0;
             yield const GenRunning(0, 0);
+            continue;
           }
         }
 
