@@ -284,6 +284,93 @@ const kImageModels = <ImageModelSpec>[
       scheduler: 'normal',
     ),
   ),
+  // NoobAI is Illustrious dotrénovaný na danbooru + e621: stejná gramatika
+  // promptů, ale výrazně širší znalost postav a konceptů. Záměrně eps-pred
+  // varianta — v-pred verze potřebují ModelSamplingDiscrete, který generické
+  // sdxl_* šablony nemají.
+  ImageModelSpec(
+    id: 'noobai-xl',
+    label: 'NoobAI XL',
+    icon: Icons.diversity_2_outlined,
+    color: Color(0xFF8FBCBB),
+    kind: ImageBackendKind.comfyUi,
+    txt2img: true,
+    img2img: true,
+    inpaint: true,
+    loraFamily: LoraFamily.sdxl,
+    supportsPose: true,
+    preset: ComfyPreset(
+      txt2imgAsset: _sdxlTxt2img,
+      img2imgAsset: _sdxlImg2img,
+      inpaintAsset: _sdxlInpaint,
+      inpaintRefAsset: _sdxlInpaintRef,
+      ckptName: 'noobai-xl-eps11.safetensors',
+      positivePrefix: 'masterpiece, best quality, very awa',
+      negativePrompt:
+          'lowres, bad anatomy, bad hands, worst quality, low quality, '
+          'jpeg artifacts, blurry, watermark, signature',
+      steps: 28,
+      samplerName: 'euler_ancestral',
+      scheduler: 'normal',
+    ),
+  ),
+  ImageModelSpec(
+    id: 'wai-illustrious',
+    label: 'WAI Illustrious',
+    icon: Icons.auto_fix_normal_outlined,
+    color: Color(0xFFB48EAD),
+    kind: ImageBackendKind.comfyUi,
+    txt2img: true,
+    img2img: true,
+    inpaint: true,
+    loraFamily: LoraFamily.sdxl,
+    supportsPose: true,
+    preset: ComfyPreset(
+      txt2imgAsset: _sdxlTxt2img,
+      img2imgAsset: _sdxlImg2img,
+      inpaintAsset: _sdxlInpaint,
+      inpaintRefAsset: _sdxlInpaintRef,
+      ckptName: 'wai-nsfw-illustrious.safetensors',
+      positivePrefix: 'masterpiece, best quality, amazing quality',
+      negativePrompt:
+          'bad quality, worst quality, worst detail, sketch, censored, '
+          'lowres, bad anatomy, bad hands, watermark, signature',
+      steps: 28,
+      cfg: 5.0,
+      samplerName: 'euler_ancestral',
+      scheduler: 'normal',
+    ),
+  ),
+  // Přímý SDXL finetune (ne Illustrious rodina) — jiná gramatika promptů
+  // a čistší "oficiální" anime look; drží se kvůli stylovému kontrastu.
+  ImageModelSpec(
+    id: 'animagine-xl',
+    label: 'Animagine XL 4',
+    icon: Icons.brush,
+    color: Color(0xFFEBCB8B),
+    kind: ImageBackendKind.comfyUi,
+    txt2img: true,
+    img2img: true,
+    inpaint: true,
+    loraFamily: LoraFamily.sdxl,
+    supportsPose: true,
+    preset: ComfyPreset(
+      txt2imgAsset: _sdxlTxt2img,
+      img2imgAsset: _sdxlImg2img,
+      inpaintAsset: _sdxlInpaint,
+      inpaintRefAsset: _sdxlInpaintRef,
+      ckptName: 'animagine-xl-40-opt.safetensors',
+      positivePrefix: 'masterpiece, high score, great score, absurdres',
+      negativePrompt:
+          'lowres, bad anatomy, bad hands, text, error, missing finger, '
+          'extra digits, fewer digits, cropped, worst quality, low quality, '
+          'jpeg artifacts, watermark, signature',
+      steps: 28,
+      cfg: 5.0,
+      samplerName: 'euler_ancestral',
+      scheduler: 'normal',
+    ),
+  ),
   ImageModelSpec(
     id: 'atomix-pony-anime',
     label: 'Atomix Pony Anime',
