@@ -697,17 +697,37 @@ class _NodeGrid extends ConsumerWidget {
     }
 
     // One spinner per generating node (the per-step label lives in the
-    // progress banner below the grid).
+    // progress banner below the grid). 3D rounds also get a manual escape
+    // hatch: their job survives app suspension, but the stream that was
+    // watching it does not always — without a button the node would just
+    // spin forever with no way to pull the (finished) result down.
     if (node.status == GenStatus.generating) {
       return Center(
-        child: SizedBox(
-          width: 28,
-          height: 28,
-          child: CircularProgressIndicator(
-            value: node.progress,
-            strokeWidth: 2.5,
-            color: AppTheme.accent,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(
+                value: node.progress,
+                strokeWidth: 2.5,
+                color: AppTheme.accent,
+              ),
+            ),
+            if (node.is3D) ...[
+              const SizedBox(height: 20),
+              TextButton.icon(
+                onPressed: () =>
+                    ref.read(imageStudioProvider.notifier).retry(node.id),
+                icon: const Icon(Icons.download_outlined, size: 18),
+                label: const Text('Zkusit stáhnout výsledek'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.textSecondary,
+                ),
+              ),
+            ],
+          ],
         ),
       );
     }

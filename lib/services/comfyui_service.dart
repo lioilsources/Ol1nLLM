@@ -288,6 +288,12 @@ class ComfyUIService implements ImageBackend {
   static const _meshAsset = 'assets/comfyui/img2print.api.json';
   static const _meshSubfolder = '3D/app';
 
+  // Mesh downloads are heavy (STL ~15 MB) and run over the CF tunnel, so they
+  // get their own budget instead of the image-sized one.
+  static const _meshDownloadTimeout = Duration(minutes: 5);
+  static const _meshDownloadAttempts = 3;
+  static const _meshDownloadBackoff = Duration(seconds: 3);
+
   String _meshStlName(String meshId) => '${meshId}_00001_.stl';
   String _meshGlbName(String meshId) => '${meshId}g_00001_.glb';
 
@@ -333,20 +339,35 @@ class ComfyUIService implements ImageBackend {
   }) async* {
     yield GenSubmitted('$promptId|$meshId');
 
+    // Mesh files are big (STL ~15 MB, GLB ~5 MB) and go through the CF tunnel:
+    // ~17 s for the STL on a fast desktop link, several times that on mobile.
+    // Distinguish "not there (yet)" — a plain 404, the only legitimate null —
+    // from a transport failure, which must NOT be reported as a dead job: the
+    // files are durable server-side, so a retry (or the next resume) can still
+    // pick them up.
     Future<Uint8List?> download(String filename) async {
-      try {
-        final uri = Uri.parse('$_baseUrl/view').replace(queryParameters: {
-          'filename': filename,
-          'subfolder': _meshSubfolder,
-          'type': 'output',
-        });
-        final resp = await _client
-            .get(uri, headers: _authHeaders)
-            .timeout(_downloadTimeout);
-        return resp.statusCode == 200 ? resp.bodyBytes : null;
-      } catch (_) {
-        return null;
+      Object? lastError;
+      for (var attempt = 1; attempt <= _meshDownloadAttempts; attempt++) {
+        try {
+          final uri = Uri.parse('$_baseUrl/view').replace(queryParameters: {
+            'filename': filename,
+            'subfolder': _meshSubfolder,
+            'type': 'output',
+          });
+          final resp = await _client
+              .get(uri, headers: _authHeaders)
+              .timeout(_meshDownloadTimeout);
+          if (resp.statusCode == 200) return resp.bodyBytes;
+          if (resp.statusCode == 404) return null; // genuinely absent
+          lastError = 'HTTP ${resp.statusCode}';
+        } catch (e) {
+          lastError = e;
+        }
+        if (attempt < _meshDownloadAttempts) {
+          await Future.delayed(_meshDownloadBackoff * attempt);
+        }
       }
+      throw _MeshDownloadFailure('$filename: $lastError');
     }
 
     Future<GenEvent?> tryComplete() async {
@@ -437,11 +458,20 @@ class ComfyUIService implements ImageBackend {
             yield done;
             return;
           }
+          // History says done but the files are absent (404) — the export
+          // node never wrote them, so regenerating is the only way out.
           yield const GenFailed(
-            '[ComfyUI] 3D výstup se nepodařilo stáhnout.',
+            '[ComfyUI] 3D výstup na serveru chybí — zkus vygenerovat znovu.',
           );
           return;
         }
+      } on _MeshDownloadFailure catch (e) {
+        // Transport hiccup while pulling a finished mesh (slow mobile link,
+        // app suspended mid-transfer). The files stay on the server, so this
+        // is resumable — never a dead job.
+        debugPrint('[comfy] mesh download failed: $e');
+        yield GenInterrupted('$promptId|$meshId');
+        return;
       } on TimeoutException {
         yield GenInterrupted('$promptId|$meshId');
         return;
@@ -1196,4 +1226,13 @@ class ComfyUIService implements ImageBackend {
 
   @override
   void dispose() => _client.close();
+}
+
+/// Transport failure while downloading a finished mesh — resumable, because
+/// the artifacts are durable on the server (see [ComfyUIService.followMesh]).
+class _MeshDownloadFailure implements Exception {
+  final String detail;
+  const _MeshDownloadFailure(this.detail);
+  @override
+  String toString() => 'MeshDownloadFailure($detail)';
 }

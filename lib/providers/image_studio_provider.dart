@@ -869,7 +869,15 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   /// an unmasked edit.
   Future<void> retry(String nodeId) async {
     final node = _nodeById(nodeId);
-    if (node == null || node.status == GenStatus.generating) return;
+    if (node == null) return;
+    // A stuck 3D node may legitimately sit in `generating` (its job outlived
+    // an app suspension); re-attaching to it is safe and is the whole point
+    // of the manual retry there. Everything else stays guarded.
+    if (node.status == GenStatus.generating && !node.is3D) return;
+    if (node.is3D && _activeSubs.containsKey(nodeId)) {
+      // Already re-attached and working — don't stack a second stream.
+      return;
+    }
     if (node.maskFileName != null &&
         (!state.model.inpaint ||
             (node.refFileName != null && !state.model.inpaintRef) ||
@@ -886,7 +894,24 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       return;
     }
     _interruptRetries = 0;
-    // 3D mesh retry: re-run the whole mesh job from the source image.
+    // 3D mesh retry. With a job id the artifacts are (or will be) on the
+    // server — followMesh downloads them directly, which takes seconds
+    // instead of regenerating the mesh for another 4 minutes.
+    if (node.is3D && node.jobId != null) {
+      final jobId = node.jobId!;
+      _patch(
+        nodeId,
+        (n) => n.copyWith(
+          status: GenStatus.generating,
+          clearError: true,
+          clearProgress: true,
+          progressLabel: 'Stahuji výsledek…',
+        ),
+      );
+      await _runAsync(nodeId, () => _comfyui.followMesh(jobId));
+      return;
+    }
+    // No job id (or a genuinely absent output): regenerate from the source.
     if (node.is3D) {
       final base = _imageById(node.sourceImageId);
       if (base == null) {
@@ -1032,13 +1057,16 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     }
 
     void fail(String msg) {
+      // Keep the job id on 3D nodes: the mesh artifacts are durable on the
+      // server, so retry can still just download them (see [retry]).
+      final keepJobId = _nodeById(nodeId)?.is3D ?? false;
       _patch(
         nodeId,
         (n) => n.copyWith(
           status: GenStatus.error,
           error: msg,
           clearProgress: true,
-          clearJobId: true,
+          clearJobId: !keepJobId,
         ),
       );
       // Persist the terminal error so a restart doesn't resurrect a dead job
