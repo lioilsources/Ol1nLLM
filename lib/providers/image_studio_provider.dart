@@ -258,7 +258,13 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       (n) => n.status == GenStatus.generating && n.jobId != null,
     )) {
       if (_activeSubs.containsKey(node.id)) continue;
-      unawaited(_runAsync(node.id, () => backend.follow(node.jobId!)));
+      // 3D mesh jobs resume through the ComfyUI mesh path regardless of the
+      // currently selected model — followMesh is history-independent (it can
+      // finish from the durable output files even after a server restart).
+      final run = node.is3D
+          ? () => _comfyui.followMesh(node.jobId!)
+          : () => backend.follow(node.jobId!);
+      unawaited(_runAsync(node.id, run));
     }
   }
 
@@ -820,6 +826,35 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     );
   }
 
+  /// Turn the selected image into a printable 3D model (Trellis2 on the
+  /// server): STL for slicing + GLB for the in-app 360° viewer. Slow round
+  /// (~4–7 min server-side) — the node survives app suspension via
+  /// [ComfyUIService.followMesh], which can complete from the durable output
+  /// files even if the server restarts after the job finished.
+  Future<void> make3D() async {
+    final base = _imageById(state.selectedImageId);
+    if (base == null) return;
+    _interruptRetries = 0;
+    final seed = _newSeed();
+    final node = GenNode.create(
+      parentId: state.currentNodeId,
+      sourceImageId: base.id,
+      prompt: '3D model',
+      is3D: true,
+      seed: seed,
+    );
+    state = state.copyWith(
+      nodes: [...state.nodes, node],
+      currentNodeId: node.id,
+      clearSelected: true,
+      clearError: true,
+    );
+    await _runAsync(
+      node.id,
+      () => _comfyui.generateMesh(image: base.bytes, seed: seed),
+    );
+  }
+
   /// Re-run a failed (or finished) node with its original prompt.
   ///
   /// The retry runs against the *current* model/LoRA/pose (they may have
@@ -847,6 +882,33 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       return;
     }
     _interruptRetries = 0;
+    // 3D mesh retry: re-run the whole mesh job from the source image.
+    if (node.is3D) {
+      final base = _imageById(node.sourceImageId);
+      if (base == null) {
+        _patch(
+          nodeId,
+          (n) =>
+              n.copyWith(status: GenStatus.error, error: 'Source image gone'),
+        );
+        return;
+      }
+      final seed3d = _newSeed();
+      _patch(
+        nodeId,
+        (n) => n.copyWith(
+          status: GenStatus.generating,
+          clearError: true,
+          clearProgress: true,
+          clearJobId: true,
+        ),
+      );
+      await _runAsync(
+        nodeId,
+        () => _comfyui.generateMesh(image: base.bytes, seed: seed3d),
+      );
+      return;
+    }
     final parts = splitPromptNegatives(node.prompt);
     final seed = _newSeed();
     final refreshed = _createNodeWithMeta(
@@ -1046,6 +1108,30 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
                 progressLabel: 'Stahování ${done + 1}/$total',
               ),
             );
+          case GenMeshComplete(:final stl, :final glb):
+            completedByEvent = true;
+            unawaited(() async {
+              final dir = await _dirFuture;
+              // Node id is already a UUID — reuse it for stable file names.
+              final glbName = '$nodeId.glb';
+              final stlName = '$nodeId.stl';
+              await File('${dir.path}/$glbName').writeAsBytes(glb, flush: true);
+              await File('${dir.path}/$stlName').writeAsBytes(stl, flush: true);
+              if (!mounted) return;
+              _patch(
+                nodeId,
+                (n) => n.copyWith(
+                  status: GenStatus.ready,
+                  glbFileName: glbName,
+                  stlFileName: stlName,
+                  clearError: true,
+                  clearProgress: true,
+                  clearJobId: true,
+                ),
+              );
+              unawaited(_save());
+              finish();
+            }());
           case GenComplete(:final images):
             completedByEvent = true;
             unawaited(() async {

@@ -54,6 +54,15 @@ class GenComplete extends GenEvent {
   const GenComplete(this.images);
 }
 
+/// Terminal success of a 3D mesh job — printable STL plus a GLB for the
+/// in-app viewer. Emitted by [ComfyUIService.generateMesh]/[followMesh]
+/// instead of [GenComplete].
+class GenMeshComplete extends GenEvent {
+  final Uint8List stl;
+  final Uint8List glb;
+  const GenMeshComplete({required this.stl, required this.glb});
+}
+
 /// Terminal failure with a human-readable [message].
 class GenFailed extends GenEvent {
   final String message;

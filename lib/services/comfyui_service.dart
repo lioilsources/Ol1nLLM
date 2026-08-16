@@ -277,6 +277,174 @@ class ComfyUIService implements ImageBackend {
   @override
   Stream<GenEvent> follow(String jobId) => _run(null, promptId: jobId);
 
+  // ── 3D mesh (img2print / Trellis2) ──────────────────────────
+  //
+  // The Trellis2 export node writes files but reports no paths in history, so
+  // the contract is deterministic instead: the client generates a mesh id and
+  // patches it into the filename prefixes (`3D/app/<id>` / `3D/app/<id>g`),
+  // making the outputs downloadable at known names. That also makes resume
+  // history-independent: followMesh first just tries to download the files —
+  // if they exist the job is done, even if the server restarted meanwhile.
+  static const _meshAsset = 'assets/comfyui/img2print.api.json';
+  static const _meshSubfolder = '3D/app';
+
+  String _meshStlName(String meshId) => '${meshId}_00001_.stl';
+  String _meshGlbName(String meshId) => '${meshId}g_00001_.glb';
+
+  /// Image → printable STL + viewer GLB via the Trellis2 pipeline. Slow
+  /// (~4 min warm, ~7 min after a server restart) — progress is coarse
+  /// (queue position + indeterminate run), ending in [GenMeshComplete].
+  Stream<GenEvent> generateMesh({
+    required Uint8List image,
+    required int seed,
+  }) async* {
+    final imageName = await _uploadImage(image);
+    final meshId = const Uuid().v4().replaceAll('-', '');
+    final raw = jsonEncode(await _template(_meshAsset))
+        .replaceAll('__IMAGE__', imageName)
+        .replaceAll('__MESHID__', meshId);
+    final wf = jsonDecode(raw) as Map<String, dynamic>;
+    for (final node in wf.values) {
+      final inputs =
+          ((node as Map)['inputs'] as Map?)?.cast<String, dynamic>();
+      if (inputs != null && inputs.containsKey('seed')) {
+        inputs['seed'] = seed;
+      }
+    }
+    final promptId = await _queuePrompt(wf);
+    yield* _runMesh(promptId, meshId);
+  }
+
+  /// Re-attach to a mesh job. [jobId] is `promptId|meshId` as emitted by
+  /// [generateMesh]'s [GenSubmitted].
+  Stream<GenEvent> followMesh(String jobId) async* {
+    final parts = jobId.split('|');
+    if (parts.length != 2) {
+      yield const GenFailed('[ComfyUI] Neplatné id 3D jobu.');
+      return;
+    }
+    yield* _runMesh(parts[0], parts[1], resuming: true);
+  }
+
+  Stream<GenEvent> _runMesh(
+    String promptId,
+    String meshId, {
+    bool resuming = false,
+  }) async* {
+    yield GenSubmitted('$promptId|$meshId');
+
+    Future<Uint8List?> download(String filename) async {
+      try {
+        final uri = Uri.parse('$_baseUrl/view').replace(queryParameters: {
+          'filename': filename,
+          'subfolder': _meshSubfolder,
+          'type': 'output',
+        });
+        final resp = await _client
+            .get(uri, headers: _authHeaders)
+            .timeout(_downloadTimeout);
+        return resp.statusCode == 200 ? resp.bodyBytes : null;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    Future<GenEvent?> tryComplete() async {
+      final stl = await download(_meshStlName(meshId));
+      if (stl == null) return null;
+      final glb = await download(_meshGlbName(meshId));
+      if (glb == null) return null;
+      return GenMeshComplete(stl: stl, glb: glb);
+    }
+
+    // Resume shortcut: the files are durable even when history is not.
+    if (resuming) {
+      final done = await tryComplete();
+      if (done != null) {
+        yield done;
+        return;
+      }
+    }
+
+    var missingFromHistory = 0;
+    while (true) {
+      await Future.delayed(_pollInterval);
+      try {
+        // Queue position while pending.
+        final qResp = await _client
+            .get(Uri.parse('$_baseUrl/queue'), headers: _authHeaders)
+            .timeout(_pollTimeout);
+        if (qResp.statusCode == 200) {
+          final q = jsonDecode(qResp.body) as Map<String, dynamic>;
+          final pending = (q['queue_pending'] as List?) ?? const [];
+          final running = (q['queue_running'] as List?) ?? const [];
+          final pos = pending.indexWhere((e) => (e as List)[1] == promptId);
+          if (pos >= 0) {
+            yield GenQueued(pos + 1);
+            continue;
+          }
+          if (running.any((e) => (e as List)[1] == promptId)) {
+            yield const GenRunning(0, 0);
+          }
+        }
+
+        final hResp = await _client
+            .get(
+              Uri.parse('$_baseUrl/history/$promptId'),
+              headers: _authHeaders,
+            )
+            .timeout(_pollTimeout);
+        if (hResp.statusCode != 200) continue;
+        final h = jsonDecode(hResp.body) as Map<String, dynamic>;
+        final entry = h[promptId] as Map<String, dynamic>?;
+        if (entry == null) {
+          // Not queued, not running, not in history: either a race right
+          // after submit, or the server restarted and lost the job. Files
+          // may still exist (job finished before the restart).
+          if (++missingFromHistory >= 3) {
+            final done = await tryComplete();
+            if (done != null) {
+              yield done;
+              return;
+            }
+            yield const GenFailed(
+              '[ComfyUI] 3D job se na serveru ztratil (restart?) — '
+              'zkus to znovu.',
+            );
+            return;
+          }
+          continue;
+        }
+        missingFromHistory = 0;
+        final status =
+            (entry['status'] as Map?)?.cast<String, dynamic>() ?? const {};
+        if (status['status_str'] == 'error') {
+          yield const GenFailed('[ComfyUI] 3D generování selhalo na serveru.');
+          return;
+        }
+        if (status['completed'] == true ||
+            (entry['outputs'] as Map?)?.isNotEmpty == true) {
+          yield const GenDownloading(0, 2);
+          final done = await tryComplete();
+          if (done != null) {
+            yield done;
+            return;
+          }
+          yield const GenFailed(
+            '[ComfyUI] 3D výstup se nepodařilo stáhnout.',
+          );
+          return;
+        }
+      } on TimeoutException {
+        yield GenInterrupted('$promptId|$meshId');
+        return;
+      } on SocketException {
+        yield GenInterrupted('$promptId|$meshId');
+        return;
+      }
+    }
+  }
+
   // ── Orchestration: enqueue → progress (WS|poll) → download ───
   //
   // When [workflow] is null, [promptId] must be supplied — we re-attach to an

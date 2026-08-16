@@ -13,6 +13,7 @@ import '../models/pose_template.dart';
 import '../providers/image_studio_provider.dart';
 import '../widgets/image_session_drawer.dart';
 import 'mask_editor_screen.dart';
+import 'model_viewer_screen.dart';
 
 /// Copy [text] to the clipboard and confirm with a brief snackbar. No-op for
 /// empty text. Used by long-press handlers on error messages and prompts.
@@ -442,9 +443,15 @@ class _TreeNodeWidget extends StatelessWidget {
       );
     } else {
       inner = Icon(
-        node.isRoot ? Icons.auto_awesome : Icons.brush_outlined,
+        node.is3D
+            ? Icons.view_in_ar
+            : node.isRoot
+                ? Icons.auto_awesome
+                : Icons.brush_outlined,
         size: 20,
-        color: AppTheme.textSecondary,
+        color: node.is3D && node.status == GenStatus.ready
+            ? AppTheme.accent
+            : AppTheme.textSecondary,
       );
     }
 
@@ -697,6 +704,44 @@ class _NodeGrid extends ConsumerWidget {
       );
     }
 
+    if (node.is3D && node.status == GenStatus.ready) {
+      final glb = node.glbFileName == null
+          ? null
+          : '${GenImage.baseDir}/${node.glbFileName}';
+      final stl = node.stlFileName == null
+          ? null
+          : '${GenImage.baseDir}/${node.stlFileName}';
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.view_in_ar, size: 56, color: AppTheme.accent),
+            const SizedBox(height: 12),
+            const Text(
+              '3D model je hotový',
+              style: TextStyle(color: AppTheme.textPrimary, fontSize: 16),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(backgroundColor: AppTheme.accent),
+              onPressed: glb == null || stl == null
+                  ? null
+                  : () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => ModelViewerScreen(
+                            glbPath: glb,
+                            stlPath: stl,
+                          ),
+                        ),
+                      ),
+              icon: const Icon(Icons.threed_rotation, size: 18),
+              label: const Text('Otevřít a otáčet'),
+            ),
+          ],
+        ),
+      );
+    }
+
     return GridView.builder(
       padding: const EdgeInsets.all(12),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -716,12 +761,53 @@ class _NodeGrid extends ConsumerWidget {
           onExpand: () => _showFullscreen(context, img),
           onSave: () => _saveImage(context, img),
           onInpaint: () => _startInpaint(context, ref, img),
+          on3D: () => _start3D(context, ref, img),
           // Long-press copies the prompt that produced this node's images,
           // so it can be reused.
           onLongPress: () => _copyToClipboard(context, node.prompt, 'Prompt'),
         );
       },
     );
+  }
+
+  /// 3D entry: confirm the long-running round, then hand the image to the
+  /// server-side Trellis2 pipeline. Selection contract mirrors refine/inpaint.
+  Future<void> _start3D(
+    BuildContext context,
+    WidgetRef ref,
+    GenImage img,
+  ) async {
+    final notifier = ref.read(imageStudioProvider.notifier);
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: const Text(
+          'Vytvořit 3D model?',
+          style: TextStyle(color: AppTheme.textPrimary, fontSize: 17),
+        ),
+        content: const Text(
+          'Generování na serveru trvá 4–7 minut. Appku můžeš mezitím '
+          'zavřít — po návratu se výsledek dotáhne sám.\n\n'
+          'Výstup: otočitelný 3D náhled + STL pro Prusa Slicer (100 mm).',
+          style: TextStyle(color: AppTheme.textSecondary, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Zrušit'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.accent),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Vytvořit'),
+          ),
+        ],
+      ),
+    );
+    if (go != true) return;
+    notifier.selectImage(img.id);
+    await notifier.make3D();
   }
 
   /// Inpaint entry: open the mask editor; the inpaint model (FLUX Fill vs
@@ -827,6 +913,7 @@ class _ImageTile extends StatelessWidget {
     required this.onExpand,
     required this.onSave,
     required this.onInpaint,
+    required this.on3D,
     this.onLongPress,
   });
 
@@ -836,6 +923,7 @@ class _ImageTile extends StatelessWidget {
   final VoidCallback onExpand;
   final VoidCallback onSave;
   final VoidCallback onInpaint;
+  final VoidCallback on3D;
   final VoidCallback? onLongPress;
 
   @override
@@ -869,6 +957,22 @@ class _ImageTile extends StatelessWidget {
                 child: Icon(Icons.check, size: 16, color: Colors.white),
               ),
             ),
+          Positioned(
+            bottom: 4,
+            right: 112,
+            child: Material(
+              color: Colors.black54,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: on3D,
+                child: const Padding(
+                  padding: EdgeInsets.all(6),
+                  child: Icon(Icons.view_in_ar, size: 18, color: Colors.white),
+                ),
+              ),
+            ),
+          ),
           Positioned(
             bottom: 4,
             right: 76,

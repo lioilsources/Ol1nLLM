@@ -106,6 +106,16 @@ class GenNode {
   /// replay the same mode. Persisted only when true.
   final bool refIsFace;
 
+  /// True for a 3D mesh round (img2print/Trellis2): [glbFileName] /
+  /// [stlFileName] hold the results instead of [images], and resume must go
+  /// through [ComfyUIService.followMesh]. Persisted only when true.
+  final bool is3D;
+
+  /// Relative file names of the mesh results (same directory scheme as
+  /// [GenImage.fileName]): GLB for the in-app 360° viewer, STL for print.
+  final String? glbFileName;
+  final String? stlFileName;
+
   // ── Generation metadata (nullable — nodes written before this existed
   //    stay valid; NIM models leave preset-derived fields null because their
   //    values are service constants recoverable from [modelId]) ──
@@ -150,6 +160,9 @@ class GenNode {
     this.maskFileName,
     this.refFileName,
     this.refIsFace = false,
+    this.is3D = false,
+    this.glbFileName,
+    this.stlFileName,
     this.modelId,
     this.loraName,
     this.poseId,
@@ -177,6 +190,7 @@ class GenNode {
     String? maskFileName,
     String? refFileName,
     bool refIsFace = false,
+    bool is3D = false,
     String? modelId,
     String? loraName,
     String? poseId,
@@ -200,6 +214,7 @@ class GenNode {
     maskFileName: maskFileName,
     refFileName: refFileName,
     refIsFace: refIsFace,
+    is3D: is3D,
     modelId: modelId,
     loraName: loraName,
     poseId: poseId,
@@ -229,6 +244,9 @@ class GenNode {
     if (maskFileName != null) 'maskFileName': maskFileName,
     if (refFileName != null) 'refFileName': refFileName,
     if (refIsFace) 'refIsFace': true,
+    if (is3D) 'is3D': true,
+    if (glbFileName != null) 'glbFileName': glbFileName,
+    if (stlFileName != null) 'stlFileName': stlFileName,
     if (modelId != null) 'modelId': modelId,
     if (loraName != null) 'loraName': loraName,
     if (poseId != null) 'poseId': poseId,
@@ -270,6 +288,9 @@ class GenNode {
       maskFileName: json['maskFileName'] as String?,
       refFileName: json['refFileName'] as String?,
       refIsFace: json['refIsFace'] as bool? ?? false,
+      is3D: json['is3D'] as bool? ?? false,
+      glbFileName: json['glbFileName'] as String?,
+      stlFileName: json['stlFileName'] as String?,
       modelId: json['modelId'] as String?,
       loraName: json['loraName'] as String?,
       poseId: json['poseId'] as String?,
@@ -293,6 +314,8 @@ class GenNode {
   GenNode copyWith({
     GenStatus? status,
     List<GenImage>? images,
+    String? glbFileName,
+    String? stlFileName,
     String? error,
     bool clearError = false,
     double? progress,
@@ -317,6 +340,9 @@ class GenNode {
     maskFileName: maskFileName,
     refFileName: refFileName,
     refIsFace: refIsFace,
+    is3D: is3D,
+    glbFileName: glbFileName ?? this.glbFileName,
+    stlFileName: stlFileName ?? this.stlFileName,
     modelId: modelId,
     loraName: loraName,
     poseId: poseId,
