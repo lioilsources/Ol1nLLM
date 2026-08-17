@@ -19,6 +19,7 @@ typedef MaskEditorResult = ({
   bool refIsFace,
   String modelId,
   String? loraName,
+  double loraStrength,
 });
 
 /// Fullscreen mask painting over a source image.
@@ -39,6 +40,7 @@ class MaskEditorScreen extends StatefulWidget {
     required this.initialModelId,
     this.availableLoras = const [],
     this.initialLora,
+    this.initialLoraStrength = kDefaultLoraStrength,
   });
 
   final Uint8List imageBytes;
@@ -62,6 +64,9 @@ class MaskEditorScreen extends StatefulWidget {
   /// Session's selected LoRA — pre-picked when compatible with the initial
   /// model.
   final String? initialLora;
+
+  /// Session's LoRA strength, carried into (and back out of) the sheet.
+  final double initialLoraStrength;
 
   @override
   State<MaskEditorScreen> createState() => _MaskEditorScreenState();
@@ -196,6 +201,7 @@ class _MaskEditorScreenState extends State<MaskEditorScreen> {
           bool refIsFace,
           String modelId,
           String? loraName,
+          double loraStrength,
         })>(
       context: context,
       isScrollControlled: true,
@@ -205,6 +211,7 @@ class _MaskEditorScreenState extends State<MaskEditorScreen> {
         initialModelId: widget.initialModelId,
         availableLoras: widget.availableLoras,
         initialLora: widget.initialLora,
+        initialLoraStrength: widget.initialLoraStrength,
       ),
     );
     if (result == null || result.prompt.trim().isEmpty || !mounted) return;
@@ -217,6 +224,7 @@ class _MaskEditorScreenState extends State<MaskEditorScreen> {
       refIsFace: result.refIsFace,
       modelId: result.modelId,
       loraName: result.loraName,
+      loraStrength: result.loraStrength,
     ));
   }
 
@@ -413,12 +421,14 @@ class _PromptSheet extends StatefulWidget {
     required this.initialModelId,
     required this.availableLoras,
     this.initialLora,
+    required this.initialLoraStrength,
   });
 
   final List<ImageModelSpec> models;
   final String initialModelId;
   final List<String> availableLoras;
   final String? initialLora;
+  final double initialLoraStrength;
 
   @override
   State<_PromptSheet> createState() => _PromptSheetState();
@@ -434,6 +444,7 @@ class _PromptSheetState extends State<_PromptSheet> {
   bool _refIsFace = false;
   late String _modelId = widget.initialModelId;
   String? _lora;
+  late double _loraStrength = widget.initialLoraStrength;
 
   ImageModelSpec get _model =>
       widget.models.firstWhere((m) => m.id == _modelId,
@@ -521,6 +532,7 @@ class _PromptSheetState extends State<_PromptSheet> {
       refIsFace: _refPng != null && _refIsFace && _model.inpaintFace,
       modelId: _model.id,
       loraName: _compatibleLoras.contains(_lora) ? _lora : null,
+      loraStrength: _loraStrength,
     ));
   }
 
@@ -626,6 +638,34 @@ class _PromptSheetState extends State<_PromptSheet> {
                 ),
               ],
             ),
+            if (_lora != null)
+              Row(
+                children: [
+                  const SizedBox(width: 24),
+                  Text(
+                    'síla ${_loraStrength.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      color: _loraStrength < 0
+                          ? Colors.orangeAccent
+                          : AppTheme.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                  Expanded(
+                    child: Slider(
+                      value: _loraStrength.clamp(
+                          kMinLoraStrength, kMaxLoraStrength),
+                      min: kMinLoraStrength,
+                      max: kMaxLoraStrength,
+                      divisions: 50,
+                      activeColor: _loraStrength < 0
+                          ? Colors.orangeAccent
+                          : AppTheme.accent,
+                      onChanged: (v) => setState(() => _loraStrength = v),
+                    ),
+                  ),
+                ],
+              ),
           ],
           if (_model.inpaintRef) ...[
             const SizedBox(height: 10),

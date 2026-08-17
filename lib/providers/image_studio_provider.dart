@@ -55,6 +55,9 @@ class ImageStudioState {
   /// Currently selected LoRA name, or null for no LoRA.
   final String? selectedLora;
 
+  /// Strength the selected LoRA is applied with (model + clip).
+  final double loraStrength;
+
   /// Selected ControlNet pose template id (see [kPoseTemplates]), or null.
   final String? selectedPoseId;
 
@@ -83,6 +86,7 @@ class ImageStudioState {
     this.availableLoras = const [],
     this.availableCheckpoints = const [],
     this.selectedLora,
+    this.loraStrength = kDefaultLoraStrength,
     this.selectedPoseId,
     this.error,
     this.info,
@@ -140,6 +144,7 @@ class ImageStudioState {
     List<String>? availableCheckpoints,
     String? selectedLora,
     bool clearLora = false,
+    double? loraStrength,
     String? selectedPoseId,
     bool clearPose = false,
     String? error,
@@ -162,6 +167,7 @@ class ImageStudioState {
     availableLoras: availableLoras ?? this.availableLoras,
     availableCheckpoints: availableCheckpoints ?? this.availableCheckpoints,
     selectedLora: clearLora ? null : (selectedLora ?? this.selectedLora),
+    loraStrength: loraStrength ?? this.loraStrength,
     selectedPoseId: clearPose ? null : (selectedPoseId ?? this.selectedPoseId),
     error: clearError ? null : (error ?? this.error),
     info: clearInfo ? null : (info ?? this.info),
@@ -277,11 +283,15 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   /// Family membership is judged by name so it also works before the server
   /// LoRA list has loaded (session restore). Poses are dropped for models
   /// without OpenPose ControlNet support (NIM backends, flux-manga, SD 1.5).
+  /// [strength] defaults to the current state, but session restore must pass
+  /// the incoming session's value explicitly — at that point `state` still
+  /// holds the *previous* session and would push a stale strength.
   (String? lora, String? poseId) _applyModelToServices(
     String modelId,
     String? lora,
-    String? poseId,
-  ) {
+    String? poseId, {
+    double? strength,
+  }) {
     final spec = imageModelById(modelId);
     final keepLora =
         lora != null && lorasForFamily([lora], spec.loraFamily).isNotEmpty;
@@ -291,6 +301,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       _comfyui.setPreset(spec.preset!);
     }
     _comfyui.setLora(appliedLora);
+    _comfyui.setLoraStrength(strength ?? state.loraStrength);
     _comfyui.setPose(pose?.asset);
     // img2img carries the source's own structure over via depth ControlNet for
     // pose-capable (SDXL) models; a template pose picked above overrides it.
@@ -331,6 +342,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       availableLoras: state.availableLoras,
       availableCheckpoints: state.availableCheckpoints,
       selectedLora: state.selectedLora,
+      loraStrength: state.loraStrength,
       selectedPoseId: state.selectedPoseId,
     );
   }
@@ -341,6 +353,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       session.modelId,
       session.selectedLora,
       session.selectedPoseId,
+      strength: session.loraStrength,
     );
     state = ImageStudioState(
       sessions: state.sessions,
@@ -348,6 +361,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       nodes: session.nodes.toList(),
       currentNodeId: session.currentNodeId,
       selectedLora: lora,
+      loraStrength: session.loraStrength ?? kDefaultLoraStrength,
       selectedPoseId: poseId,
       modelId: session.modelId,
       availableLoras: state.availableLoras,
@@ -372,6 +386,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           next.modelId,
           next.selectedLora,
           next.selectedPoseId,
+          strength: next.loraStrength,
         );
         state = ImageStudioState(
           sessions: updated,
@@ -379,6 +394,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           nodes: next.nodes.toList(),
           currentNodeId: next.currentNodeId,
           selectedLora: lora,
+          loraStrength: next.loraStrength ?? kDefaultLoraStrength,
           selectedPoseId: poseId,
           modelId: next.modelId,
           availableLoras: state.availableLoras,
@@ -413,6 +429,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           latest.modelId,
           latest.selectedLora,
           latest.selectedPoseId,
+          strength: latest.loraStrength,
         );
         state = ImageStudioState(
           sessions: sessions,
@@ -420,6 +437,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           nodes: latest.nodes.toList(),
           currentNodeId: latest.currentNodeId,
           selectedLora: lora,
+          loraStrength: latest.loraStrength ?? kDefaultLoraStrength,
           selectedPoseId: poseId,
           modelId: latest.modelId,
           availableLoras: state.availableLoras,
@@ -447,6 +465,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       nodes: state.nodes,
       currentNodeId: state.currentNodeId,
       selectedLora: state.selectedLora,
+      loraStrength: state.loraStrength,
       selectedPoseId: state.selectedPoseId,
       modelId: state.modelId,
       exportedAt: existing?.exportedAt,
@@ -529,6 +548,12 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   void setLora(String? loraName) {
     _comfyui.setLora(loraName);
     state = state.copyWith(selectedLora: loraName, clearLora: loraName == null);
+  }
+
+  void setLoraStrength(double strength) {
+    final v = strength.clamp(kMinLoraStrength, kMaxLoraStrength).toDouble();
+    _comfyui.setLoraStrength(v);
+    state = state.copyWith(loraStrength: v);
   }
 
   void setPose(String? poseId) {

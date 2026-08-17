@@ -116,6 +116,14 @@ class ImageModelSpec {
 
 const kDefaultImageModelId = 'flux-manga';
 
+/// LoRA strength applied to both model and clip. The default matches what the
+/// service used before the control existed, so behaviour is unchanged until
+/// the user moves the slider. Negative values are allowed on purpose: slider
+/// LoRAs are trained as a direction, and below zero they push the other way.
+const kDefaultLoraStrength = 0.9;
+const kMinLoraStrength = -1.0;
+const kMaxLoraStrength = 1.5;
+
 const _sdxlTxt2img = 'assets/comfyui/sdxl_txt2img.api.json';
 const _sdxlImg2img = 'assets/comfyui/sdxl_img2img.api.json';
 const _sdxlInpaint = 'assets/comfyui/sdxl_inpaint.api.json';

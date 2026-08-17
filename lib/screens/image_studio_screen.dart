@@ -884,6 +884,7 @@ class _NodeGrid extends ConsumerWidget {
           initialModelId: initial,
           availableLoras: state.availableLoras,
           initialLora: state.selectedLora,
+          initialLoraStrength: state.loraStrength,
         ),
       ),
     );
@@ -896,6 +897,7 @@ class _NodeGrid extends ConsumerWidget {
     // The sheet's LoRA choice wins for this round — setModel may have
     // reconciled the session LoRA, so apply after it.
     notifier.setLora(result.loraName);
+    notifier.setLoraStrength(result.loraStrength);
     await notifier.inpaint(
       result.prompt,
       result.maskPng,
@@ -1070,16 +1072,85 @@ class _ImageTile extends StatelessWidget {
   }
 }
 
+/// Strength control for the selected LoRA, shared by the input-bar picker and
+/// the inpaint prompt sheet. Negative values are deliberate: slider-style
+/// LoRAs are trained as a direction and invert below zero.
+class _LoraStrengthSlider extends StatelessWidget {
+  const _LoraStrengthSlider({required this.value, required this.onChanged});
+
+  final double value;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Síla LoRA',
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+              ),
+              const Spacer(),
+              Text(
+                value.toStringAsFixed(2),
+                style: TextStyle(
+                  color: value < 0 ? Colors.orangeAccent : AppTheme.accent,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (value != kDefaultLoraStrength) ...[
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () => onChanged(kDefaultLoraStrength),
+                  child: const Padding(
+                    padding: EdgeInsets.all(2),
+                    child: Icon(Icons.restart_alt,
+                        size: 16, color: AppTheme.textSecondary),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          Slider(
+            value: value.clamp(kMinLoraStrength, kMaxLoraStrength),
+            min: kMinLoraStrength,
+            max: kMaxLoraStrength,
+            divisions: 50,
+            activeColor: value < 0 ? Colors.orangeAccent : AppTheme.accent,
+            onChanged: onChanged,
+          ),
+          Text(
+            value < 0
+                ? 'Záporná hodnota otáčí efekt LoRA (u sliderů zamýšlené).'
+                : 'Výchozí 0,90. Slabé LoRA zesílíš nad 1, jemné pojistky ztlumíš pod 0,5.',
+            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _LoraChip extends StatelessWidget {
   const _LoraChip({
     required this.loras,
     required this.selected,
     required this.onChanged,
+    required this.strength,
+    required this.onStrengthChanged,
   });
 
   final List<String> loras;
   final String? selected;
   final ValueChanged<String?> onChanged;
+  final double strength;
+  final ValueChanged<double> onStrengthChanged;
 
   String _display(String name) {
     final s = name.replaceAll('.safetensors', '');
@@ -1094,7 +1165,8 @@ class _LoraChip extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (_) => SafeArea(
-        child: Column(
+        child: StatefulBuilder(
+          builder: (context, setSheetState) => Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1158,7 +1230,18 @@ class _LoraChip extends StatelessWidget {
                 },
               ),
             ),
+            if (selected != null) ...[
+              const Divider(height: 1, color: Colors.white12),
+              _LoraStrengthSlider(
+                value: strength,
+                onChanged: (v) {
+                  setSheetState(() {});
+                  onStrengthChanged(v);
+                },
+              ),
+            ],
           ],
+        ),
         ),
       ),
     );
@@ -1690,6 +1773,10 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                       selected: selectedLora,
                       onChanged: (v) =>
                           ref.read(imageStudioProvider.notifier).setLora(v),
+                      strength: widget.state.loraStrength,
+                      onStrengthChanged: (v) => ref
+                          .read(imageStudioProvider.notifier)
+                          .setLoraStrength(v),
                     ),
                   ],
                   if (spec.supportsPose) ...[

@@ -49,6 +49,11 @@ class ComfyUIService implements ImageBackend {
   final Map<String, Map<String, dynamic>> _templateCache = {};
 
   String? _activeLora;
+
+  /// LoRA strength for both model and clip. Negative values invert the
+  /// learned direction — the intended usage of "slider" LoRAs (e.g. a realism
+  /// slider pushes back toward anime below zero).
+  double _loraStrength = kDefaultLoraStrength;
   String? _activePoseAsset;
   bool _autoPose = false;
   ComfyPreset _preset = imageModelById(kDefaultImageModelId).preset!;
@@ -58,6 +63,7 @@ class ComfyUIService implements ImageBackend {
   final Map<String, String> _poseUploadCache = {};
 
   void setLora(String? loraName) => _activeLora = loraName;
+  void setLoraStrength(double strength) => _loraStrength = strength;
   void setPose(String? poseAsset) => _activePoseAsset = poseAsset;
 
   /// Whether img2img should carry the source image's own structure over via a
@@ -984,8 +990,8 @@ class ComfyUIService implements ImageBackend {
           '_meta': {'title': 'LoRA: $lora'},
           'inputs': {
             'lora_name': lora,
-            'strength_model': 0.9,
-            'strength_clip': 0.9,
+            'strength_model': _loraStrength,
+            'strength_clip': _loraStrength,
             'model': [src.$1, src.$2],
             'clip': [src.$3, src.$4],
           },

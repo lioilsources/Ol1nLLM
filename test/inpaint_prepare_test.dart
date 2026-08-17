@@ -15,6 +15,7 @@ Map<String, dynamic> _loadTemplate(String path) =>
 String _jsonOf(Map<String, dynamic> wf) => jsonEncode(wf);
 
 void main() {
+  _strengthTests();
   final pony = imageModelById('pony');
   final fill = imageModelById('flux-fill');
 
@@ -350,6 +351,43 @@ void main() {
         isEmpty,
         reason: 'Fill + LoRA is banned until the M5 experiment',
       );
+    });
+  });
+}
+
+/// LoRA strength is user-controlled since v1.4.1 — the injected LoraLoader
+/// must carry the configured value (including negative, the intended usage
+/// of slider LoRAs) instead of the old hard-coded 0.9.
+void _strengthTests() {
+  group('LoRA strength', () {
+    final pony = imageModelById('pony');
+
+    Map<String, dynamic> prepare(double strength) {
+      final svc = ComfyUIService()
+        ..setPreset(pony.preset!)
+        ..setLora('style-gothic-niji.safetensors')
+        ..setLoraStrength(strength);
+      return svc.prepareForTest(
+        jsonDecode(File(pony.preset!.txt2imgAsset).readAsStringSync())
+            as Map<String, dynamic>,
+        prompt: 'x',
+        batch: 1,
+        seed: 1,
+      );
+    }
+
+    test('default matches the pre-slider behaviour', () {
+      expect(kDefaultLoraStrength, 0.9);
+    });
+
+    test('configured strength lands on the LoraLoader', () {
+      for (final v in [0.35, 1.4, -0.8]) {
+        final lora = prepare(v)
+            .values
+            .firstWhere((n) => n['class_type'] == 'LoraLoader');
+        expect(lora['inputs']['strength_model'], v);
+        expect(lora['inputs']['strength_clip'], v);
+      }
     });
   });
 }

@@ -11,6 +11,7 @@ class ImageSession {
     required this.nodes,
     this.currentNodeId,
     this.selectedLora,
+    this.loraStrength,
     this.selectedPoseId,
     required this.modelId,
     required this.updatedAt,
@@ -23,6 +24,9 @@ class ImageSession {
   final List<GenNode> nodes;
   final String? currentNodeId;
   final String? selectedLora;
+
+  /// LoRA strength used in this session (null = app default).
+  final double? loraStrength;
   final String? selectedPoseId;
 
   /// [ImageModelSpec.id] the session was generated with (implies the backend).
@@ -66,6 +70,7 @@ class ImageSession {
     nodes: nodes,
     currentNodeId: currentNodeId,
     selectedLora: selectedLora,
+    loraStrength: loraStrength,
     selectedPoseId: selectedPoseId,
     modelId: modelId,
     updatedAt: updatedAt,
@@ -78,6 +83,7 @@ class ImageSession {
     required List<GenNode> nodes,
     String? currentNodeId,
     String? selectedLora,
+    double? loraStrength,
     String? selectedPoseId,
     required String modelId,
     DateTime? exportedAt,
@@ -103,6 +109,7 @@ class ImageSession {
       nodes: List.unmodifiable(nodes),
       currentNodeId: currentNodeId,
       selectedLora: selectedLora,
+      loraStrength: loraStrength,
       selectedPoseId: selectedPoseId,
       modelId: modelId,
       updatedAt: DateTime.now(),
@@ -117,6 +124,7 @@ class ImageSession {
     'nodes': nodes.map((n) => n.toJson()).toList(),
     if (currentNodeId != null) 'currentNodeId': currentNodeId,
     if (selectedLora != null) 'selectedLora': selectedLora,
+    if (loraStrength != null) 'loraStrength': loraStrength,
     if (selectedPoseId != null) 'selectedPoseId': selectedPoseId,
     'modelId': modelId,
     'updatedAt': updatedAt.toIso8601String(),
@@ -132,6 +140,7 @@ class ImageSession {
         .toList(),
     currentNodeId: json['currentNodeId'] as String?,
     selectedLora: json['selectedLora'] as String?,
+    loraStrength: (json['loraStrength'] as num?)?.toDouble(),
     selectedPoseId: json['selectedPoseId'] as String?,
     modelId: json['modelId'] as String? ??
         _legacyModelId(
