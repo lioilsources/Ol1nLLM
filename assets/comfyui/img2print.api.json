@@ -304,7 +304,7 @@
     },
     "inputs": {
       "trimesh": [
-        "14",
+        "20",
         0
       ],
       "filename_prefix": "3D/app/__MESHID__",
@@ -318,7 +318,7 @@
     },
     "inputs": {
       "trimesh": [
-        "18",
+        "21",
         0
       ],
       "filename_prefix": "3D/app/__MESHID__g",
@@ -348,6 +348,44 @@
         0
       ],
       "reorient_vertices": "90 degrees"
+    }
+  },
+  "20": {
+    "class_type": "AddPrintBase",
+    "_meta": {
+      "title": "Podstava pro tisk (Z-up)"
+    },
+    "inputs": {
+      "trimesh": [
+        "14",
+        0
+      ],
+      "shape": "cylinder",
+      "height_mm": 4.0,
+      "diameter_scale": 1.15,
+      "flatten_bottom_mm": 1.0,
+      "sink_mm": 0.5,
+      "segments": 96,
+      "up_axis": "z"
+    }
+  },
+  "21": {
+    "class_type": "AddPrintBase",
+    "_meta": {
+      "title": "Podstava pro náhled (Y-up)"
+    },
+    "inputs": {
+      "trimesh": [
+        "18",
+        0
+      ],
+      "shape": "cylinder",
+      "height_mm": 4.0,
+      "diameter_scale": 1.15,
+      "flatten_bottom_mm": 1.0,
+      "sink_mm": 0.5,
+      "segments": 96,
+      "up_axis": "y"
     }
   }
 }

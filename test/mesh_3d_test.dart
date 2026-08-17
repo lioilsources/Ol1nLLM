@@ -7,6 +7,7 @@ import 'package:ol1n_llm/models/gen_node.dart';
 /// Guards the img2print asset contract (deterministic mesh-id prefixes that
 /// generateMesh/followMesh rely on) and the GenNode 3D persistence.
 void main() {
+  _printBaseTests();
   group('img2print asset', () {
     final wf =
         jsonDecode(File('assets/comfyui/img2print.api.json').readAsStringSync())
@@ -92,6 +93,52 @@ void main() {
       });
       expect(back.is3D, isFalse);
       expect(back.glbFileName, isNull);
+    });
+  });
+}
+
+/// The printable base is added on the mesh, not hoped for from the image —
+/// Trellis drops pedestals when reading a single front view. Both export
+/// branches must carry it, each in its own up-axis (STL Z-up for the slicer,
+/// GLB Y-up for <model-viewer>).
+void _printBaseTests() {
+  final wf =
+      jsonDecode(File('assets/comfyui/img2print.api.json').readAsStringSync())
+          as Map<String, dynamic>;
+
+  group('print base', () {
+    test('both export branches go through AddPrintBase', () {
+      final bases = wf.entries
+          .where((e) => (e.value as Map)['class_type'] == 'AddPrintBase')
+          .toList();
+      expect(bases, hasLength(2));
+
+      final axes = {
+        for (final b in bases)
+          ((b.value as Map)['inputs'] as Map)['up_axis'] as String: b.key,
+      };
+      expect(axes.keys, containsAll(['z', 'y']));
+
+      for (final export in wf.values
+          .where((n) => (n as Map)['class_type'] == 'Trellis2ExportMesh')) {
+        final src = ((export as Map)['inputs'] as Map)['trimesh'] as List;
+        final fmt = (export['inputs'] as Map)['file_format'];
+        final expectedAxis = fmt == 'stl' ? 'z' : 'y';
+        expect(src[0], axes[expectedAxis],
+            reason: '$fmt export must read the $expectedAxis-up base');
+      }
+    });
+
+    test('base geometry stays print-sane', () {
+      final base = wf.values
+          .firstWhere((n) => (n as Map)['class_type'] == 'AddPrintBase') as Map;
+      final i = base['inputs'] as Map;
+      expect(i['shape'], 'cylinder');
+      expect(i['height_mm'], greaterThan(0));
+      // Wider than the model's footprint, or it would not add stability.
+      expect(i['diameter_scale'], greaterThan(1.0));
+      // A real overlap is required for the boolean union to be non-degenerate.
+      expect(i['sink_mm'], greaterThan(0));
     });
   });
 }
