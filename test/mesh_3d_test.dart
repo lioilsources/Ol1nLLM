@@ -69,6 +69,10 @@ void main() {
       // mesh.contains() on eroded-interior points must be ~100% per height
       // band; volume-vs-voxel-fill ratios are biased by surface inflation).
       expect((v2m['inputs'] as Map)['coarse_downsample'], 4.0);
+      // sigma smooths the merged voxel field before marching cubes. The
+      // example workflow shipped 0.0, which left coarse-grid terraces as
+      // sharp printed steps; 1.5 (author default) rounds them off.
+      expect((v2m['inputs'] as Map)['sigma'], 1.5);
     });
   });
 

@@ -124,7 +124,7 @@
   "7": {
     "class_type": "Trellis2ShapeCascadeGenerator",
     "_meta": {
-      "title": "Shape cascade → 1024"
+      "title": "Shape cascade \u2192 1024"
     },
     "inputs": {
       "pipeline": [
@@ -235,7 +235,7 @@
   "11": {
     "class_type": "Trellis2VoxelToMesh",
     "_meta": {
-      "title": "Voxel → watertight mesh, 100 mm"
+      "title": "Voxel \u2192 watertight mesh, 100 mm"
     },
     "inputs": {
       "mesh": [
@@ -243,7 +243,7 @@
         0
       ],
       "target_height_mm": 100.0,
-      "sigma": 0.0,
+      "sigma": 1.5,
       "coarse_downsample": 4.0,
       "taubin_iterations": 20
     }
@@ -287,7 +287,7 @@
   "14": {
     "class_type": "Trellis2MeshWithVoxelToTrimesh",
     "_meta": {
-      "title": "→ Trimesh, Z-up"
+      "title": "\u2192 Trimesh, Z-up"
     },
     "inputs": {
       "mesh": [
@@ -340,7 +340,7 @@
   "18": {
     "class_type": "Trellis2MeshWithVoxelToTrimesh",
     "_meta": {
-      "title": "→ Trimesh Y-up (GLB preview)"
+      "title": "\u2192 Trimesh Y-up (GLB preview)"
     },
     "inputs": {
       "mesh": [
@@ -372,7 +372,7 @@
   "21": {
     "class_type": "AddPrintBase",
     "_meta": {
-      "title": "Podstava pro náhled (Y-up)"
+      "title": "Podstava pro n\u00e1hled (Y-up)"
     },
     "inputs": {
       "trimesh": [
