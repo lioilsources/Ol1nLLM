@@ -62,6 +62,13 @@ void main() {
         (n) => (n as Map)['class_type'] == 'Trellis2VoxelToMesh',
       ) as Map;
       expect((v2m['inputs'] as Map)['target_height_mm'], 100.0);
+      // coarse_downsample=4 seals shell gaps before the interior flood fill.
+      // At 1.0 the fill leaked and meshes came out as HOLLOW shells — printed
+      // heads collapsed (walls only, no infill volume). Never lower this
+      // without re-checking solidity via winding number (trimesh
+      // mesh.contains() on eroded-interior points must be ~100% per height
+      // band; volume-vs-voxel-fill ratios are biased by surface inflation).
+      expect((v2m['inputs'] as Map)['coarse_downsample'], 4.0);
     });
   });
 

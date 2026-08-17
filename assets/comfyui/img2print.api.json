@@ -244,7 +244,7 @@
       ],
       "target_height_mm": 100.0,
       "sigma": 0.0,
-      "coarse_downsample": 1.0,
+      "coarse_downsample": 4.0,
       "taubin_iterations": 20
     }
   },
