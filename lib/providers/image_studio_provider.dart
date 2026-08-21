@@ -690,6 +690,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     // ComfyUIService._inpaint) — don't record a pose that won't run. Repose
     // ignores a template pose too: the reference is the pose.
     final poseId = (isInpaint || isRepose) ? null : state.selectedPoseId;
+    final appliedLora = isInpaint && !patched ? null : state.selectedLora;
     final poseActive = poseId != null && patched;
     // Effective negative = preset negative + user ALL-CAPS tags. Recorded only
     // for generic-template models — elsewhere no negative is actually applied.
@@ -710,8 +711,10 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       modelId: spec.id,
       // flux-fill: LoRA is banned for the dedicated Fill workflow (M5
       // experiment pending) — mirror what the service actually applies.
-      loraName:
-          isInpaint && !patched ? null : state.selectedLora,
+      loraName: appliedLora,
+      // Strength only where a LoRA actually runs — otherwise the snapshot
+      // would claim a setting that had no effect on this round.
+      loraStrength: appliedLora != null ? state.loraStrength : null,
       poseId: poseId,
       seed: seed,
       negativePrompt: negative.isNotEmpty ? negative : null,

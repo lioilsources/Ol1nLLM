@@ -109,7 +109,11 @@ atomix-pony-anime, sd15) jede na generických template
 `__CKPT__` / `__NEGATIVE__`; sampler/steps/cfg/rozměry patchuje `_prepare()`
 z `ComfyPreset`. Flux-manga má dedikované JSONy (UNETLoader graf, hodnoty
 baked-in, `ckptName == null` ⇒ sampler se nepatchuje). Positive prefix (score
-tagy) se skládá v Dartu. LoRA se filtrují podle `LoraFamily` (heuristika:
+tagy) se skládá v Dartu. `_LoraChip` v input baru ukazuje sílu i mimo picker
+(hodnota + divergentní proužek `_LoraStrengthBar` od nuly, oranžově pro
+záporné); řada chipů je horizontálně scrollovatelná, protože model + LoRA se
+sílou + póza se na 375 pt nevejdou. Chip platí i pro repose. LoRA se filtrují
+podle `LoraFamily` (heuristika:
 'flux' v názvu). ComfyUI URL jde přepnout přes `--dart-define=COMFYUI_URL=...`
 (např. LAN `http://192.168.88.66:8188` pro testování bez CF).
 
@@ -284,7 +288,7 @@ PNG) na Go backend na NAS (`FINETUNE_URL`, default `https://finetune.ol1n.com`,
 repo `finetune-gallery`), kde se výstupy hodnotí a staví LoRA datasety.
 
 **Per-node metadata**: `GenNode` od této verze snapshotuje při vzniku modelId,
-loraName, poseId, seed, negativePrompt, positivePrefix, width/height,
+loraName, loraStrength, poseId, seed, negativePrompt, positivePrefix, width/height,
 steps/cfg/denoise, sampler/scheduler, createdAt, origin (`'upload'` pro foto
 roots). Sampler pole se ukládají jen pro generic-template ComfyUI modely
 (`ckptName != null`) — flux-manga a NIM mají hodnoty baked-in/konstantní,

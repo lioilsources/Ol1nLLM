@@ -130,6 +130,11 @@ class GenNode {
   /// modelId only reflects the *latest* choice, so it's snapshotted here.
   final String? modelId;
   final String? loraName;
+
+  /// Strength [loraName] was applied with (model + clip). Recorded only when
+  /// a LoRA actually applies — the effect isn't reproducible from the name
+  /// alone, and the strength is adjustable (including negative) since v1.4.0.
+  final double? loraStrength;
   final String? poseId;
 
   /// Base RNG seed passed to the backend. ComfyUI batches share one seed
@@ -173,6 +178,7 @@ class GenNode {
     this.stlFileName,
     this.modelId,
     this.loraName,
+    this.loraStrength,
     this.poseId,
     this.seed,
     this.negativePrompt,
@@ -202,6 +208,7 @@ class GenNode {
     bool isRepose = false,
     String? modelId,
     String? loraName,
+    double? loraStrength,
     String? poseId,
     int? seed,
     String? negativePrompt,
@@ -227,6 +234,7 @@ class GenNode {
     isRepose: isRepose,
     modelId: modelId,
     loraName: loraName,
+    loraStrength: loraStrength,
     poseId: poseId,
     seed: seed,
     negativePrompt: negativePrompt,
@@ -260,6 +268,7 @@ class GenNode {
     if (stlFileName != null) 'stlFileName': stlFileName,
     if (modelId != null) 'modelId': modelId,
     if (loraName != null) 'loraName': loraName,
+    if (loraStrength != null) 'loraStrength': loraStrength,
     if (poseId != null) 'poseId': poseId,
     if (seed != null) 'seed': seed,
     if (negativePrompt != null) 'negativePrompt': negativePrompt,
@@ -305,6 +314,7 @@ class GenNode {
       stlFileName: json['stlFileName'] as String?,
       modelId: json['modelId'] as String?,
       loraName: json['loraName'] as String?,
+      loraStrength: (json['loraStrength'] as num?)?.toDouble(),
       poseId: json['poseId'] as String?,
       seed: json['seed'] as int?,
       negativePrompt: json['negativePrompt'] as String?,
@@ -358,6 +368,7 @@ class GenNode {
     stlFileName: stlFileName ?? this.stlFileName,
     modelId: modelId,
     loraName: loraName,
+    loraStrength: loraStrength,
     poseId: poseId,
     seed: seed,
     negativePrompt: negativePrompt,

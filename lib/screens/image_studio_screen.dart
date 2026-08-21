@@ -1117,6 +1117,69 @@ class _ImageTile extends StatelessWidget {
   }
 }
 
+/// Compact read-out of the LoRA strength for the chip: a divergent bar drawn
+/// from the zero mark, so a negative strength (an inverted LoRA) reads as a
+/// bar growing the other way instead of a merely shorter one. Same colour
+/// rule as [_LoraStrengthSlider], which the chip still opens on tap.
+class _LoraStrengthBar extends StatelessWidget {
+  const _LoraStrengthBar({required this.value});
+
+  final double value;
+
+  /// Fixed track width: the chip sits in a horizontally scrollable row, so
+  /// its constraints are unbounded — a LayoutBuilder here would resolve to
+  /// an infinite width and blow up the layout.
+  static const _trackWidth = 56.0;
+
+  /// Position of [v] on the kMin..kMax track, 0..1.
+  static double _t(double v) =>
+      (v.clamp(kMinLoraStrength, kMaxLoraStrength) - kMinLoraStrength) /
+      (kMaxLoraStrength - kMinLoraStrength);
+
+  @override
+  Widget build(BuildContext context) {
+    final zero = _t(0);
+    final now = _t(value);
+    final left = (now < zero ? now : zero) * _trackWidth;
+    final width = ((now - zero).abs() * _trackWidth).clamp(1.0, _trackWidth);
+    return SizedBox(
+      width: _trackWidth,
+      height: 3,
+      child: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white24,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Positioned(
+            left: left,
+            width: width,
+            top: 0,
+            bottom: 0,
+            child: Container(
+              decoration: BoxDecoration(
+                color: value < 0 ? Colors.orangeAccent : AppTheme.accent,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          // Zero mark: without it a bar filled from the left edge would read
+          // as "no strength" rather than "strongly negative".
+          Positioned(
+            left: zero * _trackWidth,
+            width: 1,
+            top: 0,
+            bottom: 0,
+            child: const ColoredBox(color: Colors.white54),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Strength control for the selected LoRA, shared by the input-bar picker and
 /// the inpaint prompt sheet. Negative values are deliberate: slider-style
 /// LoRAs are trained as a direction and invert below zero.
@@ -1199,7 +1262,9 @@ class _LoraChip extends StatelessWidget {
 
   String _display(String name) {
     final s = name.replaceAll('.safetensors', '');
-    return s.length > 22 ? '${s.substring(0, 22)}…' : s;
+    // Shorter than the sheet's full name: the chip also carries the strength
+    // read-out, and the chips row competes for width on small phones.
+    return s.length > 16 ? '${s.substring(0, 16)}…' : s;
   }
 
   void _pick(BuildContext context) {
@@ -1308,34 +1373,56 @@ class _LoraChip extends StatelessWidget {
             width: 0.5,
           ),
         ),
-        child: Row(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              Icons.style_outlined,
-              size: 14,
-              color: selected != null
-                  ? AppTheme.accent
-                  : AppTheme.textSecondary,
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.style_outlined,
+                  size: 14,
+                  color: selected != null
+                      ? AppTheme.accent
+                      : AppTheme.textSecondary,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  selected != null ? _display(selected!) : 'LoRA',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: selected != null
+                        ? AppTheme.accent
+                        : AppTheme.textSecondary,
+                  ),
+                ),
+                if (selected != null) ...[
+                  const SizedBox(width: 5),
+                  Text(
+                    strength.toStringAsFixed(2),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color:
+                          strength < 0 ? Colors.orangeAccent : AppTheme.accent,
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 3),
+                Icon(
+                  Icons.expand_more,
+                  size: 14,
+                  color: selected != null
+                      ? AppTheme.accent
+                      : AppTheme.textSecondary,
+                ),
+              ],
             ),
-            const SizedBox(width: 5),
-            Text(
-              selected != null ? _display(selected!) : 'LoRA',
-              style: TextStyle(
-                fontSize: 12,
-                color: selected != null
-                    ? AppTheme.accent
-                    : AppTheme.textSecondary,
-              ),
-            ),
-            const SizedBox(width: 3),
-            Icon(
-              Icons.expand_more,
-              size: 14,
-              color: selected != null
-                  ? AppTheme.accent
-                  : AppTheme.textSecondary,
-            ),
+            if (selected != null) ...[
+              const SizedBox(height: 3),
+              _LoraStrengthBar(value: strength),
+            ],
           ],
         ),
       ),
@@ -1892,43 +1979,49 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Horizontally scrollable: model + LoRA (with its strength
+            // read-out) + pose overflow a 375 pt phone otherwise.
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                children: [
-                  _ModelChip(
-                    modelId: spec.id,
-                    models: widget.state.availableModels,
-                    needsTxt2Img: !_hasRoot,
-                    needsImg2Img: _isRefineMode,
-                    needsPose: _isReposeMode,
-                    onChanged: (id) =>
-                        ref.read(imageStudioProvider.notifier).setModel(id),
-                  ),
-                  if (loras.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    _LoraChip(
-                      loras: loras,
-                      selected: selectedLora,
-                      onChanged: (v) =>
-                          ref.read(imageStudioProvider.notifier).setLora(v),
-                      strength: widget.state.loraStrength,
-                      onStrengthChanged: (v) => ref
-                          .read(imageStudioProvider.notifier)
-                          .setLoraStrength(v),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _ModelChip(
+                      modelId: spec.id,
+                      models: widget.state.availableModels,
+                      needsTxt2Img: !_hasRoot,
+                      needsImg2Img: _isRefineMode,
+                      needsPose: _isReposeMode,
+                      onChanged: (id) =>
+                          ref.read(imageStudioProvider.notifier).setModel(id),
                     ),
+                    if (loras.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      _LoraChip(
+                        loras: loras,
+                        selected: selectedLora,
+                        onChanged: (v) =>
+                            ref.read(imageStudioProvider.notifier).setLora(v),
+                        strength: widget.state.loraStrength,
+                        onStrengthChanged: (v) => ref
+                            .read(imageStudioProvider.notifier)
+                            .setLoraStrength(v),
+                      ),
+                    ],
+                    // Repose takes its pose from the reference — a template
+                    // would be ignored, so don't offer one.
+                    if (spec.supportsPose && !_isReposeMode) ...[
+                      const SizedBox(width: 8),
+                      _PoseChip(
+                        selected: widget.state.selectedPoseId,
+                        onChanged: (v) =>
+                            ref.read(imageStudioProvider.notifier).setPose(v),
+                      ),
+                    ],
                   ],
-                  // Repose takes its pose from the reference — a template
-                  // would be ignored, so don't offer one.
-                  if (spec.supportsPose && !_isReposeMode) ...[
-                    const SizedBox(width: 8),
-                    _PoseChip(
-                      selected: widget.state.selectedPoseId,
-                      onChanged: (v) =>
-                          ref.read(imageStudioProvider.notifier).setPose(v),
-                    ),
-                  ],
-                ],
+
+                ),
               ),
             ),
             if (reposeRef != null)

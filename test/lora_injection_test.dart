@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ol1n_llm/models/gen_node.dart';
 import 'package:ol1n_llm/models/image_model.dart';
 import 'package:ol1n_llm/services/comfyui_service.dart';
 
@@ -137,6 +138,31 @@ void main() {
         wf.values.where((n) => n['class_type'] == 'LoraLoader'),
         isEmpty,
       );
+    });
+  });
+
+  group('LoRA strength is part of the node snapshot', () {
+    test('round-trips, including a negative (inverted) strength', () {
+      for (final v in [0.9, 1.4, -0.6]) {
+        final json = GenNode.create(
+          prompt: 'x',
+          loraName: 'sexy_attire.safetensors',
+          loraStrength: v,
+        ).toJson();
+        expect(json['loraStrength'], v);
+        expect(GenNode.fromJson(json).loraStrength, v);
+      }
+    });
+
+    test('absent when no LoRA applies, and survives copyWith', () {
+      final plain = GenNode.create(prompt: 'x');
+      expect(plain.toJson().containsKey('loraStrength'), isFalse);
+      final withLora = GenNode.create(
+        prompt: 'x',
+        loraName: 'sexy_attire.safetensors',
+        loraStrength: 1.1,
+      ).copyWith(status: GenStatus.ready);
+      expect(withLora.loraStrength, 1.1);
     });
   });
 }
