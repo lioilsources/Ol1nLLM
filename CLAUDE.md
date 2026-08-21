@@ -116,6 +116,24 @@ sílou + póza se na 375 pt nevejdou. Chip platí i pro repose.
 ComfyUI URL jde přepnout přes `--dart-define=COMFYUI_URL=...`
 (např. LAN `http://192.168.88.66:8188` pro testování bez CF).
 
+**Chipy sledují node**: `navigateTo()` po přesunu na node zavolá
+`_adoptNodeSettings()` — čistá funkce `adoptableSettings()` (testovatelná bez
+Hive) spočítá z metadat nodu model/LoRA/sílu/pózu a provider je nastaví, takže
+překlikáním ve stromu se vrátíš do kontextu, ve kterém obrázek vznikl (a
+následný refine/retry jede se stejným setupem). Vrací null = „chipy nech být"
+(foto root a staré sessions nemají `modelId`, nebo model už na serveru není);
+LoRA se zahodí, když ji server nemá nebo nesedí do linie modelu, póza u
+modelu bez `supportsPose`. Chybějící `loraStrength` (nody před v1.5.1) padá na
+`kDefaultLoraStrength`.
+
+**Klávesnice**: `_dismissKeyboard()` (přes `FocusManager.instance.primaryFocus`)
+se volá u všeho, co zjevně není psaní — otevření kteréhokoli bottom sheetu,
+klepnutí na dlaždici či node ve stromu, spuštění inpaintu/3D/repose, odeslání
+promptu; mřížka i chat list mají `keyboardDismissBehavior: onDrag`. Klepnutí
+mimo pole řeší `GestureDetector` kolem těla obrazovky, ale ten se k dotykům na
+potomky nedostane, proto ta explicitní volání. Repose režim klávesnici
+**neotevírá** sám.
+
 **Rodiny LoRA (`lib/models/lora_family.dart`)**: `LoraFamily` rozlišuje
 **linii**, ne jen architekturu — `flux / sdxl / pony / illustrious / sd15 /
 wan / zimage / unknown`. `loraFit(lora, model)` vrací `native` (stejná linie),

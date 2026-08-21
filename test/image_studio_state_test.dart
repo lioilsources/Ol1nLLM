@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ol1n_llm/models/gen_node.dart';
 import 'package:ol1n_llm/models/image_model.dart';
 import 'package:ol1n_llm/providers/image_studio_provider.dart';
 
@@ -73,6 +74,108 @@ void main() {
       final next = base.copyWith(clearSelected: true);
       expect(next.selectedImageId, isNull);
       expect(next.reposeSourceImageId, 'img');
+    });
+  });
+
+  group('adoptableSettings — chips follow the node you navigate to', () {
+    final models = imageModelsFor(const []); // catalog unknown ⇒ all offered
+    const catalog = [
+      'style-anime-screencap.safetensors',
+      'flux-lora-uncensored.safetensors',
+    ];
+
+    GenNode node({
+      String? modelId = 'illustrious-xl',
+      String? lora,
+      double? strength,
+      String? poseId,
+    }) => GenNode.create(
+      prompt: 'x',
+      modelId: modelId,
+      loraName: lora,
+      loraStrength: strength,
+      poseId: poseId,
+    );
+
+    test('adopts model, LoRA, strength and pose', () {
+      final s = adoptableSettings(
+        node(
+          lora: 'style-anime-screencap.safetensors',
+          strength: 1.25,
+          poseId: 'ol3',
+        ),
+        availableModels: models,
+        installedLoras: catalog,
+      );
+      expect(s?.modelId, 'illustrious-xl');
+      expect(s?.lora, 'style-anime-screencap.safetensors');
+      expect(s?.loraStrength, 1.25);
+      expect(s?.poseId, 'ol3');
+    });
+
+    test('a node without a snapshot leaves the chips alone', () {
+      // Photo roots and pre-metadata sessions carry no modelId.
+      expect(
+        adoptableSettings(node(modelId: null),
+            availableModels: models, installedLoras: catalog),
+        isNull,
+      );
+    });
+
+    test('a model the server no longer has is not adopted', () {
+      final onlyPony = models.where((m) => m.id == 'pony').toList();
+      expect(
+        adoptableSettings(node(),
+            availableModels: onlyPony, installedLoras: catalog),
+        isNull,
+      );
+    });
+
+    test('a LoRA gone from the server is dropped, the model still applies', () {
+      final s = adoptableSettings(
+        node(lora: 'deleted.safetensors', strength: 1.1),
+        availableModels: models,
+        installedLoras: catalog,
+      );
+      expect(s?.modelId, 'illustrious-xl');
+      expect(s?.lora, isNull);
+    });
+
+    test('a LoRA from another architecture is dropped', () {
+      final s = adoptableSettings(
+        node(lora: 'flux-lora-uncensored.safetensors'),
+        availableModels: models,
+        installedLoras: catalog,
+      );
+      expect(s?.lora, isNull);
+    });
+
+    test('an unknown LoRA catalog keeps the node LoRA', () {
+      final s = adoptableSettings(
+        node(lora: 'style-anime-screencap.safetensors'),
+        availableModels: models,
+        installedLoras: const [],
+      );
+      expect(s?.lora, 'style-anime-screencap.safetensors');
+    });
+
+    test('nodes from before v1.5.1 fall back to the default strength', () {
+      final s = adoptableSettings(
+        node(lora: 'style-anime-screencap.safetensors'),
+        availableModels: models,
+        installedLoras: catalog,
+      );
+      expect(s?.loraStrength, kDefaultLoraStrength);
+    });
+
+    test('a pose is dropped for a model that cannot pose', () {
+      final s = adoptableSettings(
+        node(modelId: 'flux-manga', poseId: 'ol3'),
+        availableModels: models,
+        installedLoras: catalog,
+      );
+      expect(s?.modelId, 'flux-manga');
+      expect(s?.poseId, isNull);
     });
   });
 }

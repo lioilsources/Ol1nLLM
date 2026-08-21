@@ -27,6 +27,12 @@ void _copyToClipboard(BuildContext context, String text, String what) {
 
 /// Iterative image studio: generate 4 candidates from a prompt, pick one,
 /// describe a change, and get 4 refinements of it — repeat to converge.
+/// Drop focus from wherever it is. Used by every interaction that is clearly
+/// not typing (opening a sheet, picking a tile, walking the tree): on a phone
+/// the keyboard hides most of the grid, and a tap on a child widget never
+/// reaches the screen-level tap-to-dismiss handler.
+void _dismissKeyboard() => FocusManager.instance.primaryFocus?.unfocus();
+
 class ImageStudioScreen extends ConsumerWidget {
   const ImageStudioScreen({super.key});
 
@@ -642,7 +648,10 @@ class _TreeNavigator extends ConsumerWidget {
                         displayImageId: ln.node.id == parentId
                             ? currentNode?.sourceImageId
                             : null,
-                        onTap: () => notifier.navigateTo(ln.node.id),
+                        onTap: () {
+                          _dismissKeyboard();
+                          notifier.navigateTo(ln.node.id);
+                        },
                       ),
                     ),
                 ],
@@ -798,6 +807,7 @@ class _NodeGrid extends ConsumerWidget {
       ),
     );
     return GridView.builder(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.all(12),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: node.images.length == 1 ? 1 : 2,
@@ -811,16 +821,24 @@ class _NodeGrid extends ConsumerWidget {
         return _ImageTile(
           image: img,
           selected: img.id == selectedId,
-          onSelect: () =>
-              ref.read(imageStudioProvider.notifier).selectImage(img.id),
-          onExpand: () => _showFullscreen(context, img),
+          onSelect: () {
+            _dismissKeyboard();
+            ref.read(imageStudioProvider.notifier).selectImage(img.id);
+          },
+          onExpand: () {
+            _dismissKeyboard();
+            _showFullscreen(context, img);
+          },
           onSave: () => _saveImage(context, img),
           onInpaint: () => _startInpaint(context, ref, img),
           on3D: () => _start3D(context, ref, img),
           // Repose needs an SDXL model (depth ControlNet); without one on the
           // server the affordance is hidden rather than dead.
           onRepose: canRepose
-              ? () => ref.read(imageStudioProvider.notifier).startRepose(img.id)
+              ? () {
+                  _dismissKeyboard();
+                  ref.read(imageStudioProvider.notifier).startRepose(img.id);
+                }
               : null,
           // Long-press copies the prompt that produced this node's images,
           // so it can be reused.
@@ -837,6 +855,7 @@ class _NodeGrid extends ConsumerWidget {
     WidgetRef ref,
     GenImage img,
   ) async {
+    _dismissKeyboard();
     final notifier = ref.read(imageStudioProvider.notifier);
     final go = await showDialog<bool>(
       context: context,
@@ -879,6 +898,7 @@ class _NodeGrid extends ConsumerWidget {
     WidgetRef ref,
     GenImage img,
   ) async {
+    _dismissKeyboard();
     final notifier = ref.read(imageStudioProvider.notifier);
     final state = ref.read(imageStudioProvider);
     final candidates =
@@ -1281,6 +1301,7 @@ class _LoraChip extends StatelessWidget {
   }
 
   void _pick(BuildContext context) {
+    _dismissKeyboard();
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppTheme.surface,
@@ -1481,6 +1502,7 @@ class _PoseChip extends StatelessWidget {
   final ValueChanged<String?> onChanged;
 
   void _pick(BuildContext context) {
+    _dismissKeyboard();
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppTheme.surface,
@@ -1649,6 +1671,7 @@ class _ModelChip extends StatelessWidget {
       !(needsPose && !spec.supportsPose);
 
   void _pick(BuildContext context) {
+    _dismissKeyboard();
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppTheme.surface,
@@ -1848,16 +1871,6 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
   bool get _isReposeMode => widget.state.reposeSourceImageId != null;
   bool get _hasRoot => widget.state.nodes.isNotEmpty;
 
-  @override
-  void didUpdateWidget(covariant _StudioInputBar oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Entering repose mode from a tile tap: bring the keyboard up so the
-    // next thing the user does is type the new character.
-    if (oldWidget.state.reposeSourceImageId == null && _isReposeMode) {
-      _focusNode.requestFocus();
-    }
-  }
-
   String get _hint {
     if (!_hasRoot) return 'Describe an image… (ALL CAPS = negative prompt)';
     if (_isReposeMode) return 'Popiš novou postavu v této póze…';
@@ -1896,6 +1909,7 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
   }
 
   Future<ImageSource?> _chooseSource() {
+    _dismissKeyboard();
     return showModalBottomSheet<ImageSource>(
       context: context,
       backgroundColor: AppTheme.surface,
@@ -1978,6 +1992,7 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
       return;
     }
 
+    _dismissKeyboard();
     if (!_hasRoot) {
       _controller.clear();
       await notifier.generate(text);

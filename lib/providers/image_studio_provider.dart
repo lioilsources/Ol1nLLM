@@ -30,6 +30,48 @@ final imageStudioProvider =
 /// NIM backends override [ImageBackend.variantCount] to 1.
 const kVariantCount = 4;
 
+/// Model/LoRA/pose a node was generated with, reduced to what the app can
+/// actually apply right now.
+typedef NodeSettings = ({
+  String modelId,
+  String? lora,
+  double loraStrength,
+  String? poseId,
+});
+
+/// What the chips should show when the user navigates to [node].
+///
+/// Null means "leave the chips alone": the node carries no snapshot (a photo
+/// root, or a session from before per-node metadata), or its model is gone
+/// from the server — adopting a model the server can't run would put a chip
+/// in front of the user that fails at enqueue time.
+///
+/// [installedLoras] empty means "unknown" (catalog not fetched yet), which
+/// keeps the node's LoRA rather than dropping it; a LoRA that no longer fits
+/// the model's lineage is dropped the same way [_applyModelToServices] does
+/// it on a model switch.
+NodeSettings? adoptableSettings(
+  GenNode node, {
+  required List<ImageModelSpec> availableModels,
+  required List<String> installedLoras,
+}) {
+  final modelId = node.modelId;
+  if (modelId == null) return null;
+  if (!availableModels.any((m) => m.id == modelId)) return null;
+  final spec = imageModelById(modelId);
+  final lora = node.loraName;
+  final loraUsable = lora != null &&
+      (installedLoras.isEmpty || installedLoras.contains(lora)) &&
+      lorasForFamily([lora], spec.loraFamily).isNotEmpty;
+  return (
+    modelId: modelId,
+    lora: loraUsable ? lora : null,
+    // Nodes from before v1.5.1 recorded the LoRA but not its strength.
+    loraStrength: node.loraStrength ?? kDefaultLoraStrength,
+    poseId: spec.supportsPose ? node.poseId : null,
+  );
+}
+
 class ImageStudioState {
   /// Every round ever produced this session (the refinement tree).
   final List<GenNode> nodes;
@@ -354,11 +396,34 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   void selectImage(String imageId) =>
       state = state.copyWith(selectedImageId: imageId, clearRepose: true);
 
-  void navigateTo(String nodeId) => state = state.copyWith(
-        currentNodeId: nodeId,
-        clearSelected: true,
-        clearRepose: true,
-      );
+  /// Move the grid to [nodeId] and bring the chips in line with how that node
+  /// was actually generated, so stepping around the tree restores the setup
+  /// you were working in — a refine or retry from here then continues with
+  /// the same model/LoRA/pose instead of whatever was picked last.
+  void navigateTo(String nodeId) {
+    state = state.copyWith(
+      currentNodeId: nodeId,
+      clearSelected: true,
+      clearRepose: true,
+    );
+    final node = _nodeById(nodeId);
+    if (node != null) _adoptNodeSettings(node);
+  }
+
+  void _adoptNodeSettings(GenNode node) {
+    final s = adoptableSettings(
+      node,
+      availableModels: state.availableModels,
+      installedLoras: state.availableLoras,
+    );
+    if (s == null) return;
+    if (s.modelId != state.modelId) setModel(s.modelId);
+    if (s.lora != state.selectedLora) setLora(s.lora);
+    if (s.lora != null && s.loraStrength != state.loraStrength) {
+      setLoraStrength(s.loraStrength);
+    }
+    if (s.poseId != state.selectedPoseId) setPose(s.poseId);
+  }
 
   /// Enter repose mode with [imageId] as the pose reference: the input bar
   /// then takes the prompt for [repose]. Repose is SDXL-only (depth

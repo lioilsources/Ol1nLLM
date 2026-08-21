@@ -117,6 +117,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             child: showPicker
                 ? const PersonaPicker()
                 : ListView.builder(
+                    // Scrolling the conversation is reading, not typing.
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     controller: _scrollController,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     itemCount: messages.length,
