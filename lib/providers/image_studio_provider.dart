@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/gen_node.dart';
 import '../models/image_model.dart';
 import '../models/image_session.dart';
+import '../models/latent_bucket.dart';
 import '../models/pose_template.dart';
 import '../models/prompt_negatives.dart';
 import '../services/comfyui_service.dart';
@@ -61,6 +62,13 @@ class ImageStudioState {
   /// Selected ControlNet pose template id (see [kPoseTemplates]), or null.
   final String? selectedPoseId;
 
+  /// Reference image for a pending repose round (the input bar is in repose
+  /// mode while non-null). Transient UI state — never persisted, dropped by
+  /// any full state rebuild (session switch/restore) — and mutually
+  /// exclusive with [selectedImageId] (refine); the notifier keeps the two
+  /// apart.
+  final String? reposeSourceImageId;
+
   /// Last error surfaced to the user (for a one-shot snackbar).
   final String? error;
 
@@ -88,6 +96,7 @@ class ImageStudioState {
     this.selectedLora,
     this.loraStrength = kDefaultLoraStrength,
     this.selectedPoseId,
+    this.reposeSourceImageId,
     this.error,
     this.info,
     this.sessions = const [],
@@ -112,6 +121,17 @@ class ImageStudioState {
     if (id == null) return null;
     for (final n in nodes) {
       if (n.id == id) return n;
+    }
+    return null;
+  }
+
+  /// Image with [id] anywhere in the tree, or null.
+  GenImage? imageById(String? id) {
+    if (id == null) return null;
+    for (final n in nodes) {
+      for (final img in n.images) {
+        if (img.id == id) return img;
+      }
     }
     return null;
   }
@@ -147,6 +167,8 @@ class ImageStudioState {
     double? loraStrength,
     String? selectedPoseId,
     bool clearPose = false,
+    String? reposeSourceImageId,
+    bool clearRepose = false,
     String? error,
     bool clearError = false,
     String? info,
@@ -169,6 +191,9 @@ class ImageStudioState {
     selectedLora: clearLora ? null : (selectedLora ?? this.selectedLora),
     loraStrength: loraStrength ?? this.loraStrength,
     selectedPoseId: clearPose ? null : (selectedPoseId ?? this.selectedPoseId),
+    reposeSourceImageId: clearRepose
+        ? null
+        : (reposeSourceImageId ?? this.reposeSourceImageId),
     error: clearError ? null : (error ?? this.error),
     info: clearInfo ? null : (info ?? this.info),
     sessions: sessions ?? this.sessions,
@@ -271,9 +296,14 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       // 3D mesh jobs resume through the ComfyUI mesh path regardless of the
       // currently selected model — followMesh is history-independent (it can
       // finish from the durable output files even after a server restart).
+      // Repose is a ComfyUI-only round too: the user may have switched the
+      // model chip to a NIM backend meanwhile, so don't resolve the backend
+      // from the current selection.
       final run = node.is3D
           ? () => _comfyui.followMesh(node.jobId!)
-          : () => backend.follow(node.jobId!);
+          : node.isRepose
+              ? () => _comfyui.follow(node.jobId!)
+              : () => backend.follow(node.jobId!);
       unawaited(_runAsync(node.id, run));
     }
   }
@@ -322,10 +352,50 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   }
 
   void selectImage(String imageId) =>
-      state = state.copyWith(selectedImageId: imageId);
+      state = state.copyWith(selectedImageId: imageId, clearRepose: true);
 
-  void navigateTo(String nodeId) =>
-      state = state.copyWith(currentNodeId: nodeId, clearSelected: true);
+  void navigateTo(String nodeId) => state = state.copyWith(
+        currentNodeId: nodeId,
+        clearSelected: true,
+        clearRepose: true,
+      );
+
+  /// Enter repose mode with [imageId] as the pose reference: the input bar
+  /// then takes the prompt for [repose]. Repose is SDXL-only (depth
+  /// ControlNet); if the active model can't, switch to the SDXL model last
+  /// used in this session (else the first available) — like the inpaint flow
+  /// picks its model for the user — and say so.
+  void startRepose(String imageId) {
+    if (_imageById(imageId) == null) return;
+    String? info;
+    if (!state.model.supportsPose) {
+      final candidates =
+          state.availableModels.where((m) => m.supportsPose).toList();
+      if (candidates.isEmpty) {
+        state = state.copyWith(
+          error: 'Repose vyžaduje SDXL model — na serveru žádný není.',
+        );
+        return;
+      }
+      final lastUsed = state.nodes.reversed
+          .map((n) => n.modelId)
+          .firstWhere(
+            (id) => candidates.any((m) => m.id == id),
+            orElse: () => candidates.first.id,
+          )!;
+      setModel(lastUsed);
+      info = 'Přepnuto na ${imageModelById(lastUsed).label} — '
+          'repose umí jen SDXL modely.';
+    }
+    state = state.copyWith(
+      reposeSourceImageId: imageId,
+      clearSelected: true,
+      clearError: true,
+      info: info,
+    );
+  }
+
+  void cancelRepose() => state = state.copyWith(clearRepose: true);
 
   void newSession() {
     for (final sub in _activeSubs.values) {
@@ -609,14 +679,17 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     String? maskFileName,
     String? refFileName,
     bool refIsFace = false,
+    bool isRepose = false,
+    LatentSize? latentSize,
   }) {
     final spec = state.model;
     final preset = spec.preset;
     final patched = preset?.ckptName != null;
     final isInpaint = maskFileName != null;
     // Pose/depth ControlNet never applies to inpaint rounds (see
-    // ComfyUIService._inpaint) — don't record a pose that won't run.
-    final poseId = isInpaint ? null : state.selectedPoseId;
+    // ComfyUIService._inpaint) — don't record a pose that won't run. Repose
+    // ignores a template pose too: the reference is the pose.
+    final poseId = (isInpaint || isRepose) ? null : state.selectedPoseId;
     final poseActive = poseId != null && patched;
     // Effective negative = preset negative + user ALL-CAPS tags. Recorded only
     // for generic-template models — elsewhere no negative is actually applied.
@@ -633,6 +706,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       maskFileName: maskFileName,
       refFileName: refFileName,
       refIsFace: refIsFace,
+      isRepose: isRepose,
       modelId: spec.id,
       // flux-fill: LoRA is banned for the dedicated Fill workflow (M5
       // experiment pending) — mirror what the service actually applies.
@@ -647,11 +721,16 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
               : null,
       // img2img latents come from VAEEncode of the source image, so recorded
       // dimensions stay null (source-derived) even when a pose is active.
+      // Repose records the bucket snapped to the reference's aspect.
       width: patched && !isImg2img
-          ? (poseActive ? kPoseWidth : preset!.width)
+          ? (isRepose
+              ? latentSize?.w
+              : (poseActive ? kPoseWidth : preset!.width))
           : null,
       height: patched && !isImg2img
-          ? (poseActive ? kPoseHeight : preset!.height)
+          ? (isRepose
+              ? latentSize?.h
+              : (poseActive ? kPoseHeight : preset!.height))
           : null,
       steps: patched ? preset!.steps : null,
       cfg: patched ? preset!.cfg : null,
@@ -884,6 +963,65 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     );
   }
 
+  /// Repose round: a new character/style from [prompt] in the pose of the
+  /// reference picked via [startRepose] (depth ControlNet over a txt2img
+  /// render, denoise 1.0 — see [ComfyUIService.repose]).
+  ///
+  /// Like [inpaint], the prompt is NOT chained with ancestors: inherited
+  /// tokens would drag the *old* character back in, and the whole point is
+  /// to replace it. Preset prefix/negative and ALL-CAPS negatives apply as
+  /// usual. SDXL models only.
+  Future<void> repose(String prompt) async {
+    final text = prompt.trim();
+    final base = _imageById(state.reposeSourceImageId);
+    if (text.isEmpty || base == null) return;
+    if (!state.model.supportsPose) {
+      state = state.copyWith(
+        error: 'Repose umí jen SDXL modely — vyber jiný model.',
+      );
+      return;
+    }
+    _interruptRetries = 0;
+    final parts = splitPromptNegatives(text);
+    final seed = _newSeed();
+    final latent = _reposeLatent(base);
+    final node = _createNodeWithMeta(
+      parentId: state.currentNodeId,
+      sourceImageId: base.id,
+      prompt: text,
+      seed: seed,
+      isImg2img: false,
+      isRepose: true,
+      latentSize: latent,
+      userNegative: parts.negative,
+    );
+    state = state.copyWith(
+      nodes: [...state.nodes, node],
+      currentNodeId: node.id,
+      clearSelected: true,
+      clearRepose: true,
+      clearError: true,
+    );
+    await _runAsync(
+      node.id,
+      () => _comfyui.repose(
+        image: base.bytes,
+        prompt: parts.positive,
+        n: _comfyui.variantCount,
+        seed: seed,
+        negativePrompt: parts.negative.isEmpty ? null : parts.negative,
+        latentSize: latent,
+      ),
+    );
+  }
+
+  /// Latent bucket for a repose of [base] under the active (SDXL) preset —
+  /// computed once per round so node metadata and the request agree.
+  LatentSize _reposeLatent(GenImage base) {
+    final p = state.model.preset!;
+    return reposeLatentFor(base.bytes, fallback: (w: p.width, h: p.height));
+  }
+
   /// Re-run a failed (or finished) node with its original prompt.
   ///
   /// The retry runs against the *current* model/LoRA/pose (they may have
@@ -960,6 +1098,56 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       await _runAsync(
         nodeId,
         () => _comfyui.generateMesh(image: base.bytes, seed: seed3d),
+      );
+      return;
+    }
+    // Repose retry: must not fall into the generic child path below, which
+    // would re-run it as a chained img2img (auto-depth 0.7, img2imgDenoise).
+    if (node.isRepose) {
+      if (!state.model.supportsPose) {
+        _patch(
+          nodeId,
+          (n) => n.copyWith(
+            status: GenStatus.error,
+            error: 'Repose umí jen SDXL modely — vyber jiný model.',
+          ),
+        );
+        return;
+      }
+      final base = _imageById(node.sourceImageId);
+      if (base == null) {
+        _patch(
+          nodeId,
+          (n) =>
+              n.copyWith(status: GenStatus.error, error: 'Source image gone'),
+        );
+        return;
+      }
+      final parts = splitPromptNegatives(node.prompt);
+      final seed = _newSeed();
+      final latent = _reposeLatent(base);
+      final refreshed = _createNodeWithMeta(
+        id: node.id,
+        parentId: node.parentId,
+        sourceImageId: node.sourceImageId,
+        prompt: node.prompt,
+        seed: seed,
+        isImg2img: false,
+        isRepose: true,
+        latentSize: latent,
+        userNegative: parts.negative,
+      ).copyWith(images: node.images);
+      _patch(nodeId, (_) => refreshed);
+      await _runAsync(
+        nodeId,
+        () => _comfyui.repose(
+          image: base.bytes,
+          prompt: parts.positive,
+          n: _comfyui.variantCount,
+          seed: seed,
+          negativePrompt: parts.negative.isEmpty ? null : parts.negative,
+          latentSize: latent,
+        ),
       );
       return;
     }
@@ -1255,15 +1443,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     return completer.future;
   }
 
-  GenImage? _imageById(String? id) {
-    if (id == null) return null;
-    for (final n in state.nodes) {
-      for (final img in n.images) {
-        if (img.id == id) return img;
-      }
-    }
-    return null;
-  }
+  GenImage? _imageById(String? id) => state.imageById(id);
 
   GenNode? _nodeById(String id) {
     for (final n in state.nodes) {

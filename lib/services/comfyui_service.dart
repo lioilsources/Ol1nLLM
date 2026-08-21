@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
 import '../models/image_model.dart';
+import '../models/latent_bucket.dart';
 import '../models/pose_template.dart';
 import 'http_error.dart';
 import 'image_backend.dart';
@@ -91,6 +92,18 @@ class ComfyUIService implements ImageBackend {
   static const _unionControlNet =
       'controlnet-union-sdxl-promax-xinsir.safetensors';
   static const _depthStrength = 0.7;
+
+  // Repose: the depth hint drives a txt2img render at denoise 1.0, where
+  // (unlike img2img) no source latent carries structure — so a touch more
+  // strength than the auto-depth path, but not 1.0: at full strength over
+  // the whole schedule the reference's *body volume* (hair mass, clothing
+  // bulk, the flat shading of the depth map) gets baked in and fights the
+  // new character. Releasing the last 10 % of steps lets textures and
+  // details settle without the hint. 0.75 / 0.9 are the values proven on
+  // this server for exactly this template shape (MangaPrompts repose). If
+  // poses drift in practice, step strength to 0.85 first.
+  static const _reposeDepthStrength = 0.75;
+  static const _reposeDepthEndPercent = 0.9;
 
   // Full strength for the whole schedule: at 0.9/0.8 the xinsir ControlNet
   // lost against prompts that imply a different pose (verified on server).
@@ -282,6 +295,50 @@ class ComfyUIService implements ImageBackend {
 
   @override
   Stream<GenEvent> follow(String jobId) => _run(null, promptId: jobId);
+
+  // ── Repose ──────────────────────────────────────────────────
+
+  /// Repose: a *fresh* txt2img render of [prompt] whose silhouette/stance is
+  /// pinned to [image] via DepthAnything → union ControlNet (depth). No
+  /// source latent (EmptyLatentImage, denoise 1.0) and no identity transfer
+  /// — character and style come entirely from the prompt; only the pose is
+  /// kept. SDXL only (generic template + union CN). A picked template pose
+  /// is ignored: the reference *is* the pose. The latent bucket follows the
+  /// reference's aspect so the depth hint isn't center-cropped; the caller
+  /// may pass [latentSize] to keep node metadata and the request in sync.
+  /// Resume is the plain [follow] — the job is an ordinary prompt.
+  Stream<GenEvent> repose({
+    required Uint8List image,
+    required String prompt,
+    required int n,
+    required int seed,
+    String? negativePrompt,
+    LatentSize? latentSize,
+  }) async* {
+    if (_preset.ckptName == null) {
+      yield const GenFailed('[ComfyUI] Repose umí jen SDXL modely.');
+      return;
+    }
+    final refName = await _uploadImage(
+      image,
+      filename: 'repose_${_uuidV4()}.png',
+    );
+    final tpl = await _template(_txt2imgAsset);
+    final wf = _prepare(
+      tpl,
+      prompt: prompt,
+      batch: n,
+      seed: seed,
+      depthImageName: refName,
+      latentSize: latentSize ??
+          reposeLatentFor(
+            image,
+            fallback: (w: _preset.width, h: _preset.height),
+          ),
+      userNegative: negativePrompt,
+    );
+    yield* _run(wf);
+  }
 
   // ── 3D mesh (img2print / Trellis2) ──────────────────────────
   //
@@ -936,6 +993,8 @@ class ComfyUIService implements ImageBackend {
     String? poseImageName,
     bool sourceDepth = false,
     String? userNegative,
+    String? depthImageName,
+    LatentSize? latentSize,
   }) => _prepare(
     template,
     prompt: prompt,
@@ -947,6 +1006,8 @@ class ComfyUIService implements ImageBackend {
     poseImageName: poseImageName,
     sourceDepth: sourceDepth,
     userNegative: userNegative,
+    depthImageName: depthImageName,
+    latentSize: latentSize,
   );
 
   Map<String, dynamic> _prepare(
@@ -960,6 +1021,13 @@ class ComfyUIService implements ImageBackend {
     String? poseImageName,
     bool sourceDepth = false,
     String? userNegative,
+    // Repose: explicit depth-hint source, independent of [imageName] (which
+    // also drives __IMAGE__ / VAEEncode / denoise), so a txt2img template
+    // can be pose-pinned to an uploaded reference.
+    String? depthImageName,
+    // Repose: overrides the preset/pose latent so the bucket matches the
+    // reference's aspect.
+    LatentSize? latentSize,
   }) {
     final wf = jsonDecode(jsonEncode(template)) as Map<String, dynamic>;
     final lora = _activeLora;
@@ -1014,10 +1082,19 @@ class ComfyUIService implements ImageBackend {
 
     // Splice a ControlNet between the prompt encoders and the sampler.
     // Orthogonal to the LoRA injection above: LoRA rewires model/clip edges,
-    // this rewires positive/negative conditioning edges. A picked template
-    // pose (OpenPose skeleton) wins; otherwise img2img keeps the source's own
-    // structure via a depth map. Mutually exclusive — only one runs.
-    if (poseImageName != null) {
+    // this rewires positive/negative conditioning edges. An explicit repose
+    // reference always wins (the reference *is* the pose, so a template pose
+    // can't override it); then a picked template pose (OpenPose skeleton);
+    // otherwise img2img keeps the source's own structure via a depth map.
+    // Mutually exclusive — only one runs.
+    if (depthImageName != null) {
+      _injectSourceDepthControlNet(
+        wf,
+        depthImageName,
+        strength: _reposeDepthStrength,
+        endPercent: _reposeDepthEndPercent,
+      );
+    } else if (poseImageName != null) {
       _injectPoseControlNet(wf, poseImageName);
     } else if (sourceDepth && imageName != null) {
       _injectSourceDepthControlNet(wf, imageName);
@@ -1048,9 +1125,10 @@ class ComfyUIService implements ImageBackend {
           if (preset.ckptName != null) {
             // Pose skeletons are 2:3 portrait — generate in a matching
             // bucket instead of the preset's default so they don't distort.
-            inputs['width'] = poseImageName != null ? kPoseWidth : preset.width;
-            inputs['height'] =
-                poseImageName != null ? kPoseHeight : preset.height;
+            inputs['width'] = latentSize?.w ??
+                (poseImageName != null ? kPoseWidth : preset.width);
+            inputs['height'] = latentSize?.h ??
+                (poseImageName != null ? kPoseHeight : preset.height);
           }
         case 'RepeatLatentBatch':
         case 'RepeatImageBatch':
@@ -1108,11 +1186,15 @@ class ComfyUIService implements ImageBackend {
   /// in depth mode. Keeps the source's stance/orientation without the user
   /// describing it; [setPose] overrides this. [sourceImageName] is the already
   /// uploaded img2img source — loaded again here so the injector stays
-  /// independent of which node the template wires the source through.
+  /// independent of which node the template wires the source through (which
+  /// is also what lets [repose] run it over the txt2img template, with its
+  /// own [strength] / [endPercent]).
   void _injectSourceDepthControlNet(
     Map<String, dynamic> wf,
-    String sourceImageName,
-  ) {
+    String sourceImageName, {
+    double strength = _depthStrength,
+    double endPercent = _poseEndPercent,
+  }) {
     wf['__depth_src__'] = {
       'class_type': 'LoadImage',
       '_meta': {'title': 'Depth source: $sourceImageName'},
@@ -1144,7 +1226,8 @@ class ComfyUIService implements ImageBackend {
       wf,
       controlNet: ['__depth_type__', 0],
       controlImage: ['__depth_pre__', 0],
-      strength: _depthStrength,
+      strength: strength,
+      endPercent: endPercent,
     );
   }
 
@@ -1156,6 +1239,7 @@ class ComfyUIService implements ImageBackend {
     required List<dynamic> controlNet,
     required List<dynamic> controlImage,
     required double strength,
+    double endPercent = _poseEndPercent,
   }) {
     Map<String, dynamic>? sampler;
     for (final e in wf.entries) {
@@ -1179,7 +1263,7 @@ class ComfyUIService implements ImageBackend {
         'image': controlImage,
         'strength': strength,
         'start_percent': _poseStartPercent,
-        'end_percent': _poseEndPercent,
+        'end_percent': endPercent,
       },
     };
     inputs['positive'] = ['__cn_apply__', 0];

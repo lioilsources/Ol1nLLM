@@ -177,6 +177,37 @@ Strength 0.7 (drží postoj, ale prompt pořád přebarví). Precedence:
 nepersistuje — je deterministicky odvoditelný (img2img + SDXL model + bez
 poseId).
 
+**Repose (nová postava ve stejné póze)**: ikona chodce na dlaždici
+(`_ImageTile.onRepose`, pravý horní roh) přepne input bar do režimu Repose
+(`ImageStudioState.reposeSourceImageId`, pill s miniaturou reference + ✕);
+odeslaný text jde do `repose()` v provideru → `ComfyUIService.repose()`.
+Běží nad **txt2img šablonou** (`sdxl_txt2img.api.json`, EmptyLatentImage,
+denoise 1.0) a `_prepare()` dostane `depthImageName` = nahraná reference —
+tatáž `_injectSourceDepthControlNet()` jako u auto pózy, ale se **strength
+0.75 / end_percent 0.9** (`_reposeDepthStrength`, `_reposeDepthEndPercent`;
+hodnoty ověřené v MangaPrompts pro depth → txt2img). Proč ne 1.0: při plné
+síle přes celý schedule se zapeče objem těla/vlasů/oblečení z reference a
+pere se s novou postavou; posledních 10 % kroků bez hintu nechá dosednout
+detaily. Postava a styl jdou **celé z promptu** — žádný přenos identity
+(IPAdapter/InstantID), žádný hi-res/FaceDetailer; tvář lze doplnit face
+inpaintem. Precedence injekce v `_prepare()`: **`depthImageName` > šablona
+pózy > auto depth** — v repose se vybraná šablona ignoruje (reference *je*
+póza), `_PoseChip` se v režimu skryje a `poseId` na nodu je null. Latent se
+nebere z presetu: `lib/models/latent_bucket.dart` přečte rozměry reference
+jen z hlavičky (PNG **i** JPEG — foto rooty jsou JPEG pod `.png` jménem) a
+snapne na nejbližší SDXL bucket (`snapToSdxlBucket`, porovnání v log
+prostoru), jinak by `ControlNetApplyAdvanced` depth hint center-cropnul.
+Prompt se **neřetězí** s předky (stejné pravidlo jako inpaint — staré tokeny
+by tahaly starou postavu zpět); positivePrefix + preset negativ + ALL-CAPS
+negativy platí, LoRA injekce taky. `GenNode.isRepose` (vzor `is3D`; width/
+height = bucket, denoise 1.0) řídí vlastní větev v `retry()` (jinak by spadl
+do generické img2img cesty) a resume přes `_comfyui.follow()` bez ohledu na
+aktuálně vybraný model (ModelChip není při běhu zamčený). Jen SDXL modely
+(`supportsPose`): `startRepose()` při ne-SDXL modelu přepne na naposledy
+použitý SDXL v session (jinak první dostupný) a oznámí to přes `info`;
+`_ModelChip(needsPose)` šedí ne-SDXL. Režim je transientní (nepersistuje
+se, `selectImage`/`navigateTo`/přepnutí session ho ruší).
+
 ### gen-queue — NIM async job queue (`llm.ol1n.com/nim/*`)
 
 Go služba `gen-queue` (AiStack, port 8091) obsluhuje **oba** FLUX NIM modely

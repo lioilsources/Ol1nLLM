@@ -111,6 +111,13 @@ class GenNode {
   /// through [ComfyUIService.followMesh]. Persisted only when true.
   final bool is3D;
 
+  /// True for a repose round: a fresh txt2img render of [prompt] whose pose
+  /// is pinned to [sourceImageId] via a depth ControlNet. The prompt is never
+  /// chained with ancestors, retry goes through [ImageStudioNotifier.repose]
+  /// and resume through [ComfyUIService.follow] regardless of the selected
+  /// model. Persisted only when true.
+  final bool isRepose;
+
   /// Relative file names of the mesh results (same directory scheme as
   /// [GenImage.fileName]): GLB for the in-app 360° viewer, STL for print.
   final String? glbFileName;
@@ -161,6 +168,7 @@ class GenNode {
     this.refFileName,
     this.refIsFace = false,
     this.is3D = false,
+    this.isRepose = false,
     this.glbFileName,
     this.stlFileName,
     this.modelId,
@@ -191,6 +199,7 @@ class GenNode {
     String? refFileName,
     bool refIsFace = false,
     bool is3D = false,
+    bool isRepose = false,
     String? modelId,
     String? loraName,
     String? poseId,
@@ -215,6 +224,7 @@ class GenNode {
     refFileName: refFileName,
     refIsFace: refIsFace,
     is3D: is3D,
+    isRepose: isRepose,
     modelId: modelId,
     loraName: loraName,
     poseId: poseId,
@@ -245,6 +255,7 @@ class GenNode {
     if (refFileName != null) 'refFileName': refFileName,
     if (refIsFace) 'refIsFace': true,
     if (is3D) 'is3D': true,
+    if (isRepose) 'isRepose': true,
     if (glbFileName != null) 'glbFileName': glbFileName,
     if (stlFileName != null) 'stlFileName': stlFileName,
     if (modelId != null) 'modelId': modelId,
@@ -289,6 +300,7 @@ class GenNode {
       refFileName: json['refFileName'] as String?,
       refIsFace: json['refIsFace'] as bool? ?? false,
       is3D: json['is3D'] as bool? ?? false,
+      isRepose: json['isRepose'] as bool? ?? false,
       glbFileName: json['glbFileName'] as String?,
       stlFileName: json['stlFileName'] as String?,
       modelId: json['modelId'] as String?,
@@ -341,6 +353,7 @@ class GenNode {
     refFileName: refFileName,
     refIsFace: refIsFace,
     is3D: is3D,
+    isRepose: isRepose,
     glbFileName: glbFileName ?? this.glbFileName,
     stlFileName: stlFileName ?? this.stlFileName,
     modelId: modelId,

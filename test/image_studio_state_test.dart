@@ -37,4 +37,31 @@ void main() {
     // Default model is flux-manga (no checkpoint) — must stay selectable.
     expect(ids, contains(kDefaultImageModelId));
   });
+
+  group('repose mode state', () {
+    test('defaults to off', () {
+      expect(const ImageStudioState().reposeSourceImageId, isNull);
+    });
+
+    test('survives an unrelated copyWith', () {
+      const base = ImageStudioState(reposeSourceImageId: 'img');
+      expect(base.copyWith(currentNodeId: 'n1').reposeSourceImageId, 'img');
+    });
+
+    test('clearRepose nulls it', () {
+      const base = ImageStudioState(reposeSourceImageId: 'img');
+      expect(base.copyWith(clearRepose: true).reposeSourceImageId, isNull);
+    });
+
+    test('clearSelected leaves it alone (exclusivity lives in the notifier)',
+        () {
+      const base = ImageStudioState(
+        reposeSourceImageId: 'img',
+        selectedImageId: 'sel',
+      );
+      final next = base.copyWith(clearSelected: true);
+      expect(next.selectedImageId, isNull);
+      expect(next.reposeSourceImageId, 'img');
+    });
+  });
 }

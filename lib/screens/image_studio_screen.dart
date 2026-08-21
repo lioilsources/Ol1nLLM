@@ -488,28 +488,35 @@ class _TreeNodeWidget extends StatelessWidget {
       child: Center(child: inner),
     );
 
+    final badged = node.maskFileName != null || node.isRepose;
     return GestureDetector(
       onTap: onTap,
-      child: node.maskFileName == null
+      child: !badged
           ? circle
           : Stack(
               clipBehavior: Clip.none,
               children: [
                 circle,
                 // Inpaint badge: tap previews the mask over the node's image.
+                // Repose badge: marks the round; its reference already shows
+                // in the parent circle (displayImageId = sourceImageId).
                 Positioned(
                   top: -3,
                   right: -3,
                   child: GestureDetector(
-                    onTap: () => _showMaskPreview(context, node),
+                    onTap: node.isRepose
+                        ? onTap
+                        : () => _showMaskPreview(context, node),
                     child: Container(
                       padding: const EdgeInsets.all(3),
                       decoration: const BoxDecoration(
                         shape: BoxShape.circle,
                         color: AppTheme.surfaceAlt,
                       ),
-                      child: const Icon(
-                        Icons.auto_fix_high,
+                      child: Icon(
+                        node.isRepose
+                            ? Icons.directions_walk
+                            : Icons.auto_fix_high,
                         size: 10,
                         color: AppTheme.accent,
                       ),
@@ -785,6 +792,11 @@ class _NodeGrid extends ConsumerWidget {
       );
     }
 
+    final canRepose = ref.watch(
+      imageStudioProvider.select(
+        (s) => s.availableModels.any((m) => m.supportsPose),
+      ),
+    );
     return GridView.builder(
       padding: const EdgeInsets.all(12),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -805,6 +817,11 @@ class _NodeGrid extends ConsumerWidget {
           onSave: () => _saveImage(context, img),
           onInpaint: () => _startInpaint(context, ref, img),
           on3D: () => _start3D(context, ref, img),
+          // Repose needs an SDXL model (depth ControlNet); without one on the
+          // server the affordance is hidden rather than dead.
+          onRepose: canRepose
+              ? () => ref.read(imageStudioProvider.notifier).startRepose(img.id)
+              : null,
           // Long-press copies the prompt that produced this node's images,
           // so it can be reused.
           onLongPress: () => _copyToClipboard(context, node.prompt, 'Prompt'),
@@ -959,6 +976,7 @@ class _ImageTile extends StatelessWidget {
     required this.onSave,
     required this.onInpaint,
     required this.on3D,
+    this.onRepose,
     this.onLongPress,
   });
 
@@ -969,6 +987,9 @@ class _ImageTile extends StatelessWidget {
   final VoidCallback onSave;
   final VoidCallback onInpaint;
   final VoidCallback on3D;
+
+  /// Repose (new character in this image's pose). Null hides the button.
+  final VoidCallback? onRepose;
   final VoidCallback? onLongPress;
 
   @override
@@ -1000,6 +1021,30 @@ class _ImageTile extends StatelessWidget {
                 radius: 12,
                 backgroundColor: AppTheme.accent,
                 child: Icon(Icons.check, size: 16, color: Colors.white),
+              ),
+            ),
+          // Top-right: the bottom row is full (a 5th slot at right: 148
+          // overflows the 2-column tile on 375 pt phones), and "derive a new
+          // image from this one" reads fine apart from the file actions.
+          if (onRepose != null)
+            Positioned(
+              top: 4,
+              right: 4,
+              child: Material(
+                color: Colors.black54,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: onRepose,
+                  child: const Padding(
+                    padding: EdgeInsets.all(6),
+                    child: Icon(
+                      Icons.directions_walk,
+                      size: 18,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
               ),
             ),
           Positioned(
@@ -1448,6 +1493,7 @@ class _ModelChip extends StatelessWidget {
     required this.models,
     required this.needsTxt2Img,
     required this.needsImg2Img,
+    this.needsPose = false,
     required this.onChanged,
   });
 
@@ -1461,10 +1507,15 @@ class _ModelChip extends StatelessWidget {
 
   /// True when the next send would refine the selected image (img2img).
   final bool needsImg2Img;
+
+  /// True when the next send is a repose (depth ControlNet → SDXL only).
+  final bool needsPose;
   final ValueChanged<String> onChanged;
 
   bool _isUsable(ImageModelSpec spec) =>
-      !(needsTxt2Img && !spec.txt2img) && !(needsImg2Img && !spec.img2img);
+      !(needsTxt2Img && !spec.txt2img) &&
+      !(needsImg2Img && !spec.img2img) &&
+      !(needsPose && !spec.supportsPose);
 
   void _pick(BuildContext context) {
     showModalBottomSheet<void>(
@@ -1506,9 +1557,11 @@ class _ModelChip extends StatelessWidget {
                       ? 'inpaint — spustíš ikonou ✨ na obrázku'
                       : usable
                           ? spec.capabilityLabel
-                          : spec.img2img
-                              ? '${spec.capabilityLabel} — vyžaduje obrázek'
-                              : '${spec.capabilityLabel} — jen nové generování';
+                          : needsPose
+                              ? '${spec.capabilityLabel} — repose umí jen SDXL'
+                              : spec.img2img
+                                  ? '${spec.capabilityLabel} — vyžaduje obrázek'
+                                  : '${spec.capabilityLabel} — jen nové generování';
                   return Opacity(
                     opacity: usable ? 1.0 : 0.38,
                     child: ListTile(
@@ -1581,6 +1634,64 @@ class _ModelChip extends StatelessWidget {
   }
 }
 
+/// Input-bar banner for repose mode: the reference thumbnail, what's about
+/// to happen, and a way out. Mirrors the selected-state look of the chips.
+class _ReposePill extends StatelessWidget {
+  const _ReposePill({required this.reference, required this.onCancel});
+
+  final GenImage reference;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(6, 4, 4, 4),
+      decoration: BoxDecoration(
+        color: AppTheme.accent.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.accent, width: 1),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: Image.file(
+              File(reference.filePath),
+              width: 28,
+              height: 28,
+              fit: BoxFit.cover,
+              cacheWidth: 56,
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Icon(Icons.directions_walk, size: 14, color: AppTheme.accent),
+          const SizedBox(width: 4),
+          const Expanded(
+            child: Text(
+              'Repose — nová postava ve stejné póze',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: AppTheme.accent,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onCancel,
+            child: const Padding(
+              padding: EdgeInsets.all(4),
+              child: Icon(Icons.close, size: 16, color: AppTheme.accent),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _StudioInputBar extends ConsumerStatefulWidget {
   const _StudioInputBar({required this.state});
 
@@ -1603,10 +1714,22 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
   }
 
   bool get _isRefineMode => widget.state.selectedImageId != null;
+  bool get _isReposeMode => widget.state.reposeSourceImageId != null;
   bool get _hasRoot => widget.state.nodes.isNotEmpty;
+
+  @override
+  void didUpdateWidget(covariant _StudioInputBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Entering repose mode from a tile tap: bring the keyboard up so the
+    // next thing the user does is type the new character.
+    if (oldWidget.state.reposeSourceImageId == null && _isReposeMode) {
+      _focusNode.requestFocus();
+    }
+  }
 
   String get _hint {
     if (!_hasRoot) return 'Describe an image… (ALL CAPS = negative prompt)';
+    if (_isReposeMode) return 'Popiš novou postavu v této póze…';
     if (_isRefineMode) return 'Describe the change to the selected image…';
     return 'Pick an image to refine, or tap ＋ for a new one';
   }
@@ -1680,6 +1803,20 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
     // Predictable mismatch (e.g. FLUX Schnell can't refine) → snackbar instead
     // of a doomed error node; the backends' GenFailed stays as the last net.
     final spec = widget.state.model;
+    if (_isReposeMode) {
+      if (!spec.supportsPose) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Repose umí jen SDXL modely — vyber jiný model.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+        return;
+      }
+      _controller.clear();
+      await notifier.repose(text);
+      return;
+    }
     // Inpaint-only model active (after an ✨ round): the input bar can't
     // drive it — point at the flow instead of a generic "pick another model".
     if (spec.inpaint && !spec.txt2img && !spec.img2img) {
@@ -1741,6 +1878,7 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
     final nodePrompt = (currentNode?.prompt.isNotEmpty ?? false)
         ? currentNode!.prompt
         : null;
+    final reposeRef = widget.state.imageById(widget.state.reposeSourceImageId);
 
     return Container(
       decoration: const BoxDecoration(
@@ -1763,6 +1901,7 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                     models: widget.state.availableModels,
                     needsTxt2Img: !_hasRoot,
                     needsImg2Img: _isRefineMode,
+                    needsPose: _isReposeMode,
                     onChanged: (id) =>
                         ref.read(imageStudioProvider.notifier).setModel(id),
                   ),
@@ -1779,7 +1918,9 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                           .setLoraStrength(v),
                     ),
                   ],
-                  if (spec.supportsPose) ...[
+                  // Repose takes its pose from the reference — a template
+                  // would be ignored, so don't offer one.
+                  if (spec.supportsPose && !_isReposeMode) ...[
                     const SizedBox(width: 8),
                     _PoseChip(
                       selected: widget.state.selectedPoseId,
@@ -1790,7 +1931,16 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                 ],
               ),
             ),
-            if (nodePrompt != null)
+            if (reposeRef != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: _ReposePill(
+                  reference: reposeRef,
+                  onCancel: () =>
+                      ref.read(imageStudioProvider.notifier).cancelRepose(),
+                ),
+              )
+            else if (nodePrompt != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Row(
