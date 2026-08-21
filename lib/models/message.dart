@@ -1,3 +1,5 @@
+import 'library_source.dart';
+
 enum MessageRole { user, assistant }
 
 class Message {
@@ -18,6 +20,11 @@ class Message {
   /// active branch inherits the nearest message that carries one.
   final String? personaId;
 
+  /// Chunks a library (RAG) answer was built from. Empty for every other
+  /// backend. Snapshotted on the assistant message when the stream finishes,
+  /// so the citations survive a restart with the answer they belong to.
+  final List<LibrarySource> sources;
+
   const Message({
     required this.id,
     this.parentId,
@@ -26,6 +33,7 @@ class Message {
     required this.createdAt,
     this.images = const [],
     this.personaId,
+    this.sources = const [],
   });
 
   Message copyWith({
@@ -33,6 +41,7 @@ class Message {
     List<String>? images,
     String? parentId,
     String? personaId,
+    List<LibrarySource>? sources,
   }) => Message(
     id: id,
     parentId: parentId ?? this.parentId,
@@ -41,6 +50,7 @@ class Message {
     createdAt: createdAt,
     images: images ?? this.images,
     personaId: personaId ?? this.personaId,
+    sources: sources ?? this.sources,
   );
 
   Map<String, dynamic> toOllamaJson() => {
@@ -56,6 +66,8 @@ class Message {
     'createdAt': createdAt.toIso8601String(),
     if (images.isNotEmpty) 'images': images,
     if (personaId != null) 'personaId': personaId,
+    if (sources.isNotEmpty)
+      'sources': sources.map((s) => s.toJson()).toList(),
   };
 
   factory Message.fromJson(Map<String, dynamic> json) => Message(
@@ -66,5 +78,6 @@ class Message {
     createdAt: DateTime.parse(json['createdAt'] as String),
     images: (json['images'] as List?)?.cast<String>() ?? [],
     personaId: json['personaId'] as String?,
+    sources: LibrarySource.listFrom(json['sources']),
   );
 }

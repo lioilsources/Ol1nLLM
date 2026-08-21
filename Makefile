@@ -7,7 +7,9 @@ DART_DEFINES = \
 	--dart-define=CF_ACCESS_CLIENT_SECRET=$(CF_ACCESS_CLIENT_SECRET) \
 	$(if $(FLUX_NIM_URL),--dart-define=FLUX_NIM_URL=$(FLUX_NIM_URL),) \
 	$(if $(COMFYUI_URL),--dart-define=COMFYUI_URL=$(COMFYUI_URL),) \
-	$(if $(FINETUNE_URL),--dart-define=FINETUNE_URL=$(FINETUNE_URL),)
+	$(if $(FINETUNE_URL),--dart-define=FINETUNE_URL=$(FINETUNE_URL),) \
+	$(if $(LIBRARY_CHAT_URL),--dart-define=LIBRARY_CHAT_URL=$(LIBRARY_CHAT_URL),) \
+	$(if $(VLLM_URL),--dart-define=VLLM_URL=$(VLLM_URL),)
 
 run:
 	flutter run --release $(DART_DEFINES)

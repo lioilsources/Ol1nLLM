@@ -20,6 +20,19 @@ class Conversation {
   /// the leaf there, so the next send branches.
   final String? activeLeafId;
 
+  /// Conversation id held by the library RAG server, which keeps its own
+  /// history in RAM (`rag/server.py: self.sessions`). Null for backends that
+  /// are stateless.
+  final String? remoteSessionId;
+
+  /// Message id the server's history ends at. The server stores one linear
+  /// deque per session while this conversation is a tree, so the session is
+  /// only safe to reuse while [remoteLeafId] still equals [activeLeafId] —
+  /// any fork, branch switch or regenerate breaks that equality and must
+  /// start a fresh server session instead of inheriting another branch's
+  /// turns.
+  final String? remoteLeafId;
+
   const Conversation({
     required this.id,
     required this.title,
@@ -27,6 +40,8 @@ class Conversation {
     required this.updatedAt,
     this.personaId,
     this.activeLeafId,
+    this.remoteSessionId,
+    this.remoteLeafId,
   });
 
   factory Conversation.create({String? personaId}) => Conversation(
@@ -44,6 +59,9 @@ class Conversation {
     String? personaId,
     bool clearPersona = false,
     String? activeLeafId,
+    String? remoteSessionId,
+    String? remoteLeafId,
+    bool clearRemoteSession = false,
   }) => Conversation(
     id: id,
     title: title ?? this.title,
@@ -51,7 +69,19 @@ class Conversation {
     updatedAt: updatedAt ?? this.updatedAt,
     personaId: clearPersona ? null : (personaId ?? this.personaId),
     activeLeafId: activeLeafId ?? this.activeLeafId,
+    remoteSessionId: clearRemoteSession
+        ? null
+        : (remoteSessionId ?? this.remoteSessionId),
+    remoteLeafId: clearRemoteSession
+        ? null
+        : (remoteLeafId ?? this.remoteLeafId),
   );
+
+  /// True when the server's history ends exactly at the message the next send
+  /// will extend, so [remoteSessionId] can be reused without inheriting turns
+  /// from a different branch.
+  bool get canReuseRemoteSession =>
+      remoteSessionId != null && remoteLeafId == activeLeafId;
 
   Message? get _byIdLeaf =>
       messages.where((m) => m.id == activeLeafId).firstOrNull;
@@ -102,6 +132,8 @@ class Conversation {
     'updatedAt': updatedAt.toIso8601String(),
     if (personaId != null) 'personaId': personaId,
     if (activeLeafId != null) 'activeLeafId': activeLeafId,
+    if (remoteSessionId != null) 'remoteSessionId': remoteSessionId,
+    if (remoteLeafId != null) 'remoteLeafId': remoteLeafId,
   };
 
   factory Conversation.fromJson(Map<String, dynamic> json) {
@@ -129,6 +161,8 @@ class Conversation {
       updatedAt: DateTime.parse(json['updatedAt'] as String),
       personaId: json['personaId'] as String?,
       activeLeafId: activeLeafId,
+      remoteSessionId: json['remoteSessionId'] as String?,
+      remoteLeafId: json['remoteLeafId'] as String?,
     );
   }
 }

@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/constants/theme.dart';
 import '../models/message.dart';
+import 'source_list.dart';
 
 class MessageBubble extends StatefulWidget {
   final Message message;
@@ -23,6 +25,12 @@ class _MessageBubbleState extends State<MessageBubble>
     with SingleTickerProviderStateMixin {
   late final AnimationController _cursorController;
 
+  /// Seconds spent waiting for the first token. The library backend can spend
+  /// minutes on retrieval + prefill before anything arrives, and a bare
+  /// blinking cursor for that long reads as a frozen app.
+  Timer? _waitTimer;
+  int _waitSeconds = 0;
+
   @override
   void initState() {
     super.initState();
@@ -30,10 +38,36 @@ class _MessageBubbleState extends State<MessageBubble>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     )..repeat(reverse: true);
+    _syncWaitTimer();
+  }
+
+  @override
+  void didUpdateWidget(MessageBubble oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncWaitTimer();
+  }
+
+  bool get _isWaiting =>
+      widget.isStreaming &&
+      widget.message.content.isEmpty &&
+      widget.message.images.isEmpty;
+
+  void _syncWaitTimer() {
+    if (_isWaiting) {
+      _waitTimer ??= Timer.periodic(
+        const Duration(seconds: 1),
+        (_) => setState(() => _waitSeconds++),
+      );
+    } else if (_waitTimer != null) {
+      _waitTimer!.cancel();
+      _waitTimer = null;
+      _waitSeconds = 0;
+    }
   }
 
   @override
   void dispose() {
+    _waitTimer?.cancel();
     _cursorController.dispose();
     super.dispose();
   }
@@ -96,14 +130,30 @@ class _MessageBubbleState extends State<MessageBubble>
           ...msg.images.map(_buildImage),
           if (hasText) ...[
             const SizedBox(height: 8),
-            isUser ? _buildPlainText() : _buildMarkdown(context),
+            isUser ? _buildPlainText() : _buildAssistantBody(context),
           ],
         ],
       );
     }
 
     // User input with an attached image (base64 in images list shown above)
-    return isUser ? _buildPlainText() : _buildMarkdown(context);
+    return isUser ? _buildPlainText() : _buildAssistantBody(context);
+  }
+
+  /// Assistant answer plus, for library (RAG) replies, the citations it was
+  /// built from. Held back while streaming — they only arrive with the final
+  /// event, so showing the section mid-stream would make it pop in at the end.
+  Widget _buildAssistantBody(BuildContext context) {
+    final sources = widget.message.sources;
+    if (sources.isEmpty || widget.isStreaming) return _buildMarkdown(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildMarkdown(context),
+        SourceList(sources: sources),
+      ],
+    );
   }
 
   Widget _buildImage(String base64) {
@@ -184,12 +234,30 @@ class _MessageBubbleState extends State<MessageBubble>
     return AnimatedBuilder(
       animation: _cursorController,
       builder: (context, _) {
-        return Opacity(
-          opacity: 0.3 + _cursorController.value * 0.7,
-          child: const Text(
-            '▌',
-            style: TextStyle(color: AppTheme.accent, fontSize: 15),
-          ),
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Opacity(
+              opacity: 0.3 + _cursorController.value * 0.7,
+              child: const Text(
+                '▌',
+                style: TextStyle(color: AppTheme.accent, fontSize: 15),
+              ),
+            ),
+            // Only once the wait is long enough to look like a hang — a fast
+            // reply should not flash a counter.
+            if (_waitSeconds >= 3) ...[
+              const SizedBox(width: 8),
+              Text(
+                'hledám… $_waitSeconds s',
+                style: const TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ],
         );
       },
     );

@@ -8,6 +8,7 @@ import '../core/constants/theme.dart';
 import '../models/conversation.dart';
 import '../models/persona.dart';
 import '../providers/chat_provider.dart';
+import '../services/chat_backend.dart';
 import '../services/persona_service.dart';
 
 enum InputMode { chat, ocr }
@@ -151,6 +152,12 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
         .watch(personaListProvider)
         .maybeWhen(data: (l) => l, orElse: () => const <Persona>[]);
 
+    final isLibrary =
+        personas
+            .firstWhereOrNull((p) => p.id == _effectivePersonaId(conv))
+            ?.backend ==
+        kChatBackendLibrary;
+
     return Container(
       decoration: const BoxDecoration(
         color: AppTheme.surfaceAlt,
@@ -198,7 +205,9 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
                           fontSize: 15,
                         ),
                         decoration: InputDecoration(
-                          hintText: _mode.hint,
+                          hintText: _mode == InputMode.chat && isLibrary
+                              ? 'Zeptej se knihovny…'
+                              : _mode.hint,
                           hintStyle: const TextStyle(
                             color: AppTheme.textSecondary,
                           ),
@@ -347,8 +356,25 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
                           ? const Icon(Icons.check, color: AppTheme.accent, size: 20)
                           : null,
                       onTap: () {
-                        setState(() => _personaOverride = p.id);
                         Navigator.of(ctx).pop();
+                        // Personas are a per-turn override, but the backend
+                        // they route to is not: the library server keeps its
+                        // own history and never sees the vLLM turns (and vice
+                        // versa), so a mixed thread would feed both sides
+                        // garbage. Crossing backends starts a new conversation
+                        // instead — selectPersona already does that when the
+                        // current one has messages.
+                        final currentBackend = personas
+                            .firstWhereOrNull((x) => x.id == selectedId)
+                            ?.backend;
+                        if (p.backend != currentBackend) {
+                          ref
+                              .read(chatProvider.notifier)
+                              .selectPersona(p.id);
+                          setState(() => _personaOverride = null);
+                          return;
+                        }
+                        setState(() => _personaOverride = p.id);
                       },
                     ),
                 ],

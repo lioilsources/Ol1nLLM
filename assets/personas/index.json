@@ -69,6 +69,13 @@
       "emoji": "🔓",
       "file": "assets/personas/probuzeni_deepseek.md",
       "description": "Přímý, syrový, bez filtrů a zábrán."
+    },
+    {
+      "id": "knihovnik",
+      "name": "Knihovník",
+      "emoji": "📚",
+      "backend": "library",
+      "description": "Odpovídá z korpusu světové filosofie a posvátných textů, s citacemi."
     }
   ]
 }
