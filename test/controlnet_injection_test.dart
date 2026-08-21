@@ -206,7 +206,7 @@ void main() {
       final wf = repose(
         ComfyUIService()
           ..setPreset(pony)
-          ..setLora('sexy_attire.safetensors'),
+          ..setLora('style-anime-screencap.safetensors'),
       );
       expect(wf.containsKey('__lora__'), isTrue);
       for (final e in _allEdges(wf)) {

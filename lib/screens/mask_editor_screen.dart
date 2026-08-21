@@ -450,9 +450,10 @@ class _PromptSheetState extends State<_PromptSheet> {
       widget.models.firstWhere((m) => m.id == _modelId,
           orElse: () => widget.models.first);
 
-  /// LoRAs usable with the selected model's inpaint round: family-filtered,
-  /// and only for generic (SDXL) templates — dedicated flux workflows ban
-  /// LoRA (see ComfyUIService._prepare).
+  /// LoRAs usable with the selected model's inpaint round: filtered and
+  /// ordered by lineage fit (see [lorasForFamily] — cross-architecture files
+  /// are dropped), and only for generic (SDXL) templates, since dedicated
+  /// flux workflows ban LoRA (see ComfyUIService._prepare).
   List<String> get _compatibleLoras => _model.preset?.ckptName == null
       ? const []
       : lorasForFamily(widget.availableLoras, _model.loraFamily);
@@ -623,11 +624,14 @@ class _PromptSheetState extends State<_PromptSheet> {
                           value: null,
                           child: Text('Bez LoRA'),
                         ),
+                        // Family suffix: the list keeps cross-lineage files
+                        // (they load, just weaker), so say which is which.
                         for (final l in _compatibleLoras)
                           DropdownMenuItem<String?>(
                             value: l,
                             child: Text(
-                              l.replaceAll('.safetensors', ''),
+                              '${l.replaceAll('.safetensors', '')}'
+                              '  · ${loraFamilyLabel(familyOfLora(l))}',
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),

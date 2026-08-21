@@ -112,10 +112,30 @@ baked-in, `ckptName == null` ⇒ sampler se nepatchuje). Positive prefix (score
 tagy) se skládá v Dartu. `_LoraChip` v input baru ukazuje sílu i mimo picker
 (hodnota + divergentní proužek `_LoraStrengthBar` od nuly, oranžově pro
 záporné); řada chipů je horizontálně scrollovatelná, protože model + LoRA se
-sílou + póza se na 375 pt nevejdou. Chip platí i pro repose. LoRA se filtrují
-podle `LoraFamily` (heuristika:
-'flux' v názvu). ComfyUI URL jde přepnout přes `--dart-define=COMFYUI_URL=...`
+sílou + póza se na 375 pt nevejdou. Chip platí i pro repose.
+ComfyUI URL jde přepnout přes `--dart-define=COMFYUI_URL=...`
 (např. LAN `http://192.168.88.66:8188` pro testování bez CF).
+
+**Rodiny LoRA (`lib/models/lora_family.dart`)**: `LoraFamily` rozlišuje
+**linii**, ne jen architekturu — `flux / sdxl / pony / illustrious / sd15 /
+wan / zimage / unknown`. `loraFit(lora, model)` vrací `native` (stejná linie),
+`weak` (stejná architektura, jiná linie — Illustrious LoRA na Juggernautu se
+načte, ale táhne slaběji), `unknown` (nezjištěno) nebo `incompatible` (jiná
+architektura). `lorasForFamily()` vrací nabídku seřazenou native → weak →
+unknown a **incompatible zahazuje**; picker sekce popisuje a u každé položky
+píše rodinu.
+
+Rodiny jsou **kurátorské podle metadat souboru** (`ss_base_model_version` /
+`ss_sd_model_name`, čitelné přes ComfyUI `GET /view_metadata/loras?filename=`),
+ne podle názvu — z názvu to spolehlivě nejde: `sexy_attire.safetensors` zní
+jako každá druhá SDXL character LoRA, ale je trénovaná na
+`runwayml/stable-diffusion-v1-5`. **SD 1.5 LoRA na SDXL není no-op** — UNet
+klíče nesedí, ale sdílený CLIP-L text encoder ano, takže rozhodí prompt, aniž
+by aplikovala natrénovaný koncept (ověřeno na serveru: mean 7.3/255 driftu,
+nic z toho není subjekt LoRA). Z 36 LoRA na serveru takhle vypadlo 13
+(8× SD 1.5, 4× WAN video, 1× Z-Image). Neznámá rodina se **nikdy neskrývá**,
+jen označí — jinak by nová LoRA na serveru byla neviditelná do ruční editace
+registru. Heuristika z názvu je až fallback pro soubory mimo registr.
 
 **Katalog ze serveru** (`_loadServerCatalog()` v provideru, jednou při startu):
 `ComfyUiService.fetchLoras()` / `fetchCheckpoints()` čtou

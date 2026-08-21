@@ -39,7 +39,7 @@ void main() {
     test('SDXL family (CheckpointLoaderSimple)', () {
       final svc = ComfyUIService()
         ..setPreset(pony.preset!)
-        ..setLora('sexy_attire.safetensors');
+        ..setLora('style-anime-screencap.safetensors');
       final wf = svc.prepareForTest(
         _loadTemplate(pony.preset!.txt2imgAsset),
         prompt: 'x',
@@ -56,7 +56,7 @@ void main() {
 
       // LoRA reads model(0)/clip(1) straight from the checkpoint.
       final li = (wf[lora]['inputs'] as Map);
-      expect(li['lora_name'], 'sexy_attire.safetensors');
+      expect(li['lora_name'], 'style-anime-screencap.safetensors');
       expect(li['model'], [ckpt, 0]);
       expect(li['clip'], [ckpt, 1]);
 
@@ -146,7 +146,7 @@ void main() {
       for (final v in [0.9, 1.4, -0.6]) {
         final json = GenNode.create(
           prompt: 'x',
-          loraName: 'sexy_attire.safetensors',
+          loraName: 'style-anime-screencap.safetensors',
           loraStrength: v,
         ).toJson();
         expect(json['loraStrength'], v);
@@ -159,7 +159,7 @@ void main() {
       expect(plain.toJson().containsKey('loraStrength'), isFalse);
       final withLora = GenNode.create(
         prompt: 'x',
-        loraName: 'sexy_attire.safetensors',
+        loraName: 'style-anime-screencap.safetensors',
         loraStrength: 1.1,
       ).copyWith(status: GenStatus.ready);
       expect(withLora.loraStrength, 1.1);

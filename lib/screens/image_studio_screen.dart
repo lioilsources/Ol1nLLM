@@ -1248,6 +1248,7 @@ class _LoraStrengthSlider extends StatelessWidget {
 class _LoraChip extends StatelessWidget {
   const _LoraChip({
     required this.loras,
+    required this.family,
     required this.selected,
     required this.onChanged,
     required this.strength,
@@ -1255,10 +1256,22 @@ class _LoraChip extends StatelessWidget {
   });
 
   final List<String> loras;
+
+  /// Active model's lineage — decides how each entry is labelled (the list
+  /// itself is already filtered and ordered by [lorasForFamily]).
+  final LoraFamily family;
   final String? selected;
   final ValueChanged<String?> onChanged;
   final double strength;
   final ValueChanged<double> onStrengthChanged;
+
+  static String _loraSectionTitle(LoraFit fit, LoraFamily model) =>
+      switch (fit) {
+        LoraFit.native => 'Pro ${loraFamilyLabel(model)} — doporučené',
+        LoraFit.weak => 'Jiná rodina SDXL — slabší nebo jiný efekt',
+        LoraFit.unknown => 'Neznámý původ — efekt neověřený',
+        LoraFit.incompatible => '',
+      };
 
   String _display(String name) {
     final s = name.replaceAll('.safetensors', '');
@@ -1318,7 +1331,12 @@ class _LoraChip extends StatelessWidget {
                 itemBuilder: (_, i) {
                   final lora = loras[i];
                   final isSel = lora == selected;
-                  return ListTile(
+                  final fit = fitOfLora(lora, family);
+                  // The list is ordered by fit, so a change of fit starts a
+                  // new section — the header says why the rest is different.
+                  final newSection =
+                      i == 0 || fitOfLora(loras[i - 1], family) != fit;
+                  final tile = ListTile(
                     leading: Icon(
                       isSel
                           ? Icons.radio_button_checked
@@ -1332,10 +1350,36 @@ class _LoraChip extends StatelessWidget {
                         color: isSel ? AppTheme.accent : AppTheme.textPrimary,
                       ),
                     ),
+                    subtitle: Text(
+                      loraFamilyLabel(familyOfLora(lora)),
+                      style: const TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 11,
+                      ),
+                    ),
                     onTap: () {
                       onChanged(lora);
                       Navigator.of(context).pop();
                     },
+                  );
+                  if (!newSection) return tile;
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+                        child: Text(
+                          _loraSectionTitle(fit, family),
+                          style: const TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      tile,
+                    ],
                   );
                 },
               ),
@@ -2000,6 +2044,7 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                       const SizedBox(width: 8),
                       _LoraChip(
                         loras: loras,
+                        family: spec.loraFamily,
                         selected: selectedLora,
                         onChanged: (v) =>
                             ref.read(imageStudioProvider.notifier).setLora(v),

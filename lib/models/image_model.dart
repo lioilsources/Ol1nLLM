@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 
+import 'lora_family.dart';
+
+export 'lora_family.dart';
+
 /// Which service instance handles a model's requests.
 enum ImageBackendKind { comfyUi, fluxNim, fluxKontextNim }
-
-/// LoRA compatibility family. The server hosts a mixed pile of FLUX and
-/// SDXL/Pony LoRAs with no manifest, so models declare which family applies
-/// and the list is filtered by name heuristic (see [lorasForFamily]).
-enum LoraFamily { flux, sdxl, none }
 
 /// ComfyUI generation parameters for one model.
 ///
@@ -95,6 +94,11 @@ class ImageModelSpec {
 
   /// Whether the reference can run in face-identity mode.
   bool get inpaintFace => inpaint && preset?.inpaintFaceAsset != null;
+
+  /// Lineage this checkpoint's LoRAs are trained for — not just the
+  /// architecture: Pony, Illustrious and vanilla SDXL all load each other's
+  /// files, but only the matching lineage transfers properly (see
+  /// [loraFit]). Cross-architecture files are filtered out entirely.
   final LoraFamily loraFamily;
 
   /// OpenPose ControlNet pose templates apply to this model. Explicit flag,
@@ -201,7 +205,7 @@ const kImageModels = <ImageModelSpec>[
     txt2img: true,
     img2img: true,
     inpaint: true,
-    loraFamily: LoraFamily.sdxl,
+    loraFamily: LoraFamily.pony,
     supportsPose: true,
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
@@ -275,7 +279,7 @@ const kImageModels = <ImageModelSpec>[
     txt2img: true,
     img2img: true,
     inpaint: true,
-    loraFamily: LoraFamily.sdxl,
+    loraFamily: LoraFamily.illustrious,
     supportsPose: true,
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
@@ -305,7 +309,7 @@ const kImageModels = <ImageModelSpec>[
     txt2img: true,
     img2img: true,
     inpaint: true,
-    loraFamily: LoraFamily.sdxl,
+    loraFamily: LoraFamily.illustrious,
     supportsPose: true,
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
@@ -331,7 +335,7 @@ const kImageModels = <ImageModelSpec>[
     txt2img: true,
     img2img: true,
     inpaint: true,
-    loraFamily: LoraFamily.sdxl,
+    loraFamily: LoraFamily.illustrious,
     supportsPose: true,
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
@@ -360,7 +364,7 @@ const kImageModels = <ImageModelSpec>[
     txt2img: true,
     img2img: true,
     inpaint: true,
-    loraFamily: LoraFamily.sdxl,
+    loraFamily: LoraFamily.sdxl,  // anime-tuned SDXL, not Illustrious lineage
     supportsPose: true,
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
@@ -388,7 +392,7 @@ const kImageModels = <ImageModelSpec>[
     txt2img: true,
     img2img: true,
     inpaint: true,
-    loraFamily: LoraFamily.sdxl,
+    loraFamily: LoraFamily.pony,
     supportsPose: true,
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
@@ -461,13 +465,3 @@ List<ImageModelSpec> imageModelsFor(
   ];
 }
 
-/// Name heuristic: FLUX-trained LoRAs on the server all carry 'flux' in the
-/// filename ('flux-lora-…', 'sldr_flux_…'); everything else is SDXL/Pony.
-bool _isFluxLora(String name) => name.toLowerCase().contains('flux');
-
-List<String> lorasForFamily(List<String> all, LoraFamily family) =>
-    switch (family) {
-      LoraFamily.flux => all.where(_isFluxLora).toList(),
-      LoraFamily.sdxl => all.where((n) => !_isFluxLora(n)).toList(),
-      LoraFamily.none => const [],
-    };
