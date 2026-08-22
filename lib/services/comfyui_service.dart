@@ -43,9 +43,21 @@ class ComfyUIService implements ImageBackend {
   static const _pollTimeout = Duration(seconds: 15);
   static const _pollInterval = Duration(seconds: 2);
   static const _wsConnectTimeout = Duration(seconds: 10);
+
+  /// No message at all for this long ⇒ stop trusting the socket and poll.
+  static const _wsSilenceTimeout = Duration(seconds: 90);
   static const _downloadTimeout = Duration(seconds: 120);
 
-  final String _clientId = const Uuid().v4();
+  /// ComfyUI keys its websockets by `clientId` and **evicts** an existing
+  /// socket when a second one connects with the same id ("reusing existing
+  /// session, remove old"). One id per service instance therefore meant that
+  /// starting a second job silently starved the first job's socket: its
+  /// progress froze and, since the socket stayed open without erroring, it
+  /// never fell through to polling either. So each run gets its own id, used
+  /// for both the enqueue and its socket (verified against the server: with
+  /// a shared id the first socket goes dead the instant the second connects;
+  /// with distinct ids it keeps receiving every message).
+  static String _newClientId() => const Uuid().v4();
   final http.Client _client = _makeClient();
   final Map<String, Map<String, dynamic>> _templateCache = {};
 
@@ -380,7 +392,9 @@ class ComfyUIService implements ImageBackend {
         inputs['seed'] = seed;
       }
     }
-    final promptId = await _queuePrompt(wf);
+    // Mesh progress is polled (no per-step events), so this id only tags the
+    // submission — but it must still be unique per job.
+    final promptId = await _queuePrompt(wf, clientId: _newClientId());
     yield* _runMesh(promptId, meshId);
   }
 
@@ -571,29 +585,43 @@ class ComfyUIService implements ImageBackend {
       );
       return;
     }
-    promptId ??= await _queuePrompt(workflow!);
+    final clientId = _newClientId();
+    final resuming = workflow == null;
+    promptId ??= await _queuePrompt(workflow!, clientId: clientId);
     yield GenSubmitted(promptId);
     yield const GenQueued(0);
 
     // Prefer the websocket for true per-step progress; fall back to polling
     // /history + /queue if the WS can't be established (e.g. CF Access blocks
     // the upgrade, or on platforms without dart:io sockets).
+    //
+    // On the follow() path there is nothing to listen to: the running job was
+    // enqueued under a client id from before the suspend/restart, and ComfyUI
+    // addresses execution messages to *that* socket — a fresh one would sit
+    // silent forever. Straight to polling.
     WebSocket? ws;
-    try {
-      ws = await WebSocket.connect(
-        '$_wsUrl?clientId=$_clientId',
-        headers: _authHeaders,
-      ).timeout(_wsConnectTimeout);
-    } catch (e) {
-      debugPrint('[comfy] ws connect failed ($e) — polling instead');
-      ws = null;
+    if (!resuming) {
+      try {
+        ws = await WebSocket.connect(
+          '$_wsUrl?clientId=$clientId',
+          headers: _authHeaders,
+        ).timeout(_wsConnectTimeout);
+      } catch (e) {
+        debugPrint('[comfy] ws connect failed ($e) — polling instead');
+        ws = null;
+      }
     }
 
     var finished = false;
     if (ws != null) {
       var started = false;
       try {
-        await for (final raw in ws) {
+        // A socket that goes quiet must not freeze the node: half-open
+        // connections and any future message-routing surprise would otherwise
+        // hang here with no error to fall back from. The timeout throws into
+        // the catch below, which switches to polling. Generous, because a job
+        // queued behind a long one legitimately hears nothing meanwhile.
+        await for (final raw in ws.timeout(_wsSilenceTimeout)) {
           if (raw is! String) continue; // binary frames = preview images
           Map<String, dynamic> msg;
           try {
@@ -762,12 +790,15 @@ class ComfyUIService implements ImageBackend {
   }
 
   // ── ComfyUI REST primitives ─────────────────────────────────
-  Future<String> _queuePrompt(Map<String, dynamic> workflow) async {
+  Future<String> _queuePrompt(
+    Map<String, dynamic> workflow, {
+    required String clientId,
+  }) async {
     final resp = await _client
         .post(
           Uri.parse('$_baseUrl/prompt'),
           headers: _jsonHeaders,
-          body: jsonEncode({'prompt': workflow, 'client_id': _clientId}),
+          body: jsonEncode({'prompt': workflow, 'client_id': clientId}),
         )
         .timeout(_submitTimeout, onTimeout: () {
       throw Exception(

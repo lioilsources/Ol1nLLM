@@ -92,6 +92,19 @@ Progress events z WS: `status` (queue depth), `execution_start`, `progress` (ste
 
 Pokud WS selže (CF Access blokuje upgrade): fallback na HTTP polling `/history` + `/queue`.
 
+**`clientId` je per-job, ne per-instance.** ComfyUI drží sockety ve slovníku
+podle `clientId` a při druhém připojení se stejným id to staré **vyhodí**
+(„reusing existing session, remove old"). Když tedy dva joby sdílely jedno id
+služby, druhý job umlčel socket prvního: progress zamrzl a protože socket
+zůstal otevřený bez chyby, nespadlo to ani do pollingu — node visel.
+Ověřeno proti serveru (sdílené id: první socket po připojení druhého dostane
+0 zpráv; různá id: dostane všech 91) i přes reálný `generate()` ×2 nad jednou
+instancí služby (před opravou A zamrzlo na 9/30 kroků, po ní 30/30).
+`follow()` proto WS **vůbec neotvírá** — běžící job je zaregistrovaný pod
+starým id a nová socket by mlčela navždy; jde rovnou do pollingu. Navíc má
+smyčka `_wsSilenceTimeout` (90 s bez jakékoli zprávy ⇒ polling), aby ticho na
+socketu nikdy nezmrazilo node natrvalo.
+
 `n > 1` řeší ComfyUI nativně přes `batch_size` / `RepeatLatentBatch` — jediný request, server vygeneruje n obrázků najednou.
 
 **`follow(promptId)`**: přeskočí enqueue, jde rovnou do polling fallbacku (WS je ztracený po suspenzi). Výsledky na serveru přežívají restart ComfyUI? Ne — history se resetuje. TTL: neomezené do restartu serveru.
