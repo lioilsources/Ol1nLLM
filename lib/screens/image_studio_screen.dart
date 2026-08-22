@@ -361,7 +361,11 @@ class _TreeLayout {
       result.add(_LayoutNode(n, Offset(leftX + w / 2, kNodeSize / 2 + level * kLevelStride)));
       final kids = childrenMap[n.id] ?? [];
       double cursor = leftX;
-      for (final k in kids) {
+      // Newest child first (left). Children arrive in creation order, so
+      // laying them out left→right pushed the freshest branch to the far
+      // right — off-screen on a phone, since the viewer starts at the canvas
+      // origin. Reversed, the round you just made is the one you can see.
+      for (final k in kids.reversed) {
         assignPos(k, cursor, level + 1);
         cursor += subtreeWidths[k.id]! * kUnitWidth;
       }

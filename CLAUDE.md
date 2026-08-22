@@ -126,6 +126,11 @@ LoRA se zahodí, když ji server nemá nebo nesedí do linie modelu, póza u
 modelu bez `supportsPose`. Chybějící `loraStrength` (nody před v1.5.1) padá na
 `kDefaultLoraStrength`.
 
+**Strom nodů**: děti se kreslí **nejnovější vlevo** (`kids.reversed`
+v `_TreeLayout.assignPos`) — `InteractiveViewer` startuje v počátku plátna,
+takže poslední kolo je vidět bez scrollování; opačné pořadí tlačilo čerstvou
+větev mimo obrazovku.
+
 **Klávesnice**: `_dismissKeyboard()` (přes `FocusManager.instance.primaryFocus`)
 se volá u všeho, co zjevně není psaní — otevření kteréhokoli bottom sheetu,
 klepnutí na dlaždici či node ve stromu, spuštění inpaintu/3D/repose, odeslání
