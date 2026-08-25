@@ -367,6 +367,18 @@ a zavolá `backend.follow(jobId)`. Čítač pokusů se nuluje při reálném pro
 (`queued`/`running`); po vyčerpání → měkká chyba. Skutečné selhání (`GenFailed`)
 i `cancel()` se **persistují**, takže restart už mrtvý/zrušený job neobnovuje.
 
+## Stylová matice (`scripts/style_matrix/`)
+
+Nástroj pro otázku „co který model udělá s kterým stylem". Workflow staví
+**kód appky** (`prepareForTest` → `_prepare`), takže měří to, co appka
+skutečně posílá. `./scripts/style_matrix/run.sh --ref-prompt "…"` projede
+reference → dump → generování → skóre → kontaktní archy; přepínači jde zúžit
+modely, styly i flow (`--flows repose,img2img,txt2img`, `--edit-denoise 0.9`).
+Ke každému modelu se dumpuje i `__baseline` (týž prompt bez bloku stylu), aby
+šlo odlišit „model na styl reaguje" od „tohle maluje vždycky". Generování je
+resumovatelné. Metriky jsou barevné, tedy jen předvýběr — rozhoduje pohled na
+arch. Poslední výsledky a verdikty: `docs/style-matrix.md`.
+
 ## FINETUNE gallery export
 
 Tlačítko exportu (AppBar + per-session v draweru) posílá session (strom nodů +
