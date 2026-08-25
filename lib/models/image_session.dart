@@ -13,6 +13,8 @@ class ImageSession {
     this.selectedLora,
     this.loraStrength,
     this.selectedPoseId,
+    this.selectedStyleId,
+    this.editDenoise,
     required this.modelId,
     required this.updatedAt,
     this.exportedAt,
@@ -28,6 +30,13 @@ class ImageSession {
   /// LoRA strength used in this session (null = app default).
   final double? loraStrength;
   final String? selectedPoseId;
+
+  /// Art-style preset id appended to prompts in this session (see
+  /// [kStylePresets]); null = no style.
+  final String? selectedStyleId;
+
+  /// img2img denoise chosen by the user; null = the model preset's value.
+  final double? editDenoise;
 
   /// [ImageModelSpec.id] the session was generated with (implies the backend).
   final String modelId;
@@ -85,6 +94,8 @@ class ImageSession {
     String? selectedLora,
     double? loraStrength,
     String? selectedPoseId,
+    String? selectedStyleId,
+    double? editDenoise,
     required String modelId,
     DateTime? exportedAt,
     int? exportedImageCount,
@@ -111,6 +122,8 @@ class ImageSession {
       selectedLora: selectedLora,
       loraStrength: loraStrength,
       selectedPoseId: selectedPoseId,
+      selectedStyleId: selectedStyleId,
+      editDenoise: editDenoise,
       modelId: modelId,
       updatedAt: DateTime.now(),
       exportedAt: exportedAt,
@@ -126,6 +139,8 @@ class ImageSession {
     if (selectedLora != null) 'selectedLora': selectedLora,
     if (loraStrength != null) 'loraStrength': loraStrength,
     if (selectedPoseId != null) 'selectedPoseId': selectedPoseId,
+    if (selectedStyleId != null) 'selectedStyleId': selectedStyleId,
+    if (editDenoise != null) 'editDenoise': editDenoise,
     'modelId': modelId,
     'updatedAt': updatedAt.toIso8601String(),
     if (exportedAt != null) 'exportedAt': exportedAt!.toIso8601String(),
@@ -142,6 +157,8 @@ class ImageSession {
     selectedLora: json['selectedLora'] as String?,
     loraStrength: (json['loraStrength'] as num?)?.toDouble(),
     selectedPoseId: json['selectedPoseId'] as String?,
+    selectedStyleId: json['selectedStyleId'] as String?,
+    editDenoise: (json['editDenoise'] as num?)?.toDouble(),
     modelId: json['modelId'] as String? ??
         _legacyModelId(
           json['backendId'] as String?,

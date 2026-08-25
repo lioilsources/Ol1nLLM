@@ -15,6 +15,7 @@ import '../models/image_session.dart';
 import '../models/latent_bucket.dart';
 import '../models/pose_template.dart';
 import '../models/prompt_negatives.dart';
+import '../models/style_preset.dart';
 import '../services/comfyui_service.dart';
 import '../services/finetune_export_service.dart';
 import '../services/flux_kontext_nim_service.dart';
@@ -29,6 +30,14 @@ final imageStudioProvider =
 /// How many candidates ComfyUI produces per round (native batch, free).
 /// NIM backends override [ImageBackend.variantCount] to 1.
 const kVariantCount = 4;
+
+/// img2img denoise steps offered in the UI. The preset's own value (~0.72)
+/// is the middle "běžná" option and stays the default; [kStyleEditDenoise]
+/// is the one that actually lets an art style through — measured across
+/// 10 models × 25 styles, at 0.72 the style barely lands, at 0.9 it does,
+/// and the pose still holds because auto-depth keeps carrying it.
+const kGentleEditDenoise = 0.5;
+const kStyleEditDenoise = 0.9;
 
 /// Model/LoRA/pose a node was generated with, reduced to what the app can
 /// actually apply right now.
@@ -104,6 +113,14 @@ class ImageStudioState {
   /// Selected ControlNet pose template id (see [kPoseTemplates]), or null.
   final String? selectedPoseId;
 
+  /// Selected art-style preset id (see [kStylePresets]), or null. The block
+  /// is appended to the prompt at request time and only the id is persisted.
+  final String? selectedStyleId;
+
+  /// img2img denoise chosen by the user, or null for the model preset's
+  /// value. See [ComfyUIService.setEditDenoise].
+  final double? editDenoise;
+
   /// Reference image for a pending repose round (the input bar is in repose
   /// mode while non-null). Transient UI state — never persisted, dropped by
   /// any full state rebuild (session switch/restore) — and mutually
@@ -138,6 +155,8 @@ class ImageStudioState {
     this.selectedLora,
     this.loraStrength = kDefaultLoraStrength,
     this.selectedPoseId,
+    this.selectedStyleId,
+    this.editDenoise,
     this.reposeSourceImageId,
     this.error,
     this.info,
@@ -209,6 +228,10 @@ class ImageStudioState {
     double? loraStrength,
     String? selectedPoseId,
     bool clearPose = false,
+    String? selectedStyleId,
+    bool clearStyle = false,
+    double? editDenoise,
+    bool clearEditDenoise = false,
     String? reposeSourceImageId,
     bool clearRepose = false,
     String? error,
@@ -233,6 +256,10 @@ class ImageStudioState {
     selectedLora: clearLora ? null : (selectedLora ?? this.selectedLora),
     loraStrength: loraStrength ?? this.loraStrength,
     selectedPoseId: clearPose ? null : (selectedPoseId ?? this.selectedPoseId),
+    selectedStyleId:
+        clearStyle ? null : (selectedStyleId ?? this.selectedStyleId),
+    editDenoise:
+        clearEditDenoise ? null : (editDenoise ?? this.editDenoise),
     reposeSourceImageId: clearRepose
         ? null
         : (reposeSourceImageId ?? this.reposeSourceImageId),
@@ -363,6 +390,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     String? lora,
     String? poseId, {
     double? strength,
+    double? editDenoise,
   }) {
     final spec = imageModelById(modelId);
     final keepLora =
@@ -378,6 +406,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     // img2img carries the source's own structure over via depth ControlNet for
     // pose-capable (SDXL) models; a template pose picked above overrides it.
     _comfyui.setAutoPose(spec.supportsPose);
+    // Session restore calls this *before* the new state exists, so the
+    // caller passes the session's value; null falls back to the live state.
+    _comfyui.setEditDenoise(editDenoise ?? state.editDenoise);
     return (appliedLora, pose?.id);
   }
 
@@ -390,6 +421,26 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       clearLora: lora == null,
       selectedPoseId: poseId,
       clearPose: poseId == null,
+    );
+  }
+
+  /// Pick the art style appended to every prompt in this session, or null.
+  void setStyle(String? styleId) {
+    final style = styleById(styleId);
+    state = state.copyWith(
+      selectedStyleId: style?.id,
+      clearStyle: style == null,
+    );
+  }
+
+  /// How hard an img2img round repaints. Null returns the model preset's
+  /// value; [kStyleEditDenoise] is what actually lets an art style through
+  /// (the preset's ~0.72 keeps the source's palette and lighting).
+  void setEditDenoise(double? denoise) {
+    _comfyui.setEditDenoise(denoise);
+    state = state.copyWith(
+      editDenoise: denoise,
+      clearEditDenoise: denoise == null,
     );
   }
 
@@ -479,6 +530,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       selectedLora: state.selectedLora,
       loraStrength: state.loraStrength,
       selectedPoseId: state.selectedPoseId,
+      selectedStyleId: state.selectedStyleId,
+      editDenoise: state.editDenoise,
     );
   }
 
@@ -489,6 +542,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       session.selectedLora,
       session.selectedPoseId,
       strength: session.loraStrength,
+      editDenoise: session.editDenoise,
     );
     state = ImageStudioState(
       sessions: state.sessions,
@@ -498,6 +552,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       selectedLora: lora,
       loraStrength: session.loraStrength ?? kDefaultLoraStrength,
       selectedPoseId: poseId,
+      selectedStyleId: session.selectedStyleId,
+      editDenoise: session.editDenoise,
       modelId: session.modelId,
       availableLoras: state.availableLoras,
       availableCheckpoints: state.availableCheckpoints,
@@ -522,6 +578,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           next.selectedLora,
           next.selectedPoseId,
           strength: next.loraStrength,
+          editDenoise: next.editDenoise,
         );
         state = ImageStudioState(
           sessions: updated,
@@ -531,6 +588,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           selectedLora: lora,
           loraStrength: next.loraStrength ?? kDefaultLoraStrength,
           selectedPoseId: poseId,
+          selectedStyleId: next.selectedStyleId,
+          editDenoise: next.editDenoise,
           modelId: next.modelId,
           availableLoras: state.availableLoras,
           availableCheckpoints: state.availableCheckpoints,
@@ -565,6 +624,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           latest.selectedLora,
           latest.selectedPoseId,
           strength: latest.loraStrength,
+          editDenoise: latest.editDenoise,
         );
         state = ImageStudioState(
           sessions: sessions,
@@ -574,6 +634,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           selectedLora: lora,
           loraStrength: latest.loraStrength ?? kDefaultLoraStrength,
           selectedPoseId: poseId,
+          selectedStyleId: latest.selectedStyleId,
+          editDenoise: latest.editDenoise,
           modelId: latest.modelId,
           availableLoras: state.availableLoras,
           availableCheckpoints: state.availableCheckpoints,
@@ -602,6 +664,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       selectedLora: state.selectedLora,
       loraStrength: state.loraStrength,
       selectedPoseId: state.selectedPoseId,
+      selectedStyleId: state.selectedStyleId,
+      editDenoise: state.editDenoise,
       modelId: state.modelId,
       exportedAt: existing?.exportedAt,
       exportedImageCount: existing?.exportedImageCount,
@@ -755,6 +819,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     // ComfyUIService._inpaint) — don't record a pose that won't run. Repose
     // ignores a template pose too: the reference is the pose.
     final poseId = (isInpaint || isRepose) ? null : state.selectedPoseId;
+    // Inpaint describes only the masked area — a whole-image art style would
+    // fight it, so the style block is not applied (nor recorded) there.
+    final styleId = isInpaint ? null : state.selectedStyleId;
     final appliedLora = isInpaint && !patched ? null : state.selectedLora;
     final poseActive = poseId != null && patched;
     // Effective negative = preset negative + user ALL-CAPS tags. Recorded only
@@ -780,6 +847,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       // Strength only where a LoRA actually runs — otherwise the snapshot
       // would claim a setting that had no effect on this round.
       loraStrength: appliedLora != null ? state.loraStrength : null,
+      styleId: styleId,
       poseId: poseId,
       seed: seed,
       negativePrompt: negative.isNotEmpty ? negative : null,
@@ -805,7 +873,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       // Inpaint always samples at full denoise — the mask limits the change.
       denoise: patched
           ? (isImg2img && !isInpaint
-              ? (poseActive ? kPoseEditDenoise : preset!.img2imgDenoise)
+              ? (poseActive
+                  ? kPoseEditDenoise
+                  : (state.editDenoise ?? preset!.img2imgDenoise))
               : 1.0)
           : null,
       samplerName: patched ? preset!.samplerName : null,
@@ -837,7 +907,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     await _runAsync(
       node.id,
       () => _backend.generate(
-        prompt: parts.positive,
+        prompt: applyStyle(parts.positive, state.selectedStyleId),
         n: _backend.variantCount,
         seed: seed,
         negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -924,7 +994,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       node.id,
       () => _backend.edit(
         image: base.bytes,
-        prompt: chained,
+        prompt: applyStyle(chained, state.selectedStyleId),
         n: _backend.variantCount,
         seed: seed,
         negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -1074,7 +1144,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       node.id,
       () => _comfyui.repose(
         image: base.bytes,
-        prompt: parts.positive,
+        prompt: applyStyle(parts.positive, state.selectedStyleId),
         n: _comfyui.variantCount,
         seed: seed,
         negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -1210,7 +1280,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         nodeId,
         () => _comfyui.repose(
           image: base.bytes,
-          prompt: parts.positive,
+          prompt: applyStyle(parts.positive, node.styleId),
           n: _comfyui.variantCount,
           seed: seed,
           negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -1238,7 +1308,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       await _runAsync(
         nodeId,
         () => _backend.generate(
-          prompt: parts.positive,
+          // The style follows the *current* selection, like the model and
+          // LoRA above — the rebuilt snapshot records what actually ran.
+          prompt: applyStyle(parts.positive, state.selectedStyleId),
           n: _backend.variantCount,
           seed: seed,
           negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -1286,7 +1358,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         nodeId,
         () => _backend.edit(
           image: base.bytes,
-          prompt: chained,
+          prompt: mask != null
+              ? chained
+              : applyStyle(chained, state.selectedStyleId),
           n: _backend.variantCount,
           seed: seed,
           negativePrompt: parts.negative.isEmpty ? null : parts.negative,

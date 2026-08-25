@@ -69,6 +69,7 @@ class ComfyUIService implements ImageBackend {
   double _loraStrength = kDefaultLoraStrength;
   String? _activePoseAsset;
   bool _autoPose = false;
+  double? _editDenoise;
   ComfyPreset _preset = imageModelById(kDefaultImageModelId).preset!;
 
   /// Pose asset → server-side filename, so each skeleton uploads at most once
@@ -90,6 +91,16 @@ class ComfyUIService implements ImageBackend {
   /// stance while the prompt still restyles freely (verified on the server).
   void setAutoPose(bool enabled) => _autoPose = enabled;
   void setPreset(ComfyPreset preset) => _preset = preset;
+
+  /// Denoise for the next [edit], overriding the preset's `img2imgDenoise`.
+  /// Null = the preset value. This is the difference between "retouch the
+  /// photo" and "repaint it in another visual language": at the preset's 0.72
+  /// the source latent carries palette and lighting through, so an art style
+  /// barely lands (measured over 10 models × 25 styles), while 0.9 lets the
+  /// style through and the depth ControlNet still holds the pose. A picked
+  /// pose template keeps [kPoseEditDenoise] regardless — it needs the high
+  /// value to move limbs at all.
+  void setEditDenoise(double? denoise) => _editDenoise = denoise;
 
   // OpenPose ControlNet for the template-override path (pre-made skeletons).
   // SDXL-only — callers must not set a template pose for non-SDXL presets.
@@ -235,6 +246,7 @@ class ComfyUIService implements ImageBackend {
     final poseImageName = (pose != null && _preset.ckptName != null)
         ? await _ensurePoseUploaded(pose)
         : null;
+    final editDenoise = _editDenoise;
     final imageName = await _uploadImage(image);
     // Carry the source's own structure over via depth ControlNet, unless a
     // template pose was picked (that overrides) — see [setAutoPose].
@@ -250,6 +262,7 @@ class ComfyUIService implements ImageBackend {
       poseImageName: poseImageName,
       sourceDepth: sourceDepth,
       userNegative: negativePrompt,
+      editDenoise: editDenoise,
     );
     yield* _run(wf);
   }
@@ -1026,6 +1039,7 @@ class ComfyUIService implements ImageBackend {
     String? userNegative,
     String? depthImageName,
     LatentSize? latentSize,
+    double? editDenoise,
   }) => _prepare(
     template,
     prompt: prompt,
@@ -1039,6 +1053,7 @@ class ComfyUIService implements ImageBackend {
     userNegative: userNegative,
     depthImageName: depthImageName,
     latentSize: latentSize,
+    editDenoise: editDenoise,
   );
 
   Map<String, dynamic> _prepare(
@@ -1059,6 +1074,8 @@ class ComfyUIService implements ImageBackend {
     // Repose: overrides the preset/pose latent so the bucket matches the
     // reference's aspect.
     LatentSize? latentSize,
+    // img2img edit strength, overriding the preset (see [setEditDenoise]).
+    double? editDenoise,
   }) {
     final wf = jsonDecode(jsonEncode(template)) as Map<String, dynamic>;
     final lora = _activeLora;
@@ -1177,7 +1194,7 @@ class ComfyUIService implements ImageBackend {
                 ? 1.0
                 : (poseImageName != null
                     ? kPoseEditDenoise
-                    : preset.img2imgDenoise);
+                    : (editDenoise ?? preset.img2imgDenoise));
           }
       }
       if (inputs.containsKey('seed')) inputs['seed'] = seed;

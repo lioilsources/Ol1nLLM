@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ol1n_llm/models/image_model.dart';
+import 'package:ol1n_llm/models/pose_template.dart';
 import 'package:ol1n_llm/services/comfyui_service.dart';
 
 /// Verifies the inpaint request path against the real workflow assets:
@@ -388,6 +389,57 @@ void _strengthTests() {
         expect(lora['inputs']['strength_model'], v);
         expect(lora['inputs']['strength_clip'], v);
       }
+    });
+  });
+
+  group('edit strength (img2img denoise override)', () {
+    final pony = imageModelById('pony').preset!;
+    Map<String, dynamic> img2img() => jsonDecode(
+          File(pony.img2imgAsset).readAsStringSync(),
+        ) as Map<String, dynamic>;
+    double denoiseOf(Map<String, dynamic> wf) => wf.values
+        .map((e) => e as Map)
+        .firstWhere((n) => n['class_type'] == 'KSampler')['inputs']['denoise']
+        as double;
+
+    test('null keeps the model preset value', () {
+      final wf = (ComfyUIService()..setPreset(pony)).prepareForTest(
+        img2img(),
+        prompt: 'x', batch: 1, seed: 1, imageName: 'src.png',
+      );
+      expect(denoiseOf(wf), pony.img2imgDenoise);
+    });
+
+    test('the override reaches the sampler', () {
+      for (final v in [0.5, 0.9]) {
+        final wf = (ComfyUIService()..setPreset(pony)).prepareForTest(
+          img2img(),
+          prompt: 'x', batch: 1, seed: 1, imageName: 'src.png',
+          editDenoise: v,
+        );
+        expect(denoiseOf(wf), v);
+      }
+    });
+
+    test('a template pose still wins — it needs the high value to move limbs',
+        () {
+      final wf = (ComfyUIService()..setPreset(pony)).prepareForTest(
+        img2img(),
+        prompt: 'x', batch: 1, seed: 1, imageName: 'src.png',
+        poseImageName: 'skeleton.png', editDenoise: 0.5,
+      );
+      expect(denoiseOf(wf), kPoseEditDenoise);
+    });
+
+    test('inpaint ignores it — the mask limits the change, not the denoise',
+        () {
+      final wf = (ComfyUIService()..setPreset(pony)).prepareForTest(
+        jsonDecode(File(pony.inpaintAsset!).readAsStringSync())
+            as Map<String, dynamic>,
+        prompt: 'x', batch: 1, seed: 1,
+        imageName: 'src.png', maskName: 'mask.png', editDenoise: 0.5,
+      );
+      expect(denoiseOf(wf), 1.0);
     });
   });
 }

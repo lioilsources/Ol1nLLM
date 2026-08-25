@@ -152,6 +152,27 @@ mimo pole řeší `GestureDetector` kolem těla obrazovky, ale ten se k dotykům
 potomky nedostane, proto ta explicitní volání. Repose režim klávesnici
 **neotevírá** sám.
 
+**Styly (`lib/models/style_preset.dart`)**: 25 výtvarných bloků ověřených
+měřením (`docs/style-matrix.md`), vybírané `_StyleChip` v input baru. Blok se
+připojuje **za** prompt (`applyStyle()`) — vlastní zadání má přednost; prázdný
+prompt (foto root) zůstane prázdný, aby se styl nestal jediným obsahem. Na uzlu
+se persistuje jen `GenNode.styleId`, text je z něj odvoditelný (stejný princip
+jako u póz). Platí pro generate/refine/repose, **ne pro inpaint** (ten popisuje
+jen zamalovanou oblast, celoobrazový styl by se s ním pral).
+
+**Síla úpravy (`_EditStrengthChip`)**: `ComfyUIService.setEditDenoise()`
+přebíjí presetový `img2imgDenoise`. Měření ukázalo, že při presetových ~0.72 je
+img2img stylově skoro slepý (rozptyl 5–50× nižší než repose, u pony 0.011),
+zatímco při `kStyleEditDenoise` 0.9 styl projde a pózu dál drží auto-depth.
+Nabídka: jemná 0.5 / běžná (preset) / silná 0.9. Šablona pózy si drží
+`kPoseEditDenoise` bez ohledu na volbu a inpaint jede vždy na 1.0. Chip se
+ukazuje jen u ComfyUI img2img kola (NIM backendy denoise nemají).
+
+**Popisky modelů (`ImageModelSpec.styleNote`)**: jedna věta o tom, co model
+udělá se stylovým promptem, ukazuje se v pickeru pod schopnostmi. Není odhad —
+plyne z matice; „výchozí scéna" modelu je při výběru podstatnější než výčet
+schopností.
+
 **Rodiny LoRA (`lib/models/lora_family.dart`)**: `LoraFamily` rozlišuje
 **linii**, ne jen architekturu — `flux / sdxl / pony / illustrious / sd15 /
 wan / zimage / unknown`. `loraFit(lora, model)` vrací `native` (stejná linie),

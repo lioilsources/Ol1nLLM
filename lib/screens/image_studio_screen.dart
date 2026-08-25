@@ -10,6 +10,7 @@ import '../core/constants/theme.dart';
 import '../models/gen_node.dart';
 import '../models/image_model.dart';
 import '../models/pose_template.dart';
+import '../models/style_preset.dart';
 import '../providers/image_studio_provider.dart';
 import '../widgets/image_session_drawer.dart';
 import 'mask_editor_screen.dart';
@@ -1720,9 +1721,11 @@ class _ModelChip extends StatelessWidget {
                               : spec.img2img
                                   ? '${spec.capabilityLabel} — vyžaduje obrázek'
                                   : '${spec.capabilityLabel} — jen nové generování';
+                  final note = spec.styleNote;
                   return Opacity(
                     opacity: usable ? 1.0 : 0.38,
                     child: ListTile(
+                      isThreeLine: note != null,
                       enabled: usable,
                       leading: Icon(spec.icon, color: spec.color, size: 22),
                       title: Text(
@@ -1732,12 +1735,33 @@ class _ModelChip extends StatelessWidget {
                               isSel ? AppTheme.accent : AppTheme.textPrimary,
                         ),
                       ),
-                      subtitle: Text(
-                        hint,
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 12,
-                        ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            hint,
+                            style: const TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                          // What the model does with an art-style prompt —
+                          // the thing you can't read off the capability list.
+                          if (note != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                note,
+                                style: TextStyle(
+                                  color: AppTheme.textSecondary
+                                      .withValues(alpha: 0.75),
+                                  fontSize: 11,
+                                  height: 1.25,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                       trailing: Icon(
                         isSel
@@ -1845,6 +1869,270 @@ class _ReposePill extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Art style appended to every prompt in the session.
+class _StyleChip extends StatelessWidget {
+  const _StyleChip({required this.selected, required this.onChanged});
+
+  final String? selected;
+  final ValueChanged<String?> onChanged;
+
+  void _pick(BuildContext context) {
+    _dismissKeyboard();
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: FractionallySizedBox(
+          heightFactor: 0.75,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 2),
+                child: Text(
+                  'Výtvarný styl',
+                  style: TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text(
+                  'Připojí se za tvůj prompt. Nejlíp funguje v repose; '
+                  'v úpravě zvyš sílu na „silná".',
+                  style: TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              ListTile(
+                leading: Icon(
+                  selected == null
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  color:
+                      selected == null ? AppTheme.accent : AppTheme.textSecondary,
+                  size: 20,
+                ),
+                title: const Text('Bez stylu',
+                    style: TextStyle(color: AppTheme.textPrimary)),
+                onTap: () {
+                  onChanged(null);
+                  Navigator.of(ctx).pop();
+                },
+              ),
+              const Divider(height: 1, color: Colors.white12),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: kStylePresets.length,
+                  itemBuilder: (_, i) {
+                    final st = kStylePresets[i];
+                    final isSel = st.id == selected;
+                    return ListTile(
+                      leading: Icon(
+                        isSel
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                        color:
+                            isSel ? AppTheme.accent : AppTheme.textSecondary,
+                        size: 20,
+                      ),
+                      title: Text(
+                        st.label,
+                        style: TextStyle(
+                          color:
+                              isSel ? AppTheme.accent : AppTheme.textPrimary,
+                        ),
+                      ),
+                      subtitle: Text(
+                        st.block,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                      onTap: () {
+                        onChanged(st.id);
+                        Navigator.of(ctx).pop();
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final style = styleById(selected);
+    return _ChipShell(
+      active: style != null,
+      icon: Icons.palette_outlined,
+      label: style?.label ?? 'Styl',
+      onTap: () => _pick(context),
+    );
+  }
+}
+
+/// How hard an img2img round repaints — the difference between a retouch and
+/// a restyle.
+class _EditStrengthChip extends StatelessWidget {
+  const _EditStrengthChip({
+    required this.denoise,
+    required this.presetDenoise,
+    required this.onChanged,
+  });
+
+  /// Null = the model preset's own value.
+  final double? denoise;
+  final double presetDenoise;
+  final ValueChanged<double?> onChanged;
+
+  String get _label => switch (denoise) {
+        null => 'Úprava: běžná',
+        kGentleEditDenoise => 'Úprava: jemná',
+        kStyleEditDenoise => 'Úprava: silná',
+        _ => 'Úprava: ${denoise!.toStringAsFixed(2)}',
+      };
+
+  void _pick(BuildContext context) {
+    _dismissKeyboard();
+    final options = <(String, String, double?)>[
+      ('Jemná', 'drží zdroj, mění detaily (${kGentleEditDenoise.toStringAsFixed(2)})',
+          kGentleEditDenoise),
+      ('Běžná', 'výchozí pro model (${presetDenoise.toStringAsFixed(2)})', null),
+      ('Silná', 'projde i výtvarný styl, pózu drží ControlNet '
+          '(${kStyleEditDenoise.toStringAsFixed(2)})', kStyleEditDenoise),
+    ];
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                'Síla úpravy',
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            for (final (title, sub, value) in options)
+              ListTile(
+                leading: Icon(
+                  value == denoise
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  color: value == denoise
+                      ? AppTheme.accent
+                      : AppTheme.textSecondary,
+                  size: 20,
+                ),
+                title: Text(title,
+                    style: TextStyle(
+                      color: value == denoise
+                          ? AppTheme.accent
+                          : AppTheme.textPrimary,
+                    )),
+                subtitle: Text(sub,
+                    style: const TextStyle(
+                        color: AppTheme.textSecondary, fontSize: 11)),
+                onTap: () {
+                  onChanged(value);
+                  Navigator.of(ctx).pop();
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => _ChipShell(
+        active: denoise != null,
+        icon: Icons.tune,
+        label: _label,
+        onTap: () => _pick(context),
+      );
+}
+
+/// Shared chip look: accent-tinted when a non-default value is active.
+class _ChipShell extends StatelessWidget {
+  const _ChipShell({
+    required this.active,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final bool active;
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = active ? AppTheme.accent : AppTheme.textSecondary;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: active ? AppTheme.accent.withValues(alpha: 0.15) : AppTheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: active ? AppTheme.accent : Colors.white24,
+            width: 0.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: fg),
+            const SizedBox(width: 5),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 150),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, color: fg),
+              ),
+            ),
+            const SizedBox(width: 3),
+            Icon(Icons.expand_more, size: 14, color: fg),
+          ],
+        ),
       ),
     );
   }
@@ -2071,6 +2359,27 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                         onStrengthChanged: (v) => ref
                             .read(imageStudioProvider.notifier)
                             .setLoraStrength(v),
+                      ),
+                    ],
+                    const SizedBox(width: 8),
+                    _StyleChip(
+                      selected: widget.state.selectedStyleId,
+                      onChanged: (v) =>
+                          ref.read(imageStudioProvider.notifier).setStyle(v),
+                    ),
+                    // Only meaningful for a ComfyUI img2img round: the NIM
+                    // backends have no denoise and inpaint always runs at 1.0.
+                    if (_isRefineMode &&
+                        !_isReposeMode &&
+                        spec.kind == ImageBackendKind.comfyUi &&
+                        spec.preset?.ckptName != null) ...[
+                      const SizedBox(width: 8),
+                      _EditStrengthChip(
+                        denoise: widget.state.editDenoise,
+                        presetDenoise: spec.preset!.img2imgDenoise,
+                        onChanged: (v) => ref
+                            .read(imageStudioProvider.notifier)
+                            .setEditDenoise(v),
                       ),
                     ],
                     // Repose takes its pose from the reference — a template

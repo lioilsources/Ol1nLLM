@@ -73,6 +73,7 @@ class ImageModelSpec {
     required this.img2img,
     this.inpaint = false,
     this.loraFamily = LoraFamily.none,
+    this.styleNote,
     this.supportsPose = false,
     this.preset,
   });
@@ -100,6 +101,12 @@ class ImageModelSpec {
   /// files, but only the matching lineage transfers properly (see
   /// [loraFit]). Cross-architecture files are filtered out entirely.
   final LoraFamily loraFamily;
+
+  /// One line on how this checkpoint treats an art-style prompt — measured,
+  /// not guessed (10 models × 25 styles, see `docs/style-matrix.md`). Shown in
+  /// the picker, because the model's *default scene* — what it falls back to
+  /// when the style doesn't land — matters more than its capability list.
+  final String? styleNote;
 
   /// OpenPose ControlNet pose templates apply to this model. Explicit flag,
   /// not derived from ckptName: the installed ControlNet is SDXL-only, so
@@ -150,6 +157,8 @@ const kImageModels = <ImageModelSpec>[
     kind: ImageBackendKind.fluxNim,
     txt2img: true,
     img2img: false,
+    styleNote:
+        'rychlé txt2img, styl drží slušně',
   ),
   ImageModelSpec(
     id: 'flux-kontext',
@@ -159,6 +168,8 @@ const kImageModels = <ImageModelSpec>[
     kind: ImageBackendKind.fluxKontextNim,
     txt2img: false,
     img2img: true,
+    styleNote:
+        'instrukční editace — pózu ze zdroje nedrží',
   ),
   ImageModelSpec(
     id: 'flux-manga',
@@ -169,6 +180,8 @@ const kImageModels = <ImageModelSpec>[
     txt2img: true,
     img2img: true,
     loraFamily: LoraFamily.flux,
+    styleNote:
+        'buď převezme médium naplno, nebo vůbec — pózu nedrží',
     preset: ComfyPreset(
       txt2imgAsset: 'assets/comfyui/flux_manga_txt2img.api.json',
       img2imgAsset: 'assets/comfyui/flux_manga_img2img.api.json',
@@ -186,6 +199,8 @@ const kImageModels = <ImageModelSpec>[
     // Dedicated inpaint-only workflow (UNETLoader graph, values baked in).
     // txt2img/img2img assets are never used (both flags false) — the field
     // type requires them, so they point at the same file.
+    styleNote:
+        'jen inpaint — styl řeší prompt zamalované oblasti',
     preset: ComfyPreset(
       txt2imgAsset: _fluxFillInpaint,
       img2imgAsset: _fluxFillInpaint,
@@ -207,6 +222,8 @@ const kImageModels = <ImageModelSpec>[
     inpaint: true,
     loraFamily: LoraFamily.pony,
     supportsPose: true,
+    styleNote:
+        'vlastní malovaná estetika, historické styly skoro nepřejímá',
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
@@ -228,6 +245,8 @@ const kImageModels = <ImageModelSpec>[
     inpaint: true,
     loraFamily: LoraFamily.sdxl,
     supportsPose: true,
+    styleNote:
+        'nejširší stylový rozsah; styl inscenuje jako kostým a kulisu',
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
@@ -255,6 +274,8 @@ const kImageModels = <ImageModelSpec>[
     // cfg 1.5–2. 6 steps keeps img2img usable (denoise 0.72 ⇒ ~4 real steps)
     // and cfg 2.0 is the top of the range, where the negative still bites —
     // at cfg 1 it would be ignored outright.
+    styleNote:
+        '6 kroků, skoro stejný rozsah jako Juggernaut XL',
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
@@ -281,6 +302,8 @@ const kImageModels = <ImageModelSpec>[
     inpaint: true,
     loraFamily: LoraFamily.illustrious,
     supportsPose: true,
+    styleNote:
+        'styl řeší dekorativním rámem, postava zůstane ilustrací',
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
@@ -311,6 +334,8 @@ const kImageModels = <ImageModelSpec>[
     inpaint: true,
     loraFamily: LoraFamily.illustrious,
     supportsPose: true,
+    styleNote:
+        'pastelové jeviště; spolehlivě jen ukiyo-e, tuš, Art Nouveau',
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
@@ -337,6 +362,8 @@ const kImageModels = <ImageModelSpec>[
     inpaint: true,
     loraFamily: LoraFamily.illustrious,
     supportsPose: true,
+    styleNote:
+        'silný vlastní rukopis — krémové jeviště přebije zadaný styl',
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
@@ -366,6 +393,8 @@ const kImageModels = <ImageModelSpec>[
     inpaint: true,
     loraFamily: LoraFamily.sdxl,  // anime-tuned SDXL, not Illustrious lineage
     supportsPose: true,
+    styleNote:
+        'teplé protisvětlo; výborně tuš, ukiyo-e, Art Nouveau, Egypt',
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
@@ -394,6 +423,8 @@ const kImageModels = <ImageModelSpec>[
     inpaint: true,
     loraFamily: LoraFamily.pony,
     supportsPose: true,
+    styleNote:
+        'měkká anime ilustrace, styl přes kostým a paletu',
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
@@ -416,6 +447,8 @@ const kImageModels = <ImageModelSpec>[
     kind: ImageBackendKind.comfyUi,
     txt2img: true,
     img2img: true,
+    styleNote:
+        'styl nepřejímá, 512×512',
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,

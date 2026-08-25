@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ol1n_llm/models/gen_node.dart';
 import 'package:ol1n_llm/models/image_model.dart';
+import 'package:ol1n_llm/models/image_session.dart';
 import 'package:ol1n_llm/providers/image_studio_provider.dart';
 
 void main() {
@@ -176,6 +178,48 @@ void main() {
       );
       expect(s?.modelId, 'flux-manga');
       expect(s?.poseId, isNull);
+    });
+  });
+
+  group('style + edit strength are session settings', () {
+    test('defaults are off / preset', () {
+      const st = ImageStudioState();
+      expect(st.selectedStyleId, isNull);
+      expect(st.editDenoise, isNull);
+    });
+
+    test('survive an unrelated copyWith, clear on demand', () {
+      const base = ImageStudioState(
+        selectedStyleId: 'ukiyoe',
+        editDenoise: kStyleEditDenoise,
+      );
+      final next = base.copyWith(currentNodeId: 'n1');
+      expect(next.selectedStyleId, 'ukiyoe');
+      expect(next.editDenoise, kStyleEditDenoise);
+      expect(base.copyWith(clearStyle: true).selectedStyleId, isNull);
+      expect(base.copyWith(clearEditDenoise: true).editDenoise, isNull);
+    });
+
+    test('round-trip through the persisted session', () {
+      final s = ImageSession.create(
+        nodes: [GenNode.create(prompt: 'x')],
+        modelId: 'pony',
+        selectedStyleId: 'baroque',
+        editDenoise: kStyleEditDenoise,
+      );
+      final back = ImageSession.fromJson(jsonDecode(jsonEncode(s.toJson()))
+          as Map<String, dynamic>);
+      expect(back.selectedStyleId, 'baroque');
+      expect(back.editDenoise, kStyleEditDenoise);
+    });
+
+    test('a session saved before this version reads as defaults', () {
+      final back = ImageSession.fromJson({
+        'id': 'a', 'title': 't', 'nodes': <Map<String, dynamic>>[],
+        'modelId': 'pony', 'updatedAt': DateTime.now().toIso8601String(),
+      });
+      expect(back.selectedStyleId, isNull);
+      expect(back.editDenoise, isNull);
     });
   });
 }

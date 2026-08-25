@@ -131,6 +131,10 @@ class GenNode {
   final String? modelId;
   final String? loraName;
 
+  /// Style preset appended to [prompt] (see [kStylePresets]). Only the id is
+  /// stored — the block text is derivable, like [poseId].
+  final String? styleId;
+
   /// Strength [loraName] was applied with (model + clip). Recorded only when
   /// a LoRA actually applies — the effect isn't reproducible from the name
   /// alone, and the strength is adjustable (including negative) since v1.4.0.
@@ -179,6 +183,7 @@ class GenNode {
     this.modelId,
     this.loraName,
     this.loraStrength,
+    this.styleId,
     this.poseId,
     this.seed,
     this.negativePrompt,
@@ -209,6 +214,7 @@ class GenNode {
     String? modelId,
     String? loraName,
     double? loraStrength,
+    String? styleId,
     String? poseId,
     int? seed,
     String? negativePrompt,
@@ -235,6 +241,7 @@ class GenNode {
     modelId: modelId,
     loraName: loraName,
     loraStrength: loraStrength,
+    styleId: styleId,
     poseId: poseId,
     seed: seed,
     negativePrompt: negativePrompt,
@@ -269,6 +276,7 @@ class GenNode {
     if (modelId != null) 'modelId': modelId,
     if (loraName != null) 'loraName': loraName,
     if (loraStrength != null) 'loraStrength': loraStrength,
+    if (styleId != null) 'styleId': styleId,
     if (poseId != null) 'poseId': poseId,
     if (seed != null) 'seed': seed,
     if (negativePrompt != null) 'negativePrompt': negativePrompt,
@@ -315,6 +323,7 @@ class GenNode {
       modelId: json['modelId'] as String?,
       loraName: json['loraName'] as String?,
       loraStrength: (json['loraStrength'] as num?)?.toDouble(),
+      styleId: json['styleId'] as String?,
       poseId: json['poseId'] as String?,
       seed: json['seed'] as int?,
       negativePrompt: json['negativePrompt'] as String?,
@@ -369,6 +378,7 @@ class GenNode {
     modelId: modelId,
     loraName: loraName,
     loraStrength: loraStrength,
+    styleId: styleId,
     poseId: poseId,
     seed: seed,
     negativePrompt: negativePrompt,
