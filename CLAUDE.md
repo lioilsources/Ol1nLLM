@@ -125,7 +125,10 @@ baked-in, `ckptName == null` ⇒ sampler se nepatchuje). Positive prefix (score
 tagy) se skládá v Dartu. `_LoraChip` v input baru ukazuje sílu i mimo picker
 (hodnota + divergentní proužek `_LoraStrengthBar` od nuly, oranžově pro
 záporné); řada chipů je horizontálně scrollovatelná, protože model + LoRA se
-sílou + póza se na 375 pt nevejdou. Chip platí i pro repose.
+sílou + póza se na 375 pt nevejdou. Chip platí i pro „zachovej pózu“.
+Pořadí v řadě je záměrné: model → styl → síla úpravy → póza → **LoRA
+jako poslední** (používá se nejmíň, a řada scrolluje, takže co je vpravo,
+je z palce nejdál).
 ComfyUI URL jde přepnout přes `--dart-define=COMFYUI_URL=...`
 (např. LAN `http://192.168.88.66:8188` pro testování bez CF).
 

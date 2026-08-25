@@ -2348,20 +2348,6 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                       onChanged: (id) =>
                           ref.read(imageStudioProvider.notifier).setModel(id),
                     ),
-                    if (loras.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      _LoraChip(
-                        loras: loras,
-                        family: spec.loraFamily,
-                        selected: selectedLora,
-                        onChanged: (v) =>
-                            ref.read(imageStudioProvider.notifier).setLora(v),
-                        strength: widget.state.loraStrength,
-                        onStrengthChanged: (v) => ref
-                            .read(imageStudioProvider.notifier)
-                            .setLoraStrength(v),
-                      ),
-                    ],
                     const SizedBox(width: 8),
                     _StyleChip(
                       selected: widget.state.selectedStyleId,
@@ -2391,6 +2377,22 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                         selected: widget.state.selectedPoseId,
                         onChanged: (v) =>
                             ref.read(imageStudioProvider.notifier).setPose(v),
+                      ),
+                    ],
+                    // Last on purpose: rarely used, and the row scrolls — the
+                    // chips you reach for every round stay within thumb reach.
+                    if (loras.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      _LoraChip(
+                        loras: loras,
+                        family: spec.loraFamily,
+                        selected: selectedLora,
+                        onChanged: (v) =>
+                            ref.read(imageStudioProvider.notifier).setLora(v),
+                        strength: widget.state.loraStrength,
+                        onStrengthChanged: (v) => ref
+                            .read(imageStudioProvider.notifier)
+                            .setLoraStrength(v),
                       ),
                     ],
                   ],
