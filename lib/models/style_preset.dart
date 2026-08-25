@@ -275,8 +275,13 @@ StylePreset? styleById(String? id) {
 
 /// Prompt + blok stylu. Prázdný prompt zůstane prázdný (foto root), aby se
 /// styl nestal jediným obsahem zadání.
-String applyStyle(String prompt, String? styleId) {
-  final style = styleById(styleId);
+String applyStyle(String prompt, String? styleId) =>
+    applyStylePreset(prompt, styleById(styleId));
+
+/// Same rule, but for a preset the caller already holds — the lab vets style
+/// candidates that are not (yet) in [kStylePresets], and looking them up by id
+/// would silently drop their text.
+String applyStylePreset(String prompt, StylePreset? style) {
   if (style == null || prompt.trim().isEmpty) return prompt;
   return '$prompt, ${style.block}';
 }

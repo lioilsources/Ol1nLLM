@@ -367,17 +367,38 @@ a zavolá `backend.follow(jobId)`. Čítač pokusů se nuluje při reálném pro
 (`queued`/`running`); po vyčerpání → měkká chyba. Skutečné selhání (`GenFailed`)
 i `cancel()` se **persistují**, takže restart už mrtvý/zrušený job neobnovuje.
 
-## Stylová matice (`scripts/style_matrix/`)
+## Lab (`tools/lab/`)
 
-Nástroj pro otázku „co který model udělá s kterým stylem". Workflow staví
-**kód appky** (`prepareForTest` → `_prepare`), takže měří to, co appka
-skutečně posílá. `./scripts/style_matrix/run.sh --ref-prompt "…"` projede
-reference → dump → generování → skóre → kontaktní archy; přepínači jde zúžit
-modely, styly i flow (`--flows repose,img2img,txt2img`, `--edit-denoise 0.9`).
-Ke každému modelu se dumpuje i `__baseline` (týž prompt bez bloku stylu), aby
-šlo odlišit „model na styl reaguje" od „tohle maluje vždycky". Generování je
-resumovatelné. Metriky jsou barevné, tedy jen předvýběr — rozhoduje pohled na
-arch. Poslední výsledky a verdikty: `docs/style-matrix.md`.
+Nástroj pro otázku „co který model udělá s kterým promptem a nastavením".
+Webové UI (`make lab`, běží na 127.0.0.1:8765) i terminál (`lab run`,
+`lab score`, `lab check`) nad jednou Go binárkou; `make lab-dry` projede vše
+bez ComfyUI a s placeholdery.
+
+**Workflow staví kód appky** — `tools/lab/dump.dart` běží pod `flutter test`
+a volá `ComfyUIService.prepareForTest` → `_prepare`, takže lab měří to, co
+appka opravdu posílá. Modely, styly i pózy se čtou z registrů (`kImageModels`
+prořezané podle nainstalovaných checkpointů, `kStylePresets`, `kPoseTemplates`)
+a přes `manifest.json` tečou do UI — Dart zůstává jediným zdrojem pravdy.
+
+Postup je **plán → dump → prohlédnout → generovat**: dump je zadarmo a vyrobí
+přesný seznam buněk dřív, než se sáhne na GPU. Ke každému modelu se dumpuje
+i `__baseline` (týž prompt bez stylu), bez kterého nejde odlišit „model na
+styl reaguje" od „tohle maluje pokaždé". Generování je resumovatelné.
+
+Sweep míří **na uzel** (`__cn_apply__.strength`, `KSampler.cfg`, `#5.steps`,
+`param.editDenoise`), ne na jakýkoli vstup daného jména; cíl bez shody je
+chyba, aby nesmyslný běh spadl před GPU, a chybí-li jen u některých modelů
+(flux nemá `KSampler`), přeskočí se ty buňky s uvedeným důvodem. Čistá logika
+sweepů a overridů je v `tools/lab/dump_spec.dart` a testuje ji
+`test/dump_spec_test.dart`.
+
+Metriky (reakce vůči baseline, rozptyl stylů, změna proti předchozí hodnotě
+sweepu) měří **barvu, ne převzetí stylu** — jsou k předvýběru, rozhodnout musí
+pohled na obrázky. Kalibrace z reálného měření: `docs/style-matrix.md`.
+
+Prohlížeč nemůže volat ComfyUI přímo (nevrací CORS hlavičky a CF Access
+odmítá preflight 403), proto ten lokální server; drží CF creds, takže
+poslouchá jen na loopbacku a mutující požadavky chtějí `X-Lab-Token`.
 
 ## FINETUNE gallery export
 

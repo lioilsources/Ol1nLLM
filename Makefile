@@ -1,4 +1,4 @@
-.PHONY: run build-ios build-android
+.PHONY: run debug build-ios build-android lab lab-dry lab-check
 
 -include .env.local
 
@@ -23,3 +23,14 @@ build-ios:
 build-android:
 	flutter build apk --release \
 		$(DART_DEFINES)
+
+# The lab is its own Go module, so it runs from its own directory; it walks up
+# to the package root itself (pubspec.yaml) for assets and build/lab.
+lab:
+	cd tools/lab && go run . serve --port 8765 --open
+
+lab-dry:
+	cd tools/lab && go run . serve --port 8765 --open --force-dry
+
+lab-check:
+	cd tools/lab && go run . check

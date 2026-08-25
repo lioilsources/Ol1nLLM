@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="lab-token" content="__LAB_TOKEN__">
+<title>lab — dávkové experimenty</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header>
+  <div class="brand">lab <span>· co který model udělá</span></div>
+  <div class="lamps" id="lamps"></div>
+</header>
+
+<div class="wrap">
+  <aside class="rail">
+    <fieldset>
+      <legend>modely</legend>
+      <div class="chips" id="models"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>prompty</legend>
+      <label class="field">
+        <textarea id="prompts" placeholder="jeden prompt na řádek"></textarea>
+      </label>
+      <label class="field">
+        <span>negativ (volitelně)</span>
+        <input type="text" id="negative" placeholder="lowres, watermark">
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>styly</legend>
+      <div class="chips" id="styles"></div>
+      <p class="hint">Bez výběru se jede jen holý prompt. S výběrem se navíc
+        vygeneruje baseline bez stylu — bez něj nejde poznat „model na styl
+        reaguje" od „tohle maluje pokaždé".</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>flow</legend>
+      <div class="chips" id="flows"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>předloha a póza</legend>
+      <label class="field">
+        <span>referenční obrázek</span>
+        <input type="file" id="ref" accept="image/*">
+      </label>
+      <div id="refpreview"></div>
+      <div class="chips" id="posemode"></div>
+      <div class="poses" id="poses" hidden></div>
+      <p class="hint" id="posehint"></p>
+    </fieldset>
+
+    <fieldset>
+      <legend>parametr flow</legend>
+      <div class="row">
+        <label class="field"><span>seed</span><input type="number" id="seed" value="777"></label>
+        <label class="field"><span>batch</span><input type="number" id="batch" value="1" min="1" max="4"></label>
+      </div>
+      <label class="field">
+        <span>síla úpravy (img2img denoise)</span>
+        <select id="editDenoise">
+          <option value="0">preset modelu</option>
+          <option value="0.5">jemná 0.50</option>
+          <option value="0.9">silná 0.90</option>
+        </select>
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>sweep — jedna osa</legend>
+      <label class="field">
+        <span>co měnit</span>
+        <select id="sweepTarget">
+          <option value="">bez sweepu</option>
+          <option value="__cn_apply__.strength">síla ControlNetu</option>
+          <option value="__cn_apply__.end_percent">konec ControlNetu</option>
+          <option value="param.editDenoise">síla úpravy</option>
+          <option value="KSampler.cfg" data-preset="1">cfg (přebíjí preset)</option>
+          <option value="KSampler.steps" data-preset="1">kroky (přebíjí preset)</option>
+          <option value="param.seed">seed</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>hodnoty (oddělené |)</span>
+        <input type="text" id="sweepValues" placeholder="0.5|0.75|1.0">
+      </label>
+      <p class="hint" id="sweephint"></p>
+    </fieldset>
+
+    <div class="start">
+      <label class="field" style="margin-bottom:8px">
+        <span>režim</span>
+        <select id="mode">
+          <option value="dry">nanečisto — bez GPU</option>
+          <option value="real">ostrý běh</option>
+        </select>
+      </label>
+      <button id="startbtn">Spustit</button>
+      <p class="est" id="estimate">—</p>
+    </div>
+  </aside>
+
+  <main>
+    <div class="runlist" id="runlist"></div>
+    <div id="content">
+      <div class="empty">
+        <h2>Zatím tu nic neběželo</h2>
+        <p>Vlevo vyber modely, napiš prompty a spusť. Nejdřív se vygenerují
+          workflow kódem appky — teprve pak se sáhne na GPU, takže je vidět
+          přesný počet buněk dřív, než něco stojí čas.</p>
+        <p>Nanečisto projede celou cestu bez ComfyUI: tabulka, panel zapojení
+          i metriky fungují, jen místo obrázků jsou placeholdery.</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="drawer" id="drawer" hidden>
+  <button class="closebtn" id="closedrawer">zavřít</button>
+  <div id="drawerbody"></div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
