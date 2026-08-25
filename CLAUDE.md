@@ -152,8 +152,9 @@ mimo pole řeší `GestureDetector` kolem těla obrazovky, ale ten se k dotykům
 potomky nedostane, proto ta explicitní volání. Repose režim klávesnici
 **neotevírá** sám.
 
-**Styly (`lib/models/style_preset.dart`)**: 25 výtvarných bloků ověřených
-měřením (`docs/style-matrix.md`), vybírané `_StyleChip` v input baru. Blok se
+**Styly (`lib/models/style_preset.dart`)**: 40 výtvarných bloků ověřených
+měřením (`docs/style-matrix.md`) — každý prošel testem, že na něj aspoň jeden
+model skutečně reaguje, a že nedubluje jiný styl v seznamu, vybírané `_StyleChip` v input baru. Blok se
 připojuje **za** prompt (`applyStyle()`) — vlastní zadání má přednost; prázdný
 prompt (foto root) zůstane prázdný, aby se styl nestal jediným obsahem. Na uzlu
 se persistuje jen `GenNode.styleId`, text je z něj odvoditelný (stejný princip

@@ -181,7 +181,7 @@ const kImageModels = <ImageModelSpec>[
     img2img: true,
     loraFamily: LoraFamily.flux,
     styleNote:
-        'buď převezme médium naplno, nebo vůbec — pózu nedrží',
+        'pózu ze zdroje nedrží; stylů zná jen pár',
     preset: ComfyPreset(
       txt2imgAsset: 'assets/comfyui/flux_manga_txt2img.api.json',
       img2imgAsset: 'assets/comfyui/flux_manga_img2img.api.json',

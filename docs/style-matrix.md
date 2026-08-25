@@ -50,3 +50,24 @@ Spolehlivě styly s jasným médiem a plochou — čínská tuš, ukiyo-e, Art N
 egyptská stěna, indická a perská miniatura, aboriginal. Nejhůř popisy, které
 znamenají hlavně „kamenný reliéf v zemitých tónech" (asyrský, mezopotámský,
 hebrejský, předislámský arabský) — u většiny modelů z nich je jen béžová stěna.
+
+## Druhá vlna stylů (2026-08-25)
+
+24 kandidátů, 3 modely s nejširším rozsahem (juggernaut-xl, illustrious-xl,
+animagine-xl), repose, stejný seed i reference — plus **nezastylovaný baseline**
+pro každý model. Kritérium „reaguje na to aspoň jeden model" = vzdálenost
+barevného histogramu od baseline téhož modelu; laťku určil **nejslabší
+z 25 stávajících stylů** (chineseink, 0.302), ne odhad.
+
+Laťku překonalo všech 24, ale metrika měří barvu, ne převzetí stylu — proto
+rozhodl ještě pohled na výsledky:
+
+| verdikt | styly | důvod |
+|---|---|---|
+| **přidáno (15)** | byzantine, illumination, stainedglass, impressionist, woodcut, artdeco, constructivist, secession, minoan, thangka, rinpa, dunhuang, minhwa, papercut, huichol | model styl skutečně převzal |
+| zahozeno — jen barevný posun (4) | ethiopian, wayang, amate, suprematism | vysoké číslo, ale výsledkem je výchozí scéna modelu s jiným nádechem; suprematismus se navíc pere s figurou drženou depth mapou |
+| zahozeno — duplicita (5) | sumie (= chineseink), mughal (= persian), prerafael (≈ greek), adire (≈ assyrian), inuit (≈ ukiyoe) | přidalo by synonymum |
+
+Poznámka k metrice duplicit: je barevná, takže u plochých černobílých stylů
+falešně poplašila — `illumination`, `woodcut` a `huichol` vyšly „blízko"
+ukiyo-e resp. čínské tuši, ale vizuálně jsou zřetelně jiné, a proto zůstaly.

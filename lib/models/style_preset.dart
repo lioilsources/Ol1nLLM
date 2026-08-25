@@ -1,7 +1,10 @@
 /// Výtvarné styly nabízené vedle promptu.
 ///
-/// Bloky jsou ověřené na serveru: každý z nich prošel srovnáním 10 modelů ×
-/// 25 stylů (viz `docs/style-matrix.md`). Text se připojuje **za** uživatelův
+/// Bloky jsou ověřené na serveru, ne vybrané od stolu: prvních 25 prošlo
+/// srovnáním 10 modelů × 25 stylů, dalších 15 pak testem „reaguje na to
+/// aspoň jeden model?" proti nezastylovanému výchozímu obrázku téhož modelu
+/// (viz `docs/style-matrix.md`). Styly, u kterých vyšel jen barevný posun
+/// bez převzetí stylu, se sem nedostaly. Text se připojuje **za** uživatelův
 /// prompt — vlastní zadání má přednost, blok jen dobarvuje. Na uzlu se
 /// persistuje jen [StylePreset.id]: blok je z něj odvoditelný, takže se
 /// (stejně jako u póz) neukládá dvakrát.
@@ -169,6 +172,96 @@ const kStylePresets = <StylePreset>[
     label: 'Ancient Egyptian wall painting',
     block:
         'ancient egyptian wall painting style, strict side profile views, flat bold colors, hierarchical proportions, black outlines, ochre skin tones, hieroglyphic decorative elements, formal composition',
+  ),
+  StylePreset(
+    id: 'byzantine',
+    label: 'Byzantská ikona',
+    block:
+        'byzantine icon style, flat gold leaf ground, elongated solemn figures, stylized drapery folds, red and deep blue robes, hieratic frontal composition',
+  ),
+  StylePreset(
+    id: 'illumination',
+    label: 'Iluminovaný rukopis',
+    block:
+        'medieval illuminated manuscript style, gold leaf, ornate vine border, flat jewel colours, stylized figure inside a decorated initial, vellum texture',
+  ),
+  StylePreset(
+    id: 'stainedglass',
+    label: 'Vitráž',
+    block:
+        'gothic stained glass window style, bold black lead lines, luminous saturated colour panels, flat shapes, backlit glow, geometric tracery',
+  ),
+  StylePreset(
+    id: 'impressionist',
+    label: 'Impresionismus',
+    block:
+        'impressionist plein air painting, broken brushstrokes, vibrating complementary colours, soft daylight, loose edges, atmospheric immediacy',
+  ),
+  StylePreset(
+    id: 'woodcut',
+    label: 'Expresionistický dřevořez',
+    block:
+        'german expressionist woodcut print, harsh carved lines, stark black and white, angular distorted forms, visible gouge marks, raw emotional energy',
+  ),
+  StylePreset(
+    id: 'artdeco',
+    label: 'Art Deco plakát',
+    block:
+        'art deco poster style, streamlined geometric forms, strong symmetry, metallic gold and black, flat colour blocks, elegant stylized figure',
+  ),
+  StylePreset(
+    id: 'constructivist',
+    label: 'Konstruktivistický plakát',
+    block:
+        'russian constructivist poster style, bold diagonal composition, red black and cream, geometric shapes, photomontage feel, heavy sans-serif blocks',
+  ),
+  StylePreset(
+    id: 'secession',
+    label: 'Vídeňská secese',
+    block:
+        'vienna secession style, flat gilded ornament, geometric mosaic patterns, elongated figure, decorative square motifs, gold and muted green',
+  ),
+  StylePreset(
+    id: 'minoan',
+    label: 'Minojská freska',
+    block:
+        'minoan fresco style, flowing curved contours, terracotta and marine blue, stylized profile with large eye, spiral and wave motifs, plaster texture',
+  ),
+  StylePreset(
+    id: 'thangka',
+    label: 'Tibetská thangka',
+    block:
+        'tibetan thangka painting style, precise symmetrical composition, rich mineral pigments, gold outlines, ornate halo and cloud motifs, flat stylized figures',
+  ),
+  StylePreset(
+    id: 'rinpa',
+    label: 'Rinpa zlatý paraván',
+    block:
+        'japanese rinpa screen style, gold leaf background, bold flat silhouettes, stylized waves and grasses, mineral pigments, decorative asymmetry',
+  ),
+  StylePreset(
+    id: 'dunhuang',
+    label: 'Dunhuang jeskynní malba',
+    block:
+        'dunhuang cave mural style, flowing celestial ribbons, ochre and lapis pigments, weathered plaster texture, serene stylized figures, flat halo',
+  ),
+  StylePreset(
+    id: 'minhwa',
+    label: 'Korejská minhwa',
+    block:
+        'korean minhwa folk painting style, flat cheerful colours, naive charming proportions, decorative peonies and tigers motifs, hanji paper texture',
+  ),
+  StylePreset(
+    id: 'papercut',
+    label: 'Vystřihovánka',
+    block:
+        'traditional paper cut style, single flat colour silhouette, intricate symmetrical cutouts, sharp negative space, decorative floral lattice',
+  ),
+  StylePreset(
+    id: 'huichol',
+    label: 'Huichol příze',
+    block:
+        'huichol yarn painting style, dense parallel yarn lines, vivid contrasting colours, symbolic peyote and deer motifs, flat filled forms',
   ),
 ];
 

@@ -11,7 +11,17 @@ void main() {
       final ids = kStylePresets.map((s) => s.id).toList();
       expect(ids.toSet().length, ids.length);
       expect(ids, containsAll(['ukiyoe', 'chineseink', 'egyptian', 'baroque']));
-      expect(kStylePresets.length, 25);
+      // Second wave, kept only where a model demonstrably reacted.
+      expect(ids, containsAll(['byzantine', 'stainedglass', 'artdeco',
+          'constructivist', 'impressionist', 'thangka']));
+      // Dropped on purpose: the metric moved but the style never landed —
+      // the model just tinted its own default scene.
+      expect(ids, isNot(contains('suprematism')));
+      expect(ids, isNot(contains('wayang')));
+      // Dropped as duplicates of a style already here.
+      expect(ids, isNot(contains('sumie'))); // = chineseink
+      expect(ids, isNot(contains('mughal'))); // = persian
+      expect(kStylePresets.length, 40);
     });
 
     test('every preset carries a non-empty label and block', () {
