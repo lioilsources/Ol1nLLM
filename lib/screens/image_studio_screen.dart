@@ -1013,7 +1013,8 @@ class _ImageTile extends StatelessWidget {
   final VoidCallback onInpaint;
   final VoidCallback on3D;
 
-  /// Repose (new character in this image's pose). Null hides the button.
+  /// „Zachovej pózu“ — a new character on this image's pose (internally
+  /// still `repose`). Null hides the button.
   final VoidCallback? onRepose;
   final VoidCallback? onLongPress;
 
@@ -1717,7 +1718,7 @@ class _ModelChip extends StatelessWidget {
                       : usable
                           ? spec.capabilityLabel
                           : needsPose
-                              ? '${spec.capabilityLabel} — repose umí jen SDXL'
+                              ? '${spec.capabilityLabel} — „zachovej pózu“ umí jen SDXL'
                               : spec.img2img
                                   ? '${spec.capabilityLabel} — vyžaduje obrázek'
                                   : '${spec.capabilityLabel} — jen nové generování';
@@ -1850,7 +1851,7 @@ class _ReposePill extends StatelessWidget {
           const SizedBox(width: 4),
           const Expanded(
             child: Text(
-              'Repose — nová postava ve stejné póze',
+              'Zachovej pózu — popiš novou postavu',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -1911,7 +1912,7 @@ class _StyleChip extends StatelessWidget {
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Text(
-                  'Připojí se za tvůj prompt. Nejlíp funguje v repose; '
+                  'Připojí se za tvůj prompt. Nejlíp funguje při zachování pózy; '
                   'v úpravě zvyš sílu na „silná".',
                   style: TextStyle(
                     color: AppTheme.textSecondary,
@@ -2244,7 +2245,7 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
       if (!spec.supportsPose) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Repose umí jen SDXL modely — vyber jiný model.'),
+            content: Text('„Zachovej pózu“ funguje jen na SDXL modelech — vyber jiný.'),
             duration: Duration(seconds: 3),
           ),
         );

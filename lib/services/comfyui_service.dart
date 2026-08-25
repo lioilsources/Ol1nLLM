@@ -341,7 +341,7 @@ class ComfyUIService implements ImageBackend {
     LatentSize? latentSize,
   }) async* {
     if (_preset.ckptName == null) {
-      yield const GenFailed('[ComfyUI] Repose umí jen SDXL modely.');
+      yield const GenFailed('[ComfyUI] „Zachovej pózu“ funguje jen na SDXL modelech.');
       return;
     }
     final refName = await _uploadImage(

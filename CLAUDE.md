@@ -259,9 +259,14 @@ Strength 0.7 (drží postoj, ale prompt pořád přebarví). Precedence:
 nepersistuje — je deterministicky odvoditelný (img2img + SDXL model + bez
 poseId).
 
-**Repose (nová postava ve stejné póze)**: ikona chodce na dlaždici
+**„Zachovej pózu“ (v kódu `repose`)**: ikona chodce na dlaždici
 (`_ImageTile.onRepose`, pravý horní roh) přepne input bar do režimu Repose
-(`ImageStudioState.reposeSourceImageId`, pill s miniaturou reference + ✕);
+(`ImageStudioState.reposeSourceImageId`, pill s miniaturou reference + ✕).
+Název v UI je záměrně jiný než v kódu: „repose“ pochází z MangaPrompts, kde
+šlo o opak — obličej se dával do **nové** pózy ze šablony. Tady se póza ze
+zdroje naopak drží, takže by původní název sliboval pravý opak. Vnitřní název
+(`GenNode.isRepose`, `ComfyUIService.repose()`) zůstává kvůli persistovanému
+Hive klíči `isRepose`;
 odeslaný text jde do `repose()` v provideru → `ComfyUIService.repose()`.
 Běží nad **txt2img šablonou** (`sdxl_txt2img.api.json`, EmptyLatentImage,
 denoise 1.0) a `_prepare()` dostane `depthImageName` = nahraná reference —

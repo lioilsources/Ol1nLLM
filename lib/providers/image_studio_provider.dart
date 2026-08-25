@@ -489,7 +489,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           state.availableModels.where((m) => m.supportsPose).toList();
       if (candidates.isEmpty) {
         state = state.copyWith(
-          error: 'Repose vyžaduje SDXL model — na serveru žádný není.',
+          error: '„Zachovej pózu“ vyžaduje SDXL model — na serveru žádný není.',
         );
         return;
       }
@@ -501,7 +501,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           )!;
       setModel(lastUsed);
       info = 'Přepnuto na ${imageModelById(lastUsed).label} — '
-          'repose umí jen SDXL modely.';
+          '„zachovej pózu“ funguje jen na SDXL modelech.';
     }
     state = state.copyWith(
       reposeSourceImageId: imageId,
@@ -1115,7 +1115,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     if (text.isEmpty || base == null) return;
     if (!state.model.supportsPose) {
       state = state.copyWith(
-        error: 'Repose umí jen SDXL modely — vyber jiný model.',
+        error: '„Zachovej pózu“ funguje jen na SDXL modelech — vyber jiný.',
       );
       return;
     }
@@ -1247,7 +1247,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           nodeId,
           (n) => n.copyWith(
             status: GenStatus.error,
-            error: 'Repose umí jen SDXL modely — vyber jiný model.',
+            error: '„Zachovej pózu“ funguje jen na SDXL modelech — vyber jiný.',
           ),
         );
         return;
