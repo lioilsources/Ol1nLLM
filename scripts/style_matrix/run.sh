@@ -5,6 +5,11 @@
 #   ./scripts/style_matrix/run.sh --ref-prompt "photo of a dancer, full body"
 #   ./scripts/style_matrix/run.sh --ref my.png --flows repose --models pony,juggernaut-xl
 #   ./scripts/style_matrix/run.sh --ref my.png --styles ukiyoe,baroque --edit-denoise 0.9
+#   # A/B parametru — varianta se pozná ve jméně výstupu (flow@karras):
+#   ./scripts/style_matrix/run.sh --ref my.png --variant karras \
+#       --override sampler_name=dpmpp_2m,scheduler=karras
+#   # kandidáti stylů, kteří ještě nejsou v kStylePresets:
+#   ./scripts/style_matrix/run.sh --ref my.png --styles-file kandidati.json
 #
 # Needs CF Access creds — taken from .env.local in the repo root.
 set -euo pipefail
@@ -12,7 +17,7 @@ cd "$(dirname "$0")/../.."
 
 OUT="build/style-matrix/$(date +%Y%m%d-%H%M%S)"
 REF=""; REF_PROMPT=""; FLOWS="repose,img2img"; MODELS=""; STYLES=""
-SEED="777"; EDIT_DENOISE=""; STEP="all"
+SEED="777"; EDIT_DENOISE=""; STEP="all"; STYLES_FILE=""; OVERRIDE=""; VARIANT=""
 SUBJECT="a ballerina in leggings and a short ballet skirt, standing on pointe on one leg with the other leg raised straight up beside her head"
 
 while [ $# -gt 0 ]; do
@@ -23,6 +28,9 @@ while [ $# -gt 0 ]; do
     --flows) FLOWS="$2"; shift 2;;
     --models) MODELS="$2"; shift 2;;
     --styles) STYLES="$2"; shift 2;;
+    --styles-file) STYLES_FILE="$2"; shift 2;;
+    --override) OVERRIDE="$2"; shift 2;;   # sampler_name=dpmpp_2m,cfg=6
+    --variant) VARIANT="$2"; shift 2;;     # jmenovka varianty ve výstupu
     --seed) SEED="$2"; shift 2;;
     --edit-denoise) EDIT_DENOISE="$2"; shift 2;;
     --out) OUT="$2"; shift 2;;
@@ -77,13 +85,28 @@ import sys; sys.path.insert(0,'scripts/style_matrix'); import comfy
 open('$OUT/ckpts.txt','w').write('\n'.join(comfy.checkpoints()))"
 
   echo "▸ generuji workflow přes kód appky…"
-  OUT_DIR="$OUT/wf" REF_NAME="$REF_NAME" REF_FILE="$REF" SUBJECT="$SUBJECT" \
-  SEED="$SEED" FLOWS="$FLOWS" MODELS="$MODELS" STYLES="$STYLES" \
-  CKPTS="$OUT/ckpts.txt" ${EDIT_DENOISE:+EDIT_DENOISE="$EDIT_DENOISE"} \
-    flutter test scripts/style_matrix/dump.dart 2>&1 | grep -E 'DUMP|Some tests'
+  # Export, ne env prefix: ${VAR:+VAR=x} se expanduje až po parsování, takže
+  # by z něj byl název příkazu, ne přiřazení. Volitelné proměnné se exportují
+  # jen když mají hodnotu — dump.dart rozlišuje "nenastaveno" od prázdna.
+  export OUT_DIR="$OUT/wf" REF_NAME="$REF_NAME" REF_FILE="$REF" \
+         SUBJECT="$SUBJECT" SEED="$SEED" FLOWS="$FLOWS" MODELS="$MODELS" \
+         STYLES="$STYLES" CKPTS="$OUT/ckpts.txt"
+  [ -n "$EDIT_DENOISE" ] && export EDIT_DENOISE || true
+  [ -n "$STYLES_FILE" ]  && export STYLES_FILE  || true
+  [ -n "$OVERRIDE" ]     && export OVERRIDE     || true
+  [ -n "$VARIANT" ]      && export VARIANT      || true
+  flutter test scripts/style_matrix/dump.dart 2>&1 \
+    | grep -E 'DUMP|Error|Some tests' || {
+        echo "dump selhal — spusť bez filtru: flutter test scripts/style_matrix/dump.dart" >&2
+        exit 1
+      }
 fi
 
-[ "$STEP" = "all" ] || [ "$STEP" = "run" ]    && python3 scripts/style_matrix/matrix.py run    "$OUT"
-[ "$STEP" = "all" ] || [ "$STEP" = "score" ]  && python3 scripts/style_matrix/matrix.py score  "$OUT"
-[ "$STEP" = "all" ] || [ "$STEP" = "sheets" ] && python3 scripts/style_matrix/matrix.py sheets "$OUT"
+# Pozor na `[ a ] || [ b ] && cmd` pod `set -e`: když obě podmínky selžou,
+# celý výraz vrátí nenulu a skript by skončil. Proto poctivé if.
+for phase in run score sheets; do
+  if [ "$STEP" = "all" ] || [ "$STEP" = "$phase" ]; then
+    python3 scripts/style_matrix/matrix.py "$phase" "$OUT"
+  fi
+done
 echo "▸ hotovo: $OUT"

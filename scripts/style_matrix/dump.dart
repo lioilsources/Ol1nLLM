@@ -48,14 +48,56 @@ void main() {
         .where((m) => wanted.isEmpty || wanted.contains(m.id))
         .toList();
 
+    // Styles come from the app registry, unless the caller points at a file
+    // of candidates — that is how a style gets vetted *before* it is added
+    // to kStylePresets.
     final wantedStyles = _csv(env['STYLES']);
-    final styles = kStylePresets
-        .where((s) => wantedStyles.isEmpty || wantedStyles.contains(s.id))
-        .toList();
+    final styles = env['STYLES_FILE'] != null
+        ? (jsonDecode(File(env['STYLES_FILE']!).readAsStringSync()) as List)
+            .cast<Map<String, dynamic>>()
+            .map((m) => StylePreset(
+                  id: m['id'] as String,
+                  label: (m['label'] ?? m['id']) as String,
+                  block: m['block'] as String,
+                ))
+            .where((s) => wantedStyles.isEmpty || wantedStyles.contains(s.id))
+            .toList()
+        : kStylePresets
+            .where((s) => wantedStyles.isEmpty || wantedStyles.contains(s.id))
+            .toList();
+
+    // Parameter A/B: `sampler_name=dpmpp_2m,scheduler=karras,cfg=6`. Applied
+    // to the finished graph, which is what changing the preset would produce
+    // — _prepare writes exactly these fields from ComfyPreset.
+    final overrides = <String, dynamic>{};
+    for (final kv in _csv(env['OVERRIDE'])) {
+      final i = kv.indexOf('=');
+      if (i < 1) fail('bad --override entry: $kv');
+      final k = kv.substring(0, i);
+      final v = kv.substring(i + 1);
+      overrides[k] = num.tryParse(v) ?? v;
+    }
+    // Variant label lands in the flow segment, so runs stay comparable
+    // side by side: `img2img@karras__pony__ukiyoe.png`.
+    final variant = env['VARIANT'] == null ? '' : '@${env['VARIANT']}';
+
+    Map<String, dynamic> applyOverrides(Map<String, dynamic> wf) {
+      if (overrides.isEmpty) return wf;
+      for (final node in wf.values) {
+        final inputs = ((node as Map)['inputs'] as Map?)?.cast<String, dynamic>();
+        if (inputs == null) continue;
+        for (final e in overrides.entries) {
+          if (inputs.containsKey(e.key)) inputs[e.key] = e.value;
+        }
+      }
+      return wf;
+    }
 
     var n = 0;
-    void write(String name, Map<String, dynamic> wf) {
-      File('${out.path}/$name.json').writeAsStringSync(jsonEncode(wf));
+    void write(String flow, String model, String style,
+        Map<String, dynamic> wf) {
+      File('${out.path}/${flow}${variant}__${model}__${style}.json')
+          .writeAsStringSync(jsonEncode(applyOverrides(wf)));
       n++;
     }
 
@@ -77,14 +119,14 @@ void main() {
           final svc = ComfyUIService()..setPreset(preset);
           if (flow == 'repose') {
             if (!canRepose || refName == null) continue;
-            write('repose__${m.id}__$id', svc.prepareForTest(
+            write('repose', m.id, id, svc.prepareForTest(
               _load(preset.txt2imgAsset),
               prompt: prompt, batch: 1, seed: seed,
               depthImageName: refName, latentSize: latent,
             ));
           } else if (flow == 'img2img') {
             if (refName == null) continue;
-            write('img2img__${m.id}__$id', svc.prepareForTest(
+            write('img2img', m.id, id, svc.prepareForTest(
               _load(preset.img2imgAsset),
               prompt: prompt, batch: 1, seed: seed,
               imageName: refName, sourceDepth: sourceDepth,
@@ -93,7 +135,7 @@ void main() {
                   : double.parse(env['EDIT_DENOISE']!),
             ));
           } else if (flow == 'txt2img') {
-            write('txt2img__${m.id}__$id', svc.prepareForTest(
+            write('txt2img', m.id, id, svc.prepareForTest(
               _load(preset.txt2imgAsset),
               prompt: prompt, batch: 1, seed: seed,
             ));
