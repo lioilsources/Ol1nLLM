@@ -97,12 +97,13 @@
       <label class="field" style="margin-bottom:8px">
         <span>režim</span>
         <select id="mode">
-          <option value="dry">nanečisto — bez GPU</option>
-          <option value="real">ostrý běh</option>
+          <option value="real">ostrý běh — skutečné obrázky</option>
+          <option value="dry">nanečisto — bez GPU, jen placeholdery</option>
         </select>
       </label>
       <button id="startbtn">Spustit</button>
       <p class="est" id="estimate">—</p>
+      <p class="hint" id="modehint"></p>
     </div>
   </aside>
 
@@ -114,8 +115,9 @@
         <p>Vlevo vyber modely, napiš prompty a spusť. Nejdřív se vygenerují
           workflow kódem appky — teprve pak se sáhne na GPU, takže je vidět
           přesný počet buněk dřív, než něco stojí čas.</p>
-        <p>Nanečisto projede celou cestu bez ComfyUI: tabulka, panel zapojení
-          i metriky fungují, jen místo obrázků jsou placeholdery.</p>
+        <p>Režim <em>nanečisto</em> je na ověření nastavení, ne na výsledky:
+          projede celou cestu bez ComfyUI, takže uvidíš tabulku, panel zapojení
+          i metriky, ale místo obrázků šrafované placeholdery.</p>
       </div>
     </div>
   </main>

@@ -56,7 +56,7 @@ func serve(env *Env, port int, open, forceDry bool) error {
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
-		return fmt.Errorf("port %d: %w", port, err)
+		return fmt.Errorf("%s", bindHelp(addr, port, err))
 	}
 	url := fmt.Sprintf("http://%s/?t=%s", addr, s.token)
 	fmt.Printf("lab běží na %s\n", url)
@@ -68,6 +68,28 @@ func serve(env *Env, port int, open, forceDry bool) error {
 	}
 	srv := &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 	return srv.Serve(ln)
+}
+
+// bindHelp turns "address already in use" into something actionable: usually
+// it is another lab still running, and the useful answer is its URL, not the
+// syscall error.
+func bindHelp(addr string, port int, err error) string {
+	if !strings.Contains(err.Error(), "in use") {
+		return fmt.Sprintf("port %d: %v", port, err)
+	}
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, herr := client.Get("http://" + addr + "/api/health")
+	if herr == nil {
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		if strings.Contains(string(body), "repoRoot") {
+			return fmt.Sprintf("na portu %d už jeden lab běží — otevři http://%s/ "+
+				"(token vypsala ta instance), ukonči ji, nebo zvol --port %d",
+				port, addr, port+1)
+		}
+	}
+	return fmt.Sprintf("port %d obsazený něčím jiným — zvol --port %d "+
+		"(kdo port drží: lsof -nP -iTCP:%d -sTCP:LISTEN)", port, port+1, port)
 }
 
 func newToken() string {

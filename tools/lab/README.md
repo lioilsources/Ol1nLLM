@@ -5,8 +5,14 @@ stylem a nastavením** — a co je přitom vlastně v grafu zapojené.
 
 ```bash
 make lab          # webové UI na http://127.0.0.1:8765
-make lab-dry      # totéž, ale nikdy neodešle nic na ComfyUI
+make lab-check    # jen ověří prostředí (flutter, CF Access, fronta)
+make lab-dry      # projede vše bez ComfyUI — na ověření nastavení, ne na výsledky
 ```
+
+Nanečisto (`lab-dry`, nebo přepínač *režim* v UI) místo obrázků vyrábí
+šrafované placeholdery. Je to způsob, jak ověřit, že dump, tabulka, panel
+zapojení a metriky fungují, aniž by se sáhlo na GPU — ne způsob, jak něco
+vygenerovat.
 
 Workflow **staví kód appky** (`tools/lab/dump.dart` volá
 `ComfyUIService.prepareForTest` → `_prepare`), takže lab měří to, co appka

@@ -48,7 +48,13 @@ async function refreshHealth() {
   ];
   $('lamps').innerHTML = lamps.map(([name, ok, detail]) =>
     `<span class="lamp ${ok ? 'ok' : 'bad'}" title="${esc(detail)}">${name}</span>`).join('');
-  if (h.forceDry) $('mode').value = 'dry', $('mode').disabled = true;
+  // Dry is a way to check the setup, not a way to get pictures — so it is
+  // only forced when it is the only thing that can work.
+  if (h.forceDry || !h.cfAccess) {
+    $('mode').value = 'dry';
+    $('mode').disabled = true;
+  }
+  updateModeHint(h);
 }
 
 // ── plan form ──────────────────────────────────────────────
@@ -142,6 +148,18 @@ $('ref').onchange = async () => {
   }
   estimate();
 };
+
+function updateModeHint(h) {
+  const dry = $('mode').value === 'dry';
+  const el = $('modehint');
+  if (!dry) { el.textContent = ''; return; }
+  el.textContent = h && !h.cfAccess
+    ? 'Nanečisto vynuceně: chybí CF Access creds v .env.local, takže na ComfyUI se nedá.'
+    : h && h.forceDry
+      ? 'Nanečisto vynuceně: server běží s --force-dry (make lab-dry).'
+      : 'Místo obrázků budou šrafované placeholdery — na ověření nastavení, ne na výsledky.';
+}
+$('mode').addEventListener('change', () => updateModeHint(null));
 
 function spec() {
   const values = $('sweepValues').value.trim();
