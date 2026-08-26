@@ -6,6 +6,8 @@ import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 import '../models/conversation.dart';
 import '../models/message.dart';
+import '../services/chat_backend.dart';
+import '../services/library_chat_service.dart';
 import '../services/media_service.dart';
 import '../services/vllm_service.dart';
 import '../services/persona_service.dart';
@@ -54,13 +56,21 @@ class ChatNotifier extends StateNotifier<ChatState> {
   static const _boxName = 'conversations';
   static const _key = 'all';
 
-  final VllmService _service = VllmService();
+  final VllmService _vllm = VllmService();
+  final LibraryChatService _library = LibraryChatService();
   final MediaService _mediaService = MediaService(); // OCR only
   final PersonaService _personaService;
   StreamSubscription<ChatEvent>? _streamSub;
 
   ChatNotifier(this._personaService) : super(const ChatState()) {
     _load();
+  }
+
+  /// Which transport answers a turn. The persona registry is the single
+  /// source of truth — `Persona.backend` in `assets/personas/index.json`.
+  Future<ChatBackend> _backendFor(String? personaId) async {
+    final persona = await _personaService.byId(personaId);
+    return persona?.backend == kChatBackendLibrary ? _library : _vllm;
   }
 
   Future<void> _load() async {
@@ -134,6 +144,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
       state = state.copyWith(pendingContinuation: false);
 
   void deleteConversation(String id) {
+    final doomed = state.conversations.where((c) => c.id == id).firstOrNull;
+    final sessionId = doomed?.remoteSessionId;
+    if (sessionId != null) {
+      unawaited(_library.resetSession(sessionId));
+    }
     final remaining = state.conversations.where((c) => c.id != id).toList();
     final newActive = state.activeId == id
         ? (remaining.isNotEmpty ? remaining.first.id : null)
@@ -162,6 +177,18 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
     // Role for this turn: an explicit pick, else the active branch's persona.
     final turnPersonaId = personaId ?? conv.activePersonaId;
+    final convId = conv.id;
+
+    // Backends that keep history server-side (the library RAG chatbot) store
+    // one linear deque per session, while this conversation is a tree. Reuse
+    // the session only while the server's history ends at the very message we
+    // are about to extend; a fork or branch switch must start fresh rather
+    // than inherit another branch's turns. Computed before the user message
+    // is appended, i.e. against the leaf the server last saw.
+    final reuseSession = conv.canReuseRemoteSession;
+    final sessionIdForRequest = reuseSession ? conv.remoteSessionId : null;
+    final orphanedSessionId = reuseSession ? null : conv.remoteSessionId;
+
     final userMsg = Message(
       id: _uuid.v4(),
       parentId: conv.activeLeafId,
@@ -191,6 +218,14 @@ class ChatNotifier extends StateNotifier<ChatState> {
     try {
       await _save();
 
+      final backend = await _backendFor(turnPersonaId);
+      if (orphanedSessionId != null) {
+        // Fire and forget: frees the server's deque for a branch we left.
+        unawaited(backend.resetSession(orphanedSessionId));
+      }
+
+      // Null for the library persona (it carries no local prompt) and ignored
+      // by that backend anyway — the RAG server builds its own.
       final systemPrompt = await _personaService.systemPrompt(turnPersonaId);
 
       final assistantMsg = Message(
@@ -206,8 +241,12 @@ class ChatNotifier extends StateNotifier<ChatState> {
       );
       _replaceConversation(conv);
 
-      _streamSub = _service
-          .chat(messagesForApi, systemPrompt: systemPrompt)
+      _streamSub = backend
+          .chat(
+            messagesForApi,
+            systemPrompt: systemPrompt,
+            remoteSessionId: sessionIdForRequest,
+          )
           .listen(
             (event) {
               switch (event) {
@@ -224,10 +263,36 @@ class ChatNotifier extends StateNotifier<ChatState> {
                   _replaceConversation(
                     current.copyWith(messages: msgs, updatedAt: DateTime.now()),
                   );
-                case ChatDone(:final truncatedByLength):
+                case ChatDone(
+                  :final truncatedByLength,
+                  :final sources,
+                  :final remoteSessionId,
+                ):
                   if (truncatedByLength) {
                     state = state.copyWith(pendingContinuation: true);
                   }
+                  final current = state.conversations
+                      .where((c) => c.id == convId)
+                      .firstOrNull;
+                  if (current == null) return;
+                  // Snapshot the citations onto the answer they belong to, and
+                  // record where the server's history now ends.
+                  _replaceConversation(
+                    current.copyWith(
+                      messages: sources.isEmpty
+                          ? current.messages
+                          : current.messages
+                                .map(
+                                  (m) => m.id == assistantMsg.id
+                                      ? m.copyWith(sources: sources)
+                                      : m,
+                                )
+                                .toList(),
+                      remoteSessionId: remoteSessionId,
+                      remoteLeafId:
+                          remoteSessionId != null ? assistantMsg.id : null,
+                    ),
+                  );
               }
             },
             onDone: () {
@@ -235,8 +300,21 @@ class ChatNotifier extends StateNotifier<ChatState> {
               _save();
             },
             onError: (e, st) {
-              debugPrint('[vllm] stream error type=${e.runtimeType} msg=$e');
-              debugPrint('[vllm] stack: $st');
+              debugPrint(
+                '[${backend.id}] stream error type=${e.runtimeType} msg=$e',
+              );
+              debugPrint('[${backend.id}] stack: $st');
+              // Drop the empty bubble so the branch tip returns to the user
+              // turn and a retry starts from the same point.
+              final current = state.conversations
+                  .where((c) => c.id == convId)
+                  .firstOrNull;
+              final placeholder = current?.messages
+                  .where((m) => m.id == assistantMsg.id)
+                  .firstOrNull;
+              if (placeholder != null && placeholder.content.isEmpty) {
+                _removePlaceholder(convId, assistantMsg.id);
+              }
               state = state.copyWith(
                 isStreaming: false,
                 error: _errorMessage(e),
@@ -399,7 +477,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
   @override
   void dispose() {
     _cancelStream();
-    _service.dispose();
+    _vllm.dispose();
+    _library.dispose();
     _mediaService.dispose();
     super.dispose();
   }

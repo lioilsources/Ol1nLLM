@@ -35,7 +35,11 @@ class PersonaService {
     if (cached != null) return cached;
     final persona = await byId(personaId);
     if (persona == null) return null;
-    final prompt = await rootBundle.loadString(persona.file);
+    // Backend personas (library chatbot) carry no local prompt — the server
+    // builds its own and would ignore ours anyway.
+    final file = persona.file;
+    if (file == null) return null;
+    final prompt = await rootBundle.loadString(file);
     _promptCache[personaId] = prompt;
     return prompt;
   }

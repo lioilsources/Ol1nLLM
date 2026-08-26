@@ -15,6 +15,13 @@ flutter run --dart-define=CF_ACCESS_CLIENT_ID=... \
 make run
 ```
 
+Volitelné URL overrides (`.env.local`, Makefile je propouští jen když jsou
+neprázdné): `COMFYUI_URL`, `FINETUNE_URL`, `FLUX_NIM_URL`, `VLLM_URL`,
+`LIBRARY_CHAT_URL`. Pro vývoj knihovny proti SPARKu na LAN:
+`LIBRARY_CHAT_URL=http://192.168.88.66:8090` — pak ale **jen `make debug`**
+(release Android manifest nemá `usesCleartextTraffic` a iOS nemá výjimku
+v `Info.plist`, takže čistý HTTP tam neprojde).
+
 Pokud flutter run selže s „developer disk image could not be mounted":
 ```bash
 open -a Xcode ios/Runner.xcworkspace   # počkat ~20s, DDI se namountuje automaticky
@@ -39,6 +46,9 @@ lib/
     flux_kontext_nim_service.dart  # gen-queue async job queue — flux-kontext (img2img)
     flux_nim_service.dart      # gen-queue async job queue — flux-schnell (txt2img)
     image_backend.dart         # ImageBackend interface + GenEvent sealed class
+    chat_backend.dart          # ChatBackend interface + ChatEvent sealed class
+    vllm_service.dart          # llm.ol1n.com — OpenAI SSE, stateless
+    library_chat_service.dart  # chat.ol1n.com — RAG knihovna, session na serveru
   screens/
     image_studio_screen.dart
     chat_screen.dart
@@ -460,4 +470,59 @@ Starý box `image_sessions.hive` je při startu asynchronně smazán přes `_del
 
 ## Chat
 
-`ChatProvider` (Riverpod) → `VllmService` → `POST /v1/chat/completions` (streaming SSE). Persisto v Hive `chat_box`. Viz `lib/services/vllm_service.dart`.
+`ChatProvider` (Riverpod) drží **dva backendy** za společným rozhraním
+`ChatBackend` (`lib/services/chat_backend.dart`, sealed `ChatEvent`:
+`ChatDelta` → `ChatDone`). Konverzace je **strom** — `Conversation.messages`
+je pool zpráv spojený přes `Message.parentId`, `activeLeafId` je špička živé
+větve, `thread` je cesta root→leaf.
+
+Persistence: Hive box **`conversations`**, jediný klíč `'all'`, celý seznam
+jako JSON string.
+
+| | vLLM (výchozí) | Knihovna (RAG) |
+|---|---|---|
+| Endpoint | `llm.ol1n.com/v1/chat/completions` | `chat.ol1n.com/chat/stream` |
+| dart-define | `VLLM_URL` | `LIBRARY_CHAT_URL` |
+| SSE formát | OpenAI (`choices[].delta`, `[DONE]`) | `{"delta":…}` → `{"done":true,…}` |
+| Historie | stateless, klient posílá celý thread | **na serveru v RAM** (`session_id`, 10 tahů) |
+| System prompt | persona `.md` z assetů | staví si server (`librarian_cs.md` + katalog) |
+| Citace | ✗ | `sources[]` → `Message.sources` |
+| CF Access | povinný (bez tokenů hodí výjimku) | volitelný (kvůli LAN vývoji) |
+| Idle timeout | 120 s | 5 min (prefill 9–12k tokenů trvá minuty) |
+
+**Routing přes personu**: `Persona.backend` v `assets/personas/index.json`
+(`"backend": "library"` u Knihovníka 📚) určuje transport; `_backendFor()`
+v provideru je jediné místo, kde se to rozhoduje. Persona bez `file` nemá
+lokální prompt — server si ho staví sám a klientský by stejně zahodil.
+
+**Míchané vlákno je zakázané**: RAG server vidí jen poslední zprávu a vLLM by
+si četl RAG odpovědi jako vlastní výstup. `_pickPersona` proto při přechodu
+mezi backendy nevolá per-turn override, ale `selectPersona()`, které zakládá
+novou konverzaci.
+
+**Session vs. větvení** (`Conversation.canReuseRemoteSession`): server drží
+jednu lineární frontu per `session_id`, appka strom. Session se recykluje jen
+když `remoteLeafId == activeLeafId`, tj. serverová historie končí přesně
+u zprávy, kterou prodlužujeme. Fork, přepnutí větve i regenerate tuhle rovnost
+poruší → pošle se `session_id: null` (server vyrobí novou) a stará se uvolní
+přes `POST /reset`. `forksOnNextSend` **nestačí** — skok na špičku
+sourozenecké větve bez potomků by prošel a serverová paměť by tiše patřila
+jiné větvi (pokryto testem).
+
+Známá omezení: RAG stream nenese `finish_reason`, takže „Pokračuj"
+(`pendingContinuation`) u knihovních odpovědí nefunguje; restart serveru
+smaže paměť tiše. Selhání LLM na serveru přijde jako **200 OK s prázdným
+streamem** (výjimka vznikne až po flushnutí hlaviček) — proto
+`LibraryChatService` hlídá `deltas == 0` a hlásí to jako chybu.
+
+`test/fixtures/library_stream.sse` jsou rámce zachycené doslova z běžícího
+serveru přes tunel — testy tak drží skutečný formát, ne domněnku o něm.
+
+### Knihovní RAG server (mimo tohle repo)
+
+`WorldLibraryProject/rag/server.py` na SPARKu :8090, systemd unit
+`library-chat`, spouštěná s `--llm-url http://localhost:8080/v1` (LiteLLM na
+`:4000` není z hostu vidět). Vektory drží ChromaDB na JODA (:8006), aktuálně
+~43 700 chunků z 93 děl. Za Cloudflare Access (self-hosted app, policy
+`non_identity` na service tokenu sdíleném s `llm.ol1n.com`), takže appka
+posílá tytéž `CF_ACCESS_*` hlavičky jako jinam.

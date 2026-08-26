@@ -3,26 +3,16 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/message.dart';
+import 'chat_backend.dart';
+import 'http_error.dart';
 
-sealed class ChatEvent {
-  const ChatEvent();
-}
-
-class ChatDelta extends ChatEvent {
-  final String content;
-  const ChatDelta(this.content);
-}
-
-class ChatDone extends ChatEvent {
-  /// e.g. 'stop', 'length', 'content_filter', or null if server didn't send one.
-  final String? finishReason;
-  const ChatDone(this.finishReason);
-
-  bool get truncatedByLength => finishReason == 'length';
-}
-
-class VllmService {
-  static const _baseUrl = 'https://llm.ol1n.com/v1/chat/completions';
+/// Default chat backend: the AiStack LiteLLM gateway, OpenAI-compatible SSE.
+/// Stateless — the whole branch goes up on every turn.
+class VllmService extends ChatBackend {
+  static const _baseUrl = String.fromEnvironment(
+    'VLLM_URL',
+    defaultValue: 'https://llm.ol1n.com',
+  );
   static const _model = 'lab';
   static const _cfId = String.fromEnvironment('CF_ACCESS_CLIENT_ID');
   static const _cfSecret = String.fromEnvironment('CF_ACCESS_CLIENT_SECRET');
@@ -34,11 +24,18 @@ class VllmService {
 
   static http.Client _makeClient() => http.Client();
 
+  @override
+  String get id => 'vllm';
+
   /// Streams assistant events (deltas + a final ChatDone with finish_reason)
   /// from the vLLM OpenAI-compatible endpoint.
+  ///
+  /// [remoteSessionId] is ignored — this endpoint keeps no server state.
+  @override
   Stream<ChatEvent> chat(
-    List<Message> messages, {
+    List<Message> thread, {
     String? systemPrompt,
+    String? remoteSessionId,
   }) async* {
     if (_cfId.isEmpty || _cfSecret.isEmpty) {
       throw Exception(
@@ -50,10 +47,13 @@ class VllmService {
     final payload = <Map<String, dynamic>>[
       if (systemPrompt != null && systemPrompt.trim().isNotEmpty)
         {'role': 'system', 'content': systemPrompt},
-      ...messages.map((m) => m.toOllamaJson()),
+      ...thread.map((m) => m.toOllamaJson()),
     ];
 
-    final request = http.Request('POST', Uri.parse(_baseUrl));
+    final request = http.Request(
+      'POST',
+      Uri.parse('$_baseUrl/v1/chat/completions'),
+    );
     request.headers.addAll({
       'Content-Type': 'application/json',
       'Authorization': 'Bearer dummy',
@@ -72,28 +72,14 @@ class VllmService {
 
     if (response.statusCode != 200) {
       final body = await response.stream.bytesToString();
-      final diagHeaders = response.headers.entries
-          .where(
-            (e) => const {
-              'server',
-              'cf-ray',
-              'x-powered-by',
-              'content-type',
-            }.contains(e.key.toLowerCase()),
-          )
-          .map((e) => '${e.key}: ${e.value}')
-          .join(', ');
-      final bodySnippet = body.isNotEmpty
-          ? body.replaceAll(RegExp(r'\s+'), ' ').trim()
-          : '';
-      final truncated = bodySnippet.length > 120
-          ? '${bodySnippet.substring(0, 120)}…'
-          : bodySnippet;
-      throw Exception(
-        'HTTP ${response.statusCode}'
-        '${truncated.isNotEmpty ? ": $truncated" : ""}'
-        '${diagHeaders.isNotEmpty ? " [$diagHeaders]" : ""}',
+      final err = HttpLayerError.parse(
+        statusCode: response.statusCode,
+        body: body,
+        headers: response.headers,
+        step: 'chat',
+        service: 'vllm',
       );
+      throw Exception(err.toString());
     }
 
     final lineStream = response.stream
@@ -134,5 +120,6 @@ class VllmService {
     yield ChatDone(finishReason);
   }
 
+  @override
   void dispose() => _client.close();
 }
