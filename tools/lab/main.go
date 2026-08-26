@@ -21,13 +21,15 @@ const (
 )
 
 type Env struct {
-	RepoRoot   string
-	ComfyURL   string
-	ClientID   string
-	Secret     string
-	Comfy      *Comfy
-	FlutterOK  bool
-	FlutterMsg string
+	RepoRoot    string
+	ComfyURL    string
+	FinetuneURL string
+	Finetune    *Finetune
+	ClientID    string
+	Secret      string
+	Comfy       *Comfy
+	FlutterOK   bool
+	FlutterMsg  string
 }
 
 func loadEnv() (*Env, error) {
@@ -46,12 +48,15 @@ func loadEnv() (*Env, error) {
 		return def
 	}
 	e := &Env{
-		RepoRoot: root,
-		ComfyURL: get("COMFYUI_URL", defaultComfyURL),
-		ClientID: get("CF_ACCESS_CLIENT_ID", ""),
-		Secret:   get("CF_ACCESS_CLIENT_SECRET", ""),
+		RepoRoot:    root,
+		ComfyURL:    get("COMFYUI_URL", defaultComfyURL),
+		FinetuneURL: get("FINETUNE_URL", defaultFinetuneURL),
+		ClientID:    get("CF_ACCESS_CLIENT_ID", ""),
+		Secret:      get("CF_ACCESS_CLIENT_SECRET", ""),
 	}
 	e.Comfy = NewComfy(e.ComfyURL, e.ClientID, e.Secret)
+	// Same CF Access token as ComfyUI — both sit behind the same tunnel.
+	e.Finetune = NewFinetune(e.FinetuneURL, e.ClientID, e.Secret)
 	e.FlutterOK, e.FlutterMsg = flutterVersion(root)
 	return e, nil
 }
@@ -110,6 +115,7 @@ func usage() {
   lab check                                        ověří flutter, CF Access a ComfyUI
   lab run --out DIR [přepínače]                    dávka z terminálu
   lab score DIR                                    přepočítat metriky
+  lab export DIR                                   odeslat běh do FINETUNE gallery
 
 Přepínače pro `+"`lab run`"+` odpovídají ovládacím prvkům v UI:
   --models a,b   --prompts soubor   --styles a,b   --styles-file f.json
@@ -144,6 +150,8 @@ func main() {
 		fatal(runCLI(env, args))
 	case "score":
 		fatal(scoreCLI(env, args))
+	case "export":
+		fatal(exportCLI(env, args))
 	case "-h", "--help", "help":
 		usage()
 	default:

@@ -46,6 +46,7 @@ lab run --subject "a ballerina" --models juggernaut-xl,pony \
         --styles ukiyoe,baroque --flows txt2img,repose --ref foto.png
 lab run --ref-prompt "photo of a dancer" --sweep '__cn_apply__.strength=0.5|0.75|1.0'
 lab score build/lab/20260826-0023
+lab export build/lab/20260826-0023 --send   # do FINETUNE gallery
 ```
 
 ## Sweep a override
@@ -131,6 +132,39 @@ nadřazené:
   otázce „co ten model udělá s mým promptem v různých stylech?"
 
 Volba se pamatuje v prohlížeči.
+
+## Odeslání do FINETUNE gallery
+
+Hotový běh jde poslat do galerie na NAS (`finetune.ol1n.com`) — tam se výstupy
+hodnotí a staví z nich LoRA datasety. Stejný protokol, jaký používá appka na
+session (`lib/services/finetune_export_service.dart`), takže běh z labu a
+session z telefonu dopadnou do stejné knihovny.
+
+```bash
+lab export build/lab/20260826-0023            # jen vypíše, co by šlo
+lab export build/lab/20260826-0023 --send     # teprve tohle odesílá
+```
+
+V UI je u dokončeného běhu tlačítko; první klik se zeptá, druhý odesílá.
+**Odeslání je opt-in schválně** — je to ven z počítače a galerie nemá mazací
+endpoint.
+
+Mapování: **jedna buňka = jeden uzel** (prompt, model, seed, jeden obrázek).
+Když měl běh předlohu, visí buňky pod kořenovým uzlem s ní (`origin: upload`),
+takže je v galerii vidět, z čeho matice vyšla; txt2img buňky jsou kořeny samy
+o sobě. Sampler, kroky a cfg se čtou **z odeslaného grafu**, ne z presetu
+modelu — po sweepu nebo overridu už preset neplatí a čísla u obrázku musí
+sedět na obrázek.
+
+Protokol je content-addressed a idempotentní: druhé odeslání téhož běhu
+nepošle ani bajt obrazových dat navíc, jen doplní, co přibylo. Id session i
+uzlů jsou UUIDv5 odvozené z id běhu a buňky, takže re-export míří na tutéž
+session místo aby vyrobil druhou.
+
+Neodesílá se: běh nanečisto (jsou to šrafy), buňky bez obrázku, buňky
+přeskočené při dumpu. A když galerie nezná některý model z běhu (má vlastní
+registr, který za appkou zaostává), řekne se to — obrázky dojdou, ale nepůjde
+podle nich filtrovat, dokud ten model někdo do galerie nepřidá.
 
 ## Jak číst metriky
 

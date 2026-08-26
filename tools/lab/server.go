@@ -461,6 +461,16 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 		s.mu.Unlock()
 		go run.Resume()
 		writeJSON(w, 200, map[string]string{"status": "resuming"})
+	case "export":
+		plan, err := run.StartExport(s.env.Finetune)
+		if err != nil {
+			writeJSON(w, 400, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, 200, map[string]any{
+			"status": "exporting", "images": plan.Images,
+			"skipped": plan.Skipped, "sessionId": plan.SessionID,
+		})
 	case "cell":
 		if len(parts) < 3 {
 			writeJSON(w, 400, map[string]string{"error": "chybí id buňky"})

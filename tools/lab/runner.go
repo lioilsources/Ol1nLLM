@@ -31,6 +31,23 @@ type CellState struct {
 	Placeholder bool       `json:"placeholder,omitempty"`
 }
 
+// ExportState is the run's relationship with the FINETUNE gallery. A value,
+// not a pointer, so RunState.clone() keeps snapshots independent — a pointer
+// here would put a shared mutable struct into every SSE snapshot.
+type ExportState struct {
+	// Status: "" (nikdy) | running | done | failed
+	Status   string    `json:"status,omitempty"`
+	Done     int       `json:"done,omitempty"`
+	Total    int       `json:"total,omitempty"`
+	Images   int       `json:"images,omitempty"`
+	Cells    int       `json:"cells,omitempty"`
+	NewBlobs int       `json:"newBlobs,omitempty"`
+	At       time.Time `json:"at,omitempty"`
+	Error    string    `json:"error,omitempty"`
+	Warning  string    `json:"warning,omitempty"`
+	URL      string    `json:"url,omitempty"`
+}
+
 type RunState struct {
 	ID        string               `json:"id"`
 	Title     string               `json:"title"`
@@ -44,6 +61,7 @@ type RunState struct {
 	Done      int                  `json:"done"`
 	Failed    int                  `json:"failed"`
 	Total     int                  `json:"total"`
+	Export    ExportState          `json:"export"`
 }
 
 // Run owns one experiment directory. Everything the UI needs is mirrored to
@@ -81,6 +99,7 @@ type RunSummary struct {
 	Done      int       `json:"done"`
 	Failed    int       `json:"failed"`
 	Total     int       `json:"total"`
+	Exported  int       `json:"exported,omitempty"`
 }
 
 func (r *Run) Summary() RunSummary {
@@ -88,6 +107,7 @@ func (r *Run) Summary() RunSummary {
 	return RunSummary{
 		ID: s.ID, Title: s.Title, CreatedAt: s.CreatedAt, Status: s.Status,
 		Message: s.Message, Dry: s.Dry, Done: s.Done, Failed: s.Failed, Total: s.Total,
+		Exported: s.Export.Images,
 	}
 }
 
@@ -458,4 +478,91 @@ func tailLines(s string, n int) string {
 		lines = lines[len(lines)-n:]
 	}
 	return strings.Join(lines, " / ")
+}
+
+// StartExport validates and kicks off an upload to the FINETUNE gallery.
+//
+// The plan is built synchronously — reading and hashing the images is local
+// work and it is the only way to answer "is there anything to send" honestly
+// before the caller is told the export started.
+func (r *Run) StartExport(ft *Finetune) (*ExportPlan, error) {
+	if ft == nil || !ft.HasCreds() {
+		return nil, fmt.Errorf("chybí CF Access creds — FINETUNE je za stejným tunelem jako ComfyUI")
+	}
+	r.mu.Lock()
+	running := r.state.Export.Status == "running"
+	r.mu.Unlock()
+	if running {
+		return nil, fmt.Errorf("odesílání už běží")
+	}
+	plan, err := r.BuildExport()
+	if err != nil {
+		return nil, err
+	}
+	r.update(func(s *RunState) {
+		s.Export = ExportState{Status: "running", Images: plan.Images, Cells: plan.Cells}
+	})
+	go r.runExport(ft, plan)
+	return plan, nil
+}
+
+func (r *Run) runExport(ft *Finetune, plan *ExportPlan) {
+	// Cheap and read-only, so it happens before anything is uploaded: the
+	// warning is most useful while there is still time to not send.
+	if known, err := ft.KnownModels(); err == nil {
+		if miss := unknownModels(plan, known); len(miss) > 0 {
+			warn := fmt.Sprintf("galerie nezná modely %s — obrázky dojdou, "+
+				"ale nepůjde podle nich filtrovat, dokud je tam někdo nepřidá",
+				strings.Join(miss, ", "))
+			r.update(func(s *RunState) { s.Export.Warning = warn })
+		}
+	}
+	needed, err := ft.SendManifest(plan.Body)
+	if err != nil {
+		r.exportFailed(err)
+		return
+	}
+	sort.Strings(needed)
+	r.update(func(s *RunState) { s.Export.Total = len(needed) })
+	for i, sha := range needed {
+		path, ok := plan.Paths[sha]
+		if !ok {
+			continue
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			r.exportFailed(fmt.Errorf("%s: %w", filepath.Base(path), err))
+			return
+		}
+		if err := ft.PutBlob(sha, data); err != nil {
+			r.exportFailed(err)
+			return
+		}
+		done := i + 1
+		r.update(func(s *RunState) { s.Export.Done = done })
+	}
+	sum, err := ft.Finalize(plan.SessionID)
+	if err != nil {
+		r.exportFailed(err)
+		return
+	}
+	if sum.Images == 0 {
+		sum.Images = plan.Images
+	}
+	r.update(func(s *RunState) {
+		s.Export = ExportState{
+			Status: "done", Images: sum.Images, Cells: plan.Cells,
+			NewBlobs: sum.NewBlobs,
+			Total:    len(needed), Done: len(needed), At: time.Now(),
+			URL: ft.Base + "/session/" + plan.SessionID,
+		}
+	})
+}
+
+func (r *Run) exportFailed(err error) {
+	r.update(func(s *RunState) {
+		s.Export.Status = "failed"
+		s.Export.Error = err.Error()
+		s.Export.At = time.Now()
+	})
 }

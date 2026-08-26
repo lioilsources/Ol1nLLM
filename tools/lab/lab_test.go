@@ -2,6 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -609,5 +612,269 @@ func TestDumpEnvKeepsZeroLoraStrength(t *testing.T) {
 	env2, _ := none.DumpEnv(t.TempDir())
 	if strings.Contains(strings.Join(env2, "\n"), "LORA_STRENGTH") {
 		t.Error("LORA_STRENGTH bez LORA")
+	}
+}
+
+// ── FINETUNE export ────────────────────────────────────────
+
+// fakeGallery is the ingest protocol as the real backend implements it:
+// content-addressed, so it only asks for blobs it does not have, and
+// idempotent, so a second export of the same run asks for nothing.
+type fakeGallery struct {
+	blobs     map[string][]byte
+	manifests [][]byte
+	finalized int
+	putFails  int // fail the first N PUTs with a network-ish 503
+}
+
+func newFakeGallery() *fakeGallery {
+	return &fakeGallery{blobs: map[string][]byte{}}
+}
+
+func (g *fakeGallery) server(t *testing.T) *httptest.Server {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/meta", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"models":[{"id":"illustrious-xl"},{"id":"pony"}]}`))
+	})
+	mux.HandleFunc("/api/ingest/manifest", func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		g.manifests = append(g.manifests, body)
+		var in struct {
+			Nodes []struct {
+				Images []struct {
+					SHA string `json:"sha256"`
+				} `json:"images"`
+			} `json:"nodes"`
+		}
+		if err := json.Unmarshal(body, &in); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		needed := []string{}
+		for _, n := range in.Nodes {
+			for _, im := range n.Images {
+				if _, have := g.blobs[im.SHA]; !have {
+					needed = append(needed, im.SHA)
+				}
+			}
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"needed": needed})
+	})
+	mux.HandleFunc("/api/ingest/images/", func(w http.ResponseWriter, r *http.Request) {
+		if g.putFails > 0 {
+			g.putFails--
+			http.Error(w, `{"error":"nope"}`, 503)
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
+		g.blobs[strings.TrimPrefix(r.URL.Path, "/api/ingest/images/")] = body
+		w.WriteHeader(201)
+	})
+	mux.HandleFunc("/api/ingest/sessions/", func(w http.ResponseWriter, r *http.Request) {
+		g.finalized++
+		_, _ = w.Write([]byte(fmt.Sprintf(`{"images":%d,"newBlobs":%d}`,
+			len(g.blobs), len(g.blobs))))
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// fakeRun writes a run directory the way the runner would: a manifest, images
+// on disk, and a state that says which cells finished.
+func fakeRun(t *testing.T, dry bool) *Run {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "img"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "wf"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	neg := "bad hands"
+	man := &Manifest{
+		Models: []ManifestModel{{ID: "illustrious-xl", Label: "Illustrious",
+			Preset: map[string]any{"positivePrefix": "masterpiece"}}},
+		Cells: []ManifestCell{
+			{ID: "txt2img__illustrious-xl__ukiyoe", Flow: "txt2img",
+				Model: "illustrious-xl", Style: "ukiyoe",
+				Prompt: strPtr("a ballerina, ukiyo-e"), Negative: &neg,
+				Params: map[string]any{"seed": 777.0, "lora": "x.safetensors",
+					"loraStrength": 0.65}},
+			{ID: "txt2img__illustrious-xl____baseline", Flow: "txt2img",
+				Model: "illustrious-xl", Style: "__baseline",
+				Prompt: strPtr("a ballerina"),
+				Params: map[string]any{"seed": 777.0}},
+			{ID: "txt2img__illustrious-xl__nedokonceno", Flow: "txt2img",
+				Model: "illustrious-xl", Style: "baroque",
+				Prompt: strPtr("a ballerina, baroque"), Params: map[string]any{}},
+		},
+	}
+	state := RunState{ID: "20260826-000000", Title: "a ballerina", Dry: dry,
+		Cells: map[string]CellState{}, Done: 2, Total: 3}
+	for i, c := range man.Cells[:2] {
+		if err := os.WriteFile(filepath.Join(dir, "img", c.ID+".png"),
+			Placeholder(64, 96, fmt.Sprintf("cell-%d", i)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		state.Cells[c.ID] = CellState{ID: c.ID, Status: CellDone, Placeholder: dry}
+	}
+	// The third cell never produced an image; nothing to send for it.
+	state.Cells[man.Cells[2].ID] = CellState{ID: man.Cells[2].ID, Status: CellPending}
+
+	if err := os.WriteFile(filepath.Join(dir, "wf",
+		man.Cells[0].ID+".json"), []byte(`{"5":{"class_type":"KSampler","inputs":
+		{"steps":30,"cfg":6.0,"denoise":1.0,"sampler_name":"dpmpp_2m","scheduler":"karras"}}}`),
+		0o644); err != nil {
+		t.Fatal(err)
+	}
+	return &Run{Dir: dir, Spec: &Spec{}, man: man, state: state,
+		subs: map[chan RunState]struct{}{}}
+}
+
+func strPtr(s string) *string { return &s }
+
+func TestExportMapsCellsOntoGalleryNodes(t *testing.T) {
+	run := fakeRun(t, false)
+	plan, err := run.BuildExport()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Images != 2 || plan.Cells != 2 || plan.Skipped != 1 {
+		t.Fatalf("plán = %d obrázků / %d buněk / %d přeskočeno", plan.Images, plan.Cells, plan.Skipped)
+	}
+	var body struct {
+		Session map[string]any   `json:"session"`
+		Nodes   []map[string]any `json:"nodes"`
+	}
+	if err := json.Unmarshal(plan.Body, &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Session["modelId"] != "illustrious-xl" {
+		t.Errorf("session modelId = %v", body.Session["modelId"])
+	}
+	byPrompt := map[string]map[string]any{}
+	for _, n := range body.Nodes {
+		byPrompt[n["prompt"].(string)] = n
+	}
+	styled := byPrompt["a ballerina, ukiyo-e"]
+	if styled == nil {
+		t.Fatal("chybí uzel se stylem")
+	}
+	// Sampler settings come from the graph that was sent, not from a preset.
+	for k, want := range map[string]any{
+		"styleId": "ukiyoe", "loraName": "x.safetensors", "loraStrength": 0.65,
+		"seed": 777.0, "negativePrompt": "bad hands", "modelId": "illustrious-xl",
+		"steps": 30.0, "cfg": 6.0, "samplerName": "dpmpp_2m", "scheduler": "karras",
+		"positivePrefix": "masterpiece",
+	} {
+		if got := styled[k]; got != want {
+			t.Errorf("%s = %v (čekáno %v)", k, got, want)
+		}
+	}
+	// __baseline is the lab's marker for "no style", not a preset id.
+	if base := byPrompt["a ballerina"]; base["styleId"] != nil {
+		t.Errorf("baseline dostal styleId %v", base["styleId"])
+	}
+	// Every id must be a plausible UUID, and the same run must produce the
+	// same ids twice — otherwise a re-export duplicates the whole session.
+	again, err := run.BuildExport()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.SessionID != plan.SessionID {
+		t.Errorf("session id se změnil: %s vs %s", plan.SessionID, again.SessionID)
+	}
+	if len(plan.SessionID) != 36 || plan.SessionID[14] != '5' {
+		t.Errorf("session id není UUIDv5: %q", plan.SessionID)
+	}
+}
+
+func TestExportRefusesPlaceholders(t *testing.T) {
+	if _, err := fakeRun(t, true).BuildExport(); err == nil {
+		t.Fatal("běh nanečisto se nesmí dát odeslat — jsou to šrafy, ne výsledky")
+	}
+}
+
+func TestExportUploadsOnlyWhatTheServerLacks(t *testing.T) {
+	g := newFakeGallery()
+	srv := g.server(t)
+	ft := NewFinetune(srv.URL, "id", "secret")
+	run := fakeRun(t, false)
+
+	sum, err := run.ExportToFinetune(ft, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(g.blobs) != 2 || g.finalized != 1 {
+		t.Fatalf("nahráno %d blobů, finalize %d×", len(g.blobs), g.finalized)
+	}
+	if sum.Images != 2 {
+		t.Errorf("summary = %+v", sum)
+	}
+
+	// Second export of an unchanged run: the manifest still goes (the metadata
+	// may have changed), but not a single byte of image data.
+	before := len(g.blobs)
+	if _, err := run.ExportToFinetune(ft, nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(g.blobs) != before {
+		t.Errorf("re-export nahrál znovu: %d → %d", before, len(g.blobs))
+	}
+	if len(g.manifests) != 2 {
+		t.Errorf("manifestů %d", len(g.manifests))
+	}
+}
+
+func TestExportReportsModelsTheGalleryDoesNotKnow(t *testing.T) {
+	g := newFakeGallery()
+	ft := NewFinetune(g.server(t).URL, "id", "secret")
+	known, err := ft.KnownModels()
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := &ExportPlan{Models: []string{"illustrious-xl", "noobai-xl", "wai-illustrious"}}
+	got := unknownModels(plan, known)
+	if len(got) != 2 || got[0] != "noobai-xl" || got[1] != "wai-illustrious" {
+		t.Errorf("neznámé modely = %v", got)
+	}
+}
+
+func TestExportFailsLoudlyOnServerRejection(t *testing.T) {
+	g := newFakeGallery()
+	g.putFails = 1
+	ft := NewFinetune(g.server(t).URL, "id", "secret")
+	// A 503 from the gallery is the gallery refusing, not the network
+	// flaking — retrying it three times only delays the bad news.
+	if _, err := fakeRun(t, false).ExportToFinetune(ft, nil); err == nil {
+		t.Fatal("čekána chyba")
+	} else if !strings.Contains(err.Error(), "503") {
+		t.Errorf("chyba neříká co se stalo: %v", err)
+	}
+}
+
+func TestExportNeedsCredentials(t *testing.T) {
+	if _, err := fakeRun(t, false).StartExport(NewFinetune("", "", "")); err == nil {
+		t.Fatal("bez CF Access creds se nesmí tvářit, že odesílá")
+	}
+}
+
+func TestExportCLIFlagsSurviveTrailingPosition(t *testing.T) {
+	// `lab export DIR --send`: Go's flag package stops at DIR, so without
+	// reordering the flag that decides whether 200 MB leaves the machine
+	// would be silently dropped. It was — once, live.
+	got := flagsFirst([]string{"/run/dir", "--send"})
+	if len(got) != 2 || got[0] != "--send" || got[1] != "/run/dir" {
+		t.Fatalf("got %v", got)
+	}
+	fs := flag.NewFlagSet("export", flag.ContinueOnError)
+	send := fs.Bool("send", false, "")
+	if err := fs.Parse(got); err != nil {
+		t.Fatal(err)
+	}
+	if !*send || fs.Arg(0) != "/run/dir" {
+		t.Errorf("send=%v dir=%q", *send, fs.Arg(0))
 	}
 }

@@ -218,3 +218,111 @@ func splitCSV(s string) []string {
 	}
 	return out
 }
+
+// exportCLI pushes a finished run to the FINETUNE gallery. Same code path as
+// the button in the UI, so a run exported from the terminal lands identically.
+func exportCLI(env *Env, args []string) error {
+	fs := flag.NewFlagSet("export", flag.ExitOnError)
+	// Sending is opt-in, not the default. An export is outward-facing and
+	// cannot be taken back — the gallery has no delete endpoint — so the bare
+	// command shows what would go and stops.
+	send := fs.Bool("send", false, "opravdu odeslat (bez toho se jen vypíše plán)")
+	if err := fs.Parse(flagsFirst(args)); err != nil {
+		return err
+	}
+	if fs.NArg() < 1 {
+		return fmt.Errorf("lab export <adresář běhu> [--send]")
+	}
+	dir := fs.Arg(0)
+	run, err := loadRunDir(env, dir)
+	if err != nil {
+		return err
+	}
+	plan, err := run.BuildExport()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("session  %s\n", plan.SessionID)
+	fmt.Printf("obrázků  %d%s\n", plan.Images,
+		map[bool]string{true: fmt.Sprintf(" (přeskočeno %d nehotových)", plan.Skipped)}[plan.Skipped > 0])
+	fmt.Printf("manifest %d kB\n", len(plan.Body)/1024)
+	fmt.Printf("modely   %s\n", strings.Join(plan.Models, ", "))
+	if known, err := env.Finetune.KnownModels(); err == nil {
+		if miss := unknownModels(plan, known); len(miss) > 0 {
+			fmt.Printf("pozor    galerie nezná %s — obrázky dojdou, ale nepůjde podle nich filtrovat\n",
+				strings.Join(miss, ", "))
+		}
+	}
+	if !*send {
+		fmt.Println("\nnic neodesláno — spusť znovu s --send")
+		return nil
+	}
+	needed, err := env.Finetune.SendManifest(plan.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("server chce %d nových blobů\n", len(needed))
+	for i, sha := range needed {
+		path, ok := plan.Paths[sha]
+		if !ok {
+			continue
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if err := env.Finetune.PutBlob(sha, data); err != nil {
+			return err
+		}
+		fmt.Printf("\r  nahráno %d/%d", i+1, len(needed))
+	}
+	if len(needed) > 0 {
+		fmt.Println()
+	}
+	sum, err := env.Finetune.Finalize(plan.SessionID)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("hotovo: %d obrázků, %d nových\n%s/session/%s\n",
+		sum.Images, sum.NewBlobs, env.Finetune.Base, plan.SessionID)
+	return nil
+}
+
+// flagsFirst moves positional arguments behind the flags. Go's flag package
+// stops parsing at the first non-flag word, so `lab export DIR --send` would
+// otherwise silently ignore --send — and for a command whose flag decides
+// whether anything leaves the machine, silently ignoring it is not acceptable.
+func flagsFirst(args []string) []string {
+	var flags, rest []string
+	for _, a := range args {
+		if strings.HasPrefix(a, "-") {
+			flags = append(flags, a)
+		} else {
+			rest = append(rest, a)
+		}
+	}
+	return append(flags, rest...)
+}
+
+// loadRunDir rebuilds a Run from its directory — state.json says which cells
+// finished, spec.json what the run was, manifest.json what the cells are.
+func loadRunDir(env *Env, dir string) (*Run, error) {
+	man, err := ReadManifest(filepath.Join(dir, "wf", "manifest.json"))
+	if err != nil {
+		return nil, fmt.Errorf("%s: chybí manifest (%w)", dir, err)
+	}
+	spec := &Spec{}
+	if sd, err := os.ReadFile(filepath.Join(dir, "spec.json")); err == nil {
+		_ = json.Unmarshal(sd, spec)
+	}
+	run := &Run{Dir: dir, env: env, man: man, Spec: spec,
+		subs: map[chan RunState]struct{}{}}
+	data, err := os.ReadFile(filepath.Join(dir, "state.json"))
+	if err != nil {
+		return nil, fmt.Errorf("%s: chybí state.json (%w)", dir, err)
+	}
+	if err := json.Unmarshal(data, &run.state); err != nil {
+		return nil, err
+	}
+	return run, nil
+}

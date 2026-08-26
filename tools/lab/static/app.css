@@ -115,6 +115,10 @@ optgroup option { color: var(--paper); }
   text-decoration: underline; text-underline-offset: 2px;
 }
 
+.exportline { margin-left: 10px; font-size: 11.5px; color: var(--muted); font-family: var(--sans); }
+.exportline.ok { color: var(--ok); }
+.exportline a { color: inherit; }
+
 .hint { color: var(--dim); font-size: 11px; font-family: var(--sans); margin: 4px 0 0; }
 .danger { color: var(--bad); }
 .warnline { color: var(--warn); }

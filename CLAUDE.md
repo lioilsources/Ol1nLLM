@@ -410,6 +410,16 @@ Prohlížeč nemůže volat ComfyUI přímo (nevrací CORS hlavičky a CF Access
 odmítá preflight 403), proto ten lokální server; drží CF creds, takže
 poslouchá jen na loopbacku a mutující požadavky chtějí `X-Lab-Token`.
 
+**Odeslání běhu do FINETUNE gallery**: `lab export DIR --send` (nebo tlačítko
+u dokončeného běhu; odesílání je opt-in, protože galerie nemá mazací
+endpoint). Jedna buňka = jeden uzel; předloha běhu je kořenový uzel
+(`origin: upload`) a buňky pod ním. Sampler/steps/cfg se čtou z odeslaného
+grafu, ne z presetu (po sweepu preset neplatí). Session i uzly mají UUIDv5
+odvozené z id běhu, takže re-export doplňuje tutéž session. Placeholdery
+z dry-runu se neposílají. Galerie má vlastní registr modelů, který za appkou
+zaostává (nezná animagine-xl, noobai-xl, wai-illustrious,
+juggernaut-xl-lightning, flux-fill) — lab na to při odeslání upozorní.
+
 ## FINETUNE gallery export
 
 Tlačítko exportu (AppBar + per-session v draweru) posílá session (strom nodů +

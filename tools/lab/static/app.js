@@ -360,6 +360,37 @@ $('startbtn').onclick = async () => {
   }
 };
 
+// ── FINETUNE gallery ───────────────────────────────────────
+// A run is worth sending once it has pictures — the gallery is where they get
+// rated and turned into datasets. Placeholders never go: a dry run has nothing
+// to rate.
+function exportHTML(run) {
+  if (run.dry || !run.done) return '';
+  const ex = run.export || {};
+  const base = state.config?.finetuneUrl || 'https://finetune.ol1n.com';
+  if (ex.status === 'running') {
+    const bar = ex.total
+      ? `nahrávám ${ex.done || 0}/${ex.total} obrázků`
+      : 'ptám se serveru, co mu chybí…';
+    return `<span class="exportline">FINETUNE: ${bar}</span>`;
+  }
+  // Sent, and then the run grew: only the new cells would go up.
+  const fresh = run.done - (ex.cells || 0);
+  const warn = ex.warning
+    ? `<span class="exportline warnline">${esc(ex.warning)}</span>` : '';
+  if (ex.status === 'done' && fresh <= 0) {
+    return `<span class="exportline ok">FINETUNE: odesláno ${ex.images} obrázků`
+      + `${ex.newBlobs ? ` (${ex.newBlobs} nových)` : ''} · `
+      + `<a href="${esc(ex.url || base)}" target="_blank" rel="noopener">otevřít galerii</a></span>${warn}`;
+  }
+  const label = ex.status === 'done'
+    ? `Doodeslat do FINETUNE — přibylo ${fresh}`
+    : `Odeslat do FINETUNE (${run.done} obrázků)`;
+  const err = ex.status === 'failed'
+    ? `<span class="exportline danger">${esc(ex.error || 'odeslání selhalo')}</span>` : '';
+  return `<button id="exportbtn" class="chip" style="padding:6px 12px">${label}</button>${err}${warn}`;
+}
+
 // ── run view ───────────────────────────────────────────────
 async function refreshRuns() {
   let runs;
@@ -503,12 +534,12 @@ function renderInner() {
   // Shown for any resumable run, not only when the counter says something is
   // missing: a run killed mid-flight leaves a stale count, and the truth comes
   // from the images on disk when it actually resumes.
-  const actions = resumable
+  const actions = (resumable
     ? `<button id="resumebtn" class="chip" style="padding:6px 12px">
          ${missing > 0 ? `Pokračovat — zbývá ${missing} buněk` : 'Pokračovat — dopočítat chybějící'}</button>`
     : run.status === 'running'
       ? '<button id="cancelbtn" class="chip" style="padding:6px 12px">Zastavit</button>'
-      : '';
+      : '') + exportHTML(run);
 
   $('content').innerHTML =
     `<p class="hint">${esc(run.status)} — ${esc(run.message || '')}${
@@ -526,6 +557,20 @@ function renderInner() {
   $('content').onclick = async (e) => {
     const cell = e.target.closest('[data-cell]');
     if (cell) { openCell(cell.dataset.cell); return; }
+    if (e.target.id === 'exportbtn') {
+      // Two clicks, not one: the upload is outward-facing and the gallery has
+      // no delete button, so the second click is the confirmation.
+      if (e.target.dataset.armed !== '1') {
+        e.target.dataset.armed = '1';
+        e.target.textContent = `Opravdu odeslat ${run.done} obrázků? Klikni znovu`;
+        return;
+      }
+      e.target.disabled = true;
+      e.target.textContent = 'odesílám…';
+      try { await api(`/api/runs/${state.runId}/export`, { method: 'POST' }); }
+      catch (err) { e.target.textContent = err.message; }
+      return;
+    }
     if (e.target.id === 'resumebtn') {
       e.target.disabled = true;
       e.target.textContent = 'navazuji…';
