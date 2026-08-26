@@ -219,10 +219,21 @@ $('startbtn').onclick = async () => {
 
 // ── run view ───────────────────────────────────────────────
 async function refreshRuns() {
-  const runs = await api('/api/runs');
-  $('runlist').innerHTML = runs.map((r) =>
-    `<button data-run="${esc(r.id)}" class="${r.id === state.runId ? 'active' : ''}">
-       ${esc(r.id)} · ${esc(r.status)} ${r.total ? `· ${r.done}/${r.total}` : ''}</button>`).join('');
+  let runs;
+  try {
+    runs = await api('/api/runs');
+  } catch (err) {
+    $('runlist').innerHTML = `<span class="hint danger">seznam běhů se nenačetl: ${esc(err.message)}</span>`;
+    return;
+  }
+  $('runlist').innerHTML = runs.length
+    ? runs.map((r) => {
+        const unfinished = r.total && r.done < r.total && r.status !== 'running';
+        return `<button data-run="${esc(r.id)}" class="${r.id === state.runId ? 'active' : ''}"
+          title="${esc(r.title || '')}">${esc(r.id)} · ${esc(r.status)}${
+          r.total ? ` · ${r.done}/${r.total}` : ''}${unfinished ? ' ↺' : ''}</button>`;
+      }).join('')
+    : '<span class="hint">žádné běhy — první spustíš vlevo</span>';
   $('runlist').onclick = (e) => {
     const b = e.target.closest('[data-run]');
     if (b) openRun(b.dataset.run);
@@ -252,6 +263,17 @@ async function openRun(id) {
 }
 
 function render() {
+  try {
+    renderInner();
+  } catch (err) {
+    // A rendering bug must not swallow the run: show it and keep the run list.
+    $('content').innerHTML = `<div class="empty"><h2>tabulka se nevykreslila</h2>
+      <p class="danger">${esc(err.message)}</p>
+      <p>Běh je v pořádku na disku — zkus jiné řazení nebo znovu načíst stránku.</p></div>`;
+  }
+}
+
+function renderInner() {
   const run = state.run, man = state.manifest;
   if (!run) return;
   if (!man) {
@@ -479,13 +501,20 @@ function esc(s) {
 }
 
 (async function boot() {
-  await refreshHealth();
+  // Each step is independent: a failing config load must not cost you the run
+  // list, and a broken run must not cost you the form.
+  try { await refreshHealth(); } catch { /* lamps stay grey */ }
   try { await loadConfig(); } catch (err) {
     $('estimate').innerHTML = `<span class="danger">${esc(err.message)}</span>`;
   }
   await refreshRuns();
   const m = location.hash.match(/#\/run\/(.+)/);
-  if (m) openRun(m[1]);
+  if (m) {
+    try { await openRun(m[1]); } catch (err) {
+      $('content').innerHTML = `<div class="empty"><h2>běh se nenačetl</h2>
+        <p class="danger">${esc(err.message)}</p></div>`;
+    }
+  }
   estimate();
-  setInterval(refreshHealth, 30000);
+  setInterval(() => { refreshHealth().catch(() => {}); refreshRuns(); }, 30000);
 })();

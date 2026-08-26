@@ -70,6 +70,27 @@ func NewRun(env *Env, dir string, spec *Spec) *Run {
 	}
 }
 
+// RunSummary is what the run list needs — deliberately without the cell map.
+type RunSummary struct {
+	ID        string    `json:"id"`
+	Title     string    `json:"title"`
+	CreatedAt time.Time `json:"createdAt"`
+	Status    string    `json:"status"`
+	Message   string    `json:"message,omitempty"`
+	Dry       bool      `json:"dry"`
+	Done      int       `json:"done"`
+	Failed    int       `json:"failed"`
+	Total     int       `json:"total"`
+}
+
+func (r *Run) Summary() RunSummary {
+	s := r.State()
+	return RunSummary{
+		ID: s.ID, Title: s.Title, CreatedAt: s.CreatedAt, Status: s.Status,
+		Message: s.Message, Dry: s.Dry, Done: s.Done, Failed: s.Failed, Total: s.Total,
+	}
+}
+
 func (r *Run) State() RunState {
 	r.mu.Lock()
 	defer r.mu.Unlock()

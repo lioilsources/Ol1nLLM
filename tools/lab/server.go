@@ -303,10 +303,13 @@ func (s *Server) handleUploadRef(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleRuns(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
+		// Summary only: the list needs a dozen fields, not every cell. With a
+		// few hundred cells per run the full state is a fat payload for a view
+		// that renders one button per run.
 		s.mu.Lock()
-		list := make([]RunState, 0, len(s.runs))
+		list := make([]RunSummary, 0, len(s.runs))
 		for _, run := range s.runs {
-			list = append(list, run.State())
+			list = append(list, run.Summary())
 		}
 		s.mu.Unlock()
 		sort.Slice(list, func(i, j int) bool {
