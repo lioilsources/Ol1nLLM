@@ -26,10 +26,26 @@ const FLOW_LABEL = {
 };
 
 async function api(path, opts = {}) {
-  const res = await fetch(path, {
+  let res;
+  try {
+    res = await fetchApi(path, opts);
+  } catch {
+    // fetch throws a bare TypeError ("Load failed" / "Failed to fetch") when
+    // nothing is listening — which here means the server was stopped and the
+    // page is a leftover. Say that instead of the browser's wording.
+    throw new Error('server neodpovídá — běží ještě `make lab`? (stránku pak načti znovu)');
+  }
+  return handleApi(res);
+}
+
+async function fetchApi(path, opts = {}) {
+  return fetch(path, {
     ...opts,
     headers: { 'X-Lab-Token': TOKEN, ...(opts.body ? { 'Content-Type': 'application/json' } : {}), ...(opts.headers || {}) },
   });
+}
+
+async function handleApi(res) {
   const text = await res.text();
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = { error: text }; }
