@@ -303,16 +303,41 @@ function render() {
     ? `<p class="hint">Přeskočeno ${man.skipped.length} buněk: ${
         esc([...new Set(man.skipped.map((s) => s.reason))].join(' · '))}</p>` : '';
 
+  // A run that was interrupted (server restart, cancel, a failed cell) can be
+  // picked up: only the cells without an image are generated again.
+  const resumable = ['interrupted', 'cancelled', 'failed', 'stalled', 'dumped'].includes(run.status);
+  const missing = run.total - run.done;
+  // Shown for any resumable run, not only when the counter says something is
+  // missing: a run killed mid-flight leaves a stale count, and the truth comes
+  // from the images on disk when it actually resumes.
+  const actions = resumable
+    ? `<button id="resumebtn" class="chip" style="padding:6px 12px">
+         ${missing > 0 ? `Pokračovat — zbývá ${missing} buněk` : 'Pokračovat — dopočítat chybějící'}</button>`
+    : run.status === 'running'
+      ? '<button id="cancelbtn" class="chip" style="padding:6px 12px">Zastavit</button>'
+      : '';
+
   $('content').innerHTML =
     `<p class="hint">${esc(run.status)} — ${esc(run.message || '')}${
       run.total ? ` · ${run.done}/${run.total}` : ''}${
       run.dry ? ' · nanečisto (placeholdery)' : ''}</p>
+     ${actions ? `<p style="margin:6px 0 10px">${actions}</p>` : ''}
      ${skipped}
      <div class="tablewrap"><table class="matrix">${head}<tbody>${body}</tbody></table></div>`;
 
-  $('content').onclick = (e) => {
-    const b = e.target.closest('[data-cell]');
-    if (b) openCell(b.dataset.cell);
+  $('content').onclick = async (e) => {
+    const cell = e.target.closest('[data-cell]');
+    if (cell) { openCell(cell.dataset.cell); return; }
+    if (e.target.id === 'resumebtn') {
+      e.target.disabled = true;
+      e.target.textContent = 'navazuji…';
+      try { await api(`/api/runs/${state.runId}/resume`, { method: 'POST' }); openRun(state.runId); }
+      catch (err) { e.target.textContent = err.message; }
+    }
+    if (e.target.id === 'cancelbtn') {
+      e.target.disabled = true;
+      await api(`/api/runs/${state.runId}/cancel`, { method: 'POST' });
+    }
   };
 }
 

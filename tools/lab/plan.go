@@ -187,12 +187,30 @@ func splitSweep(s string) (string, []string, error) {
 }
 
 // DumpEnv translates a spec into the env contract of tools/lab/dump.dart.
+//
+// Every path goes out absolute: the dump subprocess runs with its working
+// directory at the package root (dump.dart reads assets relatively), so a
+// relative path here would resolve somewhere else entirely.
 func (s *Spec) DumpEnv(dir string) ([]string, error) {
+	dir, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, err
+	}
 	env := os.Environ()
 	set := func(k, v string) {
 		if v != "" {
 			env = append(env, k+"="+v)
 		}
+	}
+	abs := func(p string) string {
+		if p == "" {
+			return ""
+		}
+		a, err := filepath.Abs(p)
+		if err != nil {
+			return p
+		}
+		return a
 	}
 	promptsPath := filepath.Join(dir, "prompts.txt")
 	if err := os.WriteFile(promptsPath,
@@ -208,9 +226,9 @@ func (s *Spec) DumpEnv(dir string) ([]string, error) {
 	set("FLOWS", strings.Join(s.Flows, ","))
 	set("MODELS", strings.Join(s.Models, ","))
 	set("STYLES", strings.Join(s.Styles, ","))
-	set("STYLES_FILE", s.StylesFile)
+	set("STYLES_FILE", abs(s.StylesFile))
 	set("REF_NAME", s.RefName)
-	set("REF_FILE", s.RefFile)
+	set("REF_FILE", abs(s.RefFile))
 	set("POSE_MODE", s.PoseMode)
 	set("POSE_NAME", s.PoseName)
 	set("SOURCE_DEPTH", s.SourceDepth)

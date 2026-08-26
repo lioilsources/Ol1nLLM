@@ -392,6 +392,21 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 	case "cancel":
 		run.Cancel()
 		writeJSON(w, 200, map[string]string{"status": "cancelling"})
+	case "resume":
+		if st := run.State(); st.Status == "running" || st.Status == "planning" {
+			writeJSON(w, 409, map[string]string{"error": "tenhle běh už jede"})
+			return
+		}
+		if !run.Spec.Dry && !s.env.Comfy.HasCreds() {
+			writeJSON(w, 412, map[string]string{
+				"error": "chybí CF Access creds v .env.local"})
+			return
+		}
+		s.mu.Lock()
+		s.active = run.State().ID
+		s.mu.Unlock()
+		go run.Resume()
+		writeJSON(w, 200, map[string]string{"status": "resuming"})
 	case "cell":
 		if len(parts) < 3 {
 			writeJSON(w, 400, map[string]string{"error": "chybí id buňky"})

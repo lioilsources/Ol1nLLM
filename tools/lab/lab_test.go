@@ -347,3 +347,37 @@ func TestMediaServesPoseAssetsAndStillBlocksTraversal(t *testing.T) {
 		t.Fatal("cesta pro pózy pustila ven z assets/poses")
 	}
 }
+
+func TestDumpEnvPassesAbsolutePaths(t *testing.T) {
+	// The dump subprocess runs from the package root, not from wherever lab was
+	// started, so a relative --out silently broke the whole run.
+	dir := t.TempDir()
+	rel, err := filepath.Rel(mustGetwd(t), dir)
+	if err != nil {
+		t.Skip("tempdir není relativní k cwd")
+	}
+	s := &Spec{Prompts: []string{"x"}, Flows: []string{"txt2img"},
+		StylesFile: "kandidati.json", RefFile: "foto.png"}
+	env, err := s.DumpEnv(rel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, kv := range env {
+		k, v, _ := strings.Cut(kv, "=")
+		switch k {
+		case "OUT_DIR", "PROMPTS_FILE", "STYLES_FILE", "REF_FILE":
+			if !filepath.IsAbs(v) {
+				t.Errorf("%s není absolutní: %q", k, v)
+			}
+		}
+	}
+}
+
+func mustGetwd(t *testing.T) string {
+	t.Helper()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return wd
+}

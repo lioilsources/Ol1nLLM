@@ -364,6 +364,42 @@ func (r *Run) computeMetrics() {
 	_ = os.WriteFile(filepath.Join(r.Dir, "metrics.json"), data, 0o644)
 }
 
+// Reconcile rebuilds cell state from what is actually on disk. A run killed
+// mid-flight (server restart, Ctrl+C) leaves cells marked "running" that never
+// finished, and the counters have to come from the images, not from memory.
+func (r *Run) Reconcile() {
+	man := r.Manifest()
+	if man == nil {
+		return
+	}
+	r.update(func(s *RunState) {
+		s.Cells = make(map[string]CellState, len(man.Cells))
+		s.Done, s.Failed = 0, 0
+		s.Total = len(man.Cells)
+		for _, c := range man.Cells {
+			if _, err := os.Stat(r.imgPath(c.ID)); err == nil {
+				s.Cells[c.ID] = CellState{ID: c.ID, Status: CellDone}
+				s.Done++
+			} else {
+				s.Cells[c.ID] = CellState{ID: c.ID, Status: CellPending}
+			}
+		}
+		s.Message = fmt.Sprintf("navazuji — %d z %d už hotovo", s.Done, s.Total)
+	})
+}
+
+// Resume re-enters the pipeline. Cells with an image on disk are skipped, so
+// picking a run back up costs only what is genuinely missing.
+func (r *Run) Resume() {
+	if r.Manifest() == nil {
+		if err := r.Dump(); err != nil {
+			return
+		}
+	}
+	r.Reconcile()
+	r.Generate()
+}
+
 func (r *Run) Cancel() {
 	r.mu.Lock()
 	c := r.cancel
