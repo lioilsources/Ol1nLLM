@@ -71,6 +71,18 @@ preset modelu** — sweep je nastaví všem stejně, takže rozbije kalibraci
 o modelu; takové buňky mají v tabulce odznak. Naproti tomu
 `editDenoise/seed/latent/pose` jsou parametry flow a chovají se jako v appce.
 
+## Řazení tabulky
+
+Sloupce jsou vždycky modely (omezená osa). Uvnitř flow se dá přepnout, co je
+nadřazené:
+
+- **styl → prompty pod sebou** (výchozí) — jeden styl, pod ním všechny prompty.
+  Odpovídá otázce „drží ten styl napříč náměty?"
+- **prompt → styly pod sebou** — jeden námět, pod ním všechny styly. Odpovídá
+  otázce „co ten model udělá s mým promptem v různých stylech?"
+
+Volba se pamatuje v prohlížeči.
+
 ## Jak číst metriky
 
 - **reakce** — vzdálenost od `__baseline` téhož modelu: „změnil ten blok stylu

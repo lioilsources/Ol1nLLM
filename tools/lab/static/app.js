@@ -11,6 +11,7 @@ const state = {
   poseMode: 'none',
   poseId: '',
   ref: null,
+  rowOrder: localStorage.getItem('labRowOrder') || 'style',
   runId: null,
   run: null,
   manifest: null,
@@ -259,16 +260,36 @@ function render() {
     return;
   }
   const models = man.models.filter((m) => man.cells.some((c) => c.model === m.id));
-  // Rows are flow → prompt → style; models are the bounded axis, so they are
-  // the columns. Flows get their own band because their metrics live on
-  // different scales and mixing them in one column would make numbers lie.
+  // Models are the bounded axis, so they stay the columns; flows keep their own
+  // band because their metrics live on different scales and mixing them in one
+  // column would make the numbers lie. What varies inside a flow is the row
+  // order, and that is the reader's call: grouping by style puts the same style
+  // with different prompts under each other, grouping by prompt does the
+  // opposite.
+  const byStyle = state.rowOrder === 'style';
   const rows = [];
   for (const flow of [...new Set(man.cells.map((c) => c.flow))]) {
     rows.push({ band: flow });
     const inFlow = man.cells.filter((c) => c.flow === flow);
-    for (const p of [...new Set(inFlow.map((c) => c.promptIndex))].sort()) {
-      for (const style of [...new Set(inFlow.filter((c) => c.promptIndex === p).map((c) => c.style))]) {
-        rows.push({ flow, prompt: p, style });
+    const primaryOf = (c) => (byStyle ? c.style : String(c.promptIndex));
+    const secondaryOf = (c) => (byStyle ? String(c.promptIndex) : c.style);
+    const primaries = [...new Set(inFlow.map(primaryOf))];
+    if (!byStyle) primaries.sort((a, b) => Number(a) - Number(b));
+    for (const primary of primaries) {
+      const sub = inFlow.filter((c) => primaryOf(c) === primary);
+      const secondaries = [...new Set(sub.map(secondaryOf))];
+      if (!byStyle) { /* secondaries are styles, keep manifest order */ }
+      else secondaries.sort((a, b) => Number(a) - Number(b));
+      if (secondaries.length > 1) {
+        rows.push({ group: byStyle ? styleRowLabel(primary) : promptRowLabel(man, Number(primary)) });
+      }
+      for (const secondary of secondaries) {
+        rows.push({
+          flow,
+          style: byStyle ? primary : secondary,
+          prompt: Number(byStyle ? secondary : primary),
+          single: secondaries.length === 1,
+        });
       }
     }
   }
@@ -282,11 +303,18 @@ function render() {
       return `<tr class="band"><th colspan="${models.length + 1}">
         <span class="flowtag" data-flow="${esc(r.band)}">${esc(FLOW_LABEL[r.band] || r.band)}</span></th></tr>`;
     }
-    const label = r.style === '__baseline'
-      ? '<span class="styleid">bez stylu (baseline)</span>'
-      : `<span class="styleid">${esc(styleLabel(r.style))}</span>`;
-    const promptLine = man.prompts.length > 1
-      ? `<div class="promptline">${esc((man.prompts[r.prompt] || '').slice(0, 70))}</div>` : '';
+    if (r.group) {
+      return `<tr class="sub"><th colspan="${models.length + 1}">${esc(r.group)}</th></tr>`;
+    }
+    // Inside a group the row head names the axis that varies; when a group has
+    // a single row it names both, so nothing is left implicit.
+    const styleTxt = r.style === '__baseline' ? 'bez stylu (baseline)' : styleLabel(r.style);
+    const promptTxt = (man.prompts[r.prompt] || '').slice(0, 70);
+    const showBoth = r.single || man.prompts.length <= 1;
+    const primaryTxt = byStyle && !showBoth ? promptTxt : styleTxt;
+    const secondTxt = byStyle && !showBoth ? '' : (man.prompts.length > 1 ? promptTxt : '');
+    const label = `<span class="styleid">${esc(primaryTxt)}</span>`;
+    const promptLine = secondTxt ? `<div class="promptline">${esc(secondTxt)}</div>` : '';
     const cols = models.map((m) => {
       const cells = man.cells.filter((c) => c.flow === r.flow && c.model === m.id
         && c.promptIndex === r.prompt && c.style === r.style);
@@ -323,6 +351,11 @@ function render() {
       run.dry ? ' · nanečisto (placeholdery)' : ''}</p>
      ${actions ? `<p style="margin:6px 0 10px">${actions}</p>` : ''}
      ${skipped}
+     <div class="ordering">
+       <span class="grouplabel" style="margin:0">řádky</span>
+       <button class="chip" data-order="style" aria-pressed="${byStyle}">styl → prompty pod sebou</button>
+       <button class="chip" data-order="prompt" aria-pressed="${!byStyle}">prompt → styly pod sebou</button>
+     </div>
      <div class="tablewrap"><table class="matrix">${head}<tbody>${body}</tbody></table></div>`;
 
   $('content').onclick = async (e) => {
@@ -333,6 +366,13 @@ function render() {
       e.target.textContent = 'navazuji…';
       try { await api(`/api/runs/${state.runId}/resume`, { method: 'POST' }); openRun(state.runId); }
       catch (err) { e.target.textContent = err.message; }
+    }
+    const order = e.target.closest('[data-order]');
+    if (order) {
+      state.rowOrder = order.dataset.order;
+      localStorage.setItem('labRowOrder', state.rowOrder);
+      render();
+      return;
     }
     if (e.target.id === 'cancelbtn') {
       e.target.disabled = true;
@@ -349,6 +389,15 @@ function cellHTML(c) {
   return `<button class="cell" data-cell="${esc(c.id)}" data-status="${st.status}"
       title="${esc(st.error || c.id)}">
       ${src ? `<img loading="lazy" src="${src}" alt="">` : ''}${variant}${badge}</button>`;
+}
+
+function styleRowLabel(styleId) {
+  return styleId === '__baseline' ? 'bez stylu (baseline)' : styleLabel(styleId);
+}
+
+function promptRowLabel(man, idx) {
+  const p = man.prompts[idx] || '';
+  return p.length > 90 ? p.slice(0, 90) + '…' : p;
 }
 
 function styleLabel(id) {
