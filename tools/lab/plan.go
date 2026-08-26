@@ -35,6 +35,11 @@ type Spec struct {
 	PoseName    string `json:"poseName"` // uploaded skeleton filename
 	SourceDepth string `json:"sourceDepth"`
 
+	Lora string `json:"lora"`
+	// Pointer, not a plain float: 0 is a legal strength (the LoRA loaded but
+	// silent), so "not chosen" has to be distinguishable from "chosen zero".
+	LoraStrength *float64 `json:"loraStrength"`
+
 	Seed        int     `json:"seed"`
 	Batch       int     `json:"batch"`
 	Negative    string  `json:"negative"`
@@ -59,7 +64,8 @@ type Estimate struct {
 // Estimate is deliberately arithmetic, not a dump: it has to answer on every
 // keystroke. The exact count arrives later, from the manifest, before any GPU
 // time is spent — that two-stage guard is why a sweep cannot surprise you.
-func (s *Spec) Estimate(models []ManifestModel, secondsPerCell map[string]float64) Estimate {
+func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estimate {
+	models := man.Models
 	// Non-nil slices on purpose: encoding/json turns a nil slice into null,
 	// and every consumer would then need to guard before reading .length.
 	e := Estimate{Variants: 1, Warnings: []string{}, Blockers: []string{}}
@@ -143,7 +149,52 @@ func (s *Spec) Estimate(models []ManifestModel, secondsPerCell map[string]float6
 				m.Label))
 		}
 	}
+	e.loraFit(s, man, picked)
 	return e
+}
+
+// loraFit says up front what the dump would otherwise say cell by cell: a LoRA
+// of a different architecture is not applied, it is skipped. Finding that out
+// from an empty table after the GPU time is the expensive way to learn it.
+func (e *Estimate) loraFit(s *Spec, man *Manifest, picked map[string]bool) {
+	if s.Lora == "" {
+		return
+	}
+	var lora *ManifestLora
+	for i := range man.Loras {
+		if man.Loras[i].Name == s.Lora {
+			lora = &man.Loras[i]
+		}
+	}
+	if lora == nil {
+		return // a file the registry dump has not seen; the dump will judge it
+	}
+	var bad, weak []string
+	for _, m := range man.Models {
+		if !picked[m.ID] {
+			continue
+		}
+		switch lora.Fit[m.ID] {
+		case "incompatible":
+			bad = append(bad, m.Label)
+		case "weak":
+			weak = append(weak, m.Label)
+		}
+	}
+	if len(bad) > 0 {
+		msg := fmt.Sprintf("%s (%s) nesedne na %s — ty buňky se přeskočí",
+			s.Lora, lora.FamilyLabel, strings.Join(bad, ", "))
+		if len(bad) == len(picked) {
+			e.Blockers = append(e.Blockers, msg)
+		} else {
+			e.Warnings = append(e.Warnings, msg)
+		}
+	}
+	if len(weak) > 0 {
+		e.Warnings = append(e.Warnings, fmt.Sprintf(
+			"%s je %s — na %s se načte, ale táhne slaběji",
+			s.Lora, lora.FamilyLabel, strings.Join(weak, ", ")))
+	}
 }
 
 func (s *Spec) needsRef() bool {
@@ -232,6 +283,13 @@ func (s *Spec) DumpEnv(dir string) ([]string, error) {
 	set("POSE_MODE", s.PoseMode)
 	set("POSE_NAME", s.PoseName)
 	set("SOURCE_DEPTH", s.SourceDepth)
+	set("LORA", s.Lora)
+	if s.Lora != "" && s.LoraStrength != nil {
+		// FormatFloat, not set(): "0" must reach the dump, and set() drops
+		// empty strings only — but a literal zero is exactly what we mean.
+		env = append(env, "LORA_STRENGTH="+
+			strconv.FormatFloat(*s.LoraStrength, 'f', -1, 64))
+	}
 	set("NEGATIVE", s.Negative)
 	set("LATENT", s.Latent)
 	set("OVERRIDE_AT", strings.Join(s.Overrides, ","))

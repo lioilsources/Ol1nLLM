@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -318,4 +319,50 @@ func defaultStr(s, def string) string {
 		return def
 	}
 	return s
+}
+
+// LoraMetadata reads the safetensors header of a LoRA — the training metadata
+// kohya/ai-toolkit bake in. Values are all strings on the wire, whatever they
+// look like (`ss_tag_frequency` is a JSON document inside a string).
+//
+// Not every file has a header: ComfyUI answers with an empty body for those,
+// which is an answer, not a failure — the caller records "no trigger words"
+// rather than retrying forever.
+func (c *Comfy) LoraMetadata(name string) (map[string]string, error) {
+	req, err := http.NewRequest("GET",
+		c.Base+"/view_metadata/loras?filename="+url.QueryEscape(name), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != 200 {
+		return nil, &HTTPError{Status: resp.StatusCode, Body: snippet(body),
+			Path: "/view_metadata/loras"}
+	}
+	trimmed := strings.TrimSpace(string(body))
+	if trimmed == "" || trimmed == "null" {
+		return map[string]string{}, nil
+	}
+	var raw map[string]any
+	if err := json.Unmarshal([]byte(trimmed), &raw); err != nil {
+		return nil, fmt.Errorf("/view_metadata/loras (%s): %s", name, snippet(body))
+	}
+	out := make(map[string]string, len(raw))
+	for k, v := range raw {
+		if s, ok := v.(string); ok {
+			out[k] = s
+			continue
+		}
+		b, _ := json.Marshal(v)
+		out[k] = string(b)
+	}
+	return out, nil
 }

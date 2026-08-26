@@ -30,7 +30,7 @@ func TestEstimateBlocksBeforeSpendingGPU(t *testing.T) {
 		Models: []string{"a", "b"}, Prompts: []string{"x"},
 		Flows: []string{"txt2img"}, Styles: []string{"ukiyoe"},
 	}
-	e := base.Estimate(models, nil)
+	e := base.Estimate(&Manifest{Models: models}, nil)
 	// 2 models × 1 prompt × (1 style + baseline) × 1 flow
 	if e.Cells != 4 {
 		t.Fatalf("cells = %d, want 4", e.Cells)
@@ -42,7 +42,7 @@ func TestEstimateBlocksBeforeSpendingGPU(t *testing.T) {
 	// A run that needs a reference must not start without one.
 	needRef := base
 	needRef.Flows = []string{"repose"}
-	if got := needRef.Estimate(models, nil); len(got.Blockers) == 0 {
+	if got := needRef.Estimate(&Manifest{Models: models}, nil); len(got.Blockers) == 0 {
 		t.Fatal("repose bez reference musí blokovat start")
 	}
 
@@ -53,7 +53,7 @@ func TestEstimateBlocksBeforeSpendingGPU(t *testing.T) {
 	for i := range big.Prompts {
 		big.Prompts[i] = "p"
 	}
-	if got := big.Estimate(models, nil); len(got.Blockers) == 0 {
+	if got := big.Estimate(&Manifest{Models: models}, nil); len(got.Blockers) == 0 {
 		t.Fatalf("nad stropem %d musí blokovat (bylo %d buněk)", MaxCells, got.Cells)
 	}
 }
@@ -65,7 +65,7 @@ func TestEstimateWarnsAboutPresetOverrideAndFluxSweep(t *testing.T) {
 		Models: []string{"flux-manga"}, Prompts: []string{"x"},
 		Flows: []string{"txt2img"}, Sweep: "KSampler.cfg=5|6",
 	}
-	e := s.Estimate([]ManifestModel{flux}, nil)
+	e := s.Estimate(&Manifest{Models: []ManifestModel{flux}}, nil)
 	if len(e.Warnings) == 0 || !strings.Contains(strings.Join(e.Warnings, " "), "vlastní šabloně") {
 		t.Fatalf("sweep přes model bez KSampleru musí varovat, dostal jsem %v", e.Warnings)
 	}
@@ -81,7 +81,7 @@ func TestEstimateWarnsWhenLatentFightsDepth(t *testing.T) {
 		Models: []string{"a"}, Prompts: []string{"x"}, Flows: []string{"txt2img"},
 		PoseMode: "depth", RefName: "r.png", Latent: "1024x1024",
 	}
-	e := s.Estimate([]ManifestModel{{ID: "a", Preset: map[string]any{}}}, nil)
+	e := s.Estimate(&Manifest{Models: []ManifestModel{{ID: "a", Preset: map[string]any{}}}}, nil)
 	if !strings.Contains(strings.Join(e.Warnings, " "), "ořízne hloubkovou mapu") {
 		t.Fatalf("chybí varování o latentu, dostal jsem %v", e.Warnings)
 	}
@@ -303,7 +303,7 @@ func TestEstimateNeverSerialisesNullLists(t *testing.T) {
 	// blockers.length. The API shape must not depend on whether anything was
 	// appended.
 	s := Spec{Models: []string{"a"}, Prompts: []string{"x"}, Flows: []string{"txt2img"}}
-	data, err := json.Marshal(s.Estimate([]ManifestModel{{ID: "a", Preset: map[string]any{}}}, nil))
+	data, err := json.Marshal(s.Estimate(&Manifest{Models: []ManifestModel{{ID: "a", Preset: map[string]any{}}}}, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -431,4 +431,183 @@ func TestUpdateSurvivesSubscribersComingAndGoing(t *testing.T) {
 	time.Sleep(150 * time.Millisecond)
 	close(stop)
 	wg.Wait()
+}
+
+// ── LoRA trigger words ─────────────────────────────────────
+// Fixtures are trimmed copies of real headers read off the server, so the
+// thresholds stay calibrated against the files the lab actually offers.
+
+func triggerWords(in []LoraTrigger) []string {
+	out := make([]string, 0, len(in))
+	for _, t := range in {
+		out = append(out, t.Word)
+	}
+	return out
+}
+
+func TestTriggersFromFullCoverageTags(t *testing.T) {
+	// style-anime-screencap: captions on all 160 images, then the dataset's
+	// incidental subjects. "school uniform" is on four fifths of them —
+	// frequent, specific, and still not a trigger.
+	meta := map[string]string{
+		"ss_dataset_dirs": `{"dataset": {"n_repeats": 1, "img_count": 160}}`,
+		"ss_tag_frequency": `{"dataset": {"anime screencap": 160, "anime coloring": 160,
+			"school uniform": 130, "1girl": 94, "solo": 88}}`,
+	}
+	got, src := extractTriggers(meta)
+	if src != "tagy" {
+		t.Fatalf("zdroj = %q, čekáno tagy", src)
+	}
+	words := strings.Join(triggerWords(got), ", ")
+	if !strings.Contains(words, "anime screencap") {
+		t.Errorf("chybí trigger: %s", words)
+	}
+	if strings.Contains(words, "school uniform") {
+		t.Errorf("tag na 81 %% obrázků není trigger: %s", words)
+	}
+	if strings.Contains(words, "1girl") {
+		t.Errorf("booru boilerplate není trigger ani na 100 %%: %s", words)
+	}
+	if got[0].Cover != "160/160" {
+		t.Errorf("pokrytí = %q", got[0].Cover)
+	}
+}
+
+func TestTriggersDropGenericTagsEvenAtFullCoverage(t *testing.T) {
+	// style-gothic-niji: everything that covers the dataset is boilerplate,
+	// so the honest answer is "no trigger words", not "1girl".
+	meta := map[string]string{
+		"ss_dataset_dirs": `{"img": {"n_repeats": 7, "img_count": 29}}`,
+		"ss_tag_frequency": `{"img": {"1girl": 29, "solo": 29, "looking at viewer": 29,
+			"lips": 28, "breasts": 27}}`,
+	}
+	if got, src := extractTriggers(meta); got != nil {
+		t.Errorf("čekáno nic, dostal jsem %v (%s)", triggerWords(got), src)
+	}
+}
+
+func TestTriggersIgnoreTinyFolders(t *testing.T) {
+	// npm-v11t has folders of 4 and 99 images; what all four share is
+	// coincidence, so only the big folder may speak.
+	meta := map[string]string{
+		"ss_dataset_dirs": `{"11_np": {"img_count": 4}, "4_np": {"img_count": 99}}`,
+		"ss_tag_frequency": `{"11_np": {"happy": 4, "hidden privates": 4},
+			"4_np": {"hidden privates": 99, "1girl": 90}}`,
+	}
+	got, _ := extractTriggers(meta)
+	if w := triggerWords(got); len(w) != 1 || w[0] != "hidden privates" {
+		t.Errorf("dostal jsem %v", w)
+	}
+}
+
+func TestTriggersExplicitFieldWinsOverTags(t *testing.T) {
+	meta := map[string]string{
+		"avatar_trigger":   "ohwxtestface person",
+		"ss_dataset_dirs":  `{"img": {"img_count": 20}}`,
+		"ss_tag_frequency": `{"img": {"something": 20}}`,
+	}
+	got, src := extractTriggers(meta)
+	if src != "metadata" || len(got) != 1 || got[0].Word != "ohwxtestface person" {
+		t.Fatalf("got %v (%s)", triggerWords(got), src)
+	}
+}
+
+func TestTriggersFallBackToFolderNames(t *testing.T) {
+	// NakedHoodieV1: no captions at all, but the folder names the concept.
+	// The notebook checkpoint folder holds no images and must not appear.
+	meta := map[string]string{
+		"ss_dataset_dirs": `{"7_hoodie": {"n_repeats": 7, "img_count": 35},
+			".ipynb_checkpoints": {"n_repeats": 0, "img_count": 0}}`,
+	}
+	got, src := extractTriggers(meta)
+	if src != "dataset" || len(got) != 1 || got[0].Word != "hoodie" {
+		t.Fatalf("got %v (%s)", triggerWords(got), src)
+	}
+}
+
+func TestTriggersEmptyHeaderIsAnAnswer(t *testing.T) {
+	if got, src := extractTriggers(map[string]string{}); got != nil || src != "" {
+		t.Errorf("got %v (%s)", got, src)
+	}
+	// A folder called "img" says nothing; guessing "img" would be worse than
+	// admitting we do not know.
+	if got, _ := extractTriggers(map[string]string{
+		"ss_dataset_dirs": `{"img": {"img_count": 40}}`,
+	}); got != nil {
+		t.Errorf("got %v", triggerWords(got))
+	}
+}
+
+func TestTriggerCacheSurvivesRestart(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "lora-triggers.json")
+	c := NewTriggerCache(path)
+	c.byName["a.safetensors"] = cachedLora{
+		Triggers: []LoraTrigger{{Word: "zap", Cover: "10/10"}},
+		Source:   "tagy", Base: "sdxl",
+	}
+	c.save()
+
+	// A fresh cache with no ComfyUI behind it still answers from disk, which
+	// is what makes the picker instant on boot.
+	got := NewTriggerCache(path).Fill(nil, []string{"a.safetensors", "b.safetensors"})
+	if len(got) != 2 {
+		t.Fatalf("got %d položek", len(got))
+	}
+	if got[0].TriggerSource != "tagy" || got[0].Triggers[0].Word != "zap" {
+		t.Errorf("a = %+v", got[0])
+	}
+	// An unknown file is listed anyway: unusable trigger words are not a
+	// reason to hide a LoRA you can still run.
+	if got[1].Name != "b.safetensors" || len(got[1].Triggers) != 0 {
+		t.Errorf("b = %+v", got[1])
+	}
+}
+
+func TestEstimateFlagsLoraThatCannotApply(t *testing.T) {
+	man := &Manifest{
+		Models: []ManifestModel{
+			{ID: "illu", Label: "Illustrious", Preset: map[string]any{}},
+			{ID: "flux", Label: "Flux", Preset: map[string]any{}},
+		},
+		Loras: []ManifestLora{{
+			Name: "x.safetensors", Family: "illustrious", FamilyLabel: "Illustrious",
+			Fit: map[string]string{"illu": "native", "flux": "incompatible"},
+		}},
+	}
+	s := Spec{Models: []string{"illu", "flux"}, Prompts: []string{"p"},
+		Flows: []string{"txt2img"}, Lora: "x.safetensors"}
+	e := s.Estimate(man, nil)
+	if len(e.Blockers) != 0 {
+		t.Errorf("part of the run still works, blokovat se nemá: %v", e.Blockers)
+	}
+	if !strings.Contains(strings.Join(e.Warnings, " "), "Flux") {
+		t.Errorf("varování o Fluxu chybí: %v", e.Warnings)
+	}
+
+	// Nothing left to run — that is a blocker, before any GPU time.
+	only := Spec{Models: []string{"flux"}, Prompts: []string{"p"},
+		Flows: []string{"txt2img"}, Lora: "x.safetensors"}
+	if got := only.Estimate(man, nil); len(got.Blockers) == 0 {
+		t.Errorf("čekán blocker, dostal jsem %+v", got)
+	}
+}
+
+func TestDumpEnvKeepsZeroLoraStrength(t *testing.T) {
+	zero := 0.0
+	s := Spec{Prompts: []string{"p"}, Lora: "x.safetensors", LoraStrength: &zero}
+	env, err := s.DumpEnv(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(env, "\n")
+	if !strings.Contains(joined, "LORA_STRENGTH=0\n") &&
+		!strings.HasSuffix(joined, "LORA_STRENGTH=0") {
+		t.Errorf("nulová síla se ztratila: %s", tailLines(joined, 4))
+	}
+	// Without a LoRA the strength is noise and must not reach the dump.
+	none := Spec{Prompts: []string{"p"}, LoraStrength: &zero}
+	env2, _ := none.DumpEnv(t.TempDir())
+	if strings.Contains(strings.Join(env2, "\n"), "LORA_STRENGTH") {
+		t.Error("LORA_STRENGTH bez LORA")
+	}
 }

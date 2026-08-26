@@ -16,6 +16,17 @@ type Manifest struct {
 	Poses   []ManifestPose  `json:"poses"`
 	Buckets []string        `json:"buckets"`
 	Prompts []string        `json:"prompts"`
+	// Loras is the server's LoRA list classified by the app's registry; the
+	// trigger words are joined onto it later, from each file's metadata.
+	Loras               []ManifestLora `json:"loras"`
+	DefaultLoraStrength float64        `json:"defaultLoraStrength"`
+}
+
+type ManifestLora struct {
+	Name        string            `json:"name"`
+	Family      string            `json:"family"`
+	FamilyLabel string            `json:"familyLabel"`
+	Fit         map[string]string `json:"fit"`
 }
 
 type ManifestCell struct {

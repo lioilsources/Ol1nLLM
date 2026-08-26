@@ -396,6 +396,16 @@ Metriky (reakce vůči baseline, rozptyl stylů, změna proti předchozí hodnot
 sweepu) měří **barvu, ne převzetí stylu** — jsou k předvýběru, rozhodnout musí
 pohled na obrázky. Kalibrace z reálného měření: `docs/style-matrix.md`.
 
+**LoRA a trigger words**: ovládací panel nabízí LoRA živě ze serveru,
+seřazené podle `loraFit` vůči vybraným modelům (bez modelu podle linie);
+za jménem jsou v závorce **trigger words** čtené z hlavičky souboru
+(`GET /view_metadata/loras`) — výslovné pole > tagy s pokrytím ≥ 99 %
+> názvy trénovacích složek, booru boilerplate a složky pod 8 obrázků
+vypadávají. Cache `build/lab/lora-triggers.json` je trvalá (hlavička se
+nemění). LoRA je i osa sweepu (`param.lora`, hodnota `none` = buňka bez ní;
+`param.loraStrength`), nekompatibilní kombinace se přeskočí s důvodem už
+při plánu.
+
 Prohlížeč nemůže volat ComfyUI přímo (nevrací CORS hlavičky a CF Access
 odmítá preflight 403), proto ten lokální server; drží CF creds, takže
 poslouchá jen na loopbacku a mutující požadavky chtějí `X-Lab-Token`.

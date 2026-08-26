@@ -31,14 +31,20 @@ type Server struct {
 	active   string
 	cache    struct {
 		checkpoints []string
+		loras       []string
 		samplers    []string
 		schedulers  []string
 		at          time.Time
 	}
+	// triggers survives restarts on disk: a .safetensors header never changes,
+	// so re-reading 36 of them on every boot would be pure latency.
+	triggers *TriggerCache
 }
 
 func serve(env *Env, port int, open, forceDry bool) error {
 	s := &Server{env: env, forceDry: forceDry, runs: map[string]*Run{}, token: newToken()}
+	s.triggers = NewTriggerCache(
+		filepath.Join(env.RepoRoot, "build", "lab", "lora-triggers.json"))
 	s.loadRuns()
 
 	mux := http.NewServeMux()
@@ -174,15 +180,17 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	s.refreshOptions()
 	writeJSON(w, 200, map[string]any{
-		"models":     man.Models,
-		"styles":     man.Styles,
-		"poses":      man.Poses,
-		"buckets":    man.Buckets,
-		"samplers":   s.cache.samplers,
-		"schedulers": s.cache.schedulers,
-		"copy":       copyCS,
-		"maxCells":   MaxCells,
-		"confirm":    ConfirmCells,
+		"models":       man.Models,
+		"styles":       man.Styles,
+		"poses":        man.Poses,
+		"loras":        s.loraCatalog(man),
+		"loraStrength": man.DefaultLoraStrength,
+		"buckets":      man.Buckets,
+		"samplers":     s.cache.samplers,
+		"schedulers":   s.cache.schedulers,
+		"copy":         copyCS,
+		"maxCells":     MaxCells,
+		"confirm":      ConfirmCells,
 	})
 }
 
@@ -190,8 +198,14 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 func (s *Server) registries() (*Manifest, error) {
 	dir := filepath.Join(s.env.RepoRoot, "build", "lab", "_registry")
 	manPath := filepath.Join(dir, "wf", "manifest.json")
+	s.refreshOptions()
 	if st, err := os.Stat(manPath); err == nil && time.Since(st.ModTime()) < time.Hour {
-		return ReadManifest(manPath)
+		m, err := ReadManifest(manPath)
+		// A manifest from before the LoRA registry existed is not usable as a
+		// cache hit — it would silently leave every LoRA unclassified.
+		if err == nil && (len(m.Loras) > 0 || len(s.cache.loras) == 0) {
+			return m, nil
+		}
 	}
 	if !s.env.FlutterOK {
 		return nil, fmt.Errorf("flutter není použitelný: %s", s.env.FlutterMsg)
@@ -210,12 +224,18 @@ func (s *Server) registries() (*Manifest, error) {
 	env = append(env, "LIMIT=1")
 	// Prune to what the server can actually run, so the picker never offers a
 	// model whose checkpoint is missing.
-	s.refreshOptions()
 	if len(s.cache.checkpoints) > 0 {
 		ckPath := filepath.Join(dir, "ckpts.txt")
 		if err := os.WriteFile(ckPath,
 			[]byte(strings.Join(s.cache.checkpoints, "\n")), 0o644); err == nil {
 			env = append(env, "CKPTS="+ckPath)
+		}
+	}
+	if len(s.cache.loras) > 0 {
+		loPath := filepath.Join(dir, "loras.txt")
+		if err := os.WriteFile(loPath,
+			[]byte(strings.Join(s.cache.loras, "\n")), 0o644); err == nil {
+			env = append(env, "LORAS="+loPath)
 		}
 	}
 	cmd := exec.Command("flutter", "test", "tools/lab/dump.dart")
@@ -229,12 +249,43 @@ func (s *Server) registries() (*Manifest, error) {
 	return ReadManifest(manPath)
 }
 
+// loraCatalog joins the two halves of what the picker needs: lineage and fit
+// come from the app's registry (via the manifest), the trigger words from each
+// file's own metadata. Names come from the live server, so a LoRA the manifest
+// has not seen yet still shows up — unclassified rather than hidden, the same
+// rule the app follows.
+func (s *Server) loraCatalog(man *Manifest) []LoraInfo {
+	names := s.cache.loras
+	if len(names) == 0 {
+		// No creds or no server: fall back to whatever the last dump knew.
+		for _, l := range man.Loras {
+			names = append(names, l.Name)
+		}
+	}
+	byName := map[string]ManifestLora{}
+	for _, l := range man.Loras {
+		byName[l.Name] = l
+	}
+	out := s.triggers.Fill(s.env.Comfy, names)
+	for i := range out {
+		if l, ok := byName[out[i].Name]; ok {
+			out[i].Family = l.Family
+			out[i].FamilyLabel = l.FamilyLabel
+			out[i].Fit = l.Fit
+		}
+	}
+	return out
+}
+
 func (s *Server) refreshOptions() {
 	if time.Since(s.cache.at) < 5*time.Minute || !s.env.Comfy.HasCreds() {
 		return
 	}
 	if ck, err := s.env.Comfy.Checkpoints(); err == nil {
 		s.cache.checkpoints = ck
+	}
+	if lo, err := s.env.Comfy.Loras(); err == nil {
+		s.cache.loras = lo
 	}
 	if sa, sc, err := s.env.Comfy.Samplers(); err == nil {
 		s.cache.samplers, s.cache.schedulers = sa, sc
@@ -253,7 +304,7 @@ func (s *Server) handleEstimate(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 500, map[string]string{"error": err.Error()})
 		return
 	}
-	writeJSON(w, 200, spec.Estimate(man.Models, s.timings()))
+	writeJSON(w, 200, spec.Estimate(man, s.timings()))
 }
 
 // timings feeds the estimate from what this machine actually measured, falling

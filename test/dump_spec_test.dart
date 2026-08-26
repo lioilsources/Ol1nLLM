@@ -131,6 +131,10 @@ void main() {
       expect(sanitizeValue('0.3'), '0p3');
       expect(sanitizeValue('dpmpp_2m'), 'dpmpp_2m');
       expect(sanitizeValue('832x1216'), '832x1216');
+      // A LoRA sweep sweeps filenames; the extension is noise in every id.
+      expect(sanitizeValue('style-usnr-thin-paint.safetensors'),
+          'style-usnr-thin-paint');
+      expect(sanitizeValue('avatar/testface.safetensors'), 'avatar_testface');
     });
 
     test('cell id keeps the __ separators parseable', () {

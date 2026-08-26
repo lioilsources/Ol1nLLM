@@ -27,6 +27,8 @@ func runCLI(env *Env, args []string) error {
 	seed := fs.Int("seed", 777, "seed pro celou matici")
 	batch := fs.Int("batch", 1, "obrázků na buňku")
 	negative := fs.String("negative", "", "negativní prompt")
+	lora := fs.String("lora", "", "jméno LoRA souboru, jak ho hlásí ComfyUI")
+	loraStrength := fs.Float64("lora-strength", 0, "síla LoRA (výchozí: appková 0.9)")
 	editDenoise := fs.Float64("edit-denoise", 0, "přebít img2img denoise")
 	sweep := fs.String("sweep", "", "cíl=v1|v2|v3")
 	overrides := fs.String("override", "", "cíl=hodnota, oddělené čárkou")
@@ -36,13 +38,21 @@ func runCLI(env *Env, args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	var strength *float64
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "lora-strength" {
+			strength = loraStrength
+		}
+	})
 
 	spec := &Spec{
 		Models: splitCSV(*models), Styles: splitCSV(*styles), StylesFile: *stylesFile,
 		Flows: splitCSV(*flows), NoBaseline: *noBaseline,
 		PoseMode: *pose, PoseID: *poseID,
 		Seed: *seed, Batch: *batch, Negative: *negative, EditDenoise: *editDenoise,
+		Lora:  *lora,
 		Sweep: *sweep, Overrides: splitCSV(*overrides), Dry: *dry,
+		LoraStrength: strength,
 	}
 	switch {
 	case *promptsFile != "":

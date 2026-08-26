@@ -10,6 +10,7 @@ const state = {
   flows: new Set(['repose']),
   poseMode: 'none',
   poseId: '',
+  lora: '',
   ref: null,
   rowOrder: localStorage.getItem('labRowOrder') || 'style',
   runId: null,
@@ -118,7 +119,130 @@ async function loadConfig() {
     estimate();
   };
   updatePoseHint();
+  // The app's own default (kDefaultLoraStrength) travels in the manifest, so
+  // the lab starts where the phone starts.
+  if (cfg.loraStrength) {
+    $('loraStrength').value = cfg.loraStrength;
+    $('loraStrengthOut').textContent = Number(cfg.loraStrength).toFixed(2);
+  }
+  renderLoras();
 }
+
+// ── LoRA ───────────────────────────────────────────────────
+// Ordered by how well each file fits the models that are actually selected:
+// the same LoRA is native on Illustrious and merely weak on Juggernaut, so the
+// list is rebuilt whenever the model choice changes.
+const FIT_GROUP = [
+  ['native', 'sedí na vybrané modely'],
+  ['weak', 'jiná linie — načte se, ale táhne slaběji'],
+  ['unknown', 'neznámý původ — nabízí se, ale nezaručeně'],
+  ['incompatible', 'jiná architektura — na vybrané modely nesedne'],
+];
+
+function loraFit(l) {
+  const picked = [...state.models];
+  if (!picked.length || !l.fit) return 'unknown';
+  // Best fit across the selected models: a run over three models keeps a LoRA
+  // that is native on one of them.
+  const rank = { native: 0, weak: 1, unknown: 2, incompatible: 3 };
+  let best = 'incompatible';
+  picked.forEach((m) => {
+    const f = l.fit[m] || 'unknown';
+    if (rank[f] < rank[best]) best = f;
+  });
+  return best;
+}
+
+function loraTitle(l) {
+  const words = (l.triggers || []).map((t) => t.word);
+  const base = l.name.replace('.safetensors', '');
+  return words.length ? `${base} (${words.join(', ')})` : base;
+}
+
+function renderLoras() {
+  const list = state.config?.loras || [];
+  const sel = $('lora');
+  const opt = (l) =>
+    `<option value="${esc(l.name)}"${l.name === state.lora ? ' selected' : ''}>${esc(loraTitle(l))}</option>`;
+  // With no model chosen there is nothing to fit against, so the list falls
+  // back to lineage — still a useful sort, and it re-sorts by fit the moment
+  // a model is picked.
+  const byLineage = !state.models.size;
+  const keys = byLineage
+    ? [...new Set(list.map((l) => l.familyLabel || 'neznámý původ'))].sort()
+    : FIT_GROUP.map(([fit]) => fit);
+  const groups = keys.map((key) => {
+    const items = byLineage
+      ? list.filter((l) => (l.familyLabel || 'neznámý původ') === key)
+      : list.filter((l) => loraFit(l) === key);
+    if (!items.length) return '';
+    const label = byLineage
+      ? `linie ${key}`
+      : FIT_GROUP.find(([fit]) => fit === key)[1];
+    return `<optgroup label="${esc(label)}">${items.map(opt).join('')}</optgroup>`;
+  }).join('');
+  sel.innerHTML = `<option value="">— bez LoRA —</option>${groups}`;
+  sel.value = state.lora;
+  if (sel.value !== state.lora) state.lora = sel.value; // dropped from the list
+  updateLoraHint();
+}
+
+const TRIGGER_SOURCE = {
+  metadata: 'trigger words přímo z metadat',
+  tagy: 'tagy, které měl každý trénovací obrázek',
+  dataset: 'odhad z názvu trénovací složky — jinde v souboru nic není',
+};
+
+function updateLoraHint() {
+  const l = (state.config?.loras || []).find((x) => x.name === state.lora);
+  $('lorastrengthrow').hidden = !l;
+  if (!l) {
+    $('lorahint').innerHTML = 'Trigger words v závorce jsou z metadat souboru — '
+      + 'bez nich LoRA většinou spí.';
+    return;
+  }
+  const words = (l.triggers || []);
+  const parts = [];
+  if (l.familyLabel) parts.push(`linie <b>${esc(l.familyLabel)}</b>`);
+  if (l.base) parts.push(`trénovaná na <code>${esc(l.base)}</code>`);
+  const fit = loraFit(l);
+  if (fit === 'incompatible') {
+    parts.push('<span class="danger">na vybrané modely nesedne — buňky se přeskočí</span>');
+  } else if (fit === 'weak') {
+    parts.push('<span class="warnline">jiná linie než vybraný model</span>');
+  }
+  const trig = words.length
+    ? `<b>${words.map((t) => esc(t.word)).join(', ')}</b> — ${TRIGGER_SOURCE[l.triggerSource] || ''}`
+      + (words[0].cover ? ` (${esc(words[0].cover)} obrázků)` : '')
+      + ' <button type="button" class="linkbtn" id="loraInsert">vložit do promptů</button>'
+    : 'trigger words se z metadat vyčíst nedaly — zkus prompt bez nich, '
+      + 'nebo je dohledej u zdroje souboru';
+  $('lorahint').innerHTML = `${parts.join(' · ')}<br>${trig}`;
+  const btn = $('loraInsert');
+  if (btn) btn.onclick = () => insertTriggers(words.map((t) => t.word));
+}
+
+// Triggers go at the front of every prompt line: the earlier a token sits, the
+// more CLIP weight it carries — the same reason the app front-loads its chain.
+function insertTriggers(words) {
+  const add = words.join(', ');
+  const lines = $('prompts').value.split('\n');
+  $('prompts').value = lines.map((line) => {
+    const t = line.trim();
+    if (!t || t.startsWith(add)) return line;
+    return `${add}, ${t}`;
+  }).join('\n');
+  estimate();
+}
+
+$('lora').onchange = () => {
+  state.lora = $('lora').value;
+  updateLoraHint();
+  estimate();
+};
+$('loraStrength').oninput = () => {
+  $('loraStrengthOut').textContent = Number($('loraStrength').value).toFixed(2);
+};
 
 function toggle(e, attr, set) {
   const b = e.target.closest(`[data-${attr}]`);
@@ -126,6 +250,7 @@ function toggle(e, attr, set) {
   const v = b.dataset[attr];
   if (set.has(v)) set.delete(v); else set.add(v);
   b.setAttribute('aria-pressed', set.has(v));
+  if (attr === 'model') renderLoras();
   estimate();
 }
 
@@ -195,6 +320,8 @@ function spec() {
     seed: Number($('seed').value) || 777,
     batch: Number($('batch').value) || 1,
     negative: $('negative').value.trim(),
+    lora: state.lora,
+    loraStrength: Number($('loraStrength').value),
     editDenoise: Number($('editDenoise').value) || 0,
     sweep: target && values ? `${target}=${values}` : '',
     dry: $('mode').value === 'dry',

@@ -48,3 +48,6 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 /android/build/
+
+# lab: `go build ./...` v tools/lab shodí binárku vedle zdrojáků
+tools/lab/ol1n-lab

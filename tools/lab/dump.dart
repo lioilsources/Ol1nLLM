@@ -48,6 +48,19 @@ void main() {
     final poseMode = env['POSE_MODE'] ?? 'none';
     final poseName = env['POSE_NAME'];
     final sourceDepth = env['SOURCE_DEPTH'] ?? 'auto';
+    final lora = (env['LORA'] ?? '').isEmpty ? null : env['LORA'];
+    final loraStrength =
+        double.tryParse(env['LORA_STRENGTH'] ?? '') ?? kDefaultLoraStrength;
+    // The server's LoRA list, so the manifest can classify every file the
+    // picker will offer. Families live in the app (lora_family.dart) — the
+    // lab must not grow a second opinion about lineage.
+    final serverLoras = env['LORAS'] == null
+        ? const <String>[]
+        : File(env['LORAS']!)
+            .readAsLinesSync()
+            .map((l) => l.trim())
+            .where((l) => l.isNotEmpty)
+            .toList();
     final flows = _csv(env['FLOWS']).isEmpty
         ? const ['repose', 'img2img']
         : _csv(env['FLOWS']);
@@ -170,6 +183,30 @@ void main() {
               var cellSeed = seed;
               if (params['seed'] is int) cellSeed = params['seed'] as int;
 
+              // LoRA is sweepable (`param.lora`), so it is resolved per cell.
+              var cellLora = lora;
+              if (params['lora'] is String) {
+                final v = params['lora'] as String;
+                cellLora = (v.isEmpty || v == 'none') ? null : v;
+              }
+              var cellLoraStrength = loraStrength;
+              if (params['loraStrength'] is num) {
+                cellLoraStrength = (params['loraStrength'] as num).toDouble();
+              }
+              if (cellLora != null &&
+                  fitOfLora(cellLora, m.loraFamily) == LoraFit.incompatible) {
+                skipped.add({
+                  'cell': cellId(
+                      flow: flow, model: m.id, style: styleId,
+                      variantLabel: variantValue == null ? null : sweep.label,
+                      variantValue: variantValue,
+                      promptIndex: indexPrompts ? pi : null),
+                  'reason': '$cellLora je ${loraFamilyLabel(familyOfLora(cellLora))} '
+                      '— jiná architektura než ${m.id}, nešla by aplikovat',
+                });
+                return;
+              }
+
               LatentSize? latent;
               if (latentEnv != null) {
                 final parts = latentEnv.split('x');
@@ -182,6 +219,11 @@ void main() {
               }
 
               final svc = ComfyUIService()..setPreset(preset);
+              if (cellLora != null) {
+                svc
+                  ..setLora(cellLora)
+                  ..setLoraStrength(cellLoraStrength);
+              }
               Map<String, dynamic> wf;
               switch (flow) {
                 case 'repose':
@@ -294,6 +336,8 @@ void main() {
                   'latent': latent == null ? null : '${latent.w}x${latent.h}',
                   'poseMode': poseMode,
                   'refName': refName,
+                  'lora': cellLora,
+                  'loraStrength': cellLora == null ? null : cellLoraStrength,
                   'sourceDepth': flow == 'img2img' && poseImage == null &&
                       poseMode != 'depth' &&
                       autoDepth,
@@ -350,6 +394,21 @@ void main() {
             for (final p in kPoseTemplates)
               {'id': p.id, 'label': p.label, 'asset': p.asset},
           ],
+          // Fit per model, not a single verdict: the same file is native on
+          // Illustrious and merely weak on Juggernaut.
+          'loras': [
+            for (final n in serverLoras)
+              {
+                'name': n,
+                'family': familyOfLora(n).name,
+                'familyLabel': loraFamilyLabel(familyOfLora(n)),
+                'fit': {
+                  for (final m in models)
+                    m.id: fitOfLora(n, m.loraFamily).name,
+                },
+              },
+          ],
+          'defaultLoraStrength': kDefaultLoraStrength,
           'buckets': [
             for (final b in kSdxlBuckets) '${b.w}x${b.h}',
           ],

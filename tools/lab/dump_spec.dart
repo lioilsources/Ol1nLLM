@@ -194,7 +194,15 @@ Sweep parseSweep(String? entry, String? label) {
 }
 
 /// Filename-safe rendering of a sweep value: `0.5` → `0p5`, `dpmpp_2m` kept.
+///
+/// A LoRA sweep passes whole filenames, whose extension would otherwise turn
+/// every cell id into `…-style-usnr-thin-paintpsafetensors`. The extension
+/// carries no information — every LoRA has it — so it is dropped from the id
+/// while the value itself stays whole for the graph.
 String sanitizeValue(String v) {
+  if (v.endsWith('.safetensors')) {
+    v = v.substring(0, v.length - '.safetensors'.length);
+  }
   final buf = StringBuffer();
   for (final c in v.split('')) {
     if (RegExp(r'[A-Za-z0-9_-]').hasMatch(c)) {

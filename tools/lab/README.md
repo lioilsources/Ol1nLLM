@@ -71,6 +71,55 @@ preset modelu** — sweep je nastaví všem stejně, takže rozbije kalibraci
 o modelu; takové buňky mají v tabulce odznak. Naproti tomu
 `editDenoise/seed/latent/pose` jsou parametry flow a chovají se jako v appce.
 
+## LoRA a trigger words
+
+Nabídka LoRA v ovládacím panelu je **živá ze serveru**
+(`/object_info/LoraLoader`) a není abecední — řadí se podle toho, jak která
+sedí na vybrané modely, podle registru appky
+(`lib/models/lora_family.dart`). Bez vybraného modelu se řadí podle linie.
+
+Za jménem jsou v závorce **trigger words** — slova, na která soubor reaguje.
+Nejsou hádaná z názvu; čtou se z hlavičky samotného `.safetensors` přes
+`GET /view_metadata/loras`, ve třech úrovních důvěry:
+
+| zdroj | co to je |
+|---|---|
+| `metadata` | výslovné pole s triggerem (`avatar_trigger`) |
+| `tagy` | popisky, které měl **každý** trénovací obrázek (`ss_tag_frequency`, pokrytí ≥ 99 %) |
+| `dataset` | názvy trénovacích složek, když soubor popisky nemá (`7_hoodie` → `hoodie`) |
+
+Booru boilerplate (`1girl`, `solo`, `looking at viewer`) vypadává, i když
+pokrývá celý dataset — napsat ho zpátky nic neudělá. Složka pod 8 obrázků
+nemluví vůbec. Z 36 LoRA na serveru takhle vyjde trigger u 19 (17× z tagů,
+1× z výslovného pole, 1× z názvu složky); zbytek hlavičku buď nemá, nebo v ní
+není nic použitelného — a lab to řekne, místo aby si vymýšlel.
+Vyčtená metadata se cachují v `build/lab/lora-triggers.json` — hlavička daného
+souboru se nemění, takže se čtou jednou za život.
+
+Tlačítko *vložit do promptů* předsadí triggery na začátek každého řádku
+promptu (dřívější tokeny mají větší CLIP váhu — stejný důvod, proč appka
+řetězí prompty odpředu).
+
+Sílu bere lab z appky (`kDefaultLoraStrength`), rozsah je −1…2: záporná
+hodnota koncept **odtlačuje**, proto má posuvník značku na nule.
+
+LoRA je i osa sweepu:
+
+```bash
+lab run --subject "a ballerina" --models illustrious-xl \
+        --sweep 'param.lora=none|style-usnr-thin-paint.safetensors'
+lab run --subject "a ballerina" --lora style-usnr-thin-paint.safetensors \
+        --sweep 'param.loraStrength=0|0.5|0.9|1.4'
+```
+
+`none` je hodnota jako každá jiná — dá buňku bez LoRA, tedy srovnávací
+baseline uvnitř téhož sweepu.
+
+Buňky, kde LoRA na model architekturou nesedne, se **přeskočí s důvodem**
+(SD 1.5 LoRA na SDXL není no-op: UNet klíče nesedí, ale sdílený CLIP-L ano,
+takže jen rozhodí prompt). Odhad to řekne dřív, než se pustí GPU — a když
+nesedne na *žádný* vybraný model, je to blocker.
+
 ## Řazení tabulky
 
 Sloupce jsou vždycky modely (omezená osa). Uvnitř flow se dá přepnout, co je

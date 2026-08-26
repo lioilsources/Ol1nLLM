@@ -97,6 +97,24 @@ textarea { min-height: 68px; resize: vertical; font-size: 12px; }
 .poses button[aria-pressed="true"] { border-color: var(--flow-repose); }
 .poses img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
+/* LoRA strength is signed — a negative value pushes the trained concept away
+   rather than doing nothing — so the origin gets a visible tick instead of
+   being left to the reader's arithmetic. */
+input[type=range] { width: 100%; accent-color: var(--flow-img2img); }
+input[type=range].signed {
+  background: linear-gradient(to right,
+    transparent calc(33.33% - 1px), var(--line) calc(33.33% - 1px),
+    var(--line) calc(33.33% + 1px), transparent calc(33.33% + 1px));
+}
+output { color: var(--paper); font-variant-numeric: tabular-nums; }
+optgroup { color: var(--dim); font-style: normal; }
+optgroup option { color: var(--paper); }
+.linkbtn {
+  background: none; border: 0; padding: 0; color: var(--flow-txt2img);
+  cursor: pointer; font-size: 11px; font-family: var(--sans);
+  text-decoration: underline; text-underline-offset: 2px;
+}
+
 .hint { color: var(--dim); font-size: 11px; font-family: var(--sans); margin: 4px 0 0; }
 .danger { color: var(--bad); }
 .warnline { color: var(--warn); }

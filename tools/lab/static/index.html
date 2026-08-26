@@ -40,6 +40,21 @@
     </fieldset>
 
     <fieldset>
+      <legend>LoRA</legend>
+      <label class="field">
+        <select id="lora"><option value="">— bez LoRA —</option></select>
+      </label>
+      <div class="row" id="lorastrengthrow" hidden>
+        <label class="field">
+          <span>síla <output id="loraStrengthOut">0.90</output></span>
+          <input type="range" class="signed" id="loraStrength" min="-1" max="2" step="0.05" value="0.9">
+        </label>
+      </div>
+      <p class="hint" id="lorahint">Trigger words v závorce jsou z metadat
+        souboru — bez nich LoRA většinou spí.</p>
+    </fieldset>
+
+    <fieldset>
       <legend>flow</legend>
       <div class="chips" id="flows"></div>
     </fieldset>
@@ -84,6 +99,8 @@
           <option value="KSampler.cfg" data-preset="1">cfg (přebíjí preset)</option>
           <option value="KSampler.steps" data-preset="1">kroky (přebíjí preset)</option>
           <option value="param.seed">seed</option>
+          <option value="param.lora">LoRA (hodnoty = jména souborů)</option>
+          <option value="param.loraStrength">síla LoRA</option>
         </select>
       </label>
       <label class="field">
