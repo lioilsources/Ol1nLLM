@@ -60,7 +60,9 @@ type Estimate struct {
 // keystroke. The exact count arrives later, from the manifest, before any GPU
 // time is spent — that two-stage guard is why a sweep cannot surprise you.
 func (s *Spec) Estimate(models []ManifestModel, secondsPerCell map[string]float64) Estimate {
-	e := Estimate{Variants: 1}
+	// Non-nil slices on purpose: encoding/json turns a nil slice into null,
+	// and every consumer would then need to guard before reading .length.
+	e := Estimate{Variants: 1, Warnings: []string{}, Blockers: []string{}}
 	if s.Sweep != "" {
 		if _, values, err := splitSweep(s.Sweep); err == nil {
 			e.Variants = len(values)

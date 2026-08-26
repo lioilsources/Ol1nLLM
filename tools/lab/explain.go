@@ -84,7 +84,7 @@ func Explain(wf map[string]any) []Step {
 		}
 	}
 	if start == "" {
-		return nil
+		return []Step{}
 	}
 
 	seen := map[string]bool{}

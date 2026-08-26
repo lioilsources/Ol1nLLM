@@ -295,3 +295,37 @@ func TestThumbnailShrinksAndStaysDecodable(t *testing.T) {
 		t.Fatalf("náhled nejde dekódovat: %v", err)
 	}
 }
+
+func TestEstimateNeverSerialisesNullLists(t *testing.T) {
+	// encoding/json renders a nil slice as null, and the UI then blows up on
+	// blockers.length. The API shape must not depend on whether anything was
+	// appended.
+	s := Spec{Models: []string{"a"}, Prompts: []string{"x"}, Flows: []string{"txt2img"}}
+	data, err := json.Marshal(s.Estimate([]ManifestModel{{ID: "a", Preset: map[string]any{}}}, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "null") {
+		t.Fatalf("odhad obsahuje null: %s", data)
+	}
+	var out map[string]any
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"warnings", "blockers"} {
+		if _, ok := out[key].([]any); !ok {
+			t.Fatalf("%s není pole: %#v", key, out[key])
+		}
+	}
+}
+
+func TestExplainReturnsEmptyNotNil(t *testing.T) {
+	steps := Explain(map[string]any{"1": map[string]any{"class_type": "KSampler"}})
+	if steps == nil {
+		t.Fatal("Explain bez SaveImage musí vrátit prázdný seznam, ne nil")
+	}
+	data, _ := json.Marshal(steps)
+	if string(data) == "null" {
+		t.Fatal("prázdný řetěz se serializuje jako null")
+	}
+}

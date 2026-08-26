@@ -190,12 +190,13 @@ function estimate() {
   estTimer = setTimeout(async () => {
     try {
       const e = await api('/api/estimate', { method: 'POST', body: JSON.stringify(spec()) });
-      const blocked = e.blockers.length > 0;
-      $('startbtn').disabled = blocked;
-      $('estimate').innerHTML = blocked
-        ? `<span class="danger">${e.blockers.map(esc).join(' · ')}</span>`
-        : `${e.cells} buněk${e.variants > 1 ? ` (${e.variants} variant)` : ''} · ~${e.estMinutes.toFixed(0)} min`
-          + (e.warnings.length ? `<br><span class="warnline">${e.warnings.map(esc).join(' · ')}</span>` : '');
+      const blockers = e.blockers || [];
+      const warnings = e.warnings || [];
+      $('startbtn').disabled = blockers.length > 0;
+      $('estimate').innerHTML = blockers.length
+        ? `<span class="danger">${blockers.map(esc).join(' · ')}</span>`
+        : `${e.cells} buněk${e.variants > 1 ? ` (${e.variants} variant)` : ''} · ~${(e.estMinutes || 0).toFixed(0)} min`
+          + (warnings.length ? `<br><span class="warnline">${warnings.map(esc).join(' · ')}</span>` : '');
     } catch (err) {
       $('estimate').innerHTML = `<span class="danger">${esc(err.message)}</span>`;
     }
@@ -365,7 +366,7 @@ async function openCell(id) {
         .map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(String(v))}</dd>`).join('')}
     </dl>
     <p class="grouplabel" style="margin-top:18px">co je zapojené</p>
-    <div class="chain">${data.explain.map(chainNode).join('')}</div>
+    <div class="chain">${(data.explain || []).map(chainNode).join('')}</div>
     <details class="raw"><summary>workflow JSON</summary>
       <pre>${esc(JSON.stringify(data.workflow, null, 1))}</pre></details>`;
 }
