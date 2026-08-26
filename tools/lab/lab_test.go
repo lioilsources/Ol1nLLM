@@ -329,3 +329,21 @@ func TestExplainReturnsEmptyNotNil(t *testing.T) {
 		t.Fatal("prázdný řetěz se serializuje jako null")
 	}
 }
+
+func TestMediaServesPoseAssetsAndStillBlocksTraversal(t *testing.T) {
+	// Pose thumbnails come from the package assets, not from a run directory.
+	root := repoRootForTest(t)
+	s := &Server{env: &Env{RepoRoot: root}, runs: map[string]*Run{}, token: "t"}
+
+	rec := httptest.NewRecorder()
+	s.handleMedia(rec, httptest.NewRequest("GET", "/media/_poses/ol3.png", nil))
+	if rec.Code != 200 || rec.Body.Len() < 1000 {
+		t.Fatalf("šablona pózy se nenačetla: %d, %d B", rec.Code, rec.Body.Len())
+	}
+
+	rec = httptest.NewRecorder()
+	s.handleMedia(rec, httptest.NewRequest("GET", "/media/_poses/../../pubspec.yaml", nil))
+	if rec.Code == 200 && strings.Contains(rec.Body.String(), "name: ol1n_llm") {
+		t.Fatal("cesta pro pózy pustila ven z assets/poses")
+	}
+}

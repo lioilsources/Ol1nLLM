@@ -469,7 +469,13 @@ func (s *Server) handleCell(w http.ResponseWriter, run *Run, id string) {
 // classic traversal hole.
 func (s *Server) handleMedia(w http.ResponseWriter, r *http.Request) {
 	rel := strings.TrimPrefix(r.URL.Path, "/media/")
+	// Pose skeletons are app assets, not run artefacts — they live in the
+	// package, so they get their own root rather than a copy per run.
 	base := filepath.Join(s.env.RepoRoot, "build", "lab")
+	if after, ok := strings.CutPrefix(rel, "_poses/"); ok {
+		base = filepath.Join(s.env.RepoRoot, "assets", "poses")
+		rel = after
+	}
 	full := filepath.Join(base, filepath.Clean("/"+rel))
 	real, err := filepath.Abs(full)
 	if err != nil || !strings.HasPrefix(real, base+string(os.PathSeparator)) {
