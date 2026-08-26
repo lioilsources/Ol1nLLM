@@ -878,3 +878,49 @@ func TestExportCLIFlagsSurviveTrailingPosition(t *testing.T) {
 		t.Errorf("send=%v dir=%q", *send, fs.Arg(0))
 	}
 }
+
+func TestProgressLineMeasuresBytesNotImages(t *testing.T) {
+	// Half the bytes through, but only a quarter of the images: cells differ in
+	// size, and a bar driven by the image count would sit at 25 % while the
+	// upload is actually half done.
+	line := progressLine(25, 100, 500<<20, 1000<<20, 50*time.Second)
+	if !strings.Contains(line, "25/100") {
+		t.Errorf("chybí počet položek: %s", line)
+	}
+	if !strings.Contains(line, "500 MB / 1000 MB") {
+		t.Errorf("chybí bajty: %s", line)
+	}
+	// 500 MB in 50 s = 10 MB/s, so the remaining 500 MB take another 50 s.
+	if !strings.Contains(line, "10 MB/s") || !strings.Contains(line, "zbývá 50s") {
+		t.Errorf("špatná rychlost/ETA: %s", line)
+	}
+	half := strings.Count(line, "█")
+	if half != 12 {
+		t.Errorf("polovina pruhu = %d dílků, čekáno 12: %s", half, line)
+	}
+}
+
+func TestProgressLineHandlesTheEdges(t *testing.T) {
+	// Nothing to send: no division by zero, no bar off the end.
+	if got := progressLine(0, 0, 0, 0, time.Second); !strings.Contains(got, "0/0") {
+		t.Errorf("prázdný běh: %s", got)
+	}
+	// Finished: the ETA stops guessing instead of printing 0s forever.
+	done := progressLine(10, 10, 100, 100, time.Second)
+	if !strings.Contains(done, "zbývá —") {
+		t.Errorf("hotovo má mít prázdné ETA: %s", done)
+	}
+	if strings.Count(done, "·") != 0 {
+		t.Errorf("hotový pruh má být plný: %s", done)
+	}
+}
+
+func TestHumanBytes(t *testing.T) {
+	for in, want := range map[int64]string{
+		0: "0 B", 999: "999 B", 2048: "2 kB", 5 << 20: "5 MB", 3 << 30: "3.0 GB",
+	} {
+		if got := humanBytes(in); got != want {
+			t.Errorf("humanBytes(%d) = %q, čekáno %q", in, got, want)
+		}
+	}
+}

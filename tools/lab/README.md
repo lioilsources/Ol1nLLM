@@ -145,6 +145,16 @@ lab export build/lab/20260826-0023            # jen vypíše, co by šlo
 lab export build/lab/20260826-0023 --send     # teprve tohle odesílá
 ```
 
+V terminálu je u odesílání pruh podle **bajtů, ne obrázků** — buňky se
+velikostí liší i trojnásobně, takže pruh počítaný z kusů by poskakoval:
+
+```
+  [████████████░░░░░░░░░░░░] 148/304  612 MB / 1.2 GB  8 MB/s  zbývá 1m14s
+```
+
+Když výstup neteče do terminálu (přesměrování, smyčka přes víc běhů), místo
+překreslování se vypíše řádek po každé desetině.
+
 V UI je u dokončeného běhu tlačítko; první klik se zeptá, druhý odesílá.
 **Odeslání je opt-in schválně** — je to ven z počítače a galerie nemá mazací
 endpoint.

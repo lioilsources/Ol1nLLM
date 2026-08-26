@@ -261,8 +261,15 @@ func exportCLI(env *Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("server chce %d nových blobů\n", len(needed))
-	for i, sha := range needed {
+	var todo int64
+	for _, sha := range needed {
+		if st, err := os.Stat(plan.Paths[sha]); err == nil {
+			todo += st.Size()
+		}
+	}
+	fmt.Printf("server chce %d nových blobů (%s)\n", len(needed), humanBytes(todo))
+	bar := newProgress(len(needed), todo)
+	for _, sha := range needed {
 		path, ok := plan.Paths[sha]
 		if !ok {
 			continue
@@ -272,13 +279,12 @@ func exportCLI(env *Env, args []string) error {
 			return err
 		}
 		if err := env.Finetune.PutBlob(sha, data); err != nil {
+			fmt.Println()
 			return err
 		}
-		fmt.Printf("\r  nahráno %d/%d", i+1, len(needed))
+		bar.add(len(data))
 	}
-	if len(needed) > 0 {
-		fmt.Println()
-	}
+	bar.finish()
 	sum, err := env.Finetune.Finalize(plan.SessionID)
 	if err != nil {
 		return err
@@ -325,4 +331,113 @@ func loadRunDir(env *Env, dir string) (*Run, error) {
 		return nil, err
 	}
 	return run, nil
+}
+
+// ── upload progress ────────────────────────────────────────
+//
+// A whole lab directory is gigabytes over a home uplink, so the counter has to
+// answer "how long is this going to take", not just "is it alive". Bytes, not
+// images: cells differ in size by 3× and an image count would lurch.
+
+type progress struct {
+	items, done      int
+	totalBytes, sent int64
+	start            time.Time
+	tty              bool
+	lastLen          int
+}
+
+func newProgress(items int, totalBytes int64) *progress {
+	fi, err := os.Stdout.Stat()
+	return &progress{
+		items: items, totalBytes: totalBytes, start: time.Now(),
+		tty: err == nil && fi.Mode()&os.ModeCharDevice != 0,
+	}
+}
+
+func (p *progress) add(n int) {
+	p.done++
+	p.sent += int64(n)
+	if p.tty {
+		p.render(true)
+		return
+	}
+	// Piped into a file or a loop: a carriage return would be noise, so report
+	// at every tenth instead of on every image.
+	if p.items >= 10 && p.done%(p.items/10) == 0 {
+		p.render(false)
+		fmt.Println()
+	}
+}
+
+func (p *progress) finish() {
+	if p.done == 0 {
+		return
+	}
+	if p.tty {
+		p.render(true)
+	}
+	fmt.Println()
+}
+
+func (p *progress) render(inplace bool) {
+	line := "  " + progressLine(p.done, p.items, p.sent, p.totalBytes,
+		time.Since(p.start))
+	if inplace {
+		// Overwrite the tail of a previously longer line rather than leaving
+		// fragments of it on screen.
+		if pad := p.lastLen - len(line); pad > 0 {
+			line += strings.Repeat(" ", pad)
+		}
+		p.lastLen = len(line)
+		line = "\r" + line
+	}
+	fmt.Print(line)
+}
+
+// progressLine is pure so the formatting can be tested without a terminal.
+func progressLine(done, items int, sent, total int64, elapsed time.Duration) string {
+	frac := 0.0
+	if total > 0 {
+		frac = float64(sent) / float64(total)
+	}
+	const width = 24
+	filled := int(frac * width)
+	if filled > width {
+		filled = width
+	}
+	bar := strings.Repeat("\u2588", filled) + strings.Repeat("\u00b7", width-filled)
+
+	rate := float64(sent) / elapsed.Seconds()
+	eta := "\u2014"
+	if rate > 0 && sent < total {
+		eta = shortDuration(time.Duration(float64(total-sent)/rate) * time.Second)
+	}
+	return fmt.Sprintf("[%s] %d/%d  %s / %s  %s/s  zbývá %s",
+		bar, done, items, humanBytes(sent), humanBytes(total),
+		humanBytes(int64(rate)), eta)
+}
+
+func humanBytes(n int64) string {
+	switch {
+	case n >= 1<<30:
+		return fmt.Sprintf("%.1f GB", float64(n)/(1<<30))
+	case n >= 1<<20:
+		return fmt.Sprintf("%.0f MB", float64(n)/(1<<20))
+	case n >= 1<<10:
+		return fmt.Sprintf("%.0f kB", float64(n)/(1<<10))
+	default:
+		return fmt.Sprintf("%d B", n)
+	}
+}
+
+func shortDuration(d time.Duration) string {
+	d = d.Round(time.Second)
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+	if d < time.Hour {
+		return fmt.Sprintf("%dm%02ds", int(d.Minutes()), int(d.Seconds())%60)
+	}
+	return fmt.Sprintf("%dh%02dm", int(d.Hours()), int(d.Minutes())%60)
 }
