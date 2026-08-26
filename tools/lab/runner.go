@@ -91,10 +91,23 @@ func (r *Run) Summary() RunSummary {
 	}
 }
 
+// clone deep-copies the cell map. A shallow copy shares it with the live
+// state, so a subscriber serialising a snapshot while the run mutates its
+// cells is a data race — and eventually a "concurrent map iteration and map
+// write" crash.
+func (s RunState) clone() RunState {
+	c := s
+	c.Cells = make(map[string]CellState, len(s.Cells))
+	for k, v := range s.Cells {
+		c.Cells[k] = v
+	}
+	return c
+}
+
 func (r *Run) State() RunState {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.state
+	return r.state.clone()
 }
 
 func (r *Run) Manifest() *Manifest {
@@ -107,7 +120,7 @@ func (r *Run) Subscribe() (chan RunState, func()) {
 	ch := make(chan RunState, 8)
 	r.mu.Lock()
 	r.subs[ch] = struct{}{}
-	snapshot := r.state
+	snapshot := r.state.clone()
 	r.mu.Unlock()
 	ch <- snapshot
 	return ch, func() {
@@ -124,19 +137,20 @@ func (r *Run) update(fn func(*RunState)) {
 	r.mu.Lock()
 	fn(&r.state)
 	r.state.Version++
-	snapshot := r.state
-	subs := make([]chan RunState, 0, len(r.subs))
+	snapshot := r.state.clone()
+	// The sends happen under the same lock that guards subs. Doing them after
+	// releasing it leaves exactly the window where an unsubscribing SSE client
+	// closes its channel between the copy and the send — "send on closed
+	// channel", which takes the whole server down mid-run. The sends are
+	// non-blocking, so holding the lock costs nothing.
 	for ch := range r.subs {
-		subs = append(subs, ch)
-	}
-	r.mu.Unlock()
-	r.persist(snapshot)
-	for _, ch := range subs {
 		select {
 		case ch <- snapshot:
 		default: // a slow reader must never stall the run
 		}
 	}
+	r.mu.Unlock()
+	r.persist(snapshot)
 }
 
 func (r *Run) persist(s RunState) {

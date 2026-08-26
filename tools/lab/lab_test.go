@@ -7,7 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 func repoRootForTest(t *testing.T) string {
@@ -380,4 +382,53 @@ func mustGetwd(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return wd
+}
+
+func TestUpdateSurvivesSubscribersComingAndGoing(t *testing.T) {
+	// An SSE client disconnecting mid-run used to panic the whole server with
+	// "send on closed channel": update copied the subscriber list, released the
+	// lock, and only then sent. Run with -race.
+	r := &Run{
+		Dir:   t.TempDir(),
+		state: RunState{ID: "t", Cells: map[string]CellState{}},
+		subs:  map[chan RunState]struct{}{},
+	}
+	var wg sync.WaitGroup
+	stop := make(chan struct{})
+
+	wg.Add(1)
+	go func() { // the run, changing cell state as fast as it can
+		defer wg.Done()
+		for i := 0; ; i++ {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			id := "cell" + itoa(i%20)
+			r.update(func(s *RunState) { s.Cells[id] = CellState{ID: id, Status: CellDone} })
+		}
+	}()
+
+	for i := 0; i < 40; i++ { // browsers opening and closing the event stream
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ch, unsub := r.Subscribe()
+			<-ch
+			unsub()
+		}()
+	}
+	for i := 0; i < 40; i++ { // and readers serialising snapshots meanwhile
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := json.Marshal(r.State()); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	time.Sleep(150 * time.Millisecond)
+	close(stop)
+	wg.Wait()
 }
