@@ -416,9 +416,10 @@ endpoint). Jedna buňka = jeden uzel; předloha běhu je kořenový uzel
 (`origin: upload`) a buňky pod ním. Sampler/steps/cfg se čtou z odeslaného
 grafu, ne z presetu (po sweepu preset neplatí). Session i uzly mají UUIDv5
 odvozené z id běhu, takže re-export doplňuje tutéž session. Placeholdery
-z dry-runu se neposílají. Galerie má vlastní registr modelů, který za appkou
-zaostává (nezná animagine-xl, noobai-xl, wai-illustrious,
-juggernaut-xl-lightning, flux-fill) — lab na to při odeslání upozorní.
+z dry-runu se neposílají. Galerie má vlastní registr modelů (repo
+FineTuneGallery, `server/meta.go`) — lab se na něj před odesláním zeptá přes
+`/api/meta` a modely, které v něm nejsou, vyjmenuje: obrázky dojdou, ale
+nepůjde podle nich filtrovat.
 
 ## FINETUNE gallery export
 
