@@ -139,6 +139,11 @@ const _sdxlTxt2img = 'assets/comfyui/sdxl_txt2img.api.json';
 const _sdxlImg2img = 'assets/comfyui/sdxl_img2img.api.json';
 const _sdxlInpaint = 'assets/comfyui/sdxl_inpaint.api.json';
 const _sdxlInpaintRef = 'assets/comfyui/sdxl_inpaint_ref.api.json';
+/// flux-manga's txt2img graph. Public because it is also the one dedicated
+/// (non-generic) template the service knows how to splice a depth ControlNet
+/// into, which is what makes repose possible outside the SDXL family.
+const kFluxMangaTxt2img = 'assets/comfyui/flux_manga_txt2img.api.json';
+const _fluxMangaImg2img = 'assets/comfyui/flux_manga_img2img.api.json';
 const _fluxFillInpaint = 'assets/comfyui/flux_fill_inpaint.api.json';
 const _fluxFillInpaintRef = 'assets/comfyui/flux_fill_inpaint_ref.api.json';
 const _fluxFillInpaintFace = 'assets/comfyui/flux_fill_inpaint_face.api.json';
@@ -183,8 +188,8 @@ const kImageModels = <ImageModelSpec>[
     styleNote:
         'pózu ze zdroje nedrží; stylů zná jen pár',
     preset: ComfyPreset(
-      txt2imgAsset: 'assets/comfyui/flux_manga_txt2img.api.json',
-      img2imgAsset: 'assets/comfyui/flux_manga_img2img.api.json',
+      txt2imgAsset: kFluxMangaTxt2img,
+      img2imgAsset: _fluxMangaImg2img,
     ),
   ),
   ImageModelSpec(

@@ -13,6 +13,40 @@ import '../models/pose_template.dart';
 import 'http_error.dart';
 import 'image_backend.dart';
 
+/// How much of the reference travels into a repose render on top of the pose.
+///
+/// The pose comes from a depth map; identity is a separate, opt-in transfer
+/// read from the *same* uploaded reference (the `__depth_src__` LoadImage the
+/// depth chain already put in the graph — no second upload).
+///
+/// SDXL has two independent mechanisms and can run both; FLUX has exactly one
+/// (PuLID), so there anything but [none] means PuLID.
+enum FaceIdentity {
+  /// Pose only — the character comes entirely from the prompt. The shipped
+  /// repose behaviour, and still the default.
+  none,
+
+  /// InstantID: a face embedding on the model edge *plus* its own keypoint
+  /// ControlNet, so it also hands back conditioning. SDXL only.
+  instantid,
+
+  /// IPAdapter FaceID PlusV2: a second, independent face embedding. Model
+  /// edge only — it produces no conditioning. SDXL only.
+  faceid,
+
+  /// Both SDXL mechanisms chained, FaceID first.
+  both;
+
+  /// Tolerant parse for the lab's string plumbing (env vars, sweep values):
+  /// an unknown name is "off", not a crash mid-batch.
+  static FaceIdentity parse(String? name) => FaceIdentity.values.firstWhere(
+        (v) => v.name == name,
+        orElse: () => FaceIdentity.none,
+      );
+
+  bool get isOn => this != FaceIdentity.none;
+}
+
 /// Talks to a ComfyUI instance behind Cloudflare Access at comfyui.ol1n.com,
 /// reusing the same CF service-token credentials as the chat/diffusers paths.
 ///
@@ -127,6 +161,61 @@ class ComfyUIService implements ImageBackend {
   // poses drift in practice, step strength to 0.85 first.
   static const _reposeDepthStrength = 0.75;
   static const _reposeDepthEndPercent = 0.9;
+
+  // ── Keeping the reference's face ────────────────────────────
+  // All of it reads the reference that is *already* in the graph as
+  // `__depth_src__`, so identity costs no extra upload and cannot drift away
+  // from the image the pose came from.
+
+  // InstantID (SDXL): IP-Adapter-style face embedding + a keypoint ControlNet
+  // the node applies to the conditioning itself.
+  static const _instantIdModel = 'ip-adapter.bin';
+  static const _instantIdControlNet = 'instantid-controlnet-sdxl.safetensors';
+
+  // IPAdapter FaceID PlusV2 (SDXL): a second, independent embedding on the
+  // model edge. The unified loader resolves the .bin + its companion LoRA by
+  // filename, which is why those two files must keep their upstream names.
+  static const _faceIdPreset = 'FACEID PLUS V2';
+  static const _faceIdLoraStrength = 0.6;
+  static const _faceIdWeight = 0.8;
+  static const _faceIdV2Weight = 1.0;
+
+  // PuLID (FLUX): the same mechanism the shipped face-inpaint workflow uses.
+  static const _pulidModel = 'pulid_flux_v0.9.1.safetensors';
+
+  // 0.9, not the face-inpaint's 1.0: there a mask pins everything outside the
+  // face, here the whole frame is being generated and full strength starts
+  // dragging the reference's framing in with the identity.
+  static const _pulidWeight = 0.9;
+
+  /// Identity holds for the whole schedule, unlike the depth hint (released at
+  /// 90 % so textures can settle). A face has nothing to settle into — letting
+  /// go early just lets the prompt drift the features back.
+  static const _faceIdentityWeight = 0.8;
+  static const _faceIdentityStartAt = 0.0;
+  static const _faceIdentityEndAt = 1.0;
+
+  /// InsightFace on the CPU — same as the shipped PuLID face inpaint. The
+  /// detector is small, and keeping it off the GPU avoids competing with the
+  /// diffusion model for VRAM mid-job.
+  static const _faceAnalysisProvider = 'CPU';
+
+  // FaceDetailer (Impact Pack): a second, cropped pass over the detected face.
+  // 0.4 repairs features without inventing a different person. SAM is left
+  // unwired on purpose — no SAM model is installed, and a bbox crop is all a
+  // face pass needs.
+  static const _faceDetailDenoise = 0.4;
+  static const _faceDetailBbox = 'bbox/face_yolov8m.pt';
+
+  // FLUX depth ControlNet (InstantX): its own loader, no union type node, and
+  // ControlNetApplyAdvanced needs the VAE edge — it encodes the hint through
+  // the VAE rather than feeding it in pixel space.
+  static const _fluxDepthControlNet = 'flux-depth-controlnet-v3.safetensors';
+
+  /// Starting point, not a measured value: the InstantX ControlNet pulls
+  /// harder than xinsir's union at the same number, so repose's 0.75 would
+  /// over-pin. Sweep `__cn_apply__.strength` in the lab before trusting it.
+  static const _fluxReposeDepthStrength = 0.55;
 
   // Full strength for the whole schedule: at 0.9/0.8 the xinsir ControlNet
   // lost against prompts that imply a different pose (verified on server).
@@ -323,11 +412,20 @@ class ComfyUIService implements ImageBackend {
 
   // ── Repose ──────────────────────────────────────────────────
 
+  /// Whether this preset can run repose at all: it needs a real txt2img graph
+  /// *and* a depth ControlNet for its family — the generic SDXL templates
+  /// (xinsir union) or flux-manga (InstantX flux depth). flux-fill is neither:
+  /// its txt2img/img2img fields point at the inpaint workflow because the type
+  /// demands a value, not because it can render from a prompt.
+  bool get _reposeSupported =>
+      _preset.ckptName != null || _preset.txt2imgAsset == kFluxMangaTxt2img;
+
   /// Repose: a *fresh* txt2img render of [prompt] whose silhouette/stance is
-  /// pinned to [image] via DepthAnything → union ControlNet (depth). No
-  /// source latent (EmptyLatentImage, denoise 1.0) and no identity transfer
-  /// — character and style come entirely from the prompt; only the pose is
-  /// kept. SDXL only (generic template + union CN). A picked template pose
+  /// pinned to [image] via DepthAnything → depth ControlNet. No source latent
+  /// (empty latent, denoise 1.0), so character and style come entirely from
+  /// the prompt; only the pose is kept — unless [faceIdentity] is on, which
+  /// additionally reads the reference's *face* out of the same upload (and
+  /// [faceDetail] adds a cropped second pass over it). A picked template pose
   /// is ignored: the reference *is* the pose. The latent bucket follows the
   /// reference's aspect so the depth hint isn't center-cropped; the caller
   /// may pass [latentSize] to keep node metadata and the request in sync.
@@ -339,9 +437,11 @@ class ComfyUIService implements ImageBackend {
     required int seed,
     String? negativePrompt,
     LatentSize? latentSize,
+    FaceIdentity faceIdentity = FaceIdentity.none,
+    bool faceDetail = false,
   }) async* {
-    if (_preset.ckptName == null) {
-      yield const GenFailed('[ComfyUI] „Zachovej pózu“ funguje jen na SDXL modelech.');
+    if (!_reposeSupported) {
+      yield const GenFailed('[ComfyUI] „Zachovej pózu“ tenhle model neumí.');
       return;
     }
     final refName = await _uploadImage(
@@ -361,6 +461,8 @@ class ComfyUIService implements ImageBackend {
             fallback: (w: _preset.width, h: _preset.height),
           ),
       userNegative: negativePrompt,
+      faceIdentity: faceIdentity,
+      faceDetail: faceDetail,
     );
     yield* _run(wf);
   }
@@ -1040,6 +1142,8 @@ class ComfyUIService implements ImageBackend {
     String? depthImageName,
     LatentSize? latentSize,
     double? editDenoise,
+    FaceIdentity faceIdentity = FaceIdentity.none,
+    bool faceDetail = false,
   }) => _prepare(
     template,
     prompt: prompt,
@@ -1054,6 +1158,8 @@ class ComfyUIService implements ImageBackend {
     depthImageName: depthImageName,
     latentSize: latentSize,
     editDenoise: editDenoise,
+    faceIdentity: faceIdentity,
+    faceDetail: faceDetail,
   );
 
   Map<String, dynamic> _prepare(
@@ -1076,6 +1182,13 @@ class ComfyUIService implements ImageBackend {
     LatentSize? latentSize,
     // img2img edit strength, overriding the preset (see [setEditDenoise]).
     double? editDenoise,
+    // Carry the reference's *face* over as well, on top of the pose. Only
+    // does anything where a depth reference was injected — see
+    // [_injectFaceIdentity].
+    FaceIdentity faceIdentity = FaceIdentity.none,
+    // Second, cropped pass over the detected face. Only with an identity
+    // active: detailing a face nothing pins just re-rolls it.
+    bool faceDetail = false,
   }) {
     final wf = jsonDecode(jsonEncode(template)) as Map<String, dynamic>;
     final lora = _activeLora;
@@ -1139,7 +1252,9 @@ class ComfyUIService implements ImageBackend {
       _injectSourceDepthControlNet(
         wf,
         depthImageName,
-        strength: _reposeDepthStrength,
+        strength: _isFluxGraph(wf)
+            ? _fluxReposeDepthStrength
+            : _reposeDepthStrength,
         endPercent: _reposeDepthEndPercent,
       );
     } else if (poseImageName != null) {
@@ -1147,6 +1262,11 @@ class ComfyUIService implements ImageBackend {
     } else if (sourceDepth && imageName != null) {
       _injectSourceDepthControlNet(wf, imageName);
     }
+
+    // Identity rides on whichever depth reference just landed, so it has to
+    // come after the ControlNet splice — InstantID sits *upstream* of the
+    // depth apply and rewires the edges the splice just wrote.
+    _injectFaceIdentity(wf, faceIdentity);
 
     for (final entry in wf.values) {
       final node = (entry as Map).cast<String, dynamic>();
@@ -1170,13 +1290,19 @@ class ComfyUIService implements ImageBackend {
         case 'EmptySD3LatentImage':
         case 'EmptyLatentImage':
           if (inputs.containsKey('batch_size')) inputs['batch_size'] = batch;
-          if (preset.ckptName != null) {
+          if (latentSize != null) {
+            // An explicit size is the caller's decision (the repose bucket,
+            // derived from the reference), so it applies to dedicated
+            // templates too — otherwise flux-manga would render 1:1 while the
+            // depth hint is 2:3 and the ControlNet would squash it.
+            inputs['width'] = latentSize.w;
+            inputs['height'] = latentSize.h;
+          } else if (preset.ckptName != null) {
             // Pose skeletons are 2:3 portrait — generate in a matching
             // bucket instead of the preset's default so they don't distort.
-            inputs['width'] = latentSize?.w ??
-                (poseImageName != null ? kPoseWidth : preset.width);
-            inputs['height'] = latentSize?.h ??
-                (poseImageName != null ? kPoseHeight : preset.height);
+            inputs['width'] = poseImageName != null ? kPoseWidth : preset.width;
+            inputs['height'] =
+                poseImageName != null ? kPoseHeight : preset.height;
           }
         case 'RepeatLatentBatch':
         case 'RepeatImageBatch':
@@ -1200,6 +1326,10 @@ class ComfyUIService implements ImageBackend {
       if (inputs.containsKey('seed')) inputs['seed'] = seed;
       if (inputs.containsKey('noise_seed')) inputs['noise_seed'] = seed;
     }
+
+    // Last, after the patch loop, so the face pass can copy the sampler's
+    // *final* steps/cfg/sampler instead of the template's placeholders.
+    if (faceDetail) _injectFaceDetailer(wf, seed);
     return wf;
   }
 
@@ -1257,25 +1387,34 @@ class ComfyUIService implements ImageBackend {
         'resolution': _depthResolution,
       },
     };
+    // Per family: SDXL runs xinsir's union ControlNet switched to depth mode,
+    // FLUX the dedicated InstantX depth net — which needs no type node but
+    // does need the VAE, because it encodes its hint through it.
+    final flux = _isFluxGraph(wf);
     wf['__depth_cn__'] = {
       'class_type': 'ControlNetLoader',
-      '_meta': {'title': 'Union ControlNet'},
-      'inputs': {'control_net_name': _unionControlNet},
-    };
-    wf['__depth_type__'] = {
-      'class_type': 'SetUnionControlNetType',
-      '_meta': {'title': 'Union type: depth'},
+      '_meta': {'title': flux ? 'FLUX depth ControlNet' : 'Union ControlNet'},
       'inputs': {
-        'control_net': ['__depth_cn__', 0],
-        'type': 'depth',
+        'control_net_name': flux ? _fluxDepthControlNet : _unionControlNet,
       },
     };
+    if (!flux) {
+      wf['__depth_type__'] = {
+        'class_type': 'SetUnionControlNetType',
+        '_meta': {'title': 'Union type: depth'},
+        'inputs': {
+          'control_net': ['__depth_cn__', 0],
+          'type': 'depth',
+        },
+      };
+    }
     _spliceControlNet(
       wf,
-      controlNet: ['__depth_type__', 0],
+      controlNet: [flux ? '__depth_cn__' : '__depth_type__', 0],
       controlImage: ['__depth_pre__', 0],
       strength: strength,
       endPercent: endPercent,
+      vae: flux ? _vaeSource(wf) : null,
     );
   }
 
@@ -1288,15 +1427,9 @@ class ComfyUIService implements ImageBackend {
     required List<dynamic> controlImage,
     required double strength,
     double endPercent = _poseEndPercent,
+    List<dynamic>? vae,
   }) {
-    Map<String, dynamic>? sampler;
-    for (final e in wf.entries) {
-      if ((e.value as Map)['class_type'] == 'KSampler') {
-        sampler = (e.value as Map).cast<String, dynamic>();
-        break;
-      }
-    }
-    final inputs = (sampler?['inputs'] as Map?)?.cast<String, dynamic>();
+    final inputs = _samplerInputs(wf);
     final positive = inputs?['positive'];
     final negative = inputs?['negative'];
     if (inputs == null || positive is! List || negative is! List) return;
@@ -1312,10 +1445,306 @@ class ComfyUIService implements ImageBackend {
         'strength': strength,
         'start_percent': _poseStartPercent,
         'end_percent': endPercent,
+        'vae': ?vae,
       },
     };
     inputs['positive'] = ['__cn_apply__', 0];
     inputs['negative'] = ['__cn_apply__', 1];
+  }
+
+  // ── Face identity ───────────────────────────────────────────
+  // Repose keeps the pose and throws the person away. These splices put the
+  // person back, reading the face out of `__depth_src__` — the very reference
+  // the depth map came from, so there is one upload and no way for the two to
+  // disagree about which photo they mean.
+  //
+  // Same idiom as the ControlNet splice: read the sampler's current edges,
+  // insert a node, rewrite. LoRA rewires model/clip, the depth CN rewires
+  // conditioning, these rewire the model edge (and, for InstantID, the
+  // conditioning again) — all orthogonal, so they compose in any combination.
+
+  /// Which family a workflow belongs to, read off the graph rather than the
+  /// preset: the identity mechanism and the depth ControlNet both differ per
+  /// family, and the graph is what is being patched.
+  static bool _isFluxGraph(Map<String, dynamic> wf) =>
+      wf.values.any((n) => (n as Map)['class_type'] == 'UNETLoader');
+
+  /// The sampler's inputs map — the splice point every injector shares.
+  Map<String, dynamic>? _samplerInputs(Map<String, dynamic> wf) {
+    for (final e in wf.values) {
+      final node = (e as Map).cast<String, dynamic>();
+      if (node['class_type'] == 'KSampler') {
+        return (node['inputs'] as Map?)?.cast<String, dynamic>();
+      }
+    }
+    return null;
+  }
+
+  /// Whoever consumes the positive/negative conditioning: the ControlNet apply
+  /// once one is spliced in, otherwise the sampler. Anything that wants to sit
+  /// *upstream* of the depth hint rewires this node's edges, not the sampler's.
+  Map<String, dynamic>? _condConsumer(Map<String, dynamic> wf) =>
+      ((wf['__cn_apply__'] as Map?)?['inputs'] as Map?)
+          ?.cast<String, dynamic>() ??
+      _samplerInputs(wf);
+
+  /// The VAE edge the graph already uses, read off VAEDecode so it works for a
+  /// checkpoint's baked-in VAE and a separate VAELoader alike.
+  List<dynamic>? _vaeSource(Map<String, dynamic> wf) {
+    for (final e in wf.values) {
+      final node = (e as Map).cast<String, dynamic>();
+      if (node['class_type'] != 'VAEDecode') continue;
+      final v = (node['inputs'] as Map?)?['vae'];
+      if (v is List && v.length == 2) return v;
+    }
+    return null;
+  }
+
+  /// The CLIP edge, read off a text encoder — which the LoRA injection has
+  /// already rewired if there is a LoRA, so this follows it for free.
+  List<dynamic>? _clipSource(Map<String, dynamic> wf) {
+    for (final e in wf.values) {
+      final node = (e as Map).cast<String, dynamic>();
+      if (node['class_type'] != 'CLIPTextEncode') continue;
+      final v = (node['inputs'] as Map?)?['clip'];
+      if (v is List && v.length == 2) return v;
+    }
+    return null;
+  }
+
+  bool _hasFaceIdentity(Map<String, dynamic> wf) =>
+      wf.containsKey('__face_apply__') || wf.containsKey('__faceid_apply__');
+
+  /// Splices the requested identity transfer in, if the graph has a reference
+  /// to read a face from. `__depth_src__` is that reference, so identity is
+  /// available exactly where a depth hint is — repose, and the lab's depth
+  /// pose mode. No reference (plain txt2img, a template skeleton) ⇒ no-op,
+  /// which is also what keeps `['__depth_src__', 0]` from ever dangling.
+  void _injectFaceIdentity(Map<String, dynamic> wf, FaceIdentity mode) {
+    if (!mode.isOn || !wf.containsKey('__depth_src__')) return;
+    if (_isFluxGraph(wf)) {
+      // FLUX has one mechanism, so every mode maps onto PuLID; the lab records
+      // the effective method it finds in the graph, not the one it asked for.
+      _injectPulid(wf);
+      return;
+    }
+    // FaceID first, so InstantID ends up last on the model edge:
+    // loader → [__lora__] → [__faceid_apply__] → __face_apply__ → sampler.
+    if (mode == FaceIdentity.faceid || mode == FaceIdentity.both) {
+      _injectFaceIdV2(wf);
+    }
+    if (mode == FaceIdentity.instantid || mode == FaceIdentity.both) {
+      _injectInstantId(wf);
+    }
+  }
+
+  /// SDXL: InstantID. Takes conditioning in and hands it back with its own
+  /// keypoint ControlNet applied, so it has to sit upstream of the depth
+  /// apply — the two ControlNets then stack, face keypoints inside the depth
+  /// silhouette.
+  void _injectInstantId(Map<String, dynamic> wf) {
+    final sampler = _samplerInputs(wf);
+    final cond = _condConsumer(wf);
+    final model = sampler?['model'];
+    final positive = cond?['positive'];
+    final negative = cond?['negative'];
+    if (sampler == null || cond == null) return;
+    if (model is! List || positive is! List || negative is! List) return;
+
+    wf['__face_id__'] = {
+      'class_type': 'InstantIDModelLoader',
+      '_meta': {'title': 'InstantID'},
+      'inputs': {'instantid_file': _instantIdModel},
+    };
+    wf['__face_analysis__'] = {
+      'class_type': 'InstantIDFaceAnalysis',
+      '_meta': {'title': 'Rozpoznání tváře (InsightFace)'},
+      'inputs': {'provider': _faceAnalysisProvider},
+    };
+    wf['__face_cn__'] = {
+      'class_type': 'ControlNetLoader',
+      '_meta': {'title': 'InstantID ControlNet'},
+      'inputs': {'control_net_name': _instantIdControlNet},
+    };
+    wf['__face_apply__'] = {
+      'class_type': 'ApplyInstantID',
+      '_meta': {'title': 'Tvář z předlohy (InstantID)'},
+      'inputs': {
+        'instantid': ['__face_id__', 0],
+        'insightface': ['__face_analysis__', 0],
+        'control_net': ['__face_cn__', 0],
+        'image': ['__depth_src__', 0],
+        'model': model,
+        'positive': positive,
+        'negative': negative,
+        'weight': _faceIdentityWeight,
+        'start_at': _faceIdentityStartAt,
+        'end_at': _faceIdentityEndAt,
+      },
+    };
+    sampler['model'] = ['__face_apply__', 0];
+    cond['positive'] = ['__face_apply__', 1];
+    cond['negative'] = ['__face_apply__', 2];
+  }
+
+  /// SDXL: IPAdapter FaceID PlusV2 — a second embedding, model edge only. The
+  /// unified loader also patches its companion LoRA onto the model, which is
+  /// why it takes a model in and hands one back.
+  void _injectFaceIdV2(Map<String, dynamic> wf) {
+    final sampler = _samplerInputs(wf);
+    final model = sampler?['model'];
+    if (sampler == null || model is! List) return;
+
+    wf['__faceid_loader__'] = {
+      'class_type': 'IPAdapterUnifiedLoaderFaceID',
+      '_meta': {'title': 'IPAdapter FaceID PlusV2'},
+      'inputs': {
+        'model': model,
+        'preset': _faceIdPreset,
+        'lora_strength': _faceIdLoraStrength,
+        'provider': _faceAnalysisProvider,
+      },
+    };
+    wf['__faceid_apply__'] = {
+      'class_type': 'IPAdapterFaceID',
+      '_meta': {'title': 'Tvář z předlohy (FaceID)'},
+      'inputs': {
+        'model': ['__faceid_loader__', 0],
+        'ipadapter': ['__faceid_loader__', 1],
+        'image': ['__depth_src__', 0],
+        'weight': _faceIdWeight,
+        'weight_faceidv2': _faceIdV2Weight,
+        'weight_type': 'linear',
+        'combine_embeds': 'concat',
+        'start_at': _faceIdentityStartAt,
+        'end_at': _faceIdentityEndAt,
+        'embeds_scaling': 'V only',
+      },
+    };
+    sampler['model'] = ['__faceid_apply__', 0];
+  }
+
+  /// FLUX: PuLID, the mechanism the shipped face-inpaint workflow already
+  /// uses. Model edge only — it produces no conditioning, so the depth apply
+  /// keeps the edges the splice gave it.
+  void _injectPulid(Map<String, dynamic> wf) {
+    final sampler = _samplerInputs(wf);
+    final model = sampler?['model'];
+    if (sampler == null || model is! List) return;
+
+    wf['__face_pulid__'] = {
+      'class_type': 'PulidFluxModelLoader',
+      '_meta': {'title': 'PuLID (FLUX)'},
+      'inputs': {'pulid_file': _pulidModel},
+    };
+    wf['__face_eva__'] = {
+      'class_type': 'PulidFluxEvaClipLoader',
+      '_meta': {'title': 'EVA-CLIP'},
+      'inputs': <String, dynamic>{},
+    };
+    wf['__face_analysis__'] = {
+      'class_type': 'PulidFluxInsightFaceLoader',
+      '_meta': {'title': 'Rozpoznání tváře (InsightFace)'},
+      'inputs': {'provider': _faceAnalysisProvider},
+    };
+    wf['__face_apply__'] = {
+      'class_type': 'ApplyPulidFlux',
+      '_meta': {'title': 'Tvář z předlohy (PuLID)'},
+      'inputs': {
+        'model': model,
+        'pulid_flux': ['__face_pulid__', 0],
+        'eva_clip': ['__face_eva__', 0],
+        'face_analysis': ['__face_analysis__', 0],
+        'image': ['__depth_src__', 0],
+        'weight': _pulidWeight,
+        'start_at': _faceIdentityStartAt,
+        'end_at': _faceIdentityEndAt,
+      },
+    };
+    sampler['model'] = ['__face_apply__', 0];
+  }
+
+  /// A second pass over just the detected face, appended at the very end:
+  /// VAEDecode → FaceDetailer → SaveImage. Independent of *which* identity
+  /// ran (it only needs one to have run), and gated on that: re-rolling a face
+  /// nothing pins would just produce a different stranger.
+  ///
+  /// It runs on the sampler's model — identity patch included — but on the
+  /// conditioning from *before* the depth apply. The detailer samples a crop,
+  /// and a full-frame depth hint resized onto that crop describes the wrong
+  /// thing entirely. (InstantID's own keypoint hint rides along in that
+  /// conditioning and is full-frame too; whether that helps or hurts on a crop
+  /// is the live question the lab run answers.)
+  void _injectFaceDetailer(Map<String, dynamic> wf, int seed) {
+    if (!_hasFaceIdentity(wf)) return;
+    final sampler = _samplerInputs(wf);
+    final cond = _condConsumer(wf);
+    final vae = _vaeSource(wf);
+    final clip = _clipSource(wf);
+    Map<String, dynamic>? save;
+    for (final e in wf.values) {
+      final node = (e as Map).cast<String, dynamic>();
+      if (node['class_type'] == 'SaveImage') {
+        save = (node['inputs'] as Map?)?.cast<String, dynamic>();
+        break;
+      }
+    }
+    if (sampler == null || cond == null || save == null) return;
+    final images = save['images'];
+    final model = sampler['model'];
+    final positive = cond['positive'];
+    final negative = cond['negative'];
+    if (vae == null || clip == null) return;
+    if (images is! List || model is! List) return;
+    if (positive is! List || negative is! List) return;
+
+    wf['__detail_bbox__'] = {
+      'class_type': 'UltralyticsDetectorProvider',
+      '_meta': {'title': 'Detektor tváří'},
+      'inputs': {'model_name': _faceDetailBbox},
+    };
+    wf['__face_detail__'] = {
+      'class_type': 'FaceDetailer',
+      '_meta': {'title': 'Dotažení tváře'},
+      'inputs': {
+        'image': images,
+        'model': model,
+        'clip': clip,
+        'vae': vae,
+        'guide_size': 512.0,
+        'guide_size_for': true,
+        'max_size': 1024.0,
+        'seed': seed,
+        // Sampler settings mirror the main pass: this is the same model, and a
+        // face repaired with a different sampler reads as a graft.
+        'steps': sampler['steps'],
+        'cfg': sampler['cfg'],
+        'sampler_name': sampler['sampler_name'],
+        'scheduler': sampler['scheduler'],
+        'positive': positive,
+        'negative': negative,
+        'denoise': _faceDetailDenoise,
+        'feather': 5,
+        'noise_mask': true,
+        'force_inpaint': true,
+        'bbox_threshold': 0.5,
+        'bbox_dilation': 10,
+        'bbox_crop_factor': 3.0,
+        // Node defaults, inert while sam_model_opt is unwired (no SAM model is
+        // installed) — but the API format demands every required input.
+        'sam_detection_hint': 'center-1',
+        'sam_dilation': 0,
+        'sam_threshold': 0.93,
+        'sam_bbox_expansion': 0,
+        'sam_mask_hint_threshold': 0.7,
+        'sam_mask_hint_use_negative': 'False',
+        'drop_size': 10,
+        'bbox_detector': ['__detail_bbox__', 0],
+        'wildcard': '',
+        'cycle': 1,
+      },
+    };
+    save['images'] = ['__face_detail__', 0];
   }
 
   // ── LoRA source detection ───────────────────────────────────

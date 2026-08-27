@@ -24,6 +24,10 @@ func runCLI(env *Env, args []string) error {
 	refPrompt := fs.String("ref-prompt", "", "vygenerovat referenci z promptu")
 	pose := fs.String("pose", "none", "none|depth|template")
 	poseID := fs.String("pose-id", "", "id šablony pózy (ol1..ol8)")
+	faceIdentity := fs.String("face-identity", "none",
+		"zachovat tvář z předlohy: none|instantid|faceid|both (FLUX vždy PuLID)")
+	faceDetail := fs.Bool("face-detail", false,
+		"dotáhnout tvář druhým průchodem (FaceDetailer); jen s identitou")
 	seed := fs.Int("seed", 777, "seed pro celou matici")
 	batch := fs.Int("batch", 1, "obrázků na buňku")
 	negative := fs.String("negative", "", "negativní prompt")
@@ -49,6 +53,7 @@ func runCLI(env *Env, args []string) error {
 		Models: splitCSV(*models), Styles: splitCSV(*styles), StylesFile: *stylesFile,
 		Flows: splitCSV(*flows), NoBaseline: *noBaseline,
 		PoseMode: *pose, PoseID: *poseID,
+		FaceIdentity: *faceIdentity, FaceDetail: *faceDetail,
 		Seed: *seed, Batch: *batch, Negative: *negative, EditDenoise: *editDenoise,
 		Lora:  *lora,
 		Sweep: *sweep, Overrides: splitCSV(*overrides), Dry: *dry,

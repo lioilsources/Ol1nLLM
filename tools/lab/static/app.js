@@ -10,6 +10,8 @@ const state = {
   flows: new Set(['repose']),
   poseMode: 'none',
   poseId: '',
+  faceIdentity: 'none',
+  faceDetail: false,
   lora: '',
   ref: null,
   rowOrder: localStorage.getItem('labRowOrder') || 'style',
@@ -119,6 +121,7 @@ async function loadConfig() {
     estimate();
   };
   updatePoseHint();
+  updateFaceHint();
   // The app's own default (kDefaultLoraStrength) travels in the manifest, so
   // the lab starts where the phone starts.
   if (cfg.loraStrength) {
@@ -263,6 +266,42 @@ function updatePoseHint() {
   $('posehint').textContent = t;
 }
 
+$('faceIdentity').onchange = () => {
+  state.faceIdentity = $('faceIdentity').value;
+  updateFaceHint();
+  estimate();
+};
+$('faceDetail').onchange = () => {
+  state.faceDetail = $('faceDetail').checked;
+  updateFaceHint();
+  estimate();
+};
+
+function updateFaceHint() {
+  const on = state.faceIdentity !== 'none';
+  // The detail pass has nothing to hold onto without an identity, so it is
+  // greyed out rather than silently ignored.
+  $('faceDetail').disabled = !on;
+  $('faceDetail').closest('label').classList.toggle('off', !on);
+  if (!on) {
+    $('facehint').textContent =
+      'Bez zachování tváře jde postava celá z promptu — to je dnešní chování „zachovej pózu".';
+    return;
+  }
+  const parts = [
+    'Tvář se čte z téže předlohy jako hloubková mapa, takže to chce '
+    + 'flow „zachovej pózu" (nebo depth pózu) a rozpoznatelný obličej — '
+    + 'buňka bez něj spadne na chybu.',
+  ];
+  if (state.faceIdentity !== 'instantid') {
+    parts.push('FaceID PlusV2 stojí na váhách '
+      + 'ip-adapter-faceid-plusv2_sdxl.bin a stejnojmenné LoRA — '
+      + 'loader je hledá podle názvu, takže přejmenovaný soubor buňku shodí.');
+  }
+  parts.push('Na FLUX modelech jede vždycky PuLID — manifest zapíše metodu, která opravdu běžela.');
+  $('facehint').textContent = parts.join(' ');
+}
+
 $('sweepTarget').onchange = () => {
   const opt = $('sweepTarget').selectedOptions[0];
   $('sweephint').innerHTML = opt.dataset.preset
@@ -317,6 +356,8 @@ function spec() {
     poseMode: state.poseMode,
     poseId: state.poseId,
     poseName: state.poseName || '',
+    faceIdentity: state.faceIdentity,
+    faceDetail: state.faceDetail,
     seed: Number($('seed').value) || 777,
     batch: Number($('batch').value) || 1,
     negative: $('negative').value.trim(),

@@ -48,6 +48,11 @@ void main() {
     final poseMode = env['POSE_MODE'] ?? 'none';
     final poseName = env['POSE_NAME'];
     final sourceDepth = env['SOURCE_DEPTH'] ?? 'auto';
+    // Identity/detail travel as names, not booleans: the sweep axis
+    // `param.faceIdentity` needs to say *which* mechanism, and the effective
+    // one is read back out of the graph afterwards anyway.
+    final faceIdentity = env['FACE_IDENTITY'] ?? 'none';
+    final faceDetail = _flag(env['FACE_DETAIL']);
     final lora = (env['LORA'] ?? '').isEmpty ? null : env['LORA'];
     final loraStrength =
         double.tryParse(env['LORA_STRENGTH'] ?? '') ?? kDefaultLoraStrength;
@@ -115,9 +120,12 @@ void main() {
     for (final m in models) {
       final preset = m.preset!;
       final generic = preset.ckptName != null;
-      // Mirrors ComfyUIService: repose is SDXL-only, auto-depth follows
-      // supportsPose unless the caller forces it.
-      final canRepose = generic && m.supportsPose;
+      // Mirrors ComfyUIService._reposeSupported: the generic SDXL templates
+      // (union CN, so supportsPose too — sd15 has no ControlNet) or
+      // flux-manga, the one dedicated template with a depth CN of its own.
+      // Auto-depth follows supportsPose unless the caller forces it.
+      final canRepose = (generic && m.supportsPose) ||
+          preset.txt2imgAsset == kFluxMangaTxt2img;
       final autoDepth = sourceDepth == 'on' ||
           (sourceDepth == 'auto' && m.supportsPose && generic);
 
@@ -193,6 +201,14 @@ void main() {
               if (params['loraStrength'] is num) {
                 cellLoraStrength = (params['loraStrength'] as num).toDouble();
               }
+              var cellFace = FaceIdentity.parse(faceIdentity);
+              if (params['faceIdentity'] is String) {
+                cellFace = FaceIdentity.parse(params['faceIdentity'] as String);
+              }
+              var cellFaceDetail = faceDetail;
+              if (params['faceDetail'] is bool) {
+                cellFaceDetail = params['faceDetail'] as bool;
+              }
               if (cellLora != null &&
                   fitOfLora(cellLora, m.loraFamily) == LoraFit.incompatible) {
                 skipped.add({
@@ -246,6 +262,8 @@ void main() {
                     depthImageName: refName,
                     latentSize: latent,
                     userNegative: negative,
+                    faceIdentity: cellFace,
+                    faceDetail: cellFaceDetail,
                   );
                 case 'img2img':
                   if (refName == null) {
@@ -270,6 +288,8 @@ void main() {
                     depthImageName: poseMode == 'depth' ? refName : null,
                     userNegative: negative,
                     editDenoise: editDenoise,
+                    faceIdentity: cellFace,
+                    faceDetail: cellFaceDetail,
                   );
                 case 'txt2img':
                   wf = svc.prepareForTest(
@@ -282,6 +302,8 @@ void main() {
                         poseMode == 'depth' ? refName : null,
                     latentSize: latent,
                     userNegative: negative,
+                    faceIdentity: cellFace,
+                    faceDetail: cellFaceDetail,
                   );
                 default:
                   fail('neznámá flow: $flow');
@@ -341,6 +363,11 @@ void main() {
                   'sourceDepth': flow == 'img2img' && poseImage == null &&
                       poseMode != 'depth' &&
                       autoDepth,
+                  // Read back out of the graph, like the prompt: asking for
+                  // `faceid` on a FLUX model gets PuLID, and the table must
+                  // say what ran, not what was requested.
+                  'faceIdentity': _effectiveFaceIdentity(wf),
+                  'faceDetail': wf.containsKey('__face_detail__'),
                 },
                 'applied': applied,
                 'presetOverridden': graphOverrides.isNotEmpty,
@@ -443,7 +470,22 @@ String? _encodedText(Map<String, dynamic> wf, {required bool positive}) {
     if (node == null) return null;
     final ni = (node['inputs'] as Map?)?.cast<String, dynamic>();
     if (node['class_type'] == 'CLIPTextEncode') return ni?['text'] as String?;
-    ref = ni?[positive ? 'positive' : 'negative'];
+    // FluxGuidance names its single input `conditioning`, so the positive side
+    // of a FLUX graph dead-ends without this hop.
+    ref = ni?[positive ? 'positive' : 'negative'] ?? ni?['conditioning'];
   }
   return null;
+}
+
+/// Which identity mechanism the finished graph actually carries. Derived, not
+/// remembered: FLUX maps every mode onto PuLID, and a mode the graph had no
+/// reference to read a face from silently stays off.
+String _effectiveFaceIdentity(Map<String, dynamic> wf) {
+  if (wf.containsKey('__face_pulid__')) return 'pulid';
+  final instant = wf.containsKey('__face_id__');
+  final faceId = wf.containsKey('__faceid_apply__');
+  if (instant && faceId) return 'both';
+  if (instant) return 'instantid';
+  if (faceId) return 'faceid';
+  return 'none';
 }

@@ -35,6 +35,13 @@ type Spec struct {
 	PoseName    string `json:"poseName"` // uploaded skeleton filename
 	SourceDepth string `json:"sourceDepth"`
 
+	// FaceIdentity carries the reference's face into the render on top of the
+	// pose: none | instantid | faceid | both (FLUX has one mechanism, so
+	// anything but none means PuLID there). FaceDetail adds a cropped second
+	// pass over the detected face; it needs an identity to be worth anything.
+	FaceIdentity string `json:"faceIdentity"`
+	FaceDetail   bool   `json:"faceDetail"`
+
 	Lora string `json:"lora"`
 	// Pointer, not a plain float: 0 is a legal strength (the LoRA loaded but
 	// silent), so "not chosen" has to be distinguishable from "chosen zero".
@@ -149,8 +156,55 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 				m.Label))
 		}
 	}
+	e.faceIdentity(s, man, picked)
 	e.loraFit(s, man, picked)
 	return e
+}
+
+// faceIdentity says up front where the face toggle will quietly do nothing.
+// It reads the reference through the depth chain, so without a flow that
+// injects one there is no face to read and the run looks identical to a plain
+// repose — an expensive way to discover a checkbox was ignored.
+func (e *Estimate) faceIdentity(s *Spec, man *Manifest, picked map[string]bool) {
+	on := s.FaceIdentity != "" && s.FaceIdentity != "none"
+	if !on && !s.FaceDetail {
+		return
+	}
+	hasRepose := false
+	for _, f := range s.Flows {
+		if f == "repose" {
+			hasRepose = true
+		}
+	}
+	if !hasRepose && s.PoseMode != "depth" {
+		e.Warnings = append(e.Warnings,
+			"tvář se čte z předlohy přes hloubkovou mapu — bez „zachovej pózu“ "+
+				"nebo depth pózy se nepoužije")
+	}
+	if s.FaceDetail && !on {
+		e.Warnings = append(e.Warnings,
+			"dotažení tváře běží jen se zapnutou identitou — samo o sobě by "+
+				"tvář jen přelosovalo")
+	}
+	if s.FaceDetail && s.Batch > 1 {
+		e.Warnings = append(e.Warnings, fmt.Sprintf(
+			"dotažení tváře nad batch %d není ověřené — první ostrý běh zkontroluj, "+
+				"jestli projde celá dávka", s.Batch))
+	}
+	if !on {
+		return
+	}
+	var flux []string
+	for _, m := range man.Models {
+		if picked[m.ID] && m.CkptName == nil {
+			flux = append(flux, m.Label)
+		}
+	}
+	if len(flux) > 0 {
+		e.Warnings = append(e.Warnings, fmt.Sprintf(
+			"%s jede PuLID — InstantID ani FaceID na FLUX nejsou; manifest zapíše "+
+				"metodu, která opravdu běžela", strings.Join(flux, ", ")))
+	}
 }
 
 // loraFit says up front what the dump would otherwise say cell by cell: a LoRA
@@ -283,6 +337,12 @@ func (s *Spec) DumpEnv(dir string) ([]string, error) {
 	set("POSE_MODE", s.PoseMode)
 	set("POSE_NAME", s.PoseName)
 	set("SOURCE_DEPTH", s.SourceDepth)
+	// set() drops empty strings, so an unset identity simply never reaches the
+	// dump — which defaults it to "none" anyway.
+	set("FACE_IDENTITY", s.FaceIdentity)
+	if s.FaceDetail {
+		set("FACE_DETAIL", "1")
+	}
 	set("LORA", s.Lora)
 	if s.Lora != "" && s.LoraStrength != nil {
 		// FormatFloat, not set(): "0" must reach the dump, and set() drops

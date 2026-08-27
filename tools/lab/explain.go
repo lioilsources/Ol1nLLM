@@ -26,6 +26,18 @@ var injectedLabels = map[string]string{
 	"__pose_image__": "šablona pózy (kostra)",
 	"__pose_cn__":    "ControlNet (OpenPose)",
 	"__cn_apply__":   "aplikace ControlNetu na podmínění",
+
+	// Tvář z předlohy — čte se ze stejného __depth_src__ jako hloubková mapa.
+	"__face_id__":       "InstantID (model tváře)",
+	"__face_cn__":       "ControlNet (InstantID, klíčové body)",
+	"__face_analysis__": "rozpoznání tváře (InsightFace)",
+	"__face_apply__":    "tvář z předlohy",
+	"__faceid_loader__": "IPAdapter FaceID PlusV2 (loader + LoRA)",
+	"__faceid_apply__":  "tvář z předlohy (FaceID)",
+	"__face_pulid__":    "PuLID (model tváře, FLUX)",
+	"__face_eva__":      "EVA-CLIP (kodér tváře)",
+	"__detail_bbox__":   "detektor tváří (YOLOv8)",
+	"__face_detail__":   "dotažení tváře (druhý průchod výřezem)",
 }
 
 var classLabels = map[string]string{
@@ -43,22 +55,35 @@ var classLabels = map[string]string{
 	"SaveImage":               "uložení",
 	"ControlNetApplyAdvanced": "ControlNet",
 	"LoadImage":               "vstupní obrázek",
+	"ApplyInstantID":          "InstantID",
+	"IPAdapterFaceID":         "IPAdapter FaceID",
+	"ApplyPulidFlux":          "PuLID",
+	"FaceDetailer":            "dotažení tváře",
 }
 
 // interesting values per class — everything else is wiring noise.
 var shownInputs = map[string][]string{
-	"CheckpointLoaderSimple":      {"ckpt_name"},
-	"LoraLoader":                  {"lora_name", "strength_model"},
-	"CLIPTextEncode":              {"text"},
-	"EmptyLatentImage":            {"width", "height", "batch_size"},
-	"EmptySD3LatentImage":         {"width", "height", "batch_size"},
-	"KSampler":                    {"steps", "cfg", "sampler_name", "scheduler", "denoise", "seed"},
-	"ControlNetApplyAdvanced":     {"strength", "start_percent", "end_percent"},
-	"ControlNetLoader":            {"control_net_name"},
-	"DepthAnythingV2Preprocessor": {"ckpt_name", "resolution"},
-	"SetUnionControlNetType":      {"type"},
-	"LoadImage":                   {"image"},
-	"RepeatLatentBatch":           {"amount"},
+	"CheckpointLoaderSimple":       {"ckpt_name"},
+	"LoraLoader":                   {"lora_name", "strength_model"},
+	"CLIPTextEncode":               {"text"},
+	"EmptyLatentImage":             {"width", "height", "batch_size"},
+	"EmptySD3LatentImage":          {"width", "height", "batch_size"},
+	"KSampler":                     {"steps", "cfg", "sampler_name", "scheduler", "denoise", "seed"},
+	"ControlNetApplyAdvanced":      {"strength", "start_percent", "end_percent"},
+	"ControlNetLoader":             {"control_net_name"},
+	"DepthAnythingV2Preprocessor":  {"ckpt_name", "resolution"},
+	"SetUnionControlNetType":       {"type"},
+	"LoadImage":                    {"image"},
+	"RepeatLatentBatch":            {"amount"},
+	"InstantIDModelLoader":         {"instantid_file"},
+	"InstantIDFaceAnalysis":        {"provider"},
+	"PulidFluxInsightFaceLoader":   {"provider"},
+	"ApplyInstantID":               {"weight", "start_at", "end_at"},
+	"ApplyPulidFlux":               {"weight", "start_at", "end_at"},
+	"IPAdapterUnifiedLoaderFaceID": {"preset", "lora_strength", "provider"},
+	"IPAdapterFaceID":              {"weight", "weight_faceidv2", "start_at", "end_at"},
+	"UltralyticsDetectorProvider":  {"model_name"},
+	"FaceDetailer":                 {"denoise", "steps", "cfg", "guide_size", "bbox_threshold"},
 }
 
 // Explain walks the graph backwards from SaveImage and returns the chain in
@@ -158,6 +183,12 @@ func explainNote(cls, id string, in map[string]any) string {
 		return copyCS["depth_vs_pose"].Text
 	case id == "__pose_cn__":
 		return copyCS["wired_pose"].Text
+	case id == "__face_apply__" || id == "__faceid_apply__":
+		return copyCS["face_identity"].Text
+	case id == "__face_detail__":
+		return copyCS["face_detail"].Text
+	case id == "__face_analysis__":
+		return copyCS["face_provider"].Text
 	case cls == "KSampler":
 		d, ok := in["denoise"].(float64)
 		if !ok {

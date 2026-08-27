@@ -186,6 +186,16 @@ void main() {
       '__pose_image__',
       '__pose_cn__',
       '__lora__',
+      '__face_id__',
+      '__face_cn__',
+      '__face_analysis__',
+      '__face_apply__',
+      '__face_pulid__',
+      '__face_eva__',
+      '__faceid_loader__',
+      '__faceid_apply__',
+      '__detail_bbox__',
+      '__face_detail__',
     ]) {
       expect(src, contains("'$id'"), reason: '$id zmizel ze služby');
     }

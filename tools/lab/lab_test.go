@@ -219,6 +219,64 @@ func TestExplainMarksInjectedNodes(t *testing.T) {
 	}
 }
 
+func TestExplainLabelsTheFaceChain(t *testing.T) {
+	// The panel exists to say what is wired; an unlabelled node shows up as a
+	// raw class name and the reader has to guess which knob it is.
+	wf := map[string]any{
+		"1": map[string]any{"class_type": "CheckpointLoaderSimple",
+			"inputs": map[string]any{"ckpt_name": "x"}},
+		"__depth_src__": map[string]any{"class_type": "LoadImage",
+			"inputs": map[string]any{"image": "ref.png"}},
+		"__face_id__": map[string]any{"class_type": "InstantIDModelLoader",
+			"inputs": map[string]any{"instantid_file": "ip-adapter.bin"}},
+		"__face_analysis__": map[string]any{"class_type": "InstantIDFaceAnalysis",
+			"inputs": map[string]any{"provider": "CPU"}},
+		"__face_apply__": map[string]any{"class_type": "ApplyInstantID",
+			"inputs": map[string]any{"weight": 0.8, "end_at": 1.0,
+				"model": []any{"1", 0}, "image": []any{"__depth_src__", 0},
+				"instantid":   []any{"__face_id__", 0},
+				"insightface": []any{"__face_analysis__", 0}}},
+		"5": map[string]any{"class_type": "KSampler",
+			"inputs": map[string]any{"denoise": 1.0, "model": []any{"__face_apply__", 0}}},
+		"6": map[string]any{"class_type": "VAEDecode",
+			"inputs": map[string]any{"samples": []any{"5", 0}}},
+		"__detail_bbox__": map[string]any{"class_type": "UltralyticsDetectorProvider",
+			"inputs": map[string]any{"model_name": "bbox/face_yolov8m.pt"}},
+		"__face_detail__": map[string]any{"class_type": "FaceDetailer",
+			"inputs": map[string]any{"denoise": 0.4, "image": []any{"6", 0},
+				"model":         []any{"__face_apply__", 0},
+				"bbox_detector": []any{"__detail_bbox__", 0}}},
+		"9": map[string]any{"class_type": "SaveImage",
+			"inputs": map[string]any{"images": []any{"__face_detail__", 0}}},
+	}
+	steps := map[string]Step{}
+	for _, st := range Explain(wf) {
+		steps[st.NodeID] = st
+	}
+	for _, id := range []string{"__face_id__", "__face_analysis__", "__face_apply__",
+		"__detail_bbox__", "__face_detail__"} {
+		st, ok := steps[id]
+		if !ok {
+			t.Fatalf("%s se do řetězu nedostal", id)
+		}
+		if !st.Injected {
+			t.Fatalf("%s musí být označený jako vložený appkou", id)
+		}
+		if st.Label == st.Class {
+			t.Fatalf("%s nemá český popisek", id)
+		}
+	}
+	if !strings.Contains(steps["__face_apply__"].Note, "předlohy") {
+		t.Fatalf("tvář nemá vysvětlivku: %q", steps["__face_apply__"].Note)
+	}
+	if got := steps["__face_apply__"].Values["weight"]; got != 0.8 {
+		t.Fatalf("panel neukazuje sílu tváře: %v", got)
+	}
+	if got := steps["__face_detail__"].Values["denoise"]; got != 0.4 {
+		t.Fatalf("panel neukazuje sílu dotažení: %v", got)
+	}
+}
+
 func TestMetricsSeparateReactionFromSpread(t *testing.T) {
 	base := Placeholder(64, 64, "baseline")
 	same := Placeholder(64, 64, "baseline")
@@ -594,6 +652,87 @@ func TestEstimateFlagsLoraThatCannotApply(t *testing.T) {
 		t.Errorf("čekán blocker, dostal jsem %+v", got)
 	}
 }
+
+func TestDumpEnvCarriesTheFaceFlags(t *testing.T) {
+	dir := t.TempDir()
+	s := &Spec{
+		Prompts: []string{"a"}, Models: []string{"pony"}, Flows: []string{"repose"},
+		FaceIdentity: "both", FaceDetail: true,
+	}
+	env, err := s.DumpEnv(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, kv := range env {
+		if k, v, ok := strings.Cut(kv, "="); ok {
+			got[k] = v
+		}
+	}
+	if got["FACE_IDENTITY"] != "both" || got["FACE_DETAIL"] != "1" {
+		t.Fatalf("FACE_IDENTITY=%q FACE_DETAIL=%q", got["FACE_IDENTITY"], got["FACE_DETAIL"])
+	}
+
+	// Off is the default on the dump side, so nothing needs to travel — and a
+	// stale FACE_DETAIL from the parent environment must not leak in either.
+	off := &Spec{Prompts: []string{"a"}, Models: []string{"pony"}, Flows: []string{"repose"}}
+	env, err = off.DumpEnv(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "FACE_IDENTITY=") || strings.HasPrefix(kv, "FACE_DETAIL=") {
+			t.Fatalf("vypnutá tvář nemá co posílat, dostal jsem %q", kv)
+		}
+	}
+}
+
+func TestEstimateWarnsWhenTheFaceToggleWouldDoNothing(t *testing.T) {
+	man := &Manifest{Models: []ManifestModel{
+		{ID: "pony", Label: "Pony", CkptName: strptr("p.safetensors"), Preset: map[string]any{}},
+	}}
+	// No repose and no depth pose ⇒ nothing injects the reference the face is
+	// read from, so the run would be indistinguishable from a plain one.
+	s := Spec{
+		Models: []string{"pony"}, Prompts: []string{"x"}, Flows: []string{"txt2img"},
+		FaceIdentity: "instantid",
+	}
+	if got := strings.Join(s.Estimate(man, nil).Warnings, " "); !strings.Contains(got, "zachovej pózu") {
+		t.Fatalf("chybí varování o nepoužité tváři: %v", got)
+	}
+
+	// With repose it is a legitimate run — no noise.
+	ok := s
+	ok.Flows = []string{"repose"}
+	ok.RefName = "ref.png"
+	if got := strings.Join(ok.Estimate(man, nil).Warnings, " "); strings.Contains(got, "zachovej pózu") {
+		t.Fatalf("nečekané varování: %v", got)
+	}
+
+	// The detail pass alone has no identity to hold onto.
+	lone := Spec{
+		Models: []string{"pony"}, Prompts: []string{"x"}, Flows: []string{"repose"},
+		RefName: "ref.png", FaceDetail: true,
+	}
+	if got := strings.Join(lone.Estimate(man, nil).Warnings, " "); !strings.Contains(got, "zapnutou identitou") {
+		t.Fatalf("chybí varování o samotném detaileru: %v", got)
+	}
+}
+
+func TestEstimateSaysFluxRunsPulid(t *testing.T) {
+	man := &Manifest{Models: []ManifestModel{
+		{ID: "flux-manga", Label: "FLUX manga", CkptName: nil, Preset: map[string]any{}},
+	}}
+	s := Spec{
+		Models: []string{"flux-manga"}, Prompts: []string{"x"}, Flows: []string{"repose"},
+		RefName: "ref.png", FaceIdentity: "faceid",
+	}
+	if got := strings.Join(s.Estimate(man, nil).Warnings, " "); !strings.Contains(got, "PuLID") {
+		t.Fatalf("chybí varování o PuLID na FLUXu: %v", got)
+	}
+}
+
+func strptr(s string) *string { return &s }
 
 func TestDumpEnvKeepsZeroLoraStrength(t *testing.T) {
 	zero := 0.0

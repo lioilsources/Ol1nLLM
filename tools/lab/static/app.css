@@ -68,6 +68,14 @@ legend, .grouplabel {
 }
 label.field { display: block; margin-bottom: 10px; }
 label.field > span { display: block; color: var(--muted); font-size: 11.5px; margin-bottom: 4px; }
+label.check {
+  display: flex; align-items: center; gap: 6px;
+  color: var(--muted); font-size: 11.5px; margin-bottom: 10px; cursor: pointer;
+}
+label.check input { width: auto; margin: 0; accent-color: var(--flow-txt2img); }
+/* Dimmed rather than hidden: the toggle exists, it just needs an identity
+   first — hiding it would read as "this build has no face pass". */
+label.check.off { opacity: .45; cursor: default; }
 input[type=text], input[type=number], textarea, select {
   width: 100%; background: var(--ink); border: 1px solid var(--line);
   border-radius: 4px; padding: 6px 8px;

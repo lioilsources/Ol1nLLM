@@ -288,9 +288,9 @@ tatáž `_injectSourceDepthControlNet()` jako u auto pózy, ale se **strength
 hodnoty ověřené v MangaPrompts pro depth → txt2img). Proč ne 1.0: při plné
 síle přes celý schedule se zapeče objem těla/vlasů/oblečení z reference a
 pere se s novou postavou; posledních 10 % kroků bez hintu nechá dosednout
-detaily. Postava a styl jdou **celé z promptu** — žádný přenos identity
-(IPAdapter/InstantID), žádný hi-res/FaceDetailer; tvář lze doplnit face
-inpaintem. Precedence injekce v `_prepare()`: **`depthImageName` > šablona
+detaily. Postava a styl jdou **celé z promptu** — přenos identity je
+volitelný (viz „Zachovat tvář“ níž, zatím jen v labu) a v telefonu vypnutý.
+Precedence injekce v `_prepare()`: **`depthImageName` > šablona
 pózy > auto depth** — v repose se vybraná šablona ignoruje (reference *je*
 póza), `_PoseChip` se v režimu skryje a `poseId` na nodu je null. Latent se
 nebere z presetu: `lib/models/latent_bucket.dart` přečte rozměry reference
@@ -307,6 +307,74 @@ aktuálně vybraný model (ModelChip není při běhu zamčený). Jen SDXL model
 použitý SDXL v session (jinak první dostupný) a oznámí to přes `info`;
 `_ModelChip(needsPose)` šedí ne-SDXL. Režim je transientní (nepersistuje
 se, `selectImage`/`navigateTo`/přepnutí session ho ruší).
+
+**„Zachovat tvář“ (`FaceIdentity`, zatím jen lab)**: repose drží pózu a
+postavu zahodí; tohle ji vrací. Tvář se čte z **téhož** uploadu jako
+hloubková mapa — uzel `__depth_src__`, který depth injekce už do grafu dala,
+takže žádný druhý upload a žádná možnost, aby si póza a tvář myslely jinou
+fotku. Gate je právě existence toho uzlu (repose a `POSE_MODE=depth`); jinde
+je to no-op, což zároveň drží hranu `['__depth_src__', 0]` bez visících konců.
+
+| | SDXL (`ckptName != null`) | flux-manga |
+|---|---|---|
+| `instantid` | `ApplyInstantID` (embedding + vlastní keypoint CN) | PuLID |
+| `faceid` | `IPAdapterFaceID` PlusV2 (jen model hrana) | PuLID |
+| `both` | obě, FaceID první na model hraně | PuLID |
+
+Rodina se pozná z grafu (`_isFluxGraph` = obsahuje `UNETLoader`), ne z
+presetu — patchuje se graf. FLUX má jediný mechanismus, takže se na něj
+mapuje každý režim; lab si proto **skutečnou** metodu čte zpátky z grafu
+(`_effectiveFaceIdentity`), ne z toho, co se objednalo.
+
+Model hrana se řetězí `loader → [__lora__] → [__faceid_apply__] →
+__face_apply__ → KSampler`; InstantID navíc vrací podmínění, takže sedí
+**před** `__cn_apply__` (`__cn_apply__.positive == ['__face_apply__', 1]`) a
+oba ControlNety se skládají — klíčové body obličeje uvnitř hloubkové siluety.
+Síla 0.8, `end_at` **1.0**: hloubka se pouští na 90 %, aby dosedly textury,
+ale tvář nemá do čeho dosedat a pustit ji dřív znamená nechat prompt rysy
+zase odvést. PuLID jede 0.9 (ne 1.0 jako v odeslaném face inpaintu — tam
+maska drží všechno mimo obličej, tady se generuje celý obraz a plná síla
+začne táhnout i rámování reference).
+
+**Dotažení tváře (`FaceDetailer`, Impact Pack)**: druhý průchod jen přes
+nalezený obličej, přilepený na konec (`VAEDecode → __face_detail__ →
+SaveImage`). Nezávislý přepínač, ale **jen se zapnutou identitou** — jinak by
+tvář jen přelosoval. Jede na modelu ze sampleru (i s identitou), sampler
+nastavení kopíruje z hotového KSampleru (proto se injektuje až za patch
+smyčkou, aby u SDXL viděl presetové hodnoty a u fluxu ty baked-in), denoise
+0.4. Podmínění bere **zpřed** hloubkového ControlNetu: detailer pracuje
+s výřezem a celoobrazová hloubková mapa natažená na výřez popisuje něco
+jiného. (InstantID svůj keypoint hint v tom podmínění veze taky a je taky
+celoobrazový — jestli to na výřezu pomáhá, nebo vadí, ukáže až ostrý běh.)
+SAM zůstává nezapojený (`sam_model_opt`) — na serveru žádný SAM model není
+a na obličej stačí bbox.
+
+**flux-manga umí repose**: guard `_reposeSupported` už není `ckptName != null`,
+ale „generický SDXL template **nebo** flux-manga txt2img“ — flux-fill zůstává
+venku, jeho `txt2imgAsset` ukazuje na inpaint workflow jen proto, že typ
+hodnotu vyžaduje. Hloubkový ControlNet se u fluxu liší: dedikovaný
+`flux-depth-controlnet-v3` (InstantX), **bez** `SetUnionControlNetType`, a
+`ControlNetApplyAdvanced` dostane `vae` hranu (čte se z `VAEDecode`, takže
+funguje pro `VAELoader` i pro VAE v checkpointu). Síla 0.55 je **odhad**, ne
+měření — InstantX táhne silněji než xinsir, ladit sweepem
+`__cn_apply__.strength`. `latentSize` se nově propíše i do dedikovaných
+šablon (`EmptySD3LatentImage`), jinak by flux renderoval 1:1, zatímco hint je
+2:3, a ControlNet by ho zmáčkl. **Telefon zůstává SDXL-only** —
+`startRepose()` pořád přepíná na SDXL model; povolení fluxu v UI je
+follow-up.
+
+Váhy na serveru jsou všechny: InstantID (`ip-adapter.bin` +
+`instantid-controlnet-sdxl`), FaceID PlusV2 (`ip-adapter-faceid-plusv2_sdxl.bin`
+v `models/ipadapter/` + stejnojmenná LoRA v `models/loras/` — jména nechat
+přesně, `IPAdapterUnifiedLoaderFaceID` je hledá podle názvu), PuLID
+(`pulid_flux_v0.9.1`) i detektor (`bbox/face_yolov8m.pt`). Ověřeno proti
+`/object_info`: 16 grafů (obě rodiny × 4 režimy × s/bez dotažení, s LoRA) —
+třídy, povinné vstupy, enum hodnoty i hrany sedí. **SAM zatím ne** —
+`SAMLoader` hlásí prázdný seznam, takže `sam_model_opt` zůstává nezapojený;
+až tam model bude, je to malý follow-up (bbox na obličej stačí).
+
+Buňka bez rozpoznatelného obličeje spadne na `execution_error` — per-buňka,
+řečeno v hintu.
 
 ### gen-queue — NIM async job queue (`llm.ol1n.com/nim/*`)
 
@@ -415,6 +483,15 @@ vypadávají. Cache `build/lab/lora-triggers.json` je trvalá (hlavička se
 nemění). LoRA je i osa sweepu (`param.lora`, hodnota `none` = buňka bez ní;
 `param.loraStrength`), nekompatibilní kombinace se přeskočí s důvodem už
 při plánu.
+
+**Zachovat tvář**: `--face-identity=none|instantid|faceid|both` a
+`--face-detail` (v UI blok „tvář“ pod pózou; checkbox dotažení je aktivní jen
+s identitou). Osy sweepu `__face_apply__.weight`, `param.faceIdentity`,
+`__face_detail__.denoise`. Manifest u každé buňky nese `faceIdentity`
+a `faceDetail` **čtené z grafu**, takže flux napíše `pulid`, i když se
+objednal `faceid`. Odhad varuje předem tam, kde by přepínač tiše nic
+neudělal: bez repose/depth flow (není odkud tvář číst), detailer bez
+identity, a batch > 1 s detailerem (nezměřené).
 
 Prohlížeč nemůže volat ComfyUI přímo (nevrací CORS hlavičky a CF Access
 odmítá preflight 403), proto ten lokální server; drží CF creds, takže

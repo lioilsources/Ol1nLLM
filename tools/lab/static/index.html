@@ -69,6 +69,20 @@
       <div class="chips" id="posemode"></div>
       <div class="poses" id="poses" hidden></div>
       <p class="hint" id="posehint"></p>
+
+      <label class="field">
+        <span>zachovat tvář</span>
+        <select id="faceIdentity">
+          <option value="none">ne — postava jen z promptu</option>
+          <option value="instantid">InstantID</option>
+          <option value="faceid">IPAdapter FaceID PlusV2</option>
+          <option value="both">obě naráz</option>
+        </select>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="faceDetail"> dotáhnout tvář (FaceDetailer)
+      </label>
+      <p class="hint" id="facehint"></p>
     </fieldset>
 
     <fieldset>
@@ -101,6 +115,9 @@
           <option value="param.seed">seed</option>
           <option value="param.lora">LoRA (hodnoty = jména souborů)</option>
           <option value="param.loraStrength">síla LoRA</option>
+          <option value="__face_apply__.weight">síla tváře</option>
+          <option value="param.faceIdentity">metoda tváře (none|instantid|faceid|both)</option>
+          <option value="__face_detail__.denoise">síla dotažení tváře</option>
         </select>
       </label>
       <label class="field">

@@ -45,6 +45,25 @@ var copyCS = map[string]Copy{
 			"rozhodnout musí pohled na obrázky.",
 		Source: "docs/style-matrix.md — druhá vlna stylů",
 	},
+	"face_identity": {
+		Text: "Tvář se čte z téže předlohy jako hloubková mapa — žádný druhý " +
+			"upload. Drží přes celý rozvrh (na rozdíl od hloubky, která končí " +
+			"na 90 %): obličej nemá do čeho dosedat, takže pustit ho dřív " +
+			"znamená nechat prompt rysy zase odvést.",
+		Source: "lib/services/comfyui_service.dart — _faceIdentityEndAt",
+	},
+	"face_detail": {
+		Text: "Druhý průchod jen přes nalezený obličej, denoise 0.4 — opraví " +
+			"rysy, ale nevymyslí jiného člověka. Podmínění bere zpřed hloubkového " +
+			"ControlNetu: detailer pracuje s výřezem a celoobrazová hloubková " +
+			"mapa natažená na výřez popisuje něco jiného.",
+		Source: "lib/services/comfyui_service.dart — _injectFaceDetailer",
+	},
+	"face_provider": {
+		Text: "InsightFace jede na CPU, stejně jako v odeslaném face inpaintu: " +
+			"detektor je malý a nemusí uprostřed jobu soupeřit s difuzí o VRAM.",
+		Source: "assets/comfyui/flux_fill_inpaint_face.api.json — uzel 85",
+	},
 	"preset_overridden": {
 		Text: "Tahle buňka běžela s přebitým presetem, takže to není verdikt " +
 			"o modelu — kalibrace (třeba 6 kroků u Lightningu) je pryč.",
