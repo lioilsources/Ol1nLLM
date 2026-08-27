@@ -170,16 +170,10 @@ func (e *Estimate) faceIdentity(s *Spec, man *Manifest, picked map[string]bool) 
 	if !on && !s.FaceDetail {
 		return
 	}
-	hasRepose := false
-	for _, f := range s.Flows {
-		if f == "repose" {
-			hasRepose = true
-		}
-	}
-	if !hasRepose && s.PoseMode != "depth" {
+	if !s.hasDepthSource(man, picked) {
 		e.Warnings = append(e.Warnings,
-			"tvář se čte z předlohy přes hloubkovou mapu — bez „zachovej pózu“ "+
-				"nebo depth pózy se nepoužije")
+			"tvář se čte z předlohy přes hloubkovou mapu — tahle kombinace žádnou "+
+				"nevyrábí, takže se přepínač neprojeví")
 	}
 	if s.FaceDetail && !on {
 		e.Warnings = append(e.Warnings,
@@ -249,6 +243,38 @@ func (e *Estimate) loraFit(s *Spec, man *Manifest, picked map[string]bool) {
 			"%s je %s — na %s se načte, ale táhne slaběji",
 			s.Lora, lora.FamilyLabel, strings.Join(weak, ", ")))
 	}
+}
+
+// hasDepthSource says whether any picked flow/model would put a `__depth_src__`
+// in the graph — the node the face is read from, so it is exactly the gate on
+// identity. Three ways in, and the third is easy to forget: img2img on an SDXL
+// model carries the source's own structure over by itself (auto-depth), so the
+// face toggle works there without anyone asking for a pose.
+func (s *Spec) hasDepthSource(man *Manifest, picked map[string]bool) bool {
+	if s.PoseMode == "template" {
+		return false // a skeleton is a pose, not a photo — no face in it
+	}
+	var img2img bool
+	for _, f := range s.Flows {
+		switch f {
+		case "repose":
+			return true // the reference *is* the depth hint
+		case "img2img":
+			img2img = true
+		}
+	}
+	if s.PoseMode == "depth" {
+		return true // explicit, and legal on img2img and txt2img alike
+	}
+	if !img2img {
+		return false
+	}
+	for _, m := range man.Models {
+		if picked[m.ID] && m.SupportsPose && m.CkptName != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Spec) needsRef() bool {

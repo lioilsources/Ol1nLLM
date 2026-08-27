@@ -312,8 +312,11 @@ se, `selectImage`/`navigateTo`/přepnutí session ho ruší).
 postavu zahodí; tohle ji vrací. Tvář se čte z **téhož** uploadu jako
 hloubková mapa — uzel `__depth_src__`, který depth injekce už do grafu dala,
 takže žádný druhý upload a žádná možnost, aby si póza a tvář myslely jinou
-fotku. Gate je právě existence toho uzlu (repose a `POSE_MODE=depth`); jinde
-je to no-op, což zároveň drží hranu `['__depth_src__', 0]` bez visících konců.
+fotku. Gate je právě existence toho uzlu — tedy **kdekoli se injektuje
+hloubka**: repose vždy, `POSE_MODE=depth` na img2img i txt2img, a taky
+img2img u SDXL modelu bez vybrané pózy (tam auto-depth vzniká sám). Šablona
+kostry ne, ta není fotka a obličej v ní není. Jinde je to no-op, což zároveň
+drží hranu `['__depth_src__', 0]` bez visících konců.
 
 | | SDXL (`ckptName != null`) | flux-manga |
 |---|---|---|
@@ -491,7 +494,9 @@ s identitou). Osy sweepu `__face_apply__.weight`, `param.faceIdentity`,
 a `faceDetail` **čtené z grafu**, takže flux napíše `pulid`, i když se
 objednal `faceid`. Odhad varuje předem tam, kde by přepínač tiše nic
 neudělal: bez repose/depth flow (není odkud tvář číst), detailer bez
-identity, a batch > 1 s detailerem (nezměřené).
+identity, a batch > 1 s detailerem (nezměřené). Podmínku „je odkud číst tvář"
+počítá `Spec.hasDepthSource` — pozor na img2img větev, auto-depth u SDXL se
+snadno zapomene a varování by pak lhalo.
 
 Prohlížeč nemůže volat ComfyUI přímo (nevrací CORS hlavičky a CF Access
 odmítá preflight 403), proto ten lokální server; drží CF creds, takže

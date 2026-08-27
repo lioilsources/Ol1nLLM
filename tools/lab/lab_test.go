@@ -689,24 +689,45 @@ func TestDumpEnvCarriesTheFaceFlags(t *testing.T) {
 
 func TestEstimateWarnsWhenTheFaceToggleWouldDoNothing(t *testing.T) {
 	man := &Manifest{Models: []ManifestModel{
-		{ID: "pony", Label: "Pony", CkptName: strptr("p.safetensors"), Preset: map[string]any{}},
+		{ID: "pony", Label: "Pony", SupportsPose: true,
+			CkptName: strptr("p.safetensors"), Preset: map[string]any{}},
 	}}
-	// No repose and no depth pose ⇒ nothing injects the reference the face is
-	// read from, so the run would be indistinguishable from a plain one.
+	const quiet = "neprojeví"
+	// txt2img without a depth pose injects no reference, so the face toggle
+	// would do nothing and the run would look like a plain one.
 	s := Spec{
 		Models: []string{"pony"}, Prompts: []string{"x"}, Flows: []string{"txt2img"},
-		FaceIdentity: "instantid",
+		PoseMode: "none", FaceIdentity: "instantid",
 	}
-	if got := strings.Join(s.Estimate(man, nil).Warnings, " "); !strings.Contains(got, "zachovej pózu") {
+	if got := strings.Join(s.Estimate(man, nil).Warnings, " "); !strings.Contains(got, quiet) {
 		t.Fatalf("chybí varování o nepoužité tváři: %v", got)
 	}
 
-	// With repose it is a legitimate run — no noise.
-	ok := s
-	ok.Flows = []string{"repose"}
-	ok.RefName = "ref.png"
-	if got := strings.Join(ok.Estimate(man, nil).Warnings, " "); strings.Contains(got, "zachovej pózu") {
-		t.Fatalf("nečekané varování: %v", got)
+	// Every way a `__depth_src__` can appear is a legitimate run — no noise.
+	for _, ok := range []Spec{
+		{Flows: []string{"repose"}, PoseMode: "none"},
+		{Flows: []string{"txt2img"}, PoseMode: "depth"},
+		// The one that is easy to get wrong: img2img on an SDXL model carries
+		// the source's structure over by itself, so the face lands without
+		// anyone picking a pose.
+		{Flows: []string{"img2img"}, PoseMode: "none"},
+	} {
+		ok.Models = []string{"pony"}
+		ok.Prompts = []string{"x"}
+		ok.RefName = "ref.png"
+		ok.FaceIdentity = "instantid"
+		if got := strings.Join(ok.Estimate(man, nil).Warnings, " "); strings.Contains(got, quiet) {
+			t.Fatalf("%v/%s: nečekané varování: %v", ok.Flows, ok.PoseMode, got)
+		}
+	}
+
+	// …but a skeleton is a pose, not a photo: no face to read there.
+	skel := Spec{
+		Models: []string{"pony"}, Prompts: []string{"x"}, Flows: []string{"img2img"},
+		RefName: "ref.png", PoseMode: "template", PoseID: "ol1", FaceIdentity: "instantid",
+	}
+	if got := strings.Join(skel.Estimate(man, nil).Warnings, " "); !strings.Contains(got, quiet) {
+		t.Fatalf("šablona kostry nemá odkud číst tvář, mělo varovat: %v", got)
 	}
 
 	// The detail pass alone has no identity to hold onto.
