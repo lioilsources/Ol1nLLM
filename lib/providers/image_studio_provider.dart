@@ -99,9 +99,12 @@ class ImageStudioState {
 
   /// LoRAs available on the ComfyUI server (unfiltered).
   ///
-  /// This and [availableCheckpoints] are app-scoped, not session-scoped: every
-  /// site that rebuilds the state from scratch (new/select/delete session,
-  /// restore) has to carry both over by hand, or the chips silently empty out.
+  /// This, [availableCheckpoints] and [availableScenes] are app-scoped, not
+  /// session-scoped: every site that rebuilds the state from scratch
+  /// (new/select/delete session, restore) has to carry ALL THREE over by hand,
+  /// or the chips/actions silently empty out. Dropping [availableScenes] here
+  /// is what hid the „Rozhýbat" button in 1.12.0 — the catalog loaded fine and
+  /// _load() then rebuilt the state without it.
   final List<String> availableLoras;
 
   /// Checkpoints installed on the ComfyUI server. Empty = not (yet) known.
@@ -541,6 +544,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       modelId: state.modelId,
       availableLoras: state.availableLoras,
       availableCheckpoints: state.availableCheckpoints,
+      availableScenes: state.availableScenes,
       selectedLora: state.selectedLora,
       loraStrength: state.loraStrength,
       selectedPoseId: state.selectedPoseId,
@@ -571,6 +575,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       modelId: session.modelId,
       availableLoras: state.availableLoras,
       availableCheckpoints: state.availableCheckpoints,
+      availableScenes: state.availableScenes,
     );
   }
 
@@ -607,6 +612,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           modelId: next.modelId,
           availableLoras: state.availableLoras,
           availableCheckpoints: state.availableCheckpoints,
+          availableScenes: state.availableScenes,
         );
       } else {
         state = ImageStudioState(
@@ -614,6 +620,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           modelId: state.modelId,
           availableLoras: state.availableLoras,
           availableCheckpoints: state.availableCheckpoints,
+          availableScenes: state.availableScenes,
         );
       }
     } else {
@@ -653,6 +660,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           modelId: latest.modelId,
           availableLoras: state.availableLoras,
           availableCheckpoints: state.availableCheckpoints,
+          availableScenes: state.availableScenes,
         );
         _resumeInFlightJob();
       } else {
