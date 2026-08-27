@@ -147,6 +147,37 @@ void main() {
       expect(LibrarySource.listFrom([1, 'x']), isEmpty);
     });
 
+    test('prefers the Czech name and keeps the chunk position visible', () {
+      final sources = LibrarySource.listFrom([
+        {
+          'work': 'Milindapañhapāḷi',
+          'name_cs': 'Khuddaka-nikája — Otázky krále Milindy',
+          'title': 'Milindapañhapāḷi (část 12/340)',
+          'group': 'pali',
+          'lang': 'pi',
+          'excerpt': 'Milindo nāma rājā ahosi',
+          'excerpt_cs': 'Byl jednou král jménem Milinda',
+        },
+      ]);
+      final s = sources.single;
+      expect(s.label, 'Khuddaka-nikája — Otázky krále Milindy');
+      // the position lives in the title the label no longer shows
+      expect(s.subtitle, 'část 12/340 · pali · pi');
+      expect(s.readableExcerpt, 'Byl jednou král jménem Milinda');
+      expect(s.hasTranslation, isTrue);
+    });
+
+    test('falls back to the original when no translation came', () {
+      final s = LibrarySource.listFrom([
+        {'work': 'zhuangzi', 'title': 'zhuangzi (část 1/488)', 'excerpt': '道'},
+      ]).single;
+      expect(s.readableExcerpt, '道');
+      expect(s.hasTranslation, isFalse);
+      // without a Czech name the title still wins, position included
+      expect(s.label, 'zhuangzi (část 1/488)');
+      expect(s.subtitle, '');
+    });
+
     test('round-trips through JSON', () {
       const s = LibrarySource(
         work: 'zhuangzi',
@@ -156,9 +187,13 @@ void main() {
         path: 'downloads/zhuangzi.txt',
         distance: 0.17247349,
         excerpt: 'úryvek',
+        excerptCs: 'překlad úryvku',
+        nameCs: 'Čuang-c\'',
       );
       final back = LibrarySource.fromJson(s.toJson());
       expect(back.work, s.work);
+      expect(back.nameCs, s.nameCs);
+      expect(back.excerptCs, s.excerptCs);
       expect(back.title, s.title);
       expect(back.path, s.path);
       expect(back.distance, s.distance);

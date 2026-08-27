@@ -603,6 +603,16 @@ přes `POST /reset`. `forksOnNextSend` **nestačí** — skok na špičku
 sourozenecké větve bez potomků by prošel a serverová paměť by tiše patřila
 jiné větvi (pokryto testem).
 
+**Zdroje jsou česky** (`LibrarySource`): server posílá u každého úryvku
+`name_cs` (kurátorský český název díla — „Khuddaka-nikája — Otázky krále
+Milindy" místo „Milindapañhapāḷi") a `excerpt_cs` (překlad úryvku, server
+ho dělá souběžně s generováním odpovědi). `label` proto dává přednost
+českému názvu a pozici v díle („část 12/340") přesouvá do podtitulku, ať
+se neztratí. V detailu zdroje je nahoře překlad a **pod ním originál** —
+úryvek je doklad, takže nepřeložený text musí zůstat po ruce, ale samotné
+pálí nebo hebrejština jsou pro čtenáře nečitelné. Obě pole jsou nullable:
+starší odpovědi v Hive je nemají a překlad může selhat.
+
 Známá omezení: RAG stream nenese `finish_reason`, takže „Pokračuj"
 (`pendingContinuation`) u knihovních odpovědí nefunguje; restart serveru
 smaže paměť tiše. Selhání LLM na serveru přijde jako **200 OK s prázdným
@@ -613,6 +623,12 @@ streamem** (výjimka vznikne až po flushnutí hlaviček) — proto
 serveru přes tunel — testy tak drží skutečný formát, ne domněnku o něm.
 
 ### Knihovní RAG server (mimo tohle repo)
+
+Server dotaz **směruje na dílo nebo tradici**, když ho otázka jmenuje
+(`rag/retrieval.py`) — bez toho vracel dotaz na Tao te ťing pálijské svazky,
+protože čeština nad korpusem v pálí rozliší top-5 o ~0,007 vzdálenosti
+a Tipitaka je 60 z 93 děl. Ve finálním eventu je `routed` (na co se
+zamířilo); appka ho zatím nezobrazuje.
 
 `WorldLibraryProject/rag/server.py` na SPARKu :8090, systemd unit
 `library-chat`, spouštěná s `--llm-url http://localhost:8080/v1` (LiteLLM na
