@@ -6,15 +6,19 @@ import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gal/gal.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:video_player/video_player.dart';
 import '../core/constants/theme.dart';
 import '../models/gen_node.dart';
 import '../models/image_model.dart';
 import '../models/pose_template.dart';
 import '../models/style_preset.dart';
+import '../models/video_scene.dart';
 import '../providers/image_studio_provider.dart';
 import '../widgets/image_session_drawer.dart';
 import 'mask_editor_screen.dart';
 import 'model_viewer_screen.dart';
+import 'video_player_screen.dart';
 
 /// Copy [text] to the clipboard and confirm with a brief snackbar. No-op for
 /// empty text. Used by long-press handlers on error messages and prompts.
@@ -462,13 +466,15 @@ class _TreeNodeWidget extends StatelessWidget {
       );
     } else {
       inner = Icon(
-        node.is3D
-            ? Icons.view_in_ar
-            : node.isRoot
-                ? Icons.auto_awesome
-                : Icons.brush_outlined,
+        node.isVideo
+            ? Icons.movie_outlined
+            : node.is3D
+                ? Icons.view_in_ar
+                : node.isRoot
+                    ? Icons.auto_awesome
+                    : Icons.brush_outlined,
         size: 20,
-        color: node.is3D && node.status == GenStatus.ready
+        color: (node.is3D || node.isVideo) && node.status == GenStatus.ready
             ? AppTheme.accent
             : AppTheme.textSecondary,
       );
@@ -736,7 +742,7 @@ class _NodeGrid extends ConsumerWidget {
                 color: AppTheme.accent,
               ),
             ),
-            if (node.is3D) ...[
+            if (node.is3D || node.isVideo) ...[
               const SizedBox(height: 20),
               TextButton.icon(
                 onPressed: () =>
@@ -751,6 +757,20 @@ class _NodeGrid extends ConsumerWidget {
           ],
         ),
       );
+    }
+
+    if (node.isVideo && node.status == GenStatus.ready) {
+      final path = node.videoFileName == null
+          ? null
+          : '${GenImage.baseDir}/${node.videoFileName}';
+      return path == null
+          ? const Center(
+              child: Text(
+                'Video soubor chybí',
+                style: TextStyle(color: AppTheme.textSecondary),
+              ),
+            )
+          : _VideoNodeView(key: ValueKey(node.id), path: path, title: node.prompt);
     }
 
     if (node.is3D && node.status == GenStatus.ready) {
@@ -811,6 +831,10 @@ class _NodeGrid extends ConsumerWidget {
         (s) => s.availableModels.any((m) => m.supportsPose),
       ),
     );
+    // No scene catalog ⇒ the video server is down; hide rather than dead.
+    final canAnimate = ref.watch(
+      imageStudioProvider.select((s) => s.availableScenes.isNotEmpty),
+    );
     return GridView.builder(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.all(12),
@@ -837,6 +861,9 @@ class _NodeGrid extends ConsumerWidget {
           onSave: () => _saveImage(context, img),
           onInpaint: () => _startInpaint(context, ref, img),
           on3D: () => _start3D(context, ref, img),
+          onAnimate: canAnimate
+              ? () => _startAnimate(context, ref, img)
+              : null,
           // Repose needs an SDXL model (depth ControlNet); without one on the
           // server the affordance is hidden rather than dead.
           onRepose: canRepose
@@ -892,6 +919,71 @@ class _NodeGrid extends ConsumerWidget {
     if (go != true) return;
     notifier.selectImage(img.id);
     await notifier.make3D();
+  }
+
+  /// Animate entry („Rozhýbat"): pick a server-defined scene, then hand the
+  /// image to the video job server. The render is minutes long and survives
+  /// app suspension — same contract as 3D.
+  Future<void> _startAnimate(
+    BuildContext context,
+    WidgetRef ref,
+    GenImage img,
+  ) async {
+    _dismissKeyboard();
+    final notifier = ref.read(imageStudioProvider.notifier);
+    final scenes = ref.read(imageStudioProvider).availableScenes;
+    final scene = await showModalBottomSheet<VideoScene>(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(
+                'Rozhýbat obrázek',
+                style: TextStyle(color: AppTheme.textPrimary, fontSize: 17),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Text(
+                'Vyber scénu. Render na serveru trvá minuty — appku můžeš '
+                'zavřít, po návratu se video dotáhne samo.',
+                style: TextStyle(color: AppTheme.textSecondary, height: 1.4),
+              ),
+            ),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final s in scenes)
+                    ListTile(
+                      leading: const Icon(Icons.movie_outlined, color: AppTheme.accent),
+                      title: Text(
+                        s.label,
+                        style: const TextStyle(color: AppTheme.textPrimary),
+                      ),
+                      subtitle: Text(
+                        '${s.desc}\n~${s.seconds.round()} s · ${s.beats} beatů · ~${s.minutesEst} min',
+                        style: const TextStyle(color: AppTheme.textSecondary, height: 1.3),
+                      ),
+                      isThreeLine: true,
+                      onTap: () => Navigator.of(context).pop(s),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (scene == null) return;
+    notifier.selectImage(img.id);
+    await notifier.animate(scene.id);
   }
 
   /// Inpaint entry: open the mask editor; the inpaint model (FLUX Fill vs
@@ -1001,6 +1093,7 @@ class _ImageTile extends StatelessWidget {
     required this.onSave,
     required this.onInpaint,
     required this.on3D,
+    this.onAnimate,
     this.onRepose,
     this.onLongPress,
   });
@@ -1016,6 +1109,10 @@ class _ImageTile extends StatelessWidget {
   /// „Zachovej pózu“ — a new character on this image's pose (internally
   /// still `repose`). Null hides the button.
   final VoidCallback? onRepose;
+
+  /// „Rozhýbat“ — animate this image into a clip. Null (no scene catalog)
+  /// hides the button.
+  final VoidCallback? onAnimate;
   final VoidCallback? onLongPress;
 
   @override
@@ -1052,6 +1149,25 @@ class _ImageTile extends StatelessWidget {
           // Top-right: the bottom row is full (a 5th slot at right: 148
           // overflows the 2-column tile on 375 pt phones), and "derive a new
           // image from this one" reads fine apart from the file actions.
+          // Animate sits left of repose (or takes its place when repose is
+          // hidden) — both are "make something new from this image".
+          if (onAnimate != null)
+            Positioned(
+              top: 4,
+              right: onRepose != null ? 40 : 4,
+              child: Material(
+                color: Colors.black54,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: onAnimate,
+                  child: const Padding(
+                    padding: EdgeInsets.all(6),
+                    child: Icon(Icons.movie_outlined, size: 18, color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
           if (onRepose != null)
             Positioned(
               top: 4,
@@ -2509,6 +2625,114 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
           ],
         ),
       ),
+    );
+  }
+}
+
+
+/// Inline looping player for a ready video node, with save/share/fullscreen.
+/// Stateful so the controller lives with the node view; keyed by node id in
+/// the caller so switching nodes rebuilds it.
+class _VideoNodeView extends StatefulWidget {
+  const _VideoNodeView({super.key, required this.path, required this.title});
+
+  final String path;
+  final String title;
+
+  @override
+  State<_VideoNodeView> createState() => _VideoNodeViewState();
+}
+
+class _VideoNodeViewState extends State<_VideoNodeView> {
+  late final VideoPlayerController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.file(File(widget.path))
+      ..setLooping(true)
+      ..initialize().then((_) {
+        if (!mounted) return;
+        setState(() {});
+        _controller.play();
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await Gal.putVideo(widget.path);
+      messenger.showSnackBar(const SnackBar(content: Text('Video uloženo do Fotek')));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Uložení selhalo: $e')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = _controller.value.isInitialized;
+    return Column(
+      children: [
+        Expanded(
+          child: Center(
+            child: ready
+                ? GestureDetector(
+                    onTap: () => setState(() {
+                      _controller.value.isPlaying
+                          ? _controller.pause()
+                          : _controller.play();
+                    }),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: AspectRatio(
+                        aspectRatio: _controller.value.aspectRatio,
+                        child: VideoPlayer(_controller),
+                      ),
+                    ),
+                  )
+                : const CircularProgressIndicator(color: AppTheme.accent),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton.icon(
+                onPressed: () => _save(context),
+                icon: const Icon(Icons.download_outlined, size: 18),
+                label: const Text('Uložit'),
+                style: TextButton.styleFrom(foregroundColor: AppTheme.textSecondary),
+              ),
+              TextButton.icon(
+                onPressed: () => SharePlus.instance.share(
+                  ShareParams(files: [XFile(widget.path, mimeType: 'video/mp4')]),
+                ),
+                icon: const Icon(Icons.ios_share, size: 18),
+                label: const Text('Sdílet'),
+                style: TextButton.styleFrom(foregroundColor: AppTheme.textSecondary),
+              ),
+              TextButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        VideoPlayerScreen(path: widget.path, title: widget.title),
+                  ),
+                ),
+                icon: const Icon(Icons.fullscreen, size: 18),
+                label: const Text('Celá obrazovka'),
+                style: TextButton.styleFrom(foregroundColor: AppTheme.textSecondary),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

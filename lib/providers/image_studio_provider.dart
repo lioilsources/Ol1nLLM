@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,11 +17,13 @@ import '../models/latent_bucket.dart';
 import '../models/pose_template.dart';
 import '../models/prompt_negatives.dart';
 import '../models/style_preset.dart';
+import '../models/video_scene.dart';
 import '../services/comfyui_service.dart';
 import '../services/finetune_export_service.dart';
 import '../services/flux_kontext_nim_service.dart';
 import '../services/flux_nim_service.dart';
 import '../services/image_backend.dart';
+import '../services/video_service.dart';
 
 final imageStudioProvider =
     StateNotifierProvider<ImageStudioNotifier, ImageStudioState>(
@@ -104,6 +107,11 @@ class ImageStudioState {
   /// Checkpoints installed on the ComfyUI server. Empty = not (yet) known.
   final List<String> availableCheckpoints;
 
+  /// Animation presets served by the video server („Rozhýbat"). Empty = the
+  /// server is unreachable or has none; the studio then hides the action.
+  /// App-scoped like [availableLoras] — carried over on every state rebuild.
+  final List<VideoScene> availableScenes;
+
   /// Currently selected LoRA name, or null for no LoRA.
   final String? selectedLora;
 
@@ -152,6 +160,7 @@ class ImageStudioState {
     this.modelId = kDefaultImageModelId,
     this.availableLoras = const [],
     this.availableCheckpoints = const [],
+    this.availableScenes = const [],
     this.selectedLora,
     this.loraStrength = kDefaultLoraStrength,
     this.selectedPoseId,
@@ -223,6 +232,7 @@ class ImageStudioState {
     String? modelId,
     List<String>? availableLoras,
     List<String>? availableCheckpoints,
+    List<VideoScene>? availableScenes,
     String? selectedLora,
     bool clearLora = false,
     double? loraStrength,
@@ -253,6 +263,7 @@ class ImageStudioState {
     modelId: modelId ?? this.modelId,
     availableLoras: availableLoras ?? this.availableLoras,
     availableCheckpoints: availableCheckpoints ?? this.availableCheckpoints,
+    availableScenes: availableScenes ?? this.availableScenes,
     selectedLora: clearLora ? null : (selectedLora ?? this.selectedLora),
     loraStrength: loraStrength ?? this.loraStrength,
     selectedPoseId: clearPose ? null : (selectedPoseId ?? this.selectedPoseId),
@@ -325,6 +336,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   static const _maxInterruptRetries = 5;
 
   final ComfyUIService _comfyui = ComfyUIService();
+  final VideoService _video = VideoService();
   final FluxNimService _fluxNim = FluxNimService();
   final FluxKontextNimService _fluxKontextNim = FluxKontextNimService();
   final FinetuneExportService _finetuneExport = FinetuneExportService();
@@ -368,11 +380,13 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       // Repose is a ComfyUI-only round too: the user may have switched the
       // model chip to a NIM backend meanwhile, so don't resolve the backend
       // from the current selection.
-      final run = node.is3D
-          ? () => _comfyui.followMesh(node.jobId!)
-          : node.isRepose
-              ? () => _comfyui.follow(node.jobId!)
-              : () => backend.follow(node.jobId!);
+      final run = node.isVideo
+          ? () => _video.follow(node.jobId!)
+          : node.is3D
+              ? () => _comfyui.followMesh(node.jobId!)
+              : node.isRepose
+                  ? () => _comfyui.follow(node.jobId!)
+                  : () => backend.follow(node.jobId!);
       unawaited(_runAsync(node.id, run));
     }
   }
@@ -786,6 +800,17 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     final checkpoints = await _comfyui.fetchCheckpoints();
     state = state.copyWith(availableCheckpoints: checkpoints);
     debugPrint('ComfyUI catalog: ${checkpoints.length} checkpoints');
+
+    // Separate server; a failure here must not take the image catalog down
+    // with it — the animate action just stays hidden.
+    try {
+      final scenes = await _video.fetchScenes();
+      if (!mounted) return;
+      state = state.copyWith(availableScenes: scenes);
+      debugPrint('Video catalog: ${scenes.length} scenes');
+    } catch (e) {
+      debugPrint('Video catalog unavailable: $e');
+    }
   }
 
   /// Fresh base seed for one generation round. Owned by the provider (not the
@@ -1101,6 +1126,36 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     );
   }
 
+  /// Animation round („Rozhýbat"): the selected image becomes a short clip
+  /// rendered server-side from the [sceneId] preset (see [VideoService]).
+  /// Mirrors [make3D]: a child node flagged [GenNode.isVideo], resumable by
+  /// job id after an app suspension.
+  Future<void> animate(String sceneId) async {
+    final base = _imageById(state.selectedImageId);
+    if (base == null) return;
+    final scene = state.availableScenes.where((s) => s.id == sceneId).firstOrNull;
+    _interruptRetries = 0;
+    final seed = _newSeed();
+    final node = GenNode.create(
+      parentId: state.currentNodeId,
+      sourceImageId: base.id,
+      prompt: scene?.label ?? sceneId,
+      isVideo: true,
+      sceneId: sceneId,
+      seed: seed,
+    );
+    state = state.copyWith(
+      nodes: [...state.nodes, node],
+      currentNodeId: node.id,
+      clearSelected: true,
+      clearError: true,
+    );
+    await _runAsync(
+      node.id,
+      () => _video.animate(image: base.bytes, sceneId: sceneId, seed: seed),
+    );
+  }
+
   /// Repose round: a new character/style from [prompt] in the pose of the
   /// reference picked via [startRepose] (depth ControlNet over a txt2img
   /// render, denoise 1.0 — see [ComfyUIService.repose]).
@@ -1174,8 +1229,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     // A stuck 3D node may legitimately sit in `generating` (its job outlived
     // an app suspension); re-attaching to it is safe and is the whole point
     // of the manual retry there. Everything else stays guarded.
-    if (node.status == GenStatus.generating && !node.is3D) return;
-    if (node.is3D && _activeSubs.containsKey(nodeId)) {
+    final durableJob = node.is3D || node.isVideo;
+    if (node.status == GenStatus.generating && !durableJob) return;
+    if (durableJob && _activeSubs.containsKey(nodeId)) {
       // Already re-attached and working — don't stack a second stream.
       return;
     }
@@ -1195,6 +1251,47 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       return;
     }
     _interruptRetries = 0;
+    // Video retry: same shape as 3D — with a job id the mp4 is (or will be)
+    // on the server, so just re-attach; without one re-submit from the
+    // source image with the original scene and seed.
+    if (node.isVideo) {
+      final jobId = node.jobId;
+      if (jobId != null) {
+        _patch(
+          nodeId,
+          (n) => n.copyWith(
+            status: GenStatus.generating,
+            clearError: true,
+            clearProgress: true,
+            progressLabel: 'Obnovuji video…',
+          ),
+        );
+        await _runAsync(nodeId, () => _video.follow(jobId));
+        return;
+      }
+      final base = _imageById(node.sourceImageId);
+      if (base == null || node.sceneId == null) {
+        _patch(
+          nodeId,
+          (n) => n.copyWith(status: GenStatus.error, error: 'Source image gone'),
+        );
+        return;
+      }
+      final seed = node.seed ?? _newSeed();
+      _patch(
+        nodeId,
+        (n) => n.copyWith(
+          status: GenStatus.generating,
+          clearError: true,
+          clearProgress: true,
+        ),
+      );
+      await _runAsync(
+        nodeId,
+        () => _video.animate(image: base.bytes, sceneId: node.sceneId!, seed: seed),
+      );
+      return;
+    }
     // 3D mesh retry. With a job id the artifacts are (or will be) on the
     // server — followMesh downloads them directly, which takes seconds
     // instead of regenerating the mesh for another 4 minutes.
@@ -1414,7 +1511,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     void fail(String msg) {
       // Keep the job id on 3D nodes: the mesh artifacts are durable on the
       // server, so retry can still just download them (see [retry]).
-      final keepJobId = _nodeById(nodeId)?.is3D ?? false;
+      final n0 = _nodeById(nodeId);
+      final keepJobId = (n0?.is3D ?? false) || (n0?.isVideo ?? false);
       _patch(
         nodeId,
         (n) => n.copyWith(
@@ -1450,8 +1548,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         Future.delayed(_interruptBackoff, () {
           if (mounted) _resumeInFlightJob();
         });
-      } else if (_nodeById(nodeId)?.is3D == true) {
-        // A mesh job is durable server-side and recoverable from its output
+      } else if (_nodeById(nodeId)?.is3D == true ||
+          _nodeById(nodeId)?.isVideo == true) {
+        // A mesh/video job is durable server-side and recoverable from its output
         // files at any time — never hard-fail it on a burnt retry budget.
         // Keep the node generating with its jobId; the next app foreground
         // (didChangeAppLifecycleState) re-attaches with a fresh budget.
@@ -1484,17 +1583,24 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
                     : 'Ve frontě…',
               ),
             );
-          case GenRunning(:final fraction):
+          case GenRunning(:final step, :final total, :final fraction):
             // Real progress ⇒ the connection is healthy again.
             _interruptRetries = 0;
+            final isVideo = _nodeById(nodeId)?.isVideo ?? false;
             _patch(
               nodeId,
               (n) => n.copyWith(
                 progress: fraction,
                 clearProgress: fraction == null,
-                progressLabel: fraction == null
-                    ? 'Generování…'
-                    : 'Generování ${(fraction * 100).round()} %',
+                // Video: step = beats finished of total; all in ⇒ the server
+                // is stitching + interpolating (ffmpeg + RIFE, ~1–2 min).
+                progressLabel: isVideo
+                    ? (step < total
+                        ? 'Beat ${step + 1}/$total · ~${(total - step) * 2.5} min'
+                        : 'Slepuji a vyhlazuji…')
+                    : fraction == null
+                        ? 'Generování…'
+                        : 'Generování ${(fraction * 100).round()} %',
               ),
             );
           case GenDownloading(:final done, :final total):
@@ -1521,6 +1627,26 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
                   status: GenStatus.ready,
                   glbFileName: glbName,
                   stlFileName: stlName,
+                  clearError: true,
+                  clearProgress: true,
+                  clearJobId: true,
+                ),
+              );
+              unawaited(_save());
+              finish();
+            }());
+          case GenVideoComplete(:final mp4):
+            completedByEvent = true;
+            unawaited(() async {
+              final dir = await _dirFuture;
+              final name = '$nodeId.mp4';
+              await File('${dir.path}/$name').writeAsBytes(mp4, flush: true);
+              if (!mounted) return;
+              _patch(
+                nodeId,
+                (n) => n.copyWith(
+                  status: GenStatus.ready,
+                  videoFileName: name,
                   clearError: true,
                   clearProgress: true,
                   clearJobId: true,
@@ -1611,6 +1737,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     }
     _activeSubs.clear();
     _comfyui.dispose();
+    _video.dispose();
     _fluxNim.dispose();
     _fluxKontextNim.dispose();
     _finetuneExport.dispose();

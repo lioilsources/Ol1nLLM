@@ -123,6 +123,17 @@ class GenNode {
   final String? glbFileName;
   final String? stlFileName;
 
+  /// True for an animation round („Rozhýbat"): the source image was turned
+  /// into a short clip by the video server; [videoFileName] holds the mp4
+  /// instead of [images], [sceneId] the server preset, and resume goes
+  /// through [VideoService.follow]. Persisted only when true.
+  final bool isVideo;
+  final String? sceneId;
+
+  /// Relative file name of the mp4 result (same directory scheme as
+  /// [GenImage.fileName]).
+  final String? videoFileName;
+
   // ── Generation metadata (nullable — nodes written before this existed
   //    stay valid; NIM models leave preset-derived fields null because their
   //    values are service constants recoverable from [modelId]) ──
@@ -180,6 +191,9 @@ class GenNode {
     this.isRepose = false,
     this.glbFileName,
     this.stlFileName,
+    this.isVideo = false,
+    this.sceneId,
+    this.videoFileName,
     this.modelId,
     this.loraName,
     this.loraStrength,
@@ -211,6 +225,8 @@ class GenNode {
     bool refIsFace = false,
     bool is3D = false,
     bool isRepose = false,
+    bool isVideo = false,
+    String? sceneId,
     String? modelId,
     String? loraName,
     double? loraStrength,
@@ -238,6 +254,8 @@ class GenNode {
     refIsFace: refIsFace,
     is3D: is3D,
     isRepose: isRepose,
+    isVideo: isVideo,
+    sceneId: sceneId,
     modelId: modelId,
     loraName: loraName,
     loraStrength: loraStrength,
@@ -273,6 +291,9 @@ class GenNode {
     if (isRepose) 'isRepose': true,
     if (glbFileName != null) 'glbFileName': glbFileName,
     if (stlFileName != null) 'stlFileName': stlFileName,
+    if (isVideo) 'isVideo': true,
+    if (sceneId != null) 'sceneId': sceneId,
+    if (videoFileName != null) 'videoFileName': videoFileName,
     if (modelId != null) 'modelId': modelId,
     if (loraName != null) 'loraName': loraName,
     if (loraStrength != null) 'loraStrength': loraStrength,
@@ -320,6 +341,9 @@ class GenNode {
       isRepose: json['isRepose'] as bool? ?? false,
       glbFileName: json['glbFileName'] as String?,
       stlFileName: json['stlFileName'] as String?,
+      isVideo: json['isVideo'] as bool? ?? false,
+      sceneId: json['sceneId'] as String?,
+      videoFileName: json['videoFileName'] as String?,
       modelId: json['modelId'] as String?,
       loraName: json['loraName'] as String?,
       loraStrength: (json['loraStrength'] as num?)?.toDouble(),
@@ -347,6 +371,7 @@ class GenNode {
     List<GenImage>? images,
     String? glbFileName,
     String? stlFileName,
+    String? videoFileName,
     String? error,
     bool clearError = false,
     double? progress,
@@ -375,6 +400,9 @@ class GenNode {
     isRepose: isRepose,
     glbFileName: glbFileName ?? this.glbFileName,
     stlFileName: stlFileName ?? this.stlFileName,
+    isVideo: isVideo,
+    sceneId: sceneId,
+    videoFileName: videoFileName ?? this.videoFileName,
     modelId: modelId,
     loraName: loraName,
     loraStrength: loraStrength,

@@ -63,6 +63,14 @@ class GenMeshComplete extends GenEvent {
   const GenMeshComplete({required this.stl, required this.glb});
 }
 
+/// Terminal success of a video job — H.264 mp4 bytes of the animated clip.
+/// Emitted by [VideoService.animate]/[VideoService.follow] instead of
+/// [GenComplete].
+class GenVideoComplete extends GenEvent {
+  final Uint8List mp4;
+  const GenVideoComplete(this.mp4);
+}
+
 /// Terminal failure with a human-readable [message].
 class GenFailed extends GenEvent {
   final String message;
