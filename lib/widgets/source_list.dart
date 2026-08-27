@@ -53,17 +53,46 @@ class _SourceListState extends State<SourceList> {
                 ),
               ],
               const SizedBox(height: 12),
+              // Czech first, original underneath: the excerpt is evidence, so
+              // the untranslated text has to stay reachable — but pálí or
+              // hebrew alone is unreadable for the person asking.
               Flexible(
                 child: SingleChildScrollView(
-                  child: SelectableText(
-                    source.excerpt.isEmpty
-                        ? '(úryvek nedorazil)'
-                        : source.excerpt,
-                    style: const TextStyle(
-                      color: AppTheme.textPrimary,
-                      fontSize: 14,
-                      height: 1.5,
-                    ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SelectableText(
+                        source.readableExcerpt.isEmpty
+                            ? '(úryvek nedorazil)'
+                            : source.readableExcerpt,
+                        style: const TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 14,
+                          height: 1.5,
+                        ),
+                      ),
+                      if (source.hasTranslation) ...[
+                        const SizedBox(height: 12),
+                        const Text(
+                          'originál',
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        SelectableText(
+                          source.excerpt,
+                          style: const TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 13,
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ),
