@@ -383,6 +383,15 @@ func (s *Server) startRun(w http.ResponseWriter, r *http.Request) {
 	if s.forceDry {
 		spec.Dry = true
 	}
+	// The UI greys the button out on blockers, but the button is not the
+	// contract — a stale page or a hand-rolled POST would otherwise burn a
+	// dump on a spec the estimate already knows is empty.
+	if man, err := s.registries(); err == nil {
+		if est := spec.Estimate(man, nil); len(est.Blockers) > 0 {
+			writeJSON(w, 422, map[string]string{"error": strings.Join(est.Blockers, " · ")})
+			return
+		}
+	}
 	if !spec.Dry && !s.env.Comfy.HasCreds() {
 		writeJSON(w, 412, map[string]string{
 			"error": "chybí CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET v .env.local — " +

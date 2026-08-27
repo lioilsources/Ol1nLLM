@@ -42,6 +42,14 @@ func TestEstimateBlocksBeforeSpendingGPU(t *testing.T) {
 		t.Fatalf("nečekaný blocker: %v", e.Blockers)
 	}
 
+	// No prompt ⇒ the dump loops over nothing and reports "0 ok, 0 chyb" as
+	// if it had run. Must block, not estimate one cell.
+	noPrompt := base
+	noPrompt.Prompts = nil
+	if got := noPrompt.Estimate(&Manifest{Models: models}, nil); len(got.Blockers) == 0 {
+		t.Fatal("prázdné prompty musí blokovat start")
+	}
+
 	// A run that needs a reference must not start without one.
 	needRef := base
 	needRef.Flows = []string{"repose"}

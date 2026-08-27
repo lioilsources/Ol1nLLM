@@ -121,6 +121,12 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 	if len(s.Models) == 0 {
 		e.Blockers = append(e.Blockers, "vyber aspoň jeden model")
 	}
+	// The dump loops over prompts, so none means zero cells — while the count
+	// above pretends one. A run that says "0 ok, 0 chyb" after a GPU-less
+	// minute is the wrong way to find out the textarea was empty.
+	if len(s.Prompts) == 0 {
+		e.Blockers = append(e.Blockers, "napiš aspoň jeden prompt")
+	}
 	if len(s.Flows) == 0 {
 		e.Blockers = append(e.Blockers, "vyber aspoň jednu flow")
 	}
