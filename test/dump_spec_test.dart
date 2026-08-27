@@ -180,7 +180,8 @@ void main() {
     for (final id in const [
       '__cn_apply__',
       '__depth_pre__',
-      '__depth_src__',
+            '__depth_src__',
+      '__depth_fit__',
       '__depth_cn__',
       '__depth_type__',
       '__pose_image__',

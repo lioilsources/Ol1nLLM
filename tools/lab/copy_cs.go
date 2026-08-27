@@ -34,6 +34,14 @@ var copyCS = map[string]Copy{
 			"a světlo. Prompt přebarví sukni, výtvarný jazyk nepřepíše.",
 		Source: "docs/style-matrix.md",
 	},
+	"depth_fit": {
+		Text: "Předloha se před hloubkou i tváří letterboxuje na poměr latentu " +
+			"(černé pruhy). Bez toho ji ControlNet škáluje na šířku a přebytek " +
+			"ořízne shora a zdola — u fotky 1:2 v bucketu 768×1344 přišla o hlavu " +
+			"i chodidla, a InstantID o klíčové body obličeje u horního okraje.",
+		Source: "lib/services/comfyui_service.dart — _fitUpscaleMethod; " +
+			"ComfyUI comfy/controlnet.py common_upscale(…, \"center\")",
+	},
 	"latent_bucket": {
 		Text: "Latent se láme na nejbližší SDXL bucket podle poměru stran předlohy " +
 			"— jinak by ControlNet hloubkovou mapu ořízl na střed a přišly by " +

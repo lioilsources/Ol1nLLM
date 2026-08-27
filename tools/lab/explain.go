@@ -20,6 +20,7 @@ type Step struct {
 var injectedLabels = map[string]string{
 	"__lora__":       "LoRA (vložena appkou)",
 	"__depth_src__":  "předloha pro hloubku",
+	"__depth_fit__":  "předloha napasovaná na latent (letterbox)",
 	"__depth_pre__":  "DepthAnything v2 — hloubková mapa",
 	"__depth_cn__":   "ControlNet (union)",
 	"__depth_type__": "režim union ControlNetu: depth",
@@ -72,6 +73,7 @@ var shownInputs = map[string][]string{
 	"ControlNetApplyAdvanced":      {"strength", "start_percent", "end_percent"},
 	"ControlNetLoader":             {"control_net_name"},
 	"DepthAnythingV2Preprocessor":  {"ckpt_name", "resolution"},
+	"ImageResizeKJv2":              {"width", "height", "keep_proportion"},
 	"SetUnionControlNetType":       {"type"},
 	"LoadImage":                    {"image"},
 	"RepeatLatentBatch":            {"amount"},
@@ -181,6 +183,8 @@ func explainNote(cls, id string, in map[string]any) string {
 			s, e*100, copyCS["cn_strength"].Text)
 	case id == "__depth_pre__":
 		return copyCS["depth_vs_pose"].Text
+	case id == "__depth_fit__":
+		return copyCS["depth_fit"].Text
 	case id == "__pose_cn__":
 		return copyCS["wired_pose"].Text
 	case id == "__face_apply__" || id == "__faceid_apply__":

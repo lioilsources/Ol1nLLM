@@ -141,6 +141,16 @@ class ComfyUIService implements ImageBackend {
   static const _openPoseControlNet =
       'controlnet-openpose-sdxl-xinsir.safetensors';
 
+  // Letterboxing the repose reference onto the latent's aspect. ComfyUI fits a
+  // ControlNet hint to the latent with `common_upscale(…, "center")` — scale
+  // to cover, crop the rest — so a 1:2 phone photo rendered in the nearest
+  // SDXL bucket (768×1344, 0.57) loses ~110 px top *and* bottom: the head and
+  // the feet, and the face keypoints InstantID draws right at the top edge.
+  // Padding with black instead: DepthAnything reads it as far background,
+  // InsightFace ignores it, and nothing of the subject is cut.
+  static const _fitUpscaleMethod = 'lanczos';
+  static const _fitPadColor = '0, 0, 0';
+
   // Auto source-structure path: DepthAnything v2 → xinsir Union ControlNet in
   // depth mode. 0.7 keeps the source stance without pinning it so hard the
   // prompt can't restyle (verified end-to-end on the server).
@@ -1256,6 +1266,12 @@ class ComfyUIService implements ImageBackend {
             ? _fluxReposeDepthStrength
             : _reposeDepthStrength,
         endPercent: _reposeDepthEndPercent,
+        // txt2img renders into a bucket the reference merely approximates, so
+        // the hint has to be letterboxed onto it (see [_fitUpscaleMethod]).
+        // img2img's latent *is* the source, aspect and all — nothing to fit.
+        fitTo: imageName == null
+            ? _txt2imgLatent(wf, latentSize: latentSize)
+            : null,
       );
     } else if (poseImageName != null) {
       _injectPoseControlNet(wf, poseImageName);
@@ -1372,17 +1388,36 @@ class ComfyUIService implements ImageBackend {
     String sourceImageName, {
     double strength = _depthStrength,
     double endPercent = _poseEndPercent,
+    // Letterbox the reference onto this size before anything reads it, so
+    // the ControlNet never center-crops the hint (see [_fitUpscaleMethod]).
+    LatentSize? fitTo,
   }) {
     wf['__depth_src__'] = {
       'class_type': 'LoadImage',
       '_meta': {'title': 'Depth source: $sourceImageName'},
       'inputs': {'image': sourceImageName, 'upload': 'image'},
     };
+    if (fitTo != null) {
+      wf['__depth_fit__'] = {
+        'class_type': 'ImageResizeKJv2',
+        '_meta': {'title': 'Fit reference to latent (${fitTo.w}×${fitTo.h})'},
+        'inputs': {
+          'image': ['__depth_src__', 0],
+          'width': fitTo.w,
+          'height': fitTo.h,
+          'upscale_method': _fitUpscaleMethod,
+          'keep_proportion': 'pad',
+          'pad_color': _fitPadColor,
+          'crop_position': 'center',
+          'divisible_by': 8,
+        },
+      };
+    }
     wf['__depth_pre__'] = {
       'class_type': 'DepthAnythingV2Preprocessor',
       '_meta': {'title': 'Depth map from source'},
       'inputs': {
-        'image': ['__depth_src__', 0],
+        'image': _referenceImage(wf),
         'ckpt_name': _depthPreprocessorCkpt,
         'resolution': _depthResolution,
       },
@@ -1468,6 +1503,32 @@ class ComfyUIService implements ImageBackend {
   /// family, and the graph is what is being patched.
   static bool _isFluxGraph(Map<String, dynamic> wf) =>
       wf.values.any((n) => (n as Map)['class_type'] == 'UNETLoader');
+
+  /// The size the patch loop will write into the empty latent: an explicit
+  /// override, else the preset (generic templates), else whatever the
+  /// dedicated template bakes in. Mirrors the `Empty*LatentImage` case below
+  /// for the no-template-pose branch, which is the only one that reaches here.
+  LatentSize _txt2imgLatent(
+    Map<String, dynamic> wf, {
+    required LatentSize? latentSize,
+  }) {
+    if (latentSize != null) return latentSize;
+    if (_preset.ckptName != null) return (w: _preset.width, h: _preset.height);
+    for (final e in wf.values) {
+      final node = (e as Map).cast<String, dynamic>();
+      final cls = node['class_type'];
+      if (cls != 'EmptySD3LatentImage' && cls != 'EmptyLatentImage') continue;
+      final i = (node['inputs'] as Map?)?.cast<String, dynamic>();
+      final w = i?['width'], h = i?['height'];
+      if (w is int && h is int) return (w: w, h: h);
+    }
+    return (w: _preset.width, h: _preset.height);
+  }
+
+  /// The reference as everything downstream should read it: letterboxed when
+  /// a fit node exists, raw otherwise. Gate on `__depth_src__` regardless.
+  List<dynamic> _referenceImage(Map<String, dynamic> wf) =>
+      [wf.containsKey('__depth_fit__') ? '__depth_fit__' : '__depth_src__', 0];
 
   /// The sampler's inputs map — the splice point every injector shares.
   Map<String, dynamic>? _samplerInputs(Map<String, dynamic> wf) {
@@ -1573,7 +1634,7 @@ class ComfyUIService implements ImageBackend {
         'instantid': ['__face_id__', 0],
         'insightface': ['__face_analysis__', 0],
         'control_net': ['__face_cn__', 0],
-        'image': ['__depth_src__', 0],
+        'image': _referenceImage(wf),
         'model': model,
         'positive': positive,
         'negative': negative,
@@ -1611,7 +1672,7 @@ class ComfyUIService implements ImageBackend {
       'inputs': {
         'model': ['__faceid_loader__', 0],
         'ipadapter': ['__faceid_loader__', 1],
-        'image': ['__depth_src__', 0],
+        'image': _referenceImage(wf),
         'weight': _faceIdWeight,
         'weight_faceidv2': _faceIdV2Weight,
         'weight_type': 'linear',
@@ -1655,7 +1716,7 @@ class ComfyUIService implements ImageBackend {
         'pulid_flux': ['__face_pulid__', 0],
         'eva_clip': ['__face_eva__', 0],
         'face_analysis': ['__face_analysis__', 0],
-        'image': ['__depth_src__', 0],
+        'image': _referenceImage(wf),
         'weight': _pulidWeight,
         'start_at': _faceIdentityStartAt,
         'end_at': _faceIdentityEndAt,

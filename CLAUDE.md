@@ -296,7 +296,19 @@ póza), `_PoseChip` se v režimu skryje a `poseId` na nodu je null. Latent se
 nebere z presetu: `lib/models/latent_bucket.dart` přečte rozměry reference
 jen z hlavičky (PNG **i** JPEG — foto rooty jsou JPEG pod `.png` jménem) a
 snapne na nejbližší SDXL bucket (`snapToSdxlBucket`, porovnání v log
-prostoru), jinak by `ControlNetApplyAdvanced` depth hint center-cropnul.
+prostoru). **Bucket sám ale ořezu nezabrání** — ComfyUI přizpůsobuje hint
+latentu přes `common_upscale(…, "center")`, tj. škáluje na pokrytí a přebytek
+ořízne. Fotka z telefonu 1:2 (434×884, 0.49) v nejbližším bucketu 768×1344
+(0.57) tak přišla o ~110 px nahoře i dole: hlavu a chodidla, a InstantID
+o klíčové body obličeje u horního okraje (tvář vyjížděla z rámu). Proto
+`_injectSourceDepthControlNet(fitTo:)` vloží `__depth_fit__`
+(`ImageResizeKJv2`, `keep_proportion: pad`, černé pruhy) mezi `__depth_src__`
+a **všechno, co z předlohy čte** — hloubku i tvář (`_referenceImage()`).
+Černá: DepthAnything ji čte jako daleké pozadí, InsightFace ji ignoruje.
+Fituje se jen na txt2img cestě (`imageName == null`) — u img2img latent *je*
+zdroj i s poměrem, takže není co fitovat; cílový rozměr je `latentSize`, jinak
+preset, jinak baked-in latent dedikované šablony (`_txt2imgLatent`). Gate na
+identitu zůstává `__depth_src__`, fit je jen mezikrok.
 Prompt se **neřetězí** s předky (stejné pravidlo jako inpaint — staré tokeny
 by tahaly starou postavu zpět); positivePrefix + preset negativ + ALL-CAPS
 negativy platí, LoRA injekce taky. `GenNode.isRepose` (vzor `is3D`; width/

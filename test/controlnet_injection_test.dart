@@ -83,8 +83,10 @@ void main() {
     );
 
     // Depth chain: source → DepthAnythingV2 → Union CN (depth) → apply.
+    // No letterbox here: the img2img latent *is* the source, aspect and all.
     final pre = _byClass(wf, 'DepthAnythingV2Preprocessor').first;
     expect(pre['inputs']['image'], ['__depth_src__', 0]);
+    expect(wf.containsKey('__depth_fit__'), isFalse);
     final type = _byClass(wf, 'SetUnionControlNetType').first;
     expect(type['inputs']['type'], 'depth');
     expect(type['inputs']['control_net'], ['__depth_cn__', 0]);
@@ -153,7 +155,7 @@ void main() {
       final src = _byClass(wf, 'LoadImage').single;
       expect(src['inputs']['image'], 'ref.png');
       final pre = _byClass(wf, 'DepthAnythingV2Preprocessor').single;
-      expect(pre['inputs']['image'], ['__depth_src__', 0]);
+      expect(pre['inputs']['image'], ['__depth_fit__', 0]);
       expect(_byClass(wf, 'SetUnionControlNetType').single['inputs']['type'],
           'depth');
       expect(
@@ -171,6 +173,54 @@ void main() {
       expect(apply['inputs']['end_percent'], 0.9);
       expect(_sampler(wf)['positive'], ['__cn_apply__', 0]);
       expect(_sampler(wf)['negative'], ['__cn_apply__', 1]);
+    });
+
+    test('letterboxes the reference onto the bucket instead of cropping', () {
+      // ComfyUI fits a ControlNet hint with common_upscale(…, "center"):
+      // scale to cover, crop the rest. A 1:2 photo in a 0.57 bucket lost its
+      // head and feet that way — so the reference is padded to the latent's
+      // aspect before the depth map (or a face) is read from it.
+      final wf = repose(ComfyUIService()..setPreset(pony));
+      final fit = wf['__depth_fit__'] as Map;
+      expect(fit['class_type'], 'ImageResizeKJv2');
+      expect(fit['inputs']['image'], ['__depth_src__', 0]);
+      expect(fit['inputs']['width'], 832);
+      expect(fit['inputs']['height'], 1216);
+      expect(fit['inputs']['keep_proportion'], 'pad');
+      expect(fit['inputs']['crop_position'], 'center');
+    });
+
+    test('without an explicit bucket the fit follows the preset', () {
+      // Lab's txt2img + POSE_MODE=depth: the latent is the preset's, so that
+      // is what the hint must be fitted to.
+      final wf = (ComfyUIService()..setPreset(pony)).prepareForTest(
+        _txt2img(),
+        prompt: 'x',
+        batch: 1,
+        seed: 1,
+        depthImageName: 'ref.png',
+      );
+      final fit = (wf['__depth_fit__'] as Map)['inputs'] as Map;
+      expect(fit['width'], pony.width);
+      expect(fit['height'], pony.height);
+      final latent = _byClass(wf, 'EmptyLatentImage').single['inputs'];
+      expect([latent['width'], latent['height']], [fit['width'], fit['height']]);
+    });
+
+    test('img2img with an explicit depth reference is not letterboxed', () {
+      // Lab's img2img + POSE_MODE=depth: the latent comes from VAEEncode of
+      // the same image, so it already has the reference's aspect.
+      final wf = (ComfyUIService()..setPreset(pony)).prepareForTest(
+        _img2img(),
+        prompt: 'x',
+        batch: 1,
+        seed: 1,
+        imageName: 'ref.png',
+        depthImageName: 'ref.png',
+      );
+      expect(wf.containsKey('__depth_fit__'), isFalse);
+      expect(_byClass(wf, 'DepthAnythingV2Preprocessor').single['inputs']['image'],
+          ['__depth_src__', 0]);
     });
 
     test('renders from noise: denoise 1.0, no VAEEncode, no __IMAGE__', () {
@@ -304,6 +354,23 @@ void main() {
       expect(latent['height'], 1216);
     });
 
+    test('the fit follows the bucket, or the template size without one', () {
+      final fit = (repose(ComfyUIService()..setPreset(flux))['__depth_fit__']
+          as Map)['inputs'] as Map;
+      expect([fit['width'], fit['height']], [832, 1216]);
+      // No bucket ⇒ the dedicated template's baked-in latent is the target.
+      final wf = (ComfyUIService()..setPreset(flux)).prepareForTest(
+        _fluxTxt2img(),
+        prompt: 'x',
+        batch: 1,
+        seed: 1,
+        depthImageName: 'ref.png',
+      );
+      final baked = _byClass(wf, 'EmptySD3LatentImage').single['inputs'];
+      final f2 = (wf['__depth_fit__'] as Map)['inputs'] as Map;
+      expect([f2['width'], f2['height']], [baked['width'], baked['height']]);
+    });
+
     test('the preset values stay baked in', () {
       final wf = repose(ComfyUIService()..setPreset(flux));
       expect(_sampler(wf)['cfg'], 1.0);
@@ -364,9 +431,10 @@ void main() {
       }
       final apply = wf['__face_apply__'] as Map;
       expect(apply['class_type'], 'ApplyInstantID');
-      // The same LoadImage the depth map comes from — one upload, and no way
-      // for the two to disagree about which photo they mean.
-      expect(apply['inputs']['image'], ['__depth_src__', 0]);
+      // The same (letterboxed) reference the depth map comes from — one
+      // upload, and no way for the two to disagree about which photo they
+      // mean. Fitted, so InstantID's keypoint hint is never center-cropped.
+      expect(apply['inputs']['image'], ['__depth_fit__', 0]);
       expect(apply['inputs']['instantid'], ['__face_id__', 0]);
       expect(apply['inputs']['insightface'], ['__face_analysis__', 0]);
       expect(apply['inputs']['control_net'], ['__face_cn__', 0]);
@@ -401,7 +469,7 @@ void main() {
       final apply = (wf['__faceid_apply__'] as Map)['inputs'] as Map;
       expect(apply['model'], ['__faceid_loader__', 0]);
       expect(apply['ipadapter'], ['__faceid_loader__', 1]);
-      expect(apply['image'], ['__depth_src__', 0]);
+      expect(apply['image'], ['__depth_fit__', 0]);
       expect(_sampler(wf)['model'], ['__faceid_apply__', 0]);
       // Conditioning still comes straight from the encoders via the depth CN.
       final cn = (wf['__cn_apply__'] as Map)['inputs'] as Map;
@@ -438,7 +506,7 @@ void main() {
         expect(_byClass(wf, 'IPAdapterFaceID'), isEmpty, reason: mode.name);
         final apply = (wf['__face_apply__'] as Map);
         expect(apply['class_type'], 'ApplyPulidFlux');
-        expect(apply['inputs']['image'], ['__depth_src__', 0]);
+        expect(apply['inputs']['image'], ['__depth_fit__', 0]);
         expect(apply['inputs']['weight'], 0.9);
         expect(apply['inputs']['pulid_flux'], ['__face_pulid__', 0]);
         expect(apply['inputs']['eva_clip'], ['__face_eva__', 0]);
