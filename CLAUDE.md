@@ -624,18 +624,28 @@ serveru přes tunel — testy tak drží skutečný formát, ne domněnku o něm
 
 ### Knihovní RAG server (mimo tohle repo)
 
-Server dotaz **směruje na dílo nebo tradici**, když ho otázka jmenuje
-(`rag/retrieval.py`) — bez toho vracel dotaz na Tao te ťing pálijské svazky,
-protože čeština nad korpusem v pálí rozliší top-5 o ~0,007 vzdálenosti
-a Tipitaka je 60 z 92 děl. Ve finálním eventu je `routed` (na co se
-zamířilo); appka ho zatím nezobrazuje. Kandidáti se před výběrem čistí od
-rejstříků a obsahů, a když model úryvek jen opíše místo překladu,
-`excerpt_cs` vůbec nepřijde — v appce je pak jen originál.
+Server od 2. vlny (srpen 2026) neposílá do promptu celý katalog, ale nejdřív
+**plánovač** (jeden LLM roundtrip) určí intent — `catalog | work_overview |
+chapters | chapter_detail | read | content | mixed | smalltalk` — a podle něj
+buď postaví výpis z Postgresu (tabulka děl s autorem, jazykem originálu,
+poznámkou „v korpusu: překlad", tématy a anotací; přehled díla; seznam kapitol;
+obsah kapitoly; čtení dál), nebo jede **hybridní retrieval** (vektor nad
+pasážemi + vektor nad českými glosami + fulltext → Reciprocal Rank Fusion).
+Finální SSE event nese navíc `intent`, `plan` (zkrácený) a payload `catalog` /
+`work` / `chapters` / `chapter`; `sources[]` mají `work_id`, `chapter_id`,
+`chapter_path`, `ref_start/ref_end`, `lang_original/lang_corpus`, `score`,
+`channels`. Appka to zatím ignoruje (tolerantní parser) — katalogové odpovědi
+přicházejí jako markdown tabulky, které `MarkdownBody` renderuje (GFM default;
+styl pro tmavé UI je v `AppTheme.markdownStyle`).
 
 `WorldLibraryProject/rag/server.py` na SPARKu :8090, systemd unit
 `library-chat`, spouštěná s `--llm-url http://localhost:8080/v1` (LiteLLM na
 `:4000` není z hostu vidět). Vektory drží ChromaDB na JODA (:8006), aktuálně
-41 232 chunků z 92 děl (hebrejská Bible vyhozena — z PDF lezlo mojibake).
+**1 173 děl / 40 721 kapitol / 164 344 chunků** — 92 původních děl + 1 080
+řeckých a latinských originálů z Perseu (anglické překlady vynechány; hebrejská
+Bible vyhozena — z PDF lezlo mojibake). Katalog a fulltext drží
+`library_postgres` :5433, vektory `library_chroma` :8007 (obojí `deploy/joda`
+v repu WorldLibraryProject, JODA).
 Korpus jsou **originály**, ne překlady; to je smysl projektu, takže české
 překlady děl do knihovny nepatří — překládá se až výstup. Za Cloudflare Access (self-hosted app, policy
 `non_identity` na service tokenu sdíleném s `llm.ol1n.com`), takže appka
