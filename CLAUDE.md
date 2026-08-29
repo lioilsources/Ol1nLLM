@@ -627,12 +627,16 @@ serveru přes tunel — testy tak drží skutečný formát, ne domněnku o něm
 Server dotaz **směruje na dílo nebo tradici**, když ho otázka jmenuje
 (`rag/retrieval.py`) — bez toho vracel dotaz na Tao te ťing pálijské svazky,
 protože čeština nad korpusem v pálí rozliší top-5 o ~0,007 vzdálenosti
-a Tipitaka je 60 z 93 děl. Ve finálním eventu je `routed` (na co se
-zamířilo); appka ho zatím nezobrazuje.
+a Tipitaka je 60 z 92 děl. Ve finálním eventu je `routed` (na co se
+zamířilo); appka ho zatím nezobrazuje. Kandidáti se před výběrem čistí od
+rejstříků a obsahů, a když model úryvek jen opíše místo překladu,
+`excerpt_cs` vůbec nepřijde — v appce je pak jen originál.
 
 `WorldLibraryProject/rag/server.py` na SPARKu :8090, systemd unit
 `library-chat`, spouštěná s `--llm-url http://localhost:8080/v1` (LiteLLM na
 `:4000` není z hostu vidět). Vektory drží ChromaDB na JODA (:8006), aktuálně
-~43 700 chunků z 93 děl. Za Cloudflare Access (self-hosted app, policy
+41 232 chunků z 92 děl (hebrejská Bible vyhozena — z PDF lezlo mojibake).
+Korpus jsou **originály**, ne překlady; to je smysl projektu, takže české
+překlady děl do knihovny nepatří — překládá se až výstup. Za Cloudflare Access (self-hosted app, policy
 `non_identity` na service tokenu sdíleném s `llm.ol1n.com`), takže appka
 posílá tytéž `CF_ACCESS_*` hlavičky jako jinam.
