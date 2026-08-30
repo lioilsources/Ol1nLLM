@@ -18,7 +18,7 @@ import '../providers/image_studio_provider.dart';
 import '../widgets/image_session_drawer.dart';
 import 'mask_editor_screen.dart';
 import 'model_viewer_screen.dart';
-import 'video_player_screen.dart';
+import 'video_player_screen.dart' show VideoPlayerScreen, saveVideo;
 
 /// Copy [text] to the clipboard and confirm with a brief snackbar. No-op for
 /// empty text. Used by long-press handlers on error messages and prompts.
@@ -2664,15 +2664,6 @@ class _VideoNodeViewState extends State<_VideoNodeView> {
     super.dispose();
   }
 
-  Future<void> _save(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      await Gal.putVideo(widget.path);
-      messenger.showSnackBar(const SnackBar(content: Text('Video uloženo do Fotek')));
-    } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Uložení selhalo: $e')));
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -2705,7 +2696,7 @@ class _VideoNodeViewState extends State<_VideoNodeView> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               TextButton.icon(
-                onPressed: () => _save(context),
+                onPressed: () => saveVideo(context, widget.path),
                 icon: const Icon(Icons.download_outlined, size: 18),
                 label: const Text('Uložit'),
                 style: TextButton.styleFrom(foregroundColor: AppTheme.textSecondary),

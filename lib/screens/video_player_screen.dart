@@ -5,11 +5,47 @@ import 'package:gal/gal.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 
+import 'dart:async';
+
 import '../core/constants/theme.dart';
 
 /// Fullscreen looping player for an animated („Rozhýbat") clip, with save to
 /// Photos and the platform share sheet. Plays the local mp4 straight from the
 /// app's documents directory — no server round-trip once the node is ready.
+/// Uloží [path] do Fotek. PhotoKit odmítá některé jinak platné mp4
+/// („unsupported format" = pokus o konverzi, který selže), a v takovém případě
+/// je share sheet jediná cesta, jak video z appky dostat — nabídne se rovnou,
+/// místo aby uživatel zůstal jen s chybou.
+Future<void> saveVideo(BuildContext context, String path) async {
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    // Kopie do tmp: Photos čte soubor mimo sandbox appky spolehlivěji než
+    // z Application Support, a přípona musí sedět na obsah.
+    final tmp = File(
+      '${Directory.systemTemp.path}/ol1n_${DateTime.now().millisecondsSinceEpoch}.mp4',
+    );
+    await tmp.writeAsBytes(await File(path).readAsBytes(), flush: true);
+    await Gal.putVideo(tmp.path);
+    unawaited(tmp.delete().catchError((_) => tmp));
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Video uloženo do Fotek')),
+    );
+  } catch (e) {
+    messenger.showSnackBar(
+      SnackBar(
+        content: const Text('Fotky video nepřijaly — zkus Sdílet'),
+        action: SnackBarAction(
+          label: 'Sdílet',
+          onPressed: () => SharePlus.instance.share(
+            ShareParams(files: [XFile(path, mimeType: 'video/mp4')]),
+          ),
+        ),
+      ),
+    );
+    debugPrint('[video] Gal.putVideo selhalo: $e');
+  }
+}
+
 class VideoPlayerScreen extends StatefulWidget {
   const VideoPlayerScreen({super.key, required this.path, this.title});
 
@@ -41,15 +77,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     super.dispose();
   }
 
-  Future<void> _save(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      await Gal.putVideo(widget.path);
-      messenger.showSnackBar(const SnackBar(content: Text('Video uloženo do Fotek')));
-    } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Uložení selhalo: $e')));
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +90,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           IconButton(
             tooltip: 'Uložit do Fotek',
             icon: const Icon(Icons.download_outlined),
-            onPressed: () => _save(context),
+            onPressed: () => saveVideo(context, widget.path),
           ),
           IconButton(
             tooltip: 'Sdílet',
