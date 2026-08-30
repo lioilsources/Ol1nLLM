@@ -460,6 +460,26 @@ a zavolá `backend.follow(jobId)`. Čítač pokusů se nuluje při reálném pro
 (`queued`/`running`); po vyčerpání → měkká chyba. Skutečné selhání (`GenFailed`)
 i `cancel()` se **persistují**, takže restart už mrtvý/zrušený job neobnovuje.
 
+### Face inpaint (FLUX Fill + PuLID) — dva průchody
+
+`flux_fill_inpaint_face.api.json` (přepínač „Přenese se IDENTITA obličeje
+z reference" v editoru masky) jede **dva průchody**: Fill + PuLID + Redux
+zamaluje masku, pak `FaceDetailer` (nody 100–109) přemaluje jen detekovanou
+tvář na **FLUX.1-dev** s PuLID (weight 1.2, denoise 0.55, crop 1024²).
+
+Proč: PuLID je trénovaný na FLUX.1-dev, ne na Fill — v jednom průchodu se do
+Fill přenese jen část. Naměřeno (`tools/facebench`, ArcFace k referenci, 2 zdroje
+× 3 reference × 3 seedy): jeden průchod **0.48**, s druhým průchodem **0.72**
+(žádný výsledek pod 0.67). Druhý průchod má vlastní PuLID/EVA/InsightFace
+loadery — sdílené s prvním průchodem skončí po samplingu offloadnuté na CPU
+a `ApplyPulidFlux` spadne na cuda/cpu mismatch.
+
+Co **nepomohlo** (změřeno, ne odhad): vypnutí Reduxu (0.42), `attn_mask` na
+PuLID + užší crop + weight 1.3 (0.45), Kontext se dvěma referencemi (0.17 —
+tvář vůbec nevymění). Strop téhle cesty je ~0.75–0.8: PuLID kóduje tvář do
+jednoho embeddingu, tedy „typ" tváře, ne geometrii. Přes 0.9 by dal jen face
+swap (licence jen pro nekomerční použití) nebo LoRA na osobu (20+ fotek).
+
 ## Lab (`tools/lab/`)
 
 Nástroj pro otázku „co který model udělá s kterým promptem a nastavením".
