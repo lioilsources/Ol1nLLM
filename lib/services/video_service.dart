@@ -147,12 +147,29 @@ class VideoService {
         case 'done':
           yield const GenDownloading(0, 1);
           try {
-            final r = await _client
-                .get(Uri.parse('$_baseUrl/jobs/$jobId/result'), headers: _headers)
-                .timeout(_downloadTimeout);
-            if (r.statusCode != 200) throw Exception(_snippet(r));
-            debugPrint('[video] job $jobId: ${r.bodyBytes.length} B mp4');
-            yield GenVideoComplete(r.bodyBytes);
+            // Dvakrát: uříznuté stažení projde jako HTTP 200 a mp4 s moov
+            // vpředu se i uříznutý tváří přehratelně — ale import do Fotek
+            // na něm spadne („unsupported format"). Integrita se proto
+            // kontroluje proti content-length i průchodem mp4 atomů.
+            Uint8List? bytes;
+            for (var attempt = 0; attempt < 2; attempt++) {
+              final r = await _client
+                  .get(Uri.parse('$_baseUrl/jobs/$jobId/result'), headers: _headers)
+                  .timeout(_downloadTimeout);
+              if (r.statusCode != 200) throw Exception(_snippet(r));
+              final declared = int.tryParse(r.headers['content-length'] ?? '');
+              if (mp4LooksComplete(r.bodyBytes, declared)) {
+                bytes = r.bodyBytes;
+                break;
+              }
+              debugPrint('[video] job $jobId: neúplné stažení '
+                  '(${r.bodyBytes.length}/$declared B), pokus ${attempt + 1}');
+            }
+            if (bytes == null) {
+              throw Exception('stažené video je neúplné');
+            }
+            debugPrint('[video] job $jobId: ${bytes.length} B mp4');
+            yield GenVideoComplete(bytes);
           } on Exception catch (e) {
             debugPrint('[video] job $jobId: download failed ($e)');
             yield GenInterrupted(jobId);
@@ -167,6 +184,30 @@ class VideoService {
   }
 
   void dispose() => _client.close();
+}
+
+/// Whether [bytes] form a structurally complete MP4: the length matches the
+/// server-declared one (when known) and the top-level atoms (ftyp/moov/mdat)
+/// add up exactly to the file size. A truncated `mdat` still plays (moov is
+/// up front) but Photos rejects it on import — catch it before saving.
+bool mp4LooksComplete(Uint8List bytes, int? declaredLength) {
+  if (declaredLength != null && bytes.length != declaredLength) return false;
+  final data = ByteData.sublistView(bytes);
+  var pos = 0;
+  final seen = <String>{};
+  while (pos + 8 <= bytes.length) {
+    var size = data.getUint32(pos);
+    final type = String.fromCharCodes(bytes.sublist(pos + 4, pos + 8));
+    seen.add(type);
+    if (size == 0) return seen.containsAll(const ['ftyp', 'moov', 'mdat']);
+    if (size == 1) {
+      if (pos + 16 > bytes.length) return false;
+      size = data.getUint64(pos + 8);
+    }
+    if (size < 8 || pos + size > bytes.length) return false;
+    pos += size;
+  }
+  return pos == bytes.length && seen.containsAll(const ['ftyp', 'moov', 'mdat']);
 }
 
 /// True when the error looks like a plain connectivity problem rather than

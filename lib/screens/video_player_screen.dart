@@ -31,9 +31,12 @@ Future<void> saveVideo(BuildContext context, String path) async {
       const SnackBar(content: Text('Video uloženo do Fotek')),
     );
   } catch (e) {
+    // Kód chyby do hlášky: „unsupported format" má víc příčin (konverze,
+    // uříznutý soubor, přechodný stav PhotoKitu) a bez kódu se nedají odlišit.
+    final code = e is GalException ? e.type.name : e.runtimeType.toString();
     messenger.showSnackBar(
       SnackBar(
-        content: const Text('Fotky video nepřijaly — zkus Sdílet'),
+        content: Text('Fotky video nepřijaly ($code) — zkus Sdílet'),
         action: SnackBarAction(
           label: 'Sdílet',
           onPressed: () => SharePlus.instance.share(
