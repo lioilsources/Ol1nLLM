@@ -18,6 +18,10 @@ class VideoScene {
   /// Server's GPU-time estimate in minutes (queue not included).
   final int minutesEst;
 
+  /// Whether the clip comes back with a generated soundtrack. Older servers
+  /// omit the field, so the default is silent — the behaviour until now.
+  final bool audio;
+
   const VideoScene({
     required this.id,
     required this.label,
@@ -25,6 +29,7 @@ class VideoScene {
     required this.beats,
     required this.seconds,
     required this.minutesEst,
+    this.audio = false,
   });
 
   factory VideoScene.fromJson(Map<String, dynamic> json) => VideoScene(
@@ -34,5 +39,6 @@ class VideoScene {
         beats: json['beats'] as int,
         seconds: (json['seconds'] as num).toDouble(),
         minutesEst: json['minutes_est'] as int,
+        audio: json['audio'] as bool? ?? false,
       );
 }

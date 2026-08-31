@@ -962,10 +962,36 @@ class _NodeGrid extends ConsumerWidget {
                 children: [
                   for (final s in scenes)
                     ListTile(
-                      leading: const Icon(Icons.movie_outlined, color: AppTheme.accent),
-                      title: Text(
-                        s.label,
-                        style: const TextStyle(color: AppTheme.textPrimary),
+                      leading: Icon(
+                        s.audio ? Icons.music_note : Icons.movie_outlined,
+                        color: AppTheme.accent,
+                      ),
+                      title: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              s.label,
+                              style: const TextStyle(color: AppTheme.textPrimary),
+                            ),
+                          ),
+                          // Scény s vygenerovanou hudbou jsou novinka a jedou na
+                          // jiném modelu — ať je v seznamu poznat na první pohled.
+                          if (s.audio)
+                            Container(
+                              margin: const EdgeInsets.only(left: 8),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppTheme.accent.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Text(
+                                'se zvukem',
+                                style: TextStyle(
+                                    color: AppTheme.accent, fontSize: 11),
+                              ),
+                            ),
+                        ],
                       ),
                       subtitle: Text(
                         '${s.desc}\n~${s.seconds.round()} s · ${s.beats} beatů · ~${s.minutesEst} min',

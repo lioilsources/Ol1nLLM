@@ -17,6 +17,30 @@ void main() {
     ),
   ];
 
+  test('audio flag parses, and an older server without it means silent', () {
+    final withAudio = VideoScene.fromJson(const {
+      'id': 'ltx_dance_music',
+      'label': 'Tanec s hudbou',
+      'desc': '',
+      'beats': 1,
+      'seconds': 4.8,
+      'minutes_est': 3,
+      'audio': true,
+    });
+    expect(withAudio.audio, isTrue);
+
+    // Server před přidáním zvuku pole neposílá — nesmí to shodit parsování.
+    final legacy = VideoScene.fromJson(const {
+      'id': 'wink',
+      'label': 'Mrknutí',
+      'desc': '',
+      'beats': 3,
+      'seconds': 13.4,
+      'minutes_est': 6,
+    });
+    expect(legacy.audio, isFalse);
+  });
+
   test('copyWith keeps the scene catalog', () {
     const s = ImageStudioState(availableScenes: scenes);
     expect(s.copyWith(currentNodeId: 'x').availableScenes, hasLength(1));
