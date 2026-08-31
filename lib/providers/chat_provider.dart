@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/conversation.dart';
 import '../models/message.dart';
-import '../services/media_service.dart';
 import '../services/vllm_service.dart';
 import '../services/persona_service.dart';
 
@@ -56,7 +55,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
   static const _key = 'all';
 
   final VllmService _service = VllmService();
-  final MediaService _mediaService = MediaService(); // OCR only
   final PersonaService _personaService;
   StreamSubscription<ChatEvent>? _streamSub;
 
@@ -252,105 +250,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
   }
 
-  // ── OCR ──────────────────────────────────────────────────────────────────
-
-  Future<void> runOcr(String imageBase64, {String? prompt}) async {
-    if (imageBase64.isEmpty || state.isStreaming) return;
-    await _runMedia(
-      userMsg: Message(
-        id: _uuid.v4(),
-        role: MessageRole.user,
-        content: prompt?.trim() ?? '',
-        createdAt: DateTime.now(),
-        images: [imageBase64],
-      ),
-      titleSeed: 'OCR',
-      task: () async {
-        final text = await _mediaService.ocr(
-          imageBase64: imageBase64,
-          prompt: prompt,
-        );
-        return Message(
-          id: _uuid.v4(),
-          role: MessageRole.assistant,
-          content: text.isEmpty ? '_(no text recognized)_' : text,
-          createdAt: DateTime.now(),
-        );
-      },
-    );
-  }
-
-  /// OCR uses synchronous endpoint — old _runMedia pattern.
-  Future<void> _runMedia({
-    required Message userMsg,
-    required String titleSeed,
-    required Future<Message> Function() task,
-  }) async {
-    var conv = state.active;
-    if (conv == null) {
-      conv = Conversation.create();
-      state = state.copyWith(
-        conversations: [conv, ...state.conversations],
-        activeId: conv.id,
-      );
-    }
-
-    final user = userMsg.copyWith(parentId: conv.activeLeafId);
-    final placeholderId = _uuid.v4();
-    final placeholder = Message(
-      id: placeholderId,
-      parentId: user.id,
-      role: MessageRole.assistant,
-      content: '',
-      createdAt: DateTime.now(),
-    );
-    final newTitle = conv.messages.isEmpty
-        ? (titleSeed.length > 60 ? '${titleSeed.substring(0, 60)}…' : titleSeed)
-        : conv.title;
-    conv = conv.copyWith(
-      messages: [...conv.messages, user, placeholder],
-      title: newTitle,
-      updatedAt: DateTime.now(),
-      activeLeafId: placeholderId,
-    );
-    _replaceConversation(conv);
-    state = state.copyWith(
-      isStreaming: true,
-      clearError: true,
-      pendingContinuation: false,
-    );
-
-    final convId = conv.id;
-    try {
-      await _save();
-      final result = await task();
-      final current = state.conversations
-          .where((c) => c.id == convId)
-          .firstOrNull;
-      if (current != null) {
-        // Keep the placeholder's id/parent so the branch tip stays valid.
-        _replaceConversation(
-          current.copyWith(
-            messages: current.messages
-                .map(
-                  (m) => m.id == placeholderId
-                      ? m.copyWith(content: result.content, images: result.images)
-                      : m,
-                )
-                .toList(),
-            updatedAt: DateTime.now(),
-          ),
-        );
-      }
-      state = state.copyWith(isStreaming: false);
-      await _save();
-    } catch (e) {
-      debugPrint('media op error: $e');
-      _removePlaceholder(convId, placeholderId);
-      state = state.copyWith(isStreaming: false, error: _errorMessage(e));
-    }
-  }
-
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   static String _errorMessage(Object e) {
@@ -401,7 +300,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
   void dispose() {
     _cancelStream();
     _service.dispose();
-    _mediaService.dispose();
     super.dispose();
   }
 }

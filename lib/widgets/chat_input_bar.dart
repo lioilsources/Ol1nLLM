@@ -1,35 +1,11 @@
-import 'dart:convert';
-import 'dart:typed_data';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 import '../core/constants/theme.dart';
 import '../models/conversation.dart';
 import '../models/persona.dart';
 import '../providers/chat_provider.dart';
 import '../services/persona_service.dart';
-
-enum InputMode { chat, ocr }
-
-extension on InputMode {
-  IconData get icon => switch (this) {
-    InputMode.chat => Icons.chat_bubble_outline,
-    InputMode.ocr => Icons.document_scanner_outlined,
-  };
-
-  String get label => switch (this) {
-    InputMode.chat => 'Chat',
-    InputMode.ocr => 'OCR',
-  };
-
-  String get hint => switch (this) {
-    InputMode.chat => 'Message lab…',
-    InputMode.ocr => 'Optional instruction…',
-  };
-
-  bool get needsImage => this == InputMode.ocr;
-}
 
 class ChatInputBar extends ConsumerStatefulWidget {
   const ChatInputBar({super.key});
@@ -43,11 +19,6 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
 
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
-  final _picker = ImagePicker();
-
-  InputMode _mode = InputMode.chat;
-  Uint8List? _imageBytes;
-  String? _imageBase64;
 
   /// Explicit role pick for the next message; null = inherit the active
   /// branch's persona. Reset after each send and when switching conversations.
@@ -63,62 +34,17 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
     super.dispose();
   }
 
-  bool get _canSend {
-    final hasText = _controller.text.trim().isNotEmpty;
-    final hasImage = _imageBytes != null;
-    return switch (_mode) {
-      InputMode.chat => hasText,
-      InputMode.ocr => hasImage,
-    };
-  }
-
-  Future<void> _pickImage() async {
-    final file = await _picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1024,
-      maxHeight: 1024,
-      imageQuality: 85,
-    );
-    if (file == null) return;
-    final bytes = await file.readAsBytes();
-    setState(() {
-      _imageBytes = bytes;
-      _imageBase64 = base64Encode(bytes);
-    });
-  }
-
-  void _clearImage() {
-    setState(() {
-      _imageBytes = null;
-      _imageBase64 = null;
-    });
-  }
-
-  void _setMode(InputMode mode) {
-    setState(() {
-      _mode = mode;
-      if (!mode.needsImage) _clearImage();
-    });
-  }
+  bool get _canSend => _controller.text.trim().isNotEmpty;
 
   Future<void> _send() async {
     final notifier = ref.read(chatProvider.notifier);
     final text = _controller.text;
     if (!_canSend) return;
-
-    switch (_mode) {
-      case InputMode.chat:
-        final personaId = _effectivePersonaId(ref.read(chatProvider).active);
-        _controller.clear();
-        _focusNode.requestFocus();
-        setState(() => _personaOverride = null);
-        await notifier.sendMessage(text, personaId: personaId);
-      case InputMode.ocr:
-        final image = _imageBase64!;
-        _controller.clear();
-        _clearImage();
-        await notifier.runOcr(image, prompt: text);
-    }
+    final personaId = _effectivePersonaId(ref.read(chatProvider).active);
+    _controller.clear();
+    _focusNode.requestFocus();
+    setState(() => _personaOverride = null);
+    await notifier.sendMessage(text, personaId: personaId);
   }
 
   void _prefillContinuation() {
@@ -159,110 +85,61 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            if (_imageBytes != null) _buildImagePreview(),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                _buildModeButton(isBusy),
-                if (_mode == InputMode.chat && personas.isNotEmpty) ...[
-                  const SizedBox(width: 4),
-                  _buildPersonaButton(isBusy, conv, personas),
-                ],
-                if (_mode.needsImage) ...[
-                  const SizedBox(width: 4),
-                  IconButton(
-                    icon: const Icon(Icons.image_outlined),
-                    color: AppTheme.textSecondary,
-                    tooltip: 'Pick image',
-                    onPressed: isBusy ? null : _pickImage,
-                  ),
-                ],
-                Expanded(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 120),
-                    child: Scrollbar(
-                      child: TextField(
-                        controller: _controller,
-                        focusNode: _focusNode,
-                        enabled: !isBusy,
-                        maxLines: null,
-                        minLines: 1,
-                        keyboardType: TextInputType.multiline,
-                        textCapitalization: TextCapitalization.sentences,
-                        onChanged: (_) => setState(() {}),
-                        style: const TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: 15,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: _mode.hint,
-                          hintStyle: const TextStyle(
-                            color: AppTheme.textSecondary,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            borderSide: BorderSide.none,
-                          ),
-                          filled: true,
-                          fillColor: AppTheme.surface,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                        ),
-                        onSubmitted: isBusy ? null : (_) => _send(),
+            if (personas.isNotEmpty) ...[
+              _buildPersonaButton(isBusy, conv, personas),
+              const SizedBox(width: 4),
+            ],
+            Expanded(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 120),
+                child: Scrollbar(
+                  child: TextField(
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    enabled: !isBusy,
+                    maxLines: null,
+                    minLines: 1,
+                    keyboardType: TextInputType.multiline,
+                    textCapitalization: TextCapitalization.sentences,
+                    onChanged: (_) => setState(() {}),
+                    style: const TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 15,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Message lab…',
+                      hintStyle: const TextStyle(
+                        color: AppTheme.textSecondary,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: AppTheme.surface,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
                       ),
                     ),
+                    onSubmitted: isBusy ? null : (_) => _send(),
                   ),
                 ),
-                const SizedBox(width: 8),
-                _ActionButton(
-                  isBusy: isBusy,
-                  enabled: _canSend,
-                  onSend: _send,
-                  onStop: () => ref.read(chatProvider.notifier).cancelStream(),
-                ),
-              ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            _ActionButton(
+              isBusy: isBusy,
+              enabled: _canSend,
+              onSend: _send,
+              onStop: () => ref.read(chatProvider.notifier).cancelStream(),
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildModeButton(bool isBusy) {
-    return PopupMenuButton<InputMode>(
-      enabled: !isBusy,
-      tooltip: 'Mode',
-      icon: Icon(_mode.icon, color: AppTheme.accent),
-      color: AppTheme.surface,
-      onSelected: _setMode,
-      itemBuilder: (context) => InputMode.values
-          .map(
-            (m) => PopupMenuItem(
-              value: m,
-              child: Row(
-                children: [
-                  Icon(
-                    m.icon,
-                    size: 18,
-                    color: m == _mode
-                        ? AppTheme.accent
-                        : AppTheme.textSecondary,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    m.label,
-                    style: const TextStyle(color: AppTheme.textPrimary),
-                  ),
-                ],
-              ),
-            ),
-          )
-          .toList(),
     );
   }
 
@@ -352,37 +229,6 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
                       },
                     ),
                 ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildImagePreview() {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 8, left: 4),
-        child: Stack(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.memory(
-                _imageBytes!,
-                width: 64,
-                height: 64,
-                fit: BoxFit.cover,
-              ),
-            ),
-            Positioned(
-              top: -8,
-              right: -8,
-              child: IconButton(
-                icon: const Icon(Icons.cancel, size: 20),
-                color: Colors.white70,
-                onPressed: _clearImage,
               ),
             ),
           ],

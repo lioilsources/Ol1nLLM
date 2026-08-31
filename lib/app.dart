@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/constants/theme.dart';
-import 'screens/chat_screen.dart';
+import 'screens/home_shell.dart';
 
 class OllamaApp extends ConsumerWidget {
   const OllamaApp({super.key});
@@ -12,7 +12,7 @@ class OllamaApp extends ConsumerWidget {
       title: 'Ol1nLLM',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
-      home: const ChatScreen(),
+      home: const HomeShell(),
     );
   }
 }

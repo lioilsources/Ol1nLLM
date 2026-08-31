@@ -12,7 +12,7 @@ import 'http_error.dart';
 import 'image_backend.dart';
 
 /// Which ComfyUI workflow (and model family) to use.
-enum ComfyWorkflow { flux, pony }
+enum ComfyWorkflow { flux, pony, ponyWatercolor, ponyOil }
 
 /// Talks to a ComfyUI instance behind Cloudflare Access at comfyui.ol1n.com,
 /// reusing the same CF service-token credentials as the chat/diffusers paths.
@@ -41,6 +41,8 @@ class ComfyUIService implements ImageBackend {
   static const _fluxImg2img = 'assets/comfyui/flux_manga_img2img.api.json';
   static const _ponyTxt2img = 'assets/comfyui/pony_txt2img.api.json';
   static const _ponyImg2img = 'assets/comfyui/pony_img2img.api.json';
+  static const _ponyWatercolorImg2img = 'assets/comfyui/pony_watercolor_img2img.api.json';
+  static const _ponyOilImg2img = 'assets/comfyui/pony_oil_img2img.api.json';
 
   static const _submitTimeout = Duration(seconds: 30);
   static const _pollTimeout = Duration(seconds: 15);
@@ -60,8 +62,12 @@ class ComfyUIService implements ImageBackend {
 
   String get _txt2imgAsset =>
       _workflow == ComfyWorkflow.pony ? _ponyTxt2img : _fluxTxt2img;
-  String get _img2imgAsset =>
-      _workflow == ComfyWorkflow.pony ? _ponyImg2img : _fluxImg2img;
+  String get _img2imgAsset => switch (_workflow) {
+        ComfyWorkflow.ponyWatercolor => _ponyWatercolorImg2img,
+        ComfyWorkflow.ponyOil => _ponyOilImg2img,
+        ComfyWorkflow.pony => _ponyImg2img,
+        _ => _fluxImg2img,
+      };
 
   Future<List<String>> fetchLoras() async {
     try {

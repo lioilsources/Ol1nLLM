@@ -49,3 +49,6 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 /android/build/
+
+# lokální konfigurace backendu (nepatří do gitu)
+backend/.env
