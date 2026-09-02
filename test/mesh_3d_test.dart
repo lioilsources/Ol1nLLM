@@ -140,6 +140,30 @@ void _printBaseTests() {
       }
     });
 
+    test('tunnels are sealed before the base is added', () {
+      // Trellis z jednoho pohledu domýšlí odvrácenou stranu a model prokopne:
+      // vzniknou tunely skrz tělo. Mesh přitom zůstane watertight, takže je
+      // fill_holes ani kontrola watertight nezachytí (naměřeno 2. 9. 2026:
+      // watertight True, 0 otevřených hran, rod 23). SealMeshTunnels je zavře
+      // alpha wrappingem — a musí běžet PŘED podstavou, aby se neobalila.
+      final seals = wf.entries
+          .where((e) => (e.value as Map)['class_type'] == 'SealMeshTunnels')
+          .toList();
+      expect(seals, hasLength(2), reason: 'obě větve exportu musí těsnit');
+
+      for (final seal in seals) {
+        expect(((seal.value as Map)['inputs'] as Map)['enabled'], isTrue);
+      }
+
+      final sealIds = seals.map((e) => e.key).toSet();
+      for (final base in wf.values
+          .where((n) => (n as Map)['class_type'] == 'AddPrintBase')) {
+        final src = ((base as Map)['inputs'] as Map)['trimesh'] as List;
+        expect(sealIds, contains(src[0]),
+            reason: 'AddPrintBase musí číst utěsněný mesh, ne surový');
+      }
+    });
+
     test('base geometry stays print-sane', () {
       final base = wf.values
           .firstWhere((n) => (n as Map)['class_type'] == 'AddPrintBase') as Map;
