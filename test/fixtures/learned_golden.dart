@@ -32,10 +32,10 @@ const kLearned = Learned(
   },
   defaultModel: {
     // intervaly se překrývají: Pony V6 66–92 % vs Juggernaut XL 54–83 %
-    Intent.txt2img: null,
+    GenIntent.txt2img: null,
     // intervaly se překrývají: Pony V6 66–92 % vs Juggernaut XL 54–83 %
-    Intent.img2img: null,
-    Intent.repose: LearnedChoice('pony', reason: 'dolní mez 0.75 > horní 0.61 druhého (Juggernaut XL), n=31/20'),
+    GenIntent.img2img: null,
+    GenIntent.repose: LearnedChoice('pony', reason: 'dolní mez 0.75 > horní 0.61 druhého (Juggernaut XL), n=31/20'),
   },
   styleFlags: {
     'juggernaut-xl': {

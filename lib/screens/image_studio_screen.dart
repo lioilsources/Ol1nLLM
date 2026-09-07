@@ -1888,7 +1888,12 @@ class _ModelChip extends StatelessWidget {
                               : spec.img2img
                                   ? '${spec.capabilityLabel} — vyžaduje obrázek'
                                   : '${spec.capabilityLabel} — jen nové generování';
-                  final note = spec.styleNote;
+                  // Measured numbers replace the hand-written sentence
+                  // wherever there are any — the sentence was always a
+                  // stand-in for a measurement nobody had yet. Without
+                  // ratings it stays exactly as it was.
+                  final note =
+                      learnedModelFor(spec.id)?.summary ?? spec.styleNote;
                   return Opacity(
                     opacity: usable ? 1.0 : 0.38,
                     child: ListTile(
@@ -2043,9 +2048,17 @@ class _ReposePill extends StatelessWidget {
 
 /// Art style appended to every prompt in the session.
 class _StyleChip extends StatelessWidget {
-  const _StyleChip({required this.selected, required this.onChanged});
+  const _StyleChip({
+    required this.selected,
+    required this.modelId,
+    required this.onChanged,
+  });
 
   final String? selected;
+
+  /// Which model the flags apply to. A style is not weak in general — it is
+  /// weak *on a checkpoint*, and the same block can be the best one elsewhere.
+  final String modelId;
   final ValueChanged<String?> onChanged;
 
   void _pick(BuildContext context) {
@@ -2109,6 +2122,10 @@ class _StyleChip extends StatelessWidget {
                   itemBuilder: (_, i) {
                     final st = kStylePresets[i];
                     final isSel = st.id == selected;
+                    // Flagged, never hidden, never reordered. A hidden style
+                    // stops collecting ratings, so it could never come back —
+                    // one thin sample would become a permanent verdict.
+                    final flag = styleFlagFor(modelId, st.id);
                     return ListTile(
                       leading: Icon(
                         isSel
@@ -2118,12 +2135,39 @@ class _StyleChip extends StatelessWidget {
                             isSel ? AppTheme.accent : AppTheme.textSecondary,
                         size: 20,
                       ),
-                      title: Text(
-                        st.label,
-                        style: TextStyle(
-                          color:
-                              isSel ? AppTheme.accent : AppTheme.textPrimary,
-                        ),
+                      title: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              st.label,
+                              style: TextStyle(
+                                color: isSel
+                                    ? AppTheme.accent
+                                    : AppTheme.textPrimary,
+                              ),
+                            ),
+                          ),
+                          if (flag != null) ...[
+                            const SizedBox(width: 6),
+                            Tooltip(
+                              message: flag.isWeak
+                                  ? 'Na tomhle modelu naměřeno slabé:'
+                                      ' ${flag.reason}'
+                                  : 'Na tomhle modelu naměřeno silné:'
+                                      ' ${flag.reason}',
+                              triggerMode: TooltipTriggerMode.tap,
+                              child: Icon(
+                                flag.isWeak
+                                    ? Icons.warning_amber_rounded
+                                    : Icons.auto_awesome,
+                                size: 15,
+                                color: flag.isWeak
+                                    ? Colors.orangeAccent
+                                    : AppTheme.accent,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       subtitle: Text(
                         st.block,
@@ -2640,6 +2684,7 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                     const SizedBox(width: 8),
                     _StyleChip(
                       selected: widget.state.selectedStyleId,
+                      modelId: widget.state.modelId,
                       onChanged: (v) =>
                           ref.read(imageStudioProvider.notifier).setStyle(v),
                     ),

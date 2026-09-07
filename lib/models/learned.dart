@@ -28,7 +28,7 @@ library;
 
 /// Co se od modelu žádá. Odvozuje se z toho, co provider už rozlišuje
 /// (`isRepose`, `sourceImageId`) — ne nová persistovaná dimenze.
-enum Intent {
+enum GenIntent {
   /// Generování z textu, bez předlohy.
   txt2img,
 
@@ -95,6 +95,26 @@ class LearnedModel {
       sourceIdentity == null &&
       sourceStyle == null &&
       likeRate == null;
+
+  /// Jedna řádka do pickeru: „póza 90 % (n=31) · identita 62 % (n=13)".
+  ///
+  /// **Vzorek se veze s číslem, ne vedle něj.** Průměr bez n tvrdí o třinácti
+  /// hodnoceních totéž co o třinácti stech, a to je přesně ta záměna, kvůli
+  /// které se celý harness stavěl.
+  ///
+  /// Null, když se nezměřilo nic — volající pak ukáže [ImageModelSpec.styleNote]
+  /// jako dřív.
+  String? get summary {
+    final parts = <String>[
+      if (poseAdherence != null) 'póza ${_cell(poseAdherence!)}',
+      if (sourceIdentity != null) 'identita ${_cell(sourceIdentity!)}',
+      if (sourceStyle != null) 'styl ${_cell(sourceStyle!)}',
+      if (likeRate != null) 'like ${_cell(likeRate!)}',
+    ];
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
+
+  static String _cell(Rate r) => '${r.percent} (n=${r.n})';
 }
 
 /// Naučená hodnota i s tím, proč jí věřit.
@@ -111,7 +131,7 @@ class LearnedValue<T> {
   final String reason;
 }
 
-/// Naučená volba mezi kandidáty (model pro daný [Intent]). Jen jiné jméno pro
+/// Naučená volba mezi kandidáty (model pro daný [GenIntent]). Jen jiné jméno pro
 /// [LearnedValue] nad id — aby generovaný soubor četl jako věta.
 typedef LearnedChoice = LearnedValue<String>;
 
@@ -174,7 +194,7 @@ class Learned {
 
   /// Výchozí model pro daný záměr. Hodnota `null` u klíče znamená „měřeno,
   /// nerozhodnuto" — v generovaném souboru s komentářem proč.
-  final Map<Intent, LearnedChoice?> defaultModel;
+  final Map<GenIntent, LearnedChoice?> defaultModel;
 
   /// modelId → styleId → příznak.
   final Map<String, Map<String, StyleFlag>> styleFlags;

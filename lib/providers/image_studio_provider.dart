@@ -534,15 +534,29 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         );
         return;
       }
+      // Order of preference: what this session already used (an explicit
+      // recent choice), then what the gallery measured for repose, then
+      // whatever the registry lists first. The measured default only ever
+      // displaces the arbitrary one.
+      final learned = defaultModelFor(GenIntent.repose);
+      final fallback = candidates.any((m) => m.id == learned)
+          ? learned
+          : candidates.first.id;
       final lastUsed = state.nodes.reversed
           .map((n) => n.modelId)
           .firstWhere(
             (id) => candidates.any((m) => m.id == id),
-            orElse: () => candidates.first.id,
+            orElse: () => fallback,
           )!;
       setModel(lastUsed);
       info = 'Přepnuto na ${imageModelById(lastUsed).label} — '
           '„zachovej pózu“ funguje jen na SDXL modelech.';
+      // Auto-selection must never be silent: when the measured default is
+      // what picked the model, the reason travels with the message.
+      final why = defaultModelReason(GenIntent.repose);
+      if (lastUsed == learned && why != null) {
+        info = '$info Naučeno z hodnocení: $why';
+      }
     }
     state = state.copyWith(
       reposeSourceImageId: imageId,

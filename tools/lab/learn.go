@@ -76,7 +76,7 @@ func (m LearnedModelFacts) empty() bool {
 		m.SourceStyle == nil && m.LikeRate == nil
 }
 
-// intents are the app's Intent enum, in the order they are emitted.
+// intents are the app's GenIntent enum, in the order they are emitted.
 var intents = []string{"txt2img", "img2img", "repose"}
 
 // nowUTC is a variable so the golden test can pin the snapshot. Nothing else
@@ -484,10 +484,10 @@ func emitDefaultModel(b *strings.Builder, l *Learned) {
 		}
 		if !d.Decided() {
 			fmt.Fprintf(b, "    // %s\n", d.Reason)
-			fmt.Fprintf(b, "    Intent.%s: null,\n", intent)
+			fmt.Fprintf(b, "    GenIntent.%s: null,\n", intent)
 			continue
 		}
-		fmt.Fprintf(b, "    Intent.%s: LearnedChoice(%s, reason: %s),\n",
+		fmt.Fprintf(b, "    GenIntent.%s: LearnedChoice(%s, reason: %s),\n",
 			intent, dartString(d.Value.Key), dartString(d.Reason))
 	}
 	b.WriteString("  },\n")

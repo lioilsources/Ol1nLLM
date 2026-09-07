@@ -187,6 +187,35 @@ podle nich filtrovat, dokud ten model někdo do galerie nepřidá.
 Všechny tři měří **barvu, ne převzetí stylu**. Slouží k předvýběru; rozhodnout
 musí pohled na obrázky. Kalibrace z reálného měření je v `docs/style-matrix.md`.
 
+## `lab learn` — z evalu do kódu appky
+
+```bash
+lab learn --dry            # rozhodnutí + diff, nic nezapíše
+lab learn                  # zapíše lib/generated/learned.dart
+lab learn --min 15         # přísnější práh vzorku
+```
+
+Stáhne `/api/eval` (`group=model`, `group=lora`, `group=style&model=…`,
+`group=session`), aplikuje pravidla z `decide.go` a vygeneruje overlay, který
+appka čte přes `lib/models/learned_lookup.dart`. Podrobnosti a invarianty
+I1–I6 jsou v `CLAUDE.md`, sekce „Učení".
+
+Tři věci, které se při čtení výstupu pletou nejčastěji:
+
+- **Fallbacků má být víc než rozhodnutí.** Rozhoduje se jen tam, kde se
+  Wilsonovy intervaly dvou ramen **nepřekrývají**. „Nejvyšší dolní mez" je
+  žebříček galerie, ne rozhodnutí; leader je „nejlepší dosavadní důkaz", což
+  neopravňuje změnit výchozí chování.
+- **`--min` se nesnižuje, aby něco vyšlo.** Když nic nevyjde, odpověď je
+  „hodnoť víc" — a generátor ji napíše do souboru jako komentář s důvodem.
+- **Bez creds nebo bez sítě to spadne** a nezapíše nic. Prázdný soubor by
+  vypadal neškodně a smazal by všechno naučené.
+
+Golden test: `tools/lab/testdata/eval_*.json` → `learned_expected.dart`.
+Táž bajtová kopie leží v `test/fixtures/learned_golden.dart`, kterou čte
+`flutter analyze` — to je jediné, co ověří, že emitovaný Dart se přeloží.
+Zamýšlená změna: `UPDATE_GOLDEN=1 go test ./...` (přepíše obě).
+
 ## Poznámky k prostředí
 
 - CF Access creds se berou z `.env.local` (`CF_ACCESS_CLIENT_ID`,

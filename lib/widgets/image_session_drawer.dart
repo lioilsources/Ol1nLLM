@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/theme.dart';
 import '../models/image_session.dart';
+import '../models/learned_lookup.dart';
 import '../providers/image_studio_provider.dart';
 
 class ImageSessionDrawer extends ConsumerWidget {
@@ -99,6 +100,7 @@ class ImageSessionDrawer extends ConsumerWidget {
                       },
                     ),
             ),
+            const _KnowledgeFooter(),
           ],
         ),
       ),
@@ -193,6 +195,51 @@ class _SessionThumbnail extends StatelessWidget {
         fit: BoxFit.cover,
         cacheWidth: 40,
         cacheHeight: 40,
+      ),
+    );
+  }
+}
+
+/// Kdy se appka naposled něco naučila.
+///
+/// Tichá řádka, ale jediná svého druhu: bez ní nejde poznat, že někdo
+/// releasoval bez `lab learn` a appka celé měsíce jede na znalosti, která už
+/// neplatí. Proto se stárnutí zvýrazňuje — ne aby otravovalo, ale protože
+/// mlčení je tady ta horší varianta.
+class _KnowledgeFooter extends StatelessWidget {
+  const _KnowledgeFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    final snapshot = kLearned.snapshotTime;
+    final stale = kLearned.isStaleAt(DateTime.now());
+    final text = snapshot == null
+        // Not a failure: a fresh clone, or a corpus that has not been rated
+        // enough for anything to be decided yet. The app runs on its own
+        // constants and says so.
+        ? 'Znalost: zatím žádná — appka jede na výchozích hodnotách'
+        : 'Znalost: ${snapshot.day}. ${snapshot.month}. ${snapshot.year}'
+            ' · ${kLearned.ratedImages} hodnocení';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Row(
+        children: [
+          Icon(
+            stale ? Icons.update_disabled : Icons.school_outlined,
+            size: 13,
+            color: stale ? Colors.orangeAccent : AppTheme.textSecondary,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              stale ? '$text — starší než 30 dní' : text,
+              style: TextStyle(
+                fontSize: 11,
+                color: stale ? Colors.orangeAccent : AppTheme.textSecondary,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

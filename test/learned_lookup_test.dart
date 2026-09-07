@@ -12,33 +12,58 @@ void main() {
   group('prázdný overlay == dnešní konstanty (I1)', () {
     const empty = Learned();
 
-    test('kLearned v repu je prázdný, dokud generátor neběžel', () {
-      // Až `lab learn` poprvé doběhne, tenhle test se změní na kontrolu
-      // snapshotu — do té doby hlídá, že se do generovaného souboru nedostalo
-      // nic ručně.
-      expect(kLearned.isEmpty, isTrue,
-          reason: 'lib/generated/learned.dart se needituje ručně');
-      expect(kLearned.snapshotAt, isNull);
+    test('commitnutý kLearned je koherentní, ať už generátor běžel nebo ne', () {
+      // Musí platit v obou stavech: čerstvý klon s prázdným overlayem i repo
+      // po `make learn`. Test, který by trval na prázdnu, by spadl při prvním
+      // opravdovém spuštění generátoru — tedy přesně ve chvíli, kdy to celé
+      // začne fungovat.
+      if (kLearned.isEmpty) {
+        expect(kLearned.snapshotAt, isNull);
+        expect(kLearned.models, isEmpty);
+        expect(kLearned.loraStrength, isEmpty);
+        expect(kLearned.defaultModel, isEmpty);
+        expect(kLearned.styleFlags, isEmpty);
+        return;
+      }
+      // Vygenerovaný soubor: snapshot musí být čitelné datum a každá hodnota
+      // musí nést důvod (I3) — obojí se rozbije ruční editací, což je jediný
+      // způsob, jak se sem něco bez proveniences dostane.
+      expect(kLearned.snapshotTime, isNotNull,
+          reason: 'nečitelný snapshot: ${kLearned.snapshotAt}');
+      expect(kLearned.minRatings, greaterThan(0));
+      for (final e in kLearned.loraStrength.entries) {
+        expect(e.value.reason.trim(), isNotEmpty, reason: e.key);
+      }
+      for (final e in kLearned.defaultModel.entries) {
+        expect(e.value?.reason.trim() ?? 'x', isNotEmpty, reason: e.key.name);
+      }
+      for (final byStyle in kLearned.styleFlags.values) {
+        for (final e in byStyle.entries) {
+          expect(e.value.reason.trim(), isNotEmpty, reason: e.key);
+        }
+      }
     });
 
     test('síla LoRA padá na kDefaultLoraStrength', () {
-      expect(empty.loraStrength, isEmpty);
-      expect(loraStrengthFor(null), kDefaultLoraStrength);
-      expect(loraStrengthFor('cokoliv.safetensors'), kDefaultLoraStrength);
-      expect(loraStrengthReason('cokoliv.safetensors'), isNull);
+      expect(loraStrengthFor(null, overlay: empty), kDefaultLoraStrength);
+      expect(loraStrengthFor('cokoliv.safetensors', overlay: empty),
+          kDefaultLoraStrength);
+      expect(loraStrengthReason('cokoliv.safetensors', overlay: empty), isNull);
     });
 
     test('výchozí model padá na kDefaultImageModelId', () {
-      for (final i in Intent.values) {
-        expect(defaultModelFor(i), kDefaultImageModelId, reason: i.name);
-        expect(defaultModelReason(i), isNull, reason: i.name);
+      for (final i in GenIntent.values) {
+        expect(defaultModelFor(i, overlay: empty), kDefaultImageModelId,
+            reason: i.name);
+        expect(defaultModelReason(i, overlay: empty), isNull, reason: i.name);
       }
     });
 
     test('o modelu se neví nic a styl nenese příznak', () {
       for (final m in kImageModels) {
-        expect(learnedModelFor(m.id), isNull, reason: m.id);
-        expect(styleFlagFor(m.id, 'ukiyoe'), isNull, reason: m.id);
+        expect(learnedModelFor(m.id, overlay: empty), isNull, reason: m.id);
+        expect(styleFlagFor(m.id, 'ukiyoe', overlay: empty), isNull,
+            reason: m.id);
       }
     });
 
@@ -68,9 +93,9 @@ void main() {
             LearnedValue(1.2, reason: 'lower 0.71 > upper 0.58 of 0.40 arm'),
       },
       defaultModel: {
-        Intent.repose: LearnedChoice('pony', reason: 'pose_adherence 0.75'),
+        GenIntent.repose: LearnedChoice('pony', reason: 'pose_adherence 0.75'),
         // Měřeno, nerozhodnuto — pro volajícího totéž co nenaučeno.
-        Intent.txt2img: null,
+        GenIntent.txt2img: null,
       },
       styleFlags: {
         'juggernaut-xl': {
@@ -80,19 +105,38 @@ void main() {
     );
 
     test('naučená hodnota vyhraje nad konstantou', () {
-      expect(overlay.loraStrength['face_v1.safetensors']!.value, 1.2);
-      expect(overlay.loraStrength['face_v1.safetensors']!.value,
+      expect(loraStrengthFor('face_v1.safetensors', overlay: overlay), 1.2);
+      expect(loraStrengthFor('face_v1.safetensors', overlay: overlay),
           isNot(kDefaultLoraStrength));
+      expect(loraStrengthReason('face_v1.safetensors', overlay: overlay),
+          isNotNull);
+      expect(defaultModelFor(GenIntent.repose, overlay: overlay), 'pony');
+      expect(learnedModelFor('pony', overlay: overlay)?.poseAdherence?.n, 31);
+      expect(styleFlagFor('juggernaut-xl', 'assyrian', overlay: overlay)?.isWeak,
+          isTrue);
     });
 
     test('nenaučený klíč pořád padá na konstantu', () {
-      expect(overlay.loraStrength['jiná.safetensors'], isNull);
+      expect(loraStrengthFor('jiná.safetensors', overlay: overlay),
+          kDefaultLoraStrength);
+      expect(learnedModelFor('sd15', overlay: overlay), isNull);
+      expect(styleFlagFor('pony', 'ukiyoe', overlay: overlay), isNull);
     });
 
     test('„měřeno, nerozhodnuto" se chová jako nenaučeno', () {
-      expect(overlay.defaultModel.containsKey(Intent.txt2img), isTrue);
-      expect(overlay.defaultModel[Intent.txt2img], isNull);
-      expect(overlay.defaultModel[Intent.repose]!.value, 'pony');
+      // Klíč tam je, hodnota je null: volající dostane dnešní konstantu, ale
+      // generovaný soubor u toho nese důvod, takže při review jde odlišit
+      // „ještě málo dat" od „nikdo neměřil".
+      expect(overlay.defaultModel.containsKey(GenIntent.txt2img), isTrue);
+      expect(defaultModelFor(GenIntent.txt2img, overlay: overlay),
+          kDefaultImageModelId);
+      expect(defaultModelReason(GenIntent.txt2img, overlay: overlay), isNull);
+    });
+
+    test('summary veze n s číslem, ne vedle něj', () {
+      final m = learnedModelFor('pony', overlay: overlay)!;
+      expect(m.summary, 'póza 90 % (n=31) · like 82 % (n=34)');
+      expect(const LearnedModel().summary, isNull);
     });
 
     test('každá naučená hodnota nese neprázdný důvod (I3)', () {

@@ -248,6 +248,11 @@ func fakeEvalGallery(t *testing.T) *httptest.Server {
 	}))
 }
 
+// analyzedCopy is the same bytes as the golden, parked where `flutter analyze`
+// will read them — that is the only thing in this repo that can say whether
+// the emitter produces Dart that compiles.
+var analyzedCopy = filepath.Join("..", "..", "test", "fixtures", "learned_golden.dart")
+
 func TestLearnGolden(t *testing.T) {
 	srv := fakeEvalGallery(t)
 	defer srv.Close()
@@ -267,10 +272,14 @@ func TestLearnGolden(t *testing.T) {
 
 	golden := filepath.Join("testdata", "learned_expected.dart")
 	if os.Getenv("UPDATE_GOLDEN") == "1" {
-		if err := os.WriteFile(golden, []byte(got), 0o644); err != nil {
-			t.Fatal(err)
+		// Both copies, always: updating one and leaving the other is a failure
+		// the next run reports as a mystery.
+		for _, p := range []string{golden, analyzedCopy} {
+			if err := os.WriteFile(p, []byte(got), 0o644); err != nil {
+				t.Fatal(err)
+			}
 		}
-		t.Log("golden přepsán")
+		t.Log("golden i analyzovaná kopie přepsány")
 	}
 	want, err := os.ReadFile(golden)
 	if err != nil {
@@ -291,7 +300,7 @@ func TestGoldenIsAnalyzedAsDart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fixture, err := os.ReadFile(filepath.Join("..", "..", "test", "fixtures", "learned_golden.dart"))
+	fixture, err := os.ReadFile(analyzedCopy)
 	if err != nil {
 		t.Fatal(err)
 	}

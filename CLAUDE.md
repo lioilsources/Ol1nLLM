@@ -174,6 +174,29 @@ se persistuje jen `GenNode.styleId`, text je z něj odvoditelný (stejný princi
 jako u póz). Platí pro generate/refine/repose, **ne pro inpaint** (ten popisuje
 jen zamalovanou oblast, celoobrazový styl by se s ním pral).
 
+**Medium (`lib/models/medium_preset.dart`)**: 6 bloků o tom, **čím je obraz
+vykreslený** (fotografie / ilustrace / malba / tuš / reliéf / tisk z desky),
+vybíraných `_MediumChip` vedle stylu. Na rozdíl od stylu se blok staví
+**před** prompt — rané tokeny váží nejvíc, což je týž důvod, proč se řetězený
+img2img prompt skládá od nejnovějšího. Skládá to `composePrompt()`, jediné
+místo, kde efektivní prompt vzniká (styl i medium naráz).
+
+Proč vůbec: stylové bloky samy medium jmenují („woodblock print", „stone
+relief"), ale jen jako vlečnou větu ve výčtu, který jinak popisuje paletu.
+Matice zaznamenala následek — tradice, jejichž celé tvrzení *je* medium
+(asyrský, mezopotámský, hebrejský reliéf), spadnou na většině modelů na
+béžovou stěnu. Hypotéza je z Tsumiki (`MangaPrompts/.../blocks/medium.yaml`,
+25 stylových bloků znak po znaku shodných s tímhle repem).
+
+Osa je **experiment, ne doporučení**: appka žádné medium nepředvolí a picker
+nic nedoporučuje. Rozhodne A/B v galerii (`?group=medium`, kontrolní rameno
+`medium=none`). Bez media vrací `composePrompt()` **znak po znaku totéž** co
+dřív — na tom kontrolní rameno stojí, jinak by se porovnávaly dvě změny naráz
+(drží to `test/medium_preset_test.dart` i shoda bajtů na výstupu dumpu).
+V labu je to osa `--mediums` se `__none` jako kontrolním ramenem; bez ní se
+počet ani id buněk nehnou. Na uzlu se persistuje `GenNode.mediumId` a jde do
+galerie do sloupce z migrace v3.
+
 **Síla úpravy (`_EditStrengthChip`)**: `ComfyUIService.setEditDenoise()`
 přebíjí presetový `img2imgDenoise`. Měření ukázalo, že při presetových ~0.72 je
 img2img stylově skoro slepý (rozptyl 5–50× nižší než repose, u pony 0.011),
@@ -573,6 +596,87 @@ obrázků ≠ exportovaný počet (ne `updatedAt`, ten se bumpá i navigací). I
 v draweru: cloud_upload (neexportováno/stale) / cloud_done (aktuální) /
 progress ring. Chyby jdou přes standardní error snackbar, úspěch přes
 `state.info`.
+
+## Učení — appka, která ví, co se naměřilo
+
+Každý release je chytřejší než předchozí, protože obsahuje to, co se mezi
+releasy naměřilo ve FINETUNE gallery. **Učení se děje při buildu, ne za
+běhu** — appka se vždycky přebuildí.
+
+```
+lab run (kartézský součin, bez ohledu na minulá hodnocení)
+  → lab export --send → FINETUNE gallery
+  → člověk hodnotí (like/dislike + relační kritéria)
+  → /api/eval (Wilsonovy intervaly, práh vzorku, per-kritérium pokrytí)
+  → make learn → lib/generated/learned.dart
+  → git diff, review, release
+  → appka čte kLearned s fallbackem na dnešní konstanty
+```
+
+Build-time, ne runtime pull, a to není kompromis:
+
+| | build-time | runtime pull |
+|---|---|---|
+| offline | funguje vždy — znalost je v binárce | cache + fallback + invalidace |
+| CF Access | jen na build stroji | v appce za běhu, další failure mode |
+| reprodukovatelnost | release = známý snapshot, dá se diffovat | „co appka zrovna viděla" |
+| review | generovaný soubor jde přes git | tichá změna chování |
+| „auto-selection must never be silent" | splněno konstrukcí | hlídat ručně |
+
+```bash
+make learn-dry     # rozhodnutí + diff, nic nezapíše
+make learn         # zapíše lib/generated/learned.dart
+```
+
+**Invarianty** — každý má konkrétní důvod, ne jen princip:
+
+- **I1 Nikdy horší než dnes.** Prázdný `kLearned` ⇒ chování bit-identické
+  s dneškem; overlay **přebíjí, nenahrazuje**. Bez creds nebo bez sítě
+  generátor **selže nahlas** a nezapíše nic — prázdný soubor by I1 splnil
+  a tiše smazal všechno naučené. (`test/learned_lookup_test.dart`)
+- **I2 Registry zůstávají ruční.** Generátor nikdy nesahá na `kImageModels`,
+  `kStylePresets`, `kMediumPresets` — ta id se persistují na uzlech a
+  exportují do galerie, takže jedno špatné spuštění by rozvázalo stará
+  hodnocení od obrázků. Emituje **samostatný overlay**.
+- **I3 Každá hodnota nese proveniences.** `LearnedValue.reason` je povinný;
+  bez něj je „naučeno" jen jiné slovo pro „někdo to změnil". Testuje se nad
+  **emitovaným textem**, ne nad strukturou.
+- **I4 Rozhodovací pravidlo je čistá funkce.** `tools/lab/decide.go`: vstup
+  jsou řádky evalu, výstup hodnota + důvod, nebo fallback + důvod proč ne.
+  Žádné rozhodnutí v šabloně ani v HTTP vrstvě.
+- **I5 Učení nemění, co se měří.** Lab generuje kartézský součin bez ohledu
+  na hodnocení. Styl se v pickeru **označí, nikdy neskryje ani nepřeřadí** —
+  skrytý styl už nikdy nedostane data a nemůže se vrátit, takže jeden tenký
+  vzorek by se stal trvalým verdiktem.
+- **I6 Relační věci z relačních kritérií.** Výchozí model pro repose plyne
+  z `pose_adherence`, ne ze `score`. Like je vkus, adherence je fakt.
+
+**Pravidlo je nepřekrývání intervalů, ne „nejvyšší průměr".** Galerie řadí
+podle dolní meze a tím končí; „nejlepší dosavadní důkaz" ale není totéž co
+„lepší než druhý", a jen to druhé opravňuje změnit výchozí chování. Při ~36
+hodnoceních se 71 % a 27 % sotva rozpojí — takže dokud se nerozpojí, odpověď
+zní „ještě nevím", ne „vyrovnané". `leaders` z API se **nepoužívá**.
+**Nesnižovat `--min`, aby „něco vyšlo"**: když nic nevyjde, výsledek je
+„hodnoť víc", a generátor to napíše do souboru.
+
+**Nerozhodnutí je taky výstup**: emituje se `null` s důvodem nad ním, takže
+generovaný soubor dokumentuje vlastní nejistotu. Na mladém korpusu má být
+fallbacků víc než rozhodnutí — kdyby všechno „vyšlo", guard je moc měkký.
+
+Appka overlay čte **jediným místem** (`lib/models/learned_lookup.dart`) —
+invariant rozsypaný na šest míst se na sedmém poruší. Zobrazuje se:
+picker modelu (naměřená čísla s `n` místo `styleNote`), síla LoRA (odznak
++ tooltip s důvodem), příznaky stylů (ikona + tooltip), a v draweru řádka
+„Znalost: <datum> · <n> hodnocení", která zoranžoví po 30 dnech — jediný
+způsob, jak si všimnout, že někdo releasoval bez `make learn`. Totéž hlídá
+`make check-learned`, na kterém visí `build-ios`/`build-android`
+(varování, ne hard fail — CI se ke galerii nedostane).
+
+Golden test emituje Dart z fixtur (`tools/lab/testdata/`);
+`test/fixtures/learned_golden.dart` je jeho bajtová kopie, kterou čte
+`flutter analyze` — teprve to dokazuje, že generátor vyrábí platný Dart.
+Když se golden mění záměrně: `UPDATE_GOLDEN=1 go test ./...` (přepíše obě
+kopie).
 
 ## Persistence (Hive)
 
