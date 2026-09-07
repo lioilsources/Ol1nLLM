@@ -96,23 +96,35 @@ class LearnedModel {
       sourceStyle == null &&
       likeRate == null;
 
+  /// Kolik hodnocení musí kritérium mít, aby se v pickeru vyplatilo ukázat.
+  ///
+  /// Není to guard rozhodování — ten je v `decide.go` a je přísnější. Tohle
+  /// je jen otázka „řekne to číslo víc než věta, kterou nahradí?". Při jednom
+  /// hodnocení „like 100 % (n=1)" nahradí větu typu „krémové jeviště přebije
+  /// zadaný styl" něčím, co je sice pravdivé, ale míň užitečné. Do souboru se
+  /// tenká čísla emitují dál — dokumentují stav korpusu; jen se neukazují
+  /// místo prózy.
+  static const summaryMinN = 5;
+
   /// Jedna řádka do pickeru: „póza 90 % (n=31) · identita 62 % (n=13)".
   ///
   /// **Vzorek se veze s číslem, ne vedle něj.** Průměr bez n tvrdí o třinácti
   /// hodnoceních totéž co o třinácti stech, a to je přesně ta záměna, kvůli
   /// které se celý harness stavěl.
   ///
-  /// Null, když se nezměřilo nic — volající pak ukáže
+  /// Null, když se nezměřilo dost — volající pak ukáže
   /// [ImageModelSpec.styleNote] jako dřív.
   String? get summary {
     final parts = <String>[
-      if (poseAdherence != null) 'póza ${_cell(poseAdherence!)}',
-      if (sourceIdentity != null) 'identita ${_cell(sourceIdentity!)}',
-      if (sourceStyle != null) 'styl ${_cell(sourceStyle!)}',
-      if (likeRate != null) 'like ${_cell(likeRate!)}',
+      if (_thick(poseAdherence)) 'póza ${_cell(poseAdherence!)}',
+      if (_thick(sourceIdentity)) 'identita ${_cell(sourceIdentity!)}',
+      if (_thick(sourceStyle)) 'styl ${_cell(sourceStyle!)}',
+      if (_thick(likeRate)) 'like ${_cell(likeRate!)}',
     ];
     return parts.isEmpty ? null : parts.join(' · ');
   }
+
+  static bool _thick(Rate? r) => r != null && r.n >= summaryMinN;
 
   static String _cell(Rate r) => '${r.percent} (n=${r.n})';
 }

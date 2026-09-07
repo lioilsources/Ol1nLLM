@@ -90,7 +90,10 @@ type Learned struct {
 	RatedImages int
 	TotalImages int
 	MinRatings  int
-	Sessions    []string
+	// SessionCount is every session that contributed; Sessions holds only the
+	// lab run ids among them (app sessions have no id worth quoting).
+	SessionCount int
+	Sessions     []string
 
 	Models       map[string]LearnedModelFacts
 	LoraStrength map[string]Decision[float64]
@@ -215,9 +218,18 @@ func Learn(ft *Finetune, min int) (*Learned, error) {
 		DefaultModel: map[string]Decision[Candidate]{},
 		StyleFlags:   map[string]map[string]StyleFlag{},
 	}
+	// Provenance is the run, never the prompt. A session's title *is* the
+	// user's prompt, and 119 of them would put that text into a committed,
+	// reviewed source file — noise at best, and not ours to publish. The lab
+	// tags its own sessions "<prompt> [lab <id>]", so the id is both short and
+	// the thing anyone would actually trace back.
 	for _, r := range bySession.Rows {
-		if r.Key != "" {
-			l.Sessions = append(l.Sessions, r.Label)
+		if r.Key == "" {
+			continue
+		}
+		l.SessionCount++
+		if id := labRunID(r.Label); id != "" {
+			l.Sessions = append(l.Sessions, id)
 		}
 	}
 	sort.Strings(l.Sessions)
@@ -394,9 +406,11 @@ func EmitDart(l *Learned) string {
 	fmt.Fprintf(&b, "// snapshot: %s  gallery: %s\n", l.SnapshotAt, l.GalleryHost)
 	fmt.Fprintf(&b, "// eval: %d obrázků, %d hodnocených, práh %d\n",
 		l.TotalImages, l.RatedImages, l.MinRatings)
+	fmt.Fprintf(&b, "// sessions: %d", l.SessionCount)
 	if len(l.Sessions) > 0 {
-		fmt.Fprintf(&b, "// sessions: %s\n", joinCapped(l.Sessions, 6))
+		fmt.Fprintf(&b, " · lab: %s", joinCapped(l.Sessions, 6))
 	}
+	b.WriteString("\n")
 	b.WriteString("//\n")
 	b.WriteString("// A `null` below is not a gap — it is a measured refusal, with the reason\n")
 	b.WriteString("// on the line above it. The app then keeps its own constant.\n")
@@ -619,6 +633,22 @@ func joinCapped(items []string, max int) string {
 	}
 	return strings.Join(items[:max], ", ") +
 		fmt.Sprintf(" … (+%d)", len(items)-max)
+}
+
+// labRunID pulls the run id out of a lab-exported session title, which
+// BuildExport writes as "<prompt> [lab <id>]" or "<prompt> [lab <id> · N
+// modelů]". Anything else is an app session and contributes only to the count.
+func labRunID(title string) string {
+	i := strings.LastIndex(title, "[lab ")
+	if i < 0 {
+		return ""
+	}
+	rest := title[i+len("[lab "):]
+	end := strings.IndexAny(rest, " ]")
+	if end < 0 {
+		return ""
+	}
+	return rest[:end]
 }
 
 func hostOf(base string) string {

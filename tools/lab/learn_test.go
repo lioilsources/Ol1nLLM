@@ -391,6 +391,22 @@ func TestMinBelowOneIsRefused(t *testing.T) {
 	}
 }
 
+func TestLabRunID(t *testing.T) {
+	// Titles as BuildExport writes them, plus an app session, which has no id
+	// worth quoting and must contribute only to the count.
+	for in, want := range map[string]string{
+		"a ballerina [lab 20260901-1432]":                "20260901-1432",
+		"assyrian relief [lab 20260905-0917 · 3 modelů]": "20260905-0917",
+		"holka na louce": "",
+		"":               "",
+		"broken [lab ":   "",
+	} {
+		if got := labRunID(in); got != want {
+			t.Fatalf("labRunID(%q) = %q, čekal %q", in, got, want)
+		}
+	}
+}
+
 func TestDartString(t *testing.T) {
 	if got := dartString("it's"); got != `'it\'s'` {
 		t.Fatalf("got %s", got)

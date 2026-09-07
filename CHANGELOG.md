@@ -28,8 +28,14 @@ proveniences (viz I3 v `CLAUDE.md`).
 
 ### Znalost
 
-- **Snapshot: žádný.** `lib/generated/learned.dart` je zatím prázdný overlay —
-  appka jede na dosavadních konstantách a chová se bit-identicky jako předtím.
-  Nasazená galerie je starší než eval harness, takže `lab learn` zatím nemá
-  co číst; po nasazení (`git pull && docker compose up -d --build` na NAS)
-  bude tenhle oddíl uvádět snapshot, počet hodnocení a co se v overlay hnulo.
+- **Snapshot 2026-09-07 · 2796 obrázků, z toho 4 hodnocené · 0 rozhodnutí,
+  6 fallbacků.** Chování appky je proti minulému releasu **nezměněné** —
+  nerozhodlo se nic, takže platí všechny dosavadní konstanty.
+
+  Není to porucha, je to stav korpusu: 2792 z 2796 obrázků nikdo nehodnotil.
+  Generovaný soubor to říká nahlas („žádné rameno nedosáhlo min=10") a
+  vyjmenovává ramena i s jejich `n`, takže je vidět, čeho je potřeba víc.
+  Tři LoRA mají po dvou ramenech síly a **nula** hodnocení na obou — tam
+  stačí odhodnotit, nic negenerovat.
+
+  Příští release bude chytřejší přesně o to, co se mezitím ohodnotí.

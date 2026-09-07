@@ -139,6 +139,21 @@ void main() {
       expect(const LearnedModel().summary, isNull);
     });
 
+    test('tenký vzorek nevytlačí prózu z pickeru', () {
+      // Jedno hodnocení dá „like 100 % (n=1)" — pravdivé, ale míň užitečné
+      // než věta, kterou by nahradilo. Do souboru se emituje dál.
+      const thin = LearnedModel(
+        likeRate: Rate(1.0, lower: 0.207, upper: 1.0, n: 1),
+      );
+      expect(thin.summary, isNull);
+      expect(thin.isEmpty, isFalse, reason: 'v souboru zůstává');
+      // Na prahu už se ukáže.
+      const atBar = LearnedModel(
+        likeRate: Rate(0.8, lower: 0.38, upper: 0.96, n: LearnedModel.summaryMinN),
+      );
+      expect(atBar.summary, 'like 80 % (n=5)');
+    });
+
     test('každá naučená hodnota nese neprázdný důvod (I3)', () {
       for (final v in overlay.loraStrength.values) {
         expect(v.reason.trim(), isNotEmpty);
