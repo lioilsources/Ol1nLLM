@@ -511,8 +511,12 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     if (s == null) return;
     if (s.modelId != state.modelId) setModel(s.modelId);
     if (s.lora != state.selectedLora) setLora(s.lora);
+    // Replaying what a node was made with is not the user expressing a
+    // preference — it must not lock out the measured default for the *next*
+    // LoRA they pick. The node's own value still wins for this round: setLora
+    // above may have snapped to a learned strength, and this overwrites it.
     if (s.lora != null && s.loraStrength != state.loraStrength) {
-      setLoraStrength(s.loraStrength);
+      _applyLoraStrength(s.loraStrength);
     }
     if (s.poseId != state.selectedPoseId) setPose(s.poseId);
   }
@@ -830,8 +834,14 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   /// itself.
   bool _loraStrengthTouched = false;
 
+  /// The user moved the slider (input bar or the inpaint sheet). That is a
+  /// preference, so it outranks any measured value from here on.
   void setLoraStrength(double strength) {
     _loraStrengthTouched = true;
+    _applyLoraStrength(strength);
+  }
+
+  void _applyLoraStrength(double strength) {
     final v = strength.clamp(kMinLoraStrength, kMaxLoraStrength).toDouble();
     _comfyui.setLoraStrength(v);
     state = state.copyWith(loraStrength: v);
