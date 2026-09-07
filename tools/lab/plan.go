@@ -24,6 +24,12 @@ type Spec struct {
 	Prompts    []string `json:"prompts"`
 	Styles     []string `json:"styles"`
 	StylesFile string   `json:"stylesFile"`
+	// Mediums is the render-medium axis (see lib/models/medium_preset.dart).
+	// Empty means the axis is off — one implicit arm, no medium, exactly the
+	// runs that existed before it. "__none" is how the control arm is named
+	// when the axis *is* swept, because a control arm you cannot address is
+	// not a control arm.
+	Mediums    []string `json:"mediums"`
 	Flows      []string `json:"flows"`
 	NoBaseline bool     `json:"noBaseline"`
 
@@ -87,6 +93,10 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 	} else if !s.NoBaseline {
 		styleCount++ // baseline alongside the styles
 	}
+	mediumCount := len(s.Mediums)
+	if mediumCount == 0 {
+		mediumCount = 1 // axis off: one implicit arm, no medium
+	}
 	prompts := len(s.Prompts)
 	if prompts == 0 {
 		prompts = 1
@@ -112,7 +122,7 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 				per = 12
 			}
 		}
-		cells := prompts * styleCount * flows * e.Variants
+		cells := prompts * styleCount * mediumCount * flows * e.Variants
 		e.Cells += cells
 		est += float64(cells) * per
 	}
@@ -363,6 +373,7 @@ func (s *Spec) DumpEnv(dir string) ([]string, error) {
 	set("FLOWS", strings.Join(s.Flows, ","))
 	set("MODELS", strings.Join(s.Models, ","))
 	set("STYLES", strings.Join(s.Styles, ","))
+	set("MEDIUMS", strings.Join(s.Mediums, ","))
 	set("STYLES_FILE", abs(s.StylesFile))
 	set("REF_NAME", s.RefName)
 	set("REF_FILE", abs(s.RefFile))

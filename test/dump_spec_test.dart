@@ -161,6 +161,40 @@ void main() {
       );
     });
 
+    test('the medium segment appears only when the axis is swept', () {
+      // A run that does not ask for mediums has to keep producing the ids it
+      // produced before the axis existed — otherwise every resumable run in
+      // build/lab loses its results and starts over.
+      expect(
+        cellId(flow: 'repose', model: 'pony', style: 'ukiyoe', medium: null),
+        'repose__pony__ukiyoe',
+      );
+      expect(
+        cellId(
+            flow: 'repose',
+            model: 'pony',
+            style: 'ukiyoe',
+            medium: 'medium_relief'),
+        'repose__pony__ukiyoe__mmedium_relief',
+      );
+      // The control arm is a value, so it gets a segment of its own — two arms
+      // of one sweep must never collide on a filename.
+      expect(
+        cellId(
+            flow: 'repose', model: 'pony', style: 'ukiyoe', medium: '__none'),
+        'repose__pony__ukiyoe__m__none',
+      );
+      expect(
+        cellId(
+            flow: 'img2img',
+            model: 'pony',
+            style: '__baseline',
+            medium: '__none',
+            promptIndex: 2),
+        'img2img__pony____baseline__m__none__p02',
+      );
+    });
+
     test('the flow segment survives a split on __', () {
       final id = cellId(
           flow: 'img2img',

@@ -18,6 +18,8 @@ func runCLI(env *Env, args []string) error {
 	promptsFile := fs.String("prompts", "", "soubor s prompty, jeden na řádek")
 	subject := fs.String("subject", "", "jeden prompt (alternativa k --prompts)")
 	styles := fs.String("styles", "", "id stylů oddělená čárkou")
+	mediums := fs.String("mediums", "",
+		"osa media: id oddělená čárkou, __none = kontrolní rameno (bez media)")
 	stylesFile := fs.String("styles-file", "", "JSON s kandidáty stylů [{id,label,block}]")
 	flows := fs.String("flows", "repose,img2img", "txt2img,img2img,repose")
 	ref := fs.String("ref", "", "referenční obrázek")
@@ -51,7 +53,8 @@ func runCLI(env *Env, args []string) error {
 
 	spec := &Spec{
 		Models: splitCSV(*models), Styles: splitCSV(*styles), StylesFile: *stylesFile,
-		Flows: splitCSV(*flows), NoBaseline: *noBaseline,
+		Mediums: splitCSV(*mediums),
+		Flows:   splitCSV(*flows), NoBaseline: *noBaseline,
 		PoseMode: *pose, PoseID: *poseID,
 		FaceIdentity: *faceIdentity, FaceDetail: *faceDetail,
 		Seed: *seed, Batch: *batch, Negative: *negative, EditDenoise: *editDenoise,

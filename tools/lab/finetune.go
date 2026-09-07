@@ -319,6 +319,12 @@ func (r *Run) BuildExport() (*ExportPlan, error) {
 		if c.Style != "" && c.Style != "__baseline" {
 			node["styleId"] = c.Style
 		}
+		// Same rule for the medium's control arm: "__none" is the lab's name
+		// for it, and the gallery's own name for it is an absent medium_id —
+		// which is exactly what `medium=none` filters for.
+		if c.Medium != "" && c.Medium != "__none" {
+			node["mediumId"] = c.Medium
+		}
 		if v, ok := c.Params["lora"].(string); ok && v != "" {
 			node["loraName"] = v
 			if s, ok := c.Params["loraStrength"].(float64); ok {

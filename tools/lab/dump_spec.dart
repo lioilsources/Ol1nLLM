@@ -216,14 +216,20 @@ String sanitizeValue(String v) {
   return buf.toString();
 }
 
-/// `<flow>[@<label>-<value>]__<model>__<style>[__pNN]`.
+/// `<flow>[@<label>-<value>]__<model>__<style>[__m<medium>][__pNN]`.
 ///
 /// Underscore-safe by construction: consumers split on `__` with maxsplit 2,
 /// and the optional prompt index is appended after the style segment.
+///
+/// [medium] is null whenever the medium axis is not part of the run, and the
+/// segment then disappears entirely — a sweep that does not ask for mediums
+/// has to produce the exact ids it produced before the axis existed, or every
+/// resumable run in `build/lab` would restart from zero.
 String cellId({
   required String flow,
   required String model,
   required String style,
+  String? medium,
   String? variantLabel,
   String? variantValue,
   int? promptIndex,
@@ -231,8 +237,9 @@ String cellId({
   final variant = (variantLabel == null || variantValue == null)
       ? ''
       : '@$variantLabel-${sanitizeValue(variantValue)}';
+  final med = medium == null ? '' : '__m${sanitizeValue(medium)}';
   final idx = promptIndex == null
       ? ''
       : '__p${promptIndex.toString().padLeft(2, '0')}';
-  return '$flow$variant' '__$model' '__$style$idx';
+  return '$flow$variant' '__$model' '__$style$med$idx';
 }

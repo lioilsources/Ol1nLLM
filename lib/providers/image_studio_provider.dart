@@ -14,6 +14,7 @@ import '../models/gen_node.dart';
 import '../models/image_model.dart';
 import '../models/image_session.dart';
 import '../models/latent_bucket.dart';
+import '../models/medium_preset.dart';
 import '../models/pose_template.dart';
 import '../models/prompt_negatives.dart';
 import '../models/style_preset.dart';
@@ -128,6 +129,10 @@ class ImageStudioState {
   /// is appended to the prompt at request time and only the id is persisted.
   final String? selectedStyleId;
 
+  /// Selected render-medium preset id (see [kMediumPresets]), or null.
+  /// Appended after the style block at request time; only the id persists.
+  final String? selectedMediumId;
+
   /// img2img denoise chosen by the user, or null for the model preset's
   /// value. See [ComfyUIService.setEditDenoise].
   final double? editDenoise;
@@ -168,6 +173,7 @@ class ImageStudioState {
     this.loraStrength = kDefaultLoraStrength,
     this.selectedPoseId,
     this.selectedStyleId,
+    this.selectedMediumId,
     this.editDenoise,
     this.reposeSourceImageId,
     this.error,
@@ -243,6 +249,8 @@ class ImageStudioState {
     bool clearPose = false,
     String? selectedStyleId,
     bool clearStyle = false,
+    String? selectedMediumId,
+    bool clearMedium = false,
     double? editDenoise,
     bool clearEditDenoise = false,
     String? reposeSourceImageId,
@@ -272,6 +280,8 @@ class ImageStudioState {
     selectedPoseId: clearPose ? null : (selectedPoseId ?? this.selectedPoseId),
     selectedStyleId:
         clearStyle ? null : (selectedStyleId ?? this.selectedStyleId),
+    selectedMediumId:
+        clearMedium ? null : (selectedMediumId ?? this.selectedMediumId),
     editDenoise:
         clearEditDenoise ? null : (editDenoise ?? this.editDenoise),
     reposeSourceImageId: clearRepose
@@ -450,6 +460,17 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     );
   }
 
+  /// Pick the render medium declared after the style block, or null. Null is
+  /// the control arm of the medium A/B, not a missing setting — see
+  /// [kMediumPresets].
+  void setMedium(String? mediumId) {
+    final medium = mediumById(mediumId);
+    state = state.copyWith(
+      selectedMediumId: medium?.id,
+      clearMedium: medium == null,
+    );
+  }
+
   /// How hard an img2img round repaints. Null returns the model preset's
   /// value; [kStyleEditDenoise] is what actually lets an art style through
   /// (the preset's ~0.72 keeps the source's palette and lighting).
@@ -549,6 +570,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       loraStrength: state.loraStrength,
       selectedPoseId: state.selectedPoseId,
       selectedStyleId: state.selectedStyleId,
+      selectedMediumId: state.selectedMediumId,
       editDenoise: state.editDenoise,
     );
   }
@@ -571,6 +593,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       loraStrength: session.loraStrength ?? kDefaultLoraStrength,
       selectedPoseId: poseId,
       selectedStyleId: session.selectedStyleId,
+      selectedMediumId: session.selectedMediumId,
       editDenoise: session.editDenoise,
       modelId: session.modelId,
       availableLoras: state.availableLoras,
@@ -608,6 +631,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           loraStrength: next.loraStrength ?? kDefaultLoraStrength,
           selectedPoseId: poseId,
           selectedStyleId: next.selectedStyleId,
+          selectedMediumId: next.selectedMediumId,
           editDenoise: next.editDenoise,
           modelId: next.modelId,
           availableLoras: state.availableLoras,
@@ -656,6 +680,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           loraStrength: latest.loraStrength ?? kDefaultLoraStrength,
           selectedPoseId: poseId,
           selectedStyleId: latest.selectedStyleId,
+          selectedMediumId: latest.selectedMediumId,
           editDenoise: latest.editDenoise,
           modelId: latest.modelId,
           availableLoras: state.availableLoras,
@@ -687,6 +712,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       loraStrength: state.loraStrength,
       selectedPoseId: state.selectedPoseId,
       selectedStyleId: state.selectedStyleId,
+      selectedMediumId: state.selectedMediumId,
       editDenoise: state.editDenoise,
       modelId: state.modelId,
       exportedAt: existing?.exportedAt,
@@ -855,6 +881,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     // Inpaint describes only the masked area — a whole-image art style would
     // fight it, so the style block is not applied (nor recorded) there.
     final styleId = isInpaint ? null : state.selectedStyleId;
+    final mediumId = isInpaint ? null : state.selectedMediumId;
     final appliedLora = isInpaint && !patched ? null : state.selectedLora;
     final poseActive = poseId != null && patched;
     // Effective negative = preset negative + user ALL-CAPS tags. Recorded only
@@ -881,6 +908,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       // would claim a setting that had no effect on this round.
       loraStrength: appliedLora != null ? state.loraStrength : null,
       styleId: styleId,
+      mediumId: mediumId,
       poseId: poseId,
       seed: seed,
       negativePrompt: negative.isNotEmpty ? negative : null,
@@ -940,7 +968,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     await _runAsync(
       node.id,
       () => _backend.generate(
-        prompt: applyStyle(parts.positive, state.selectedStyleId),
+        prompt: composePrompt(parts.positive,
+            styleId: state.selectedStyleId,
+            mediumId: state.selectedMediumId),
         n: _backend.variantCount,
         seed: seed,
         negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -1027,7 +1057,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       node.id,
       () => _backend.edit(
         image: base.bytes,
-        prompt: applyStyle(chained, state.selectedStyleId),
+        prompt: composePrompt(chained,
+            styleId: state.selectedStyleId,
+            mediumId: state.selectedMediumId),
         n: _backend.variantCount,
         seed: seed,
         negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -1207,7 +1239,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       node.id,
       () => _comfyui.repose(
         image: base.bytes,
-        prompt: applyStyle(parts.positive, state.selectedStyleId),
+        prompt: composePrompt(parts.positive,
+            styleId: state.selectedStyleId,
+            mediumId: state.selectedMediumId),
         n: _comfyui.variantCount,
         seed: seed,
         negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -1385,7 +1419,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         nodeId,
         () => _comfyui.repose(
           image: base.bytes,
-          prompt: applyStyle(parts.positive, node.styleId),
+          prompt: composePrompt(parts.positive,
+              styleId: node.styleId, mediumId: node.mediumId),
           n: _comfyui.variantCount,
           seed: seed,
           negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -1415,7 +1450,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         () => _backend.generate(
           // The style follows the *current* selection, like the model and
           // LoRA above — the rebuilt snapshot records what actually ran.
-          prompt: applyStyle(parts.positive, state.selectedStyleId),
+          prompt: composePrompt(parts.positive,
+            styleId: state.selectedStyleId,
+            mediumId: state.selectedMediumId),
           n: _backend.variantCount,
           seed: seed,
           negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -1465,7 +1502,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           image: base.bytes,
           prompt: mask != null
               ? chained
-              : applyStyle(chained, state.selectedStyleId),
+              : composePrompt(chained,
+            styleId: state.selectedStyleId,
+            mediumId: state.selectedMediumId),
           n: _backend.variantCount,
           seed: seed,
           negativePrompt: parts.negative.isEmpty ? null : parts.negative,

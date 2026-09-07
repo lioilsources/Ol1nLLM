@@ -14,6 +14,7 @@ class ImageSession {
     this.loraStrength,
     this.selectedPoseId,
     this.selectedStyleId,
+    this.selectedMediumId,
     this.editDenoise,
     required this.modelId,
     required this.updatedAt,
@@ -34,6 +35,10 @@ class ImageSession {
   /// Art-style preset id appended to prompts in this session (see
   /// [kStylePresets]); null = no style.
   final String? selectedStyleId;
+
+  /// Render-medium preset id appended after the style block (see
+  /// [kMediumPresets]); null = medium not declared, the A/B control arm.
+  final String? selectedMediumId;
 
   /// img2img denoise chosen by the user; null = the model preset's value.
   final double? editDenoise;
@@ -95,6 +100,7 @@ class ImageSession {
     double? loraStrength,
     String? selectedPoseId,
     String? selectedStyleId,
+    String? selectedMediumId,
     double? editDenoise,
     required String modelId,
     DateTime? exportedAt,
@@ -123,6 +129,7 @@ class ImageSession {
       loraStrength: loraStrength,
       selectedPoseId: selectedPoseId,
       selectedStyleId: selectedStyleId,
+      selectedMediumId: selectedMediumId,
       editDenoise: editDenoise,
       modelId: modelId,
       updatedAt: DateTime.now(),
@@ -140,6 +147,7 @@ class ImageSession {
     if (loraStrength != null) 'loraStrength': loraStrength,
     if (selectedPoseId != null) 'selectedPoseId': selectedPoseId,
     if (selectedStyleId != null) 'selectedStyleId': selectedStyleId,
+    if (selectedMediumId != null) 'selectedMediumId': selectedMediumId,
     if (editDenoise != null) 'editDenoise': editDenoise,
     'modelId': modelId,
     'updatedAt': updatedAt.toIso8601String(),
@@ -158,6 +166,7 @@ class ImageSession {
     loraStrength: (json['loraStrength'] as num?)?.toDouble(),
     selectedPoseId: json['selectedPoseId'] as String?,
     selectedStyleId: json['selectedStyleId'] as String?,
+    selectedMediumId: json['selectedMediumId'] as String?,
     editDenoise: (json['editDenoise'] as num?)?.toDouble(),
     modelId: json['modelId'] as String? ??
         _legacyModelId(

@@ -146,6 +146,11 @@ class GenNode {
   /// stored — the block text is derivable, like [poseId].
   final String? styleId;
 
+  /// Render medium appended after the style block (see [kMediumPresets]).
+  /// Null is a value, not a gap: it is the control arm of the medium A/B, so
+  /// the gallery surfaces it as `medium=none` rather than dropping the row.
+  final String? mediumId;
+
   /// Strength [loraName] was applied with (model + clip). Recorded only when
   /// a LoRA actually applies — the effect isn't reproducible from the name
   /// alone, and the strength is adjustable (including negative) since v1.4.0.
@@ -198,6 +203,7 @@ class GenNode {
     this.loraName,
     this.loraStrength,
     this.styleId,
+    this.mediumId,
     this.poseId,
     this.seed,
     this.negativePrompt,
@@ -231,6 +237,7 @@ class GenNode {
     String? loraName,
     double? loraStrength,
     String? styleId,
+    String? mediumId,
     String? poseId,
     int? seed,
     String? negativePrompt,
@@ -260,6 +267,7 @@ class GenNode {
     loraName: loraName,
     loraStrength: loraStrength,
     styleId: styleId,
+    mediumId: mediumId,
     poseId: poseId,
     seed: seed,
     negativePrompt: negativePrompt,
@@ -298,6 +306,7 @@ class GenNode {
     if (loraName != null) 'loraName': loraName,
     if (loraStrength != null) 'loraStrength': loraStrength,
     if (styleId != null) 'styleId': styleId,
+    if (mediumId != null) 'mediumId': mediumId,
     if (poseId != null) 'poseId': poseId,
     if (seed != null) 'seed': seed,
     if (negativePrompt != null) 'negativePrompt': negativePrompt,
@@ -348,6 +357,7 @@ class GenNode {
       loraName: json['loraName'] as String?,
       loraStrength: (json['loraStrength'] as num?)?.toDouble(),
       styleId: json['styleId'] as String?,
+      mediumId: json['mediumId'] as String?,
       poseId: json['poseId'] as String?,
       seed: json['seed'] as int?,
       negativePrompt: json['negativePrompt'] as String?,
@@ -407,6 +417,7 @@ class GenNode {
     loraName: loraName,
     loraStrength: loraStrength,
     styleId: styleId,
+    mediumId: mediumId,
     poseId: poseId,
     seed: seed,
     negativePrompt: negativePrompt,

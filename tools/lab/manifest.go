@@ -9,13 +9,14 @@ import (
 // cells. The lab never parses filenames — a cell is whatever the manifest says
 // it is, so a naming change in the dumper cannot silently reshape a run.
 type Manifest struct {
-	Cells   []ManifestCell  `json:"cells"`
-	Skipped []ManifestSkip  `json:"skipped"`
-	Models  []ManifestModel `json:"models"`
-	Styles  []ManifestStyle `json:"styles"`
-	Poses   []ManifestPose  `json:"poses"`
-	Buckets []string        `json:"buckets"`
-	Prompts []string        `json:"prompts"`
+	Cells   []ManifestCell   `json:"cells"`
+	Skipped []ManifestSkip   `json:"skipped"`
+	Models  []ManifestModel  `json:"models"`
+	Styles  []ManifestStyle  `json:"styles"`
+	Mediums []ManifestMedium `json:"mediums"`
+	Poses   []ManifestPose   `json:"poses"`
+	Buckets []string         `json:"buckets"`
+	Prompts []string         `json:"prompts"`
 	// Loras is the server's LoRA list classified by the app's registry; the
 	// trigger words are joined onto it later, from each file's metadata.
 	Loras               []ManifestLora `json:"loras"`
@@ -30,12 +31,17 @@ type ManifestLora struct {
 }
 
 type ManifestCell struct {
-	ID          string              `json:"id"`
-	Flow        string              `json:"flow"`
-	Model       string              `json:"model"`
-	ModelLabel  string              `json:"modelLabel"`
-	Style       string              `json:"style"`
-	StyleLabel  *string             `json:"styleLabel"`
+	ID         string  `json:"id"`
+	Flow       string  `json:"flow"`
+	Model      string  `json:"model"`
+	ModelLabel string  `json:"modelLabel"`
+	Style      string  `json:"style"`
+	StyleLabel *string `json:"styleLabel"`
+	// Medium is empty when the axis was off and "__none" for the control arm
+	// when it was on. The two are different facts: one run never asked the
+	// question, the other asked it and this cell is the answer's baseline.
+	Medium      string              `json:"medium"`
+	MediumLabel *string             `json:"mediumLabel"`
 	PromptIndex int                 `json:"promptIndex"`
 	Prompt      *string             `json:"prompt"`
 	Negative    *string             `json:"negative"`
@@ -73,6 +79,12 @@ type ManifestStyle struct {
 	Block string `json:"block"`
 }
 
+type ManifestMedium struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+	Block string `json:"block"`
+}
+
 type ManifestPose struct {
 	ID    string `json:"id"`
 	Label string `json:"label"`
@@ -97,7 +109,8 @@ func ReadManifest(path string) (*Manifest, error) {
 			continue
 		}
 		key := m.Cells[i].Flow + "|" + m.Cells[i].Model + "|" +
-			m.Cells[i].Style + "|" + itoa(m.Cells[i].PromptIndex)
+			m.Cells[i].Style + "|" + m.Cells[i].Medium + "|" +
+			itoa(m.Cells[i].PromptIndex)
 		v.Order = seen[key]
 		seen[key]++
 	}

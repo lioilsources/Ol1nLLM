@@ -11,6 +11,7 @@ import 'package:video_player/video_player.dart';
 import '../core/constants/theme.dart';
 import '../models/gen_node.dart';
 import '../models/image_model.dart';
+import '../models/medium_preset.dart';
 import '../models/pose_template.dart';
 import '../models/style_preset.dart';
 import '../models/video_scene.dart';
@@ -2137,6 +2138,129 @@ class _StyleChip extends StatelessWidget {
   }
 }
 
+/// Render medium — its own axis, placed at the *front* of the prompt, because
+/// a style block that only mentions its medium in passing loses it on most
+/// models. See [kMediumPresets]; the axis is an experiment, so „Bez media" is
+/// both the default and a real arm of it, not an empty setting.
+class _MediumChip extends StatelessWidget {
+  const _MediumChip({required this.selected, required this.onChanged});
+
+  final String? selected;
+  final ValueChanged<String?> onChanged;
+
+  void _pick(BuildContext context) {
+    _dismissKeyboard();
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: FractionallySizedBox(
+          heightFactor: 0.75,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 2),
+                child: Text(
+                  'Medium',
+                  style: TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text(
+                  'Čím je to vykreslené. Postaví se před tvůj prompt, ne za '
+                  'něj — styl řekne odkud, medium jak.',
+                  style: TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              ListTile(
+                leading: Icon(
+                  selected == null
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  color:
+                      selected == null ? AppTheme.accent : AppTheme.textSecondary,
+                  size: 20,
+                ),
+                title: const Text('Bez media',
+                    style: TextStyle(color: AppTheme.textPrimary)),
+                onTap: () {
+                  onChanged(null);
+                  Navigator.of(ctx).pop();
+                },
+              ),
+              const Divider(height: 1, color: Colors.white12),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: kMediumPresets.length,
+                  itemBuilder: (_, i) {
+                    final md = kMediumPresets[i];
+                    final isSel = md.id == selected;
+                    return ListTile(
+                      leading: Icon(
+                        isSel
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                        color:
+                            isSel ? AppTheme.accent : AppTheme.textSecondary,
+                        size: 20,
+                      ),
+                      title: Text(
+                        md.label,
+                        style: TextStyle(
+                          color:
+                              isSel ? AppTheme.accent : AppTheme.textPrimary,
+                        ),
+                      ),
+                      subtitle: Text(
+                        md.block,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                      onTap: () {
+                        onChanged(md.id);
+                        Navigator.of(ctx).pop();
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final medium = mediumById(selected);
+    return _ChipShell(
+      active: medium != null,
+      icon: Icons.layers_outlined,
+      label: medium?.label ?? 'Medium',
+      onTap: () => _pick(context),
+    );
+  }
+}
+
 /// How hard an img2img round repaints — the difference between a retouch and
 /// a restyle.
 class _EditStrengthChip extends StatelessWidget {
@@ -2495,6 +2619,14 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                       selected: widget.state.selectedStyleId,
                       onChanged: (v) =>
                           ref.read(imageStudioProvider.notifier).setStyle(v),
+                    ),
+                    // Next to the style on purpose: the two compose one prompt
+                    // (style block, then medium block), so they are read and
+                    // changed together.
+                    _MediumChip(
+                      selected: widget.state.selectedMediumId,
+                      onChanged: (v) =>
+                          ref.read(imageStudioProvider.notifier).setMedium(v),
                     ),
                     // Only meaningful for a ComfyUI img2img round: the NIM
                     // backends have no denoise and inpaint always runs at 1.0.

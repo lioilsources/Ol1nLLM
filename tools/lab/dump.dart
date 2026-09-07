@@ -20,6 +20,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ol1n_llm/models/image_model.dart';
 import 'package:ol1n_llm/models/latent_bucket.dart';
+import 'package:ol1n_llm/models/medium_preset.dart';
 import 'package:ol1n_llm/models/pose_template.dart';
 import 'package:ol1n_llm/models/style_preset.dart';
 import 'package:ol1n_llm/services/comfyui_service.dart';
@@ -97,6 +98,18 @@ void main() {
             .where((s) => wantedStyles.isEmpty || wantedStyles.contains(s.id))
             .toList();
 
+    // Mediums: an axis only when asked for. Without MEDIUMS the run has a
+    // single implicit arm — no medium — which is what every run before the
+    // axis existed had, so the cell count and the cell ids do not move.
+    // `__none` is how the control arm is named when the axis *is* swept: it
+    // has to be listable, or the images the others are compared against are
+    // the ones you cannot address.
+    final mediums = <MediumPreset?>[
+      for (final id in _csv(env['MEDIUMS']))
+        if (id == '__none') null else mediumById(id) ?? fail('neznámé medium: $id'),
+    ];
+    final mediumAxis = mediums.isNotEmpty;
+
     final installed = env['CKPTS'] == null
         ? const <String>[]
         : File(env['CKPTS']!)
@@ -135,251 +148,278 @@ void main() {
             continue;
           }
           final styleId = style?.id ?? '__baseline';
-          final prompt = applyStylePreset(prompts[pi], style);
 
-          for (final flow in flows) {
-            void emit(String? variantValue) {
-              if (limit != null && n >= limit) return;
+          for (final medium
+              in mediumAxis ? mediums : const <MediumPreset?>[null]) {
+            // '__none' names the control arm only while the axis is actually
+            // swept; with the axis off the segment is absent altogether and
+            // the ids match what runs produced before it existed.
+            final mediumId = mediumAxis ? (medium?.id ?? '__none') : null;
+            // The one place a cell's prompt is composed — same function the
+            // app calls, so the matrix measures the app's own composition.
+            final prompt = composePromptWith(prompts[pi],
+                style: style, medium: medium);
 
-              // A pose template is only legal where the OpenPose ControlNet is
-              // (SDXL); depth wins over it inside _prepare anyway.
-              String? poseImage;
-              if (poseMode == 'template') {
-                if (!m.supportsPose || !generic) {
+            for (final flow in flows) {
+              void emit(String? variantValue) {
+                if (limit != null && n >= limit) return;
+
+                // A pose template is only legal where the OpenPose ControlNet is
+                // (SDXL); depth wins over it inside _prepare anyway.
+                String? poseImage;
+                if (poseMode == 'template') {
+                  if (!m.supportsPose || !generic) {
+                    skipped.add({
+                      'cell': cellId(
+                          flow: flow, model: m.id,
+                          style: styleId,
+                  medium: mediumId,
+                          promptIndex: indexPrompts ? pi : null),
+                      'reason': 'šablona pózy je SDXL-only (${m.id})',
+                    });
+                    return;
+                  }
+                  if (poseName == null) {
+                    throw StateError('POSE_MODE=template vyžaduje POSE_NAME');
+                  }
+                  poseImage = poseName;
+                }
+
+                // Per-variant param overrides re-enter the builder; graph-level
+                // ones are applied to the finished JSON afterwards.
+                final params = <String, Object>{};
+                for (final o in overrides) {
+                  if (o.target.kind == OverrideKind.param) {
+                    params[o.target.scope] = o.value;
+                  }
+                }
+                var graphOverrides = overrides
+                    .where((o) => o.target.kind != OverrideKind.param)
+                    .toList();
+                if (variantValue != null) {
+                  if (sweep.target.kind == OverrideKind.param) {
+                    params[sweep.target.scope] = coerce(variantValue);
+                  } else {
+                    graphOverrides = [
+                      ...graphOverrides,
+                      OverrideSpec(sweep.target, coerce(variantValue)),
+                    ];
+                  }
+                }
+
+                double? editDenoise = env['EDIT_DENOISE'] == null
+                    ? null
+                    : double.parse(env['EDIT_DENOISE']!);
+                if (params['editDenoise'] is num) {
+                  editDenoise = (params['editDenoise'] as num).toDouble();
+                }
+                var cellSeed = seed;
+                if (params['seed'] is int) cellSeed = params['seed'] as int;
+
+                // LoRA is sweepable (`param.lora`), so it is resolved per cell.
+                var cellLora = lora;
+                if (params['lora'] is String) {
+                  final v = params['lora'] as String;
+                  cellLora = (v.isEmpty || v == 'none') ? null : v;
+                }
+                var cellLoraStrength = loraStrength;
+                if (params['loraStrength'] is num) {
+                  cellLoraStrength = (params['loraStrength'] as num).toDouble();
+                }
+                var cellFace = FaceIdentity.parse(faceIdentity);
+                if (params['faceIdentity'] is String) {
+                  cellFace = FaceIdentity.parse(params['faceIdentity'] as String);
+                }
+                var cellFaceDetail = faceDetail;
+                if (params['faceDetail'] is bool) {
+                  cellFaceDetail = params['faceDetail'] as bool;
+                }
+                if (cellLora != null &&
+                    fitOfLora(cellLora, m.loraFamily) == LoraFit.incompatible) {
                   skipped.add({
                     'cell': cellId(
-                        flow: flow, model: m.id, style: styleId,
+                        flow: flow, model: m.id,
+                        style: styleId,
+                  medium: mediumId,
+                        variantLabel: variantValue == null ? null : sweep.label,
+                        variantValue: variantValue,
                         promptIndex: indexPrompts ? pi : null),
-                    'reason': 'šablona pózy je SDXL-only (${m.id})',
+                    'reason': '$cellLora je ${loraFamilyLabel(familyOfLora(cellLora))} '
+                        '— jiná architektura než ${m.id}, nešla by aplikovat',
                   });
                   return;
                 }
-                if (poseName == null) {
-                  throw StateError('POSE_MODE=template vyžaduje POSE_NAME');
-                }
-                poseImage = poseName;
-              }
 
-              // Per-variant param overrides re-enter the builder; graph-level
-              // ones are applied to the finished JSON afterwards.
-              final params = <String, Object>{};
-              for (final o in overrides) {
-                if (o.target.kind == OverrideKind.param) {
-                  params[o.target.scope] = o.value;
-                }
-              }
-              var graphOverrides = overrides
-                  .where((o) => o.target.kind != OverrideKind.param)
-                  .toList();
-              if (variantValue != null) {
-                if (sweep.target.kind == OverrideKind.param) {
-                  params[sweep.target.scope] = coerce(variantValue);
-                } else {
-                  graphOverrides = [
-                    ...graphOverrides,
-                    OverrideSpec(sweep.target, coerce(variantValue)),
-                  ];
-                }
-              }
-
-              double? editDenoise = env['EDIT_DENOISE'] == null
-                  ? null
-                  : double.parse(env['EDIT_DENOISE']!);
-              if (params['editDenoise'] is num) {
-                editDenoise = (params['editDenoise'] as num).toDouble();
-              }
-              var cellSeed = seed;
-              if (params['seed'] is int) cellSeed = params['seed'] as int;
-
-              // LoRA is sweepable (`param.lora`), so it is resolved per cell.
-              var cellLora = lora;
-              if (params['lora'] is String) {
-                final v = params['lora'] as String;
-                cellLora = (v.isEmpty || v == 'none') ? null : v;
-              }
-              var cellLoraStrength = loraStrength;
-              if (params['loraStrength'] is num) {
-                cellLoraStrength = (params['loraStrength'] as num).toDouble();
-              }
-              var cellFace = FaceIdentity.parse(faceIdentity);
-              if (params['faceIdentity'] is String) {
-                cellFace = FaceIdentity.parse(params['faceIdentity'] as String);
-              }
-              var cellFaceDetail = faceDetail;
-              if (params['faceDetail'] is bool) {
-                cellFaceDetail = params['faceDetail'] as bool;
-              }
-              if (cellLora != null &&
-                  fitOfLora(cellLora, m.loraFamily) == LoraFit.incompatible) {
-                skipped.add({
-                  'cell': cellId(
-                      flow: flow, model: m.id, style: styleId,
-                      variantLabel: variantValue == null ? null : sweep.label,
-                      variantValue: variantValue,
-                      promptIndex: indexPrompts ? pi : null),
-                  'reason': '$cellLora je ${loraFamilyLabel(familyOfLora(cellLora))} '
-                      '— jiná architektura než ${m.id}, nešla by aplikovat',
-                });
-                return;
-              }
-
-              LatentSize? latent;
-              if (latentEnv != null) {
-                final parts = latentEnv.split('x');
-                latent = (w: int.parse(parts[0]), h: int.parse(parts[1]));
-              } else if (flow == 'repose' && refFile != null) {
-                latent = reposeLatentFor(
-                  File(refFile).readAsBytesSync(),
-                  fallback: (w: preset.width, h: preset.height),
-                );
-              }
-
-              final svc = ComfyUIService()..setPreset(preset);
-              if (cellLora != null) {
-                svc
-                  ..setLora(cellLora)
-                  ..setLoraStrength(cellLoraStrength);
-              }
-              Map<String, dynamic> wf;
-              switch (flow) {
-                case 'repose':
-                  if (!canRepose || refName == null) {
-                    skipped.add({
-                      'cell': cellId(
-                          flow: flow, model: m.id, style: styleId,
-                          promptIndex: indexPrompts ? pi : null),
-                      'reason': canRepose
-                          ? 'chybí referenční obrázek'
-                          : 'zachovej pózu je SDXL-only (${m.id})',
-                    });
-                    return;
-                  }
-                  wf = svc.prepareForTest(
-                    _load(preset.txt2imgAsset),
-                    prompt: prompt,
-                    batch: batch,
-                    seed: cellSeed,
-                    depthImageName: refName,
-                    latentSize: latent,
-                    userNegative: negative,
-                    faceIdentity: cellFace,
-                    faceDetail: cellFaceDetail,
+                LatentSize? latent;
+                if (latentEnv != null) {
+                  final parts = latentEnv.split('x');
+                  latent = (w: int.parse(parts[0]), h: int.parse(parts[1]));
+                } else if (flow == 'repose' && refFile != null) {
+                  latent = reposeLatentFor(
+                    File(refFile).readAsBytesSync(),
+                    fallback: (w: preset.width, h: preset.height),
                   );
-                case 'img2img':
-                  if (refName == null) {
-                    skipped.add({
-                      'cell': cellId(
-                          flow: flow, model: m.id, style: styleId,
-                          promptIndex: indexPrompts ? pi : null),
-                      'reason': 'chybí referenční obrázek',
-                    });
-                    return;
-                  }
-                  wf = svc.prepareForTest(
-                    _load(preset.img2imgAsset),
-                    prompt: prompt,
-                    batch: batch,
-                    seed: cellSeed,
-                    imageName: refName,
-                    poseImageName: poseImage,
-                    sourceDepth: poseImage == null &&
+                }
+
+                final svc = ComfyUIService()..setPreset(preset);
+                if (cellLora != null) {
+                  svc
+                    ..setLora(cellLora)
+                    ..setLoraStrength(cellLoraStrength);
+                }
+                Map<String, dynamic> wf;
+                switch (flow) {
+                  case 'repose':
+                    if (!canRepose || refName == null) {
+                      skipped.add({
+                        'cell': cellId(
+                            flow: flow, model: m.id,
+                            style: styleId,
+                  medium: mediumId,
+                            promptIndex: indexPrompts ? pi : null),
+                        'reason': canRepose
+                            ? 'chybí referenční obrázek'
+                            : 'zachovej pózu je SDXL-only (${m.id})',
+                      });
+                      return;
+                    }
+                    wf = svc.prepareForTest(
+                      _load(preset.txt2imgAsset),
+                      prompt: prompt,
+                      batch: batch,
+                      seed: cellSeed,
+                      depthImageName: refName,
+                      latentSize: latent,
+                      userNegative: negative,
+                      faceIdentity: cellFace,
+                      faceDetail: cellFaceDetail,
+                    );
+                  case 'img2img':
+                    if (refName == null) {
+                      skipped.add({
+                        'cell': cellId(
+                            flow: flow, model: m.id,
+                            style: styleId,
+                  medium: mediumId,
+                            promptIndex: indexPrompts ? pi : null),
+                        'reason': 'chybí referenční obrázek',
+                      });
+                      return;
+                    }
+                    wf = svc.prepareForTest(
+                      _load(preset.img2imgAsset),
+                      prompt: prompt,
+                      batch: batch,
+                      seed: cellSeed,
+                      imageName: refName,
+                      poseImageName: poseImage,
+                      sourceDepth: poseImage == null &&
+                          poseMode != 'depth' &&
+                          autoDepth,
+                      depthImageName: poseMode == 'depth' ? refName : null,
+                      userNegative: negative,
+                      editDenoise: editDenoise,
+                      faceIdentity: cellFace,
+                      faceDetail: cellFaceDetail,
+                    );
+                  case 'txt2img':
+                    wf = svc.prepareForTest(
+                      _load(preset.txt2imgAsset),
+                      prompt: prompt,
+                      batch: batch,
+                      seed: cellSeed,
+                      poseImageName: poseImage,
+                      depthImageName:
+                          poseMode == 'depth' ? refName : null,
+                      latentSize: latent,
+                      userNegative: negative,
+                      faceIdentity: cellFace,
+                      faceDetail: cellFaceDetail,
+                    );
+                  default:
+                    fail('neznámá flow: $flow');
+                }
+
+                // A sweep target can be structurally absent for a model rather
+                // than mistyped — flux-manga has no ControlNet to aim at. Skip
+                // that cell with the reason instead of killing the whole dump;
+                // a genuine typo then shows up as *everything* skipped.
+                Map<String, List<String>> applied;
+                try {
+                  applied = applyOverrides(wf, graphOverrides);
+                } on StateError catch (e) {
+                  skipped.add({
+                    'cell': cellId(
+                        flow: flow, model: m.id,
+                        style: styleId,
+                  medium: mediumId,
+                        variantLabel: variantValue == null ? null : sweep.label,
+                        variantValue: variantValue,
+                        promptIndex: indexPrompts ? pi : null),
+                    'reason': e.message,
+                  });
+                  return;
+                }
+                final id = cellId(
+                  flow: flow,
+                  model: m.id,
+                  style: styleId,
+                  medium: mediumId,
+                  variantLabel: variantValue == null ? null : sweep.label,
+                  variantValue: variantValue,
+                  promptIndex: indexPrompts ? pi : null,
+                );
+                File('${out.path}/$id.json').writeAsStringSync(jsonEncode(wf));
+                cells.add({
+                  'id': id,
+                  'flow': flow,
+                  'model': m.id,
+                  'modelLabel': m.label,
+                  'style': styleId,
+                  'styleLabel': style?.label,
+                  // Absent when the axis is off, '__none' for the control arm
+                  // when it is on — the gallery needs the control arm to be a
+                  // value it can filter for, not a gap.
+                  'medium': mediumId,
+                  'mediumLabel': medium?.label,
+                  'promptIndex': pi,
+                  // Read back out of the graph, so the table can never show a
+                  // prompt that differs from the one that was sent.
+                  'prompt': _encodedText(wf, positive: true),
+                  'negative': _encodedText(wf, positive: false),
+                  'variant': variantValue == null
+                      ? null
+                      : {'label': sweep.label, 'value': variantValue},
+                  'params': {
+                    'seed': cellSeed,
+                    'batch': batch,
+                    'editDenoise': editDenoise,
+                    'latent': latent == null ? null : '${latent.w}x${latent.h}',
+                    'poseMode': poseMode,
+                    'refName': refName,
+                    'lora': cellLora,
+                    'loraStrength': cellLora == null ? null : cellLoraStrength,
+                    'sourceDepth': flow == 'img2img' && poseImage == null &&
                         poseMode != 'depth' &&
                         autoDepth,
-                    depthImageName: poseMode == 'depth' ? refName : null,
-                    userNegative: negative,
-                    editDenoise: editDenoise,
-                    faceIdentity: cellFace,
-                    faceDetail: cellFaceDetail,
-                  );
-                case 'txt2img':
-                  wf = svc.prepareForTest(
-                    _load(preset.txt2imgAsset),
-                    prompt: prompt,
-                    batch: batch,
-                    seed: cellSeed,
-                    poseImageName: poseImage,
-                    depthImageName:
-                        poseMode == 'depth' ? refName : null,
-                    latentSize: latent,
-                    userNegative: negative,
-                    faceIdentity: cellFace,
-                    faceDetail: cellFaceDetail,
-                  );
-                default:
-                  fail('neznámá flow: $flow');
-              }
-
-              // A sweep target can be structurally absent for a model rather
-              // than mistyped — flux-manga has no ControlNet to aim at. Skip
-              // that cell with the reason instead of killing the whole dump;
-              // a genuine typo then shows up as *everything* skipped.
-              Map<String, List<String>> applied;
-              try {
-                applied = applyOverrides(wf, graphOverrides);
-              } on StateError catch (e) {
-                skipped.add({
-                  'cell': cellId(
-                      flow: flow, model: m.id, style: styleId,
-                      variantLabel: variantValue == null ? null : sweep.label,
-                      variantValue: variantValue,
-                      promptIndex: indexPrompts ? pi : null),
-                  'reason': e.message,
+                    // Read back out of the graph, like the prompt: asking for
+                    // `faceid` on a FLUX model gets PuLID, and the table must
+                    // say what ran, not what was requested.
+                    'faceIdentity': _effectiveFaceIdentity(wf),
+                    'faceDetail': wf.containsKey('__face_detail__'),
+                  },
+                  'applied': applied,
+                  'presetOverridden': graphOverrides.isNotEmpty,
                 });
-                return;
+                n++;
               }
-              final id = cellId(
-                flow: flow,
-                model: m.id,
-                style: styleId,
-                variantLabel: variantValue == null ? null : sweep.label,
-                variantValue: variantValue,
-                promptIndex: indexPrompts ? pi : null,
-              );
-              File('${out.path}/$id.json').writeAsStringSync(jsonEncode(wf));
-              cells.add({
-                'id': id,
-                'flow': flow,
-                'model': m.id,
-                'modelLabel': m.label,
-                'style': styleId,
-                'styleLabel': style?.label,
-                'promptIndex': pi,
-                // Read back out of the graph, so the table can never show a
-                // prompt that differs from the one that was sent.
-                'prompt': _encodedText(wf, positive: true),
-                'negative': _encodedText(wf, positive: false),
-                'variant': variantValue == null
-                    ? null
-                    : {'label': sweep.label, 'value': variantValue},
-                'params': {
-                  'seed': cellSeed,
-                  'batch': batch,
-                  'editDenoise': editDenoise,
-                  'latent': latent == null ? null : '${latent.w}x${latent.h}',
-                  'poseMode': poseMode,
-                  'refName': refName,
-                  'lora': cellLora,
-                  'loraStrength': cellLora == null ? null : cellLoraStrength,
-                  'sourceDepth': flow == 'img2img' && poseImage == null &&
-                      poseMode != 'depth' &&
-                      autoDepth,
-                  // Read back out of the graph, like the prompt: asking for
-                  // `faceid` on a FLUX model gets PuLID, and the table must
-                  // say what ran, not what was requested.
-                  'faceIdentity': _effectiveFaceIdentity(wf),
-                  'faceDetail': wf.containsKey('__face_detail__'),
-                },
-                'applied': applied,
-                'presetOverridden': graphOverrides.isNotEmpty,
-              });
-              n++;
-            }
 
-            if (sweep.isEmpty) {
-              emit(null);
-            } else {
-              for (final v in sweep.values) {
-                emit(v);
+              if (sweep.isEmpty) {
+                emit(null);
+              } else {
+                for (final v in sweep.values) {
+                  emit(v);
+                }
               }
             }
           }
@@ -417,6 +457,10 @@ void main() {
             for (final s in kStylePresets)
               {'id': s.id, 'label': s.label, 'block': s.block},
           ],
+          'mediums': [
+            for (final md in kMediumPresets)
+              {'id': md.id, 'label': md.label, 'block': md.block},
+          ],
           'poses': [
             for (final p in kPoseTemplates)
               {'id': p.id, 'label': p.label, 'asset': p.asset},
@@ -446,6 +490,7 @@ void main() {
     stdout.writeln('DUMP $n workflows · ${models.length} modelů × '
         '${prompts.length} promptů × ${styles.length + 1} stylů × '
         '${flows.length} flow'
+        '${mediumAxis ? ' × ${mediums.length} medií' : ''}'
         '${sweep.isEmpty ? '' : ' × ${sweep.values.length} variant'}'
         '${skipped.isEmpty ? '' : ' · přeskočeno ${skipped.length}'}');
     expect(n, greaterThan(0), reason: 'dump nevyrobil žádné workflow');
