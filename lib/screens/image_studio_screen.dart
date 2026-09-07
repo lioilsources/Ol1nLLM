@@ -11,6 +11,7 @@ import 'package:video_player/video_player.dart';
 import '../core/constants/theme.dart';
 import '../models/gen_node.dart';
 import '../models/image_model.dart';
+import '../models/learned_lookup.dart';
 import '../models/medium_preset.dart';
 import '../models/pose_template.dart';
 import '../models/style_preset.dart';
@@ -1353,13 +1354,25 @@ class _LoraStrengthBar extends StatelessWidget {
 /// the inpaint prompt sheet. Negative values are deliberate: slider-style
 /// LoRAs are trained as a direction and invert below zero.
 class _LoraStrengthSlider extends StatelessWidget {
-  const _LoraStrengthSlider({required this.value, required this.onChanged});
+  const _LoraStrengthSlider({
+    required this.value,
+    required this.loraName,
+    required this.onChanged,
+  });
 
   final double value;
+
+  /// Which LoRA the strength belongs to — the reset target is what the gallery
+  /// measured for *this* file, not one number for all of them.
+  final String? loraName;
   final ValueChanged<double> onChanged;
 
   @override
   Widget build(BuildContext context) {
+    // Reset goes back to whatever counts as this LoRA's default right now:
+    // the measured value if there is one, the app constant otherwise.
+    final base = loraStrengthFor(loraName);
+    final learnedReason = loraStrengthReason(loraName);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
       child: Column(
@@ -1381,10 +1394,19 @@ class _LoraStrengthSlider extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              if (value != kDefaultLoraStrength) ...[
+              if (learnedReason != null) ...[
+                const SizedBox(width: 6),
+                Tooltip(
+                  message: 'Naučeno z hodnocení v galerii\n$learnedReason',
+                  triggerMode: TooltipTriggerMode.tap,
+                  child: const Icon(Icons.school_outlined,
+                      size: 14, color: AppTheme.textSecondary),
+                ),
+              ],
+              if (value != base) ...[
                 const SizedBox(width: 8),
                 InkWell(
-                  onTap: () => onChanged(kDefaultLoraStrength),
+                  onTap: () => onChanged(base),
                   child: const Padding(
                     padding: EdgeInsets.all(2),
                     child: Icon(Icons.restart_alt,
@@ -1558,6 +1580,7 @@ class _LoraChip extends StatelessWidget {
               const Divider(height: 1, color: Colors.white12),
               _LoraStrengthSlider(
                 value: strength,
+                loraName: selected,
                 onChanged: (v) {
                   setSheetState(() {});
                   onStrengthChanged(v);

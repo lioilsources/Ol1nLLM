@@ -116,6 +116,7 @@ func usage() {
   lab run --out DIR [přepínače]                    dávka z terminálu
   lab score DIR                                    přepočítat metriky
   lab export DIR                                   odeslat běh do FINETUNE gallery
+  lab learn [--dry] [--min 10]                     eval galerie → lib/generated/learned.dart
 
 Přepínače pro `+"`lab run`"+` odpovídají ovládacím prvkům v UI:
   --models a,b   --prompts soubor   --styles a,b   --styles-file f.json
@@ -152,6 +153,8 @@ func main() {
 		fatal(scoreCLI(env, args))
 	case "export":
 		fatal(exportCLI(env, args))
+	case "learn":
+		fatal(learnCLI(env, args))
 	case "-h", "--help", "help":
 		usage()
 	default:

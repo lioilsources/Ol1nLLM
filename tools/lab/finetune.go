@@ -10,6 +10,7 @@ import (
 	"image"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -182,6 +183,50 @@ func (f *Finetune) KnownModels() (map[string]bool, error) {
 		known[m.ID] = true
 	}
 	return known, nil
+}
+
+// Eval reads one slice of the rated corpus: GET /api/eval?group=…, plus any
+// gallery filter as scope. This is the whole input to `lab learn` — the
+// gallery does the counting and the Wilson arithmetic, the lab only decides
+// what the numbers permit.
+func (f *Finetune) Eval(group string, scope map[string]string) (*EvalResponse, error) {
+	q := url.Values{}
+	q.Set("group", group)
+	for k, v := range scope {
+		q.Set(k, v)
+	}
+	path := "/api/eval?" + q.Encode()
+	req, err := http.NewRequest("GET", f.Base+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := f.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		return nil, &HTTPError{Status: resp.StatusCode, Body: snippet(raw), Path: path}
+	}
+	var out EvalResponse
+	if err := json.Unmarshal(raw, &out); err != nil {
+		// A gallery older than the eval harness has no such route and serves
+		// its SPA index instead — a 200 full of HTML. Naming that outright
+		// saves the reader from debugging a JSON parser.
+		if bytes.HasPrefix(bytes.TrimSpace(raw), []byte("<")) {
+			return nil, fmt.Errorf(
+				"%s vrátilo HTML místo JSON — nasazená galerie je starší než eval harness (chybí /api/eval).\n"+
+					"       Na NAS: git pull && docker compose up -d --build", path)
+		}
+		return nil, fmt.Errorf("%s: nečekaná odpověď: %s", path, snippet(raw))
+	}
+	// Rows may legitimately be empty; a response with no group name at all
+	// means we are talking to something that is not this endpoint.
+	if out.Group == "" {
+		return nil, fmt.Errorf("%s: odpověď bez pole \"group\" — galerie je starší než eval harness (nasaď ji)", path)
+	}
+	return &out, nil
 }
 
 // unknownModels lists the run's models the gallery has never heard of.

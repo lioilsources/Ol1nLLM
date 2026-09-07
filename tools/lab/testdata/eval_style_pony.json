@@ -1,0 +1,251 @@
+{
+ "group": "style",
+ "groups": [
+  "model",
+  "style",
+  "medium",
+  "translator",
+  "lora",
+  "pose",
+  "session"
+ ],
+ "criteria": [
+  "pose_adherence",
+  "source_identity",
+  "source_style"
+ ],
+ "minRated": 10,
+ "rows": [
+  {
+   "key": "ukiyoe",
+   "label": "ukiyoe",
+   "n": 24,
+   "liked": 20,
+   "disliked": 1,
+   "unrated": 3,
+   "like": {
+    "up": 20,
+    "down": 1,
+    "rated": 21,
+    "eligible": 24,
+    "rate": 0.9523809523809523,
+    "lower": 0.7733063992587744,
+    "upper": 0.9915440121901736
+   },
+   "criteria": {
+    "pose_adherence": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 24,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_identity": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 24,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_style": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 24,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    }
+   }
+  },
+  {
+   "key": "assyrian",
+   "label": "assyrian",
+   "n": 18,
+   "liked": 1,
+   "disliked": 14,
+   "unrated": 3,
+   "like": {
+    "up": 1,
+    "down": 14,
+    "rated": 15,
+    "eligible": 18,
+    "rate": 0.06666666666666667,
+    "lower": 0.011866895493268559,
+    "upper": 0.29816529873780023
+   },
+   "criteria": {
+    "pose_adherence": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 18,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_identity": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 18,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_style": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 18,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    }
+   }
+  },
+  {
+   "key": "baroque",
+   "label": "baroque",
+   "n": 14,
+   "liked": 5,
+   "disliked": 7,
+   "unrated": 2,
+   "like": {
+    "up": 5,
+    "down": 7,
+    "rated": 12,
+    "eligible": 14,
+    "rate": 0.4166666666666667,
+    "lower": 0.19326031365875665,
+    "upper": 0.6804886874504503
+   },
+   "criteria": {
+    "pose_adherence": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 14,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_identity": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 14,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_style": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 14,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    }
+   }
+  },
+  {
+   "key": "",
+   "label": "(no style)",
+   "n": 10,
+   "liked": 4,
+   "disliked": 3,
+   "unrated": 3,
+   "like": {
+    "up": 4,
+    "down": 3,
+    "rated": 7,
+    "eligible": 10,
+    "rate": 0.5714285714285714,
+    "lower": 0.2504583645276572,
+    "upper": 0.8417801447485304
+   },
+   "criteria": {
+    "pose_adherence": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 10,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_identity": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 10,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_style": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 10,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    }
+   }
+  }
+ ],
+ "total": {
+  "key": "*",
+  "label": "all",
+  "n": 66,
+  "liked": 30,
+  "disliked": 25,
+  "unrated": 11,
+  "like": {
+   "up": 30,
+   "down": 25,
+   "rated": 55,
+   "eligible": 66,
+   "rate": 0.5454545454545454,
+   "lower": 0.4152269024186123,
+   "upper": 0.6697471974798342
+  },
+  "criteria": {
+   "pose_adherence": {
+    "up": 0,
+    "down": 0,
+    "rated": 0,
+    "eligible": 66,
+    "rate": null,
+    "lower": null,
+    "upper": null
+   },
+   "source_identity": {
+    "up": 0,
+    "down": 0,
+    "rated": 0,
+    "eligible": 66,
+    "rate": null,
+    "lower": null,
+    "upper": null
+   },
+   "source_style": {
+    "up": 0,
+    "down": 0,
+    "rated": 0,
+    "eligible": 66,
+    "rate": null,
+    "lower": null,
+    "upper": null
+   }
+  }
+ },
+ "leaders": {}
+}

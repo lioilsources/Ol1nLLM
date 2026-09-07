@@ -1,0 +1,159 @@
+{
+ "group": "session",
+ "groups": [
+  "model",
+  "style",
+  "medium",
+  "translator",
+  "lora",
+  "pose",
+  "session"
+ ],
+ "criteria": [
+  "pose_adherence",
+  "source_identity",
+  "source_style"
+ ],
+ "minRated": 10,
+ "rows": [
+  {
+   "key": "s1",
+   "label": "lab-20260901-ballerina",
+   "n": 40,
+   "liked": 18,
+   "disliked": 8,
+   "unrated": 14,
+   "like": {
+    "up": 18,
+    "down": 8,
+    "rated": 26,
+    "eligible": 40,
+    "rate": 0.6923076923076923,
+    "lower": 0.5001174167780164,
+    "upper": 0.8349868440453624
+   },
+   "criteria": {
+    "pose_adherence": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 40,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_identity": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 40,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_style": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 40,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    }
+   }
+  },
+  {
+   "key": "s2",
+   "label": "lab-20260905-relief",
+   "n": 38,
+   "liked": 16,
+   "disliked": 7,
+   "unrated": 15,
+   "like": {
+    "up": 16,
+    "down": 7,
+    "rated": 23,
+    "eligible": 38,
+    "rate": 0.6956521739130435,
+    "lower": 0.49134243731240795,
+    "upper": 0.8439597554678598
+   },
+   "criteria": {
+    "pose_adherence": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 38,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_identity": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 38,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_style": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 38,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    }
+   }
+  }
+ ],
+ "total": {
+  "key": "*",
+  "label": "all",
+  "n": 78,
+  "liked": 34,
+  "disliked": 15,
+  "unrated": 29,
+  "like": {
+   "up": 34,
+   "down": 15,
+   "rated": 49,
+   "eligible": 78,
+   "rate": 0.6938775510204082,
+   "lower": 0.5547210644108935,
+   "upper": 0.8048450873199342
+  },
+  "criteria": {
+   "pose_adherence": {
+    "up": 0,
+    "down": 0,
+    "rated": 0,
+    "eligible": 78,
+    "rate": null,
+    "lower": null,
+    "upper": null
+   },
+   "source_identity": {
+    "up": 0,
+    "down": 0,
+    "rated": 0,
+    "eligible": 78,
+    "rate": null,
+    "lower": null,
+    "upper": null
+   },
+   "source_style": {
+    "up": 0,
+    "down": 0,
+    "rated": 0,
+    "eligible": 78,
+    "rate": null,
+    "lower": null,
+    "upper": null
+   }
+  }
+ },
+ "leaders": {}
+}

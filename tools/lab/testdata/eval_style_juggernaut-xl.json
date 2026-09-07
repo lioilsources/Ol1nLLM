@@ -1,0 +1,159 @@
+{
+ "group": "style",
+ "groups": [
+  "model",
+  "style",
+  "medium",
+  "translator",
+  "lora",
+  "pose",
+  "session"
+ ],
+ "criteria": [
+  "pose_adherence",
+  "source_identity",
+  "source_style"
+ ],
+ "minRated": 10,
+ "rows": [
+  {
+   "key": "ukiyoe",
+   "label": "ukiyoe",
+   "n": 14,
+   "liked": 4,
+   "disliked": 6,
+   "unrated": 4,
+   "like": {
+    "up": 4,
+    "down": 6,
+    "rated": 10,
+    "eligible": 14,
+    "rate": 0.4,
+    "lower": 0.16818032970623617,
+    "upper": 0.6873262302663417
+   },
+   "criteria": {
+    "pose_adherence": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 14,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_identity": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 14,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_style": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 14,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    }
+   }
+  },
+  {
+   "key": "assyrian",
+   "label": "assyrian",
+   "n": 16,
+   "liked": 1,
+   "disliked": 13,
+   "unrated": 2,
+   "like": {
+    "up": 1,
+    "down": 13,
+    "rated": 14,
+    "eligible": 16,
+    "rate": 0.07142857142857142,
+    "lower": 0.012722215247890944,
+    "upper": 0.31468704424151117
+   },
+   "criteria": {
+    "pose_adherence": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 16,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_identity": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 16,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_style": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 16,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    }
+   }
+  }
+ ],
+ "total": {
+  "key": "*",
+  "label": "all",
+  "n": 30,
+  "liked": 5,
+  "disliked": 19,
+  "unrated": 6,
+  "like": {
+   "up": 5,
+   "down": 19,
+   "rated": 24,
+   "eligible": 30,
+   "rate": 0.20833333333333334,
+   "lower": 0.09244825352851857,
+   "upper": 0.4047045325318866
+  },
+  "criteria": {
+   "pose_adherence": {
+    "up": 0,
+    "down": 0,
+    "rated": 0,
+    "eligible": 30,
+    "rate": null,
+    "lower": null,
+    "upper": null
+   },
+   "source_identity": {
+    "up": 0,
+    "down": 0,
+    "rated": 0,
+    "eligible": 30,
+    "rate": null,
+    "lower": null,
+    "upper": null
+   },
+   "source_style": {
+    "up": 0,
+    "down": 0,
+    "rated": 0,
+    "eligible": 30,
+    "rate": null,
+    "lower": null,
+    "upper": null
+   }
+  }
+ },
+ "leaders": {}
+}

@@ -14,6 +14,7 @@ import '../models/gen_node.dart';
 import '../models/image_model.dart';
 import '../models/image_session.dart';
 import '../models/latent_bucket.dart';
+import '../models/learned_lookup.dart';
 import '../models/medium_preset.dart';
 import '../models/pose_template.dart';
 import '../models/prompt_negatives.dart';
@@ -79,8 +80,10 @@ NodeSettings? adoptableSettings(
   return (
     modelId: modelId,
     lora: loraUsable ? lora : null,
-    // Nodes from before v1.5.1 recorded the LoRA but not its strength.
-    loraStrength: node.loraStrength ?? kDefaultLoraStrength,
+    // Nodes from before v1.5.1 recorded the LoRA but not its strength. What
+    // the gallery measured for *this* LoRA is a better guess than the global
+    // constant, and falls back to it when nothing was measured.
+    loraStrength: node.loraStrength ?? loraStrengthFor(lora),
     poseId: spec.supportsPose ? node.poseId : null,
   );
 }
@@ -590,7 +593,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       nodes: session.nodes.toList(),
       currentNodeId: session.currentNodeId,
       selectedLora: lora,
-      loraStrength: session.loraStrength ?? kDefaultLoraStrength,
+      loraStrength: session.loraStrength ?? loraStrengthFor(session.selectedLora),
       selectedPoseId: poseId,
       selectedStyleId: session.selectedStyleId,
       selectedMediumId: session.selectedMediumId,
@@ -628,7 +631,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           nodes: next.nodes.toList(),
           currentNodeId: next.currentNodeId,
           selectedLora: lora,
-          loraStrength: next.loraStrength ?? kDefaultLoraStrength,
+          loraStrength: next.loraStrength ?? loraStrengthFor(next.selectedLora),
           selectedPoseId: poseId,
           selectedStyleId: next.selectedStyleId,
           selectedMediumId: next.selectedMediumId,
@@ -677,7 +680,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           nodes: latest.nodes.toList(),
           currentNodeId: latest.currentNodeId,
           selectedLora: lora,
-          loraStrength: latest.loraStrength ?? kDefaultLoraStrength,
+          loraStrength: latest.loraStrength ?? loraStrengthFor(latest.selectedLora),
           selectedPoseId: poseId,
           selectedStyleId: latest.selectedStyleId,
           selectedMediumId: latest.selectedMediumId,
@@ -795,9 +798,26 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   void setLora(String? loraName) {
     _comfyui.setLora(loraName);
     state = state.copyWith(selectedLora: loraName, clearLora: loraName == null);
+    // A strength measured for this LoRA is its default, not a suggestion the
+    // user has to find. Only ever applied to a slider the user has not moved
+    // in this session — a hand-set value outranks a measured one, always.
+    if (loraName != null && !_loraStrengthTouched) {
+      final learned = loraStrengthFor(loraName);
+      if (learned != state.loraStrength) {
+        _comfyui.setLoraStrength(learned);
+        state = state.copyWith(loraStrength: learned);
+      }
+    }
   }
 
+  /// Set once the user moves the strength slider, so switching LoRAs stops
+  /// overwriting their choice. Deliberately not persisted: the flag is about
+  /// this session's interaction, and a restored session restores the value
+  /// itself.
+  bool _loraStrengthTouched = false;
+
   void setLoraStrength(double strength) {
+    _loraStrengthTouched = true;
     final v = strength.clamp(kMinLoraStrength, kMaxLoraStrength).toDouble();
     _comfyui.setLoraStrength(v);
     state = state.copyWith(loraStrength: v);

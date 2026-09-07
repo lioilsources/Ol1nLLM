@@ -1,0 +1,389 @@
+{
+ "group": "lora",
+ "groups": [
+  "model",
+  "style",
+  "medium",
+  "translator",
+  "lora",
+  "pose",
+  "session"
+ ],
+ "criteria": [
+  "pose_adherence",
+  "source_identity",
+  "source_style"
+ ],
+ "minRated": 10,
+ "rows": [
+  {
+   "key": "face_v1.safetensors @ 1.20",
+   "label": "face_v1.safetensors @ 1.20",
+   "n": 30,
+   "liked": 20,
+   "disliked": 2,
+   "unrated": 8,
+   "like": {
+    "up": 20,
+    "down": 2,
+    "rated": 22,
+    "eligible": 30,
+    "rate": 0.9090909090909091,
+    "lower": 0.7218505315839417,
+    "upper": 0.9747045710090046
+   },
+   "criteria": {
+    "pose_adherence": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 30,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_identity": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 30,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_style": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 30,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    }
+   }
+  },
+  {
+   "key": "face_v1.safetensors @ 0.40",
+   "label": "face_v1.safetensors @ 0.40",
+   "n": 25,
+   "liked": 6,
+   "disliked": 13,
+   "unrated": 6,
+   "like": {
+    "up": 6,
+    "down": 13,
+    "rated": 19,
+    "eligible": 25,
+    "rate": 0.3157894736842105,
+    "lower": 0.1536437908779228,
+    "upper": 0.5398959232467253
+   },
+   "criteria": {
+    "pose_adherence": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 25,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_identity": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 25,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_style": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 25,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    }
+   }
+  },
+  {
+   "key": "style_v2.safetensors @ 0.90",
+   "label": "style_v2.safetensors @ 0.90",
+   "n": 16,
+   "liked": 8,
+   "disliked": 4,
+   "unrated": 4,
+   "like": {
+    "up": 8,
+    "down": 4,
+    "rated": 12,
+    "eligible": 16,
+    "rate": 0.6666666666666666,
+    "lower": 0.39062208887279953,
+    "upper": 0.8618799089087867
+   },
+   "criteria": {
+    "pose_adherence": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 16,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_identity": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 16,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_style": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 16,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    }
+   }
+  },
+  {
+   "key": "style_v2.safetensors @ 1.10",
+   "label": "style_v2.safetensors @ 1.10",
+   "n": 15,
+   "liked": 7,
+   "disliked": 4,
+   "unrated": 4,
+   "like": {
+    "up": 7,
+    "down": 4,
+    "rated": 11,
+    "eligible": 15,
+    "rate": 0.6363636363636364,
+    "lower": 0.35380117450784887,
+    "upper": 0.8483352890463243
+   },
+   "criteria": {
+    "pose_adherence": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 15,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_identity": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 15,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_style": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 15,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    }
+   }
+  },
+  {
+   "key": "solo_v1.safetensors @ 0.90",
+   "label": "solo_v1.safetensors @ 0.90",
+   "n": 20,
+   "liked": 15,
+   "disliked": 3,
+   "unrated": 2,
+   "like": {
+    "up": 15,
+    "down": 3,
+    "rated": 18,
+    "eligible": 20,
+    "rate": 0.8333333333333334,
+    "lower": 0.6077796189608428,
+    "upper": 0.9416342319413855
+   },
+   "criteria": {
+    "pose_adherence": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 20,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_identity": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 20,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_style": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 20,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    }
+   }
+  },
+  {
+   "key": "legacy_v0.safetensors",
+   "label": "legacy_v0.safetensors",
+   "n": 12,
+   "liked": 9,
+   "disliked": 2,
+   "unrated": 1,
+   "like": {
+    "up": 9,
+    "down": 2,
+    "rated": 11,
+    "eligible": 12,
+    "rate": 0.8181818181818182,
+    "lower": 0.523019438039156,
+    "upper": 0.9486323102539149
+   },
+   "criteria": {
+    "pose_adherence": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 12,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_identity": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 12,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_style": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 12,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    }
+   }
+  },
+  {
+   "key": "",
+   "label": "(no LoRA)",
+   "n": 40,
+   "liked": 20,
+   "disliked": 10,
+   "unrated": 10,
+   "like": {
+    "up": 20,
+    "down": 10,
+    "rated": 30,
+    "eligible": 40,
+    "rate": 0.6666666666666666,
+    "lower": 0.4878005164454384,
+    "upper": 0.8076950191632386
+   },
+   "criteria": {
+    "pose_adherence": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 40,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_identity": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 40,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_style": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 40,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    }
+   }
+  }
+ ],
+ "total": {
+  "key": "*",
+  "label": "all",
+  "n": 158,
+  "liked": 85,
+  "disliked": 38,
+  "unrated": 35,
+  "like": {
+   "up": 85,
+   "down": 38,
+   "rated": 123,
+   "eligible": 158,
+   "rate": 0.6910569105691057,
+   "lower": 0.6046520764682787,
+   "upper": 0.7658892310583103
+  },
+  "criteria": {
+   "pose_adherence": {
+    "up": 0,
+    "down": 0,
+    "rated": 0,
+    "eligible": 158,
+    "rate": null,
+    "lower": null,
+    "upper": null
+   },
+   "source_identity": {
+    "up": 0,
+    "down": 0,
+    "rated": 0,
+    "eligible": 158,
+    "rate": null,
+    "lower": null,
+    "upper": null
+   },
+   "source_style": {
+    "up": 0,
+    "down": 0,
+    "rated": 0,
+    "eligible": 158,
+    "rate": null,
+    "lower": null,
+    "upper": null
+   }
+  }
+ },
+ "leaders": {}
+}

@@ -1,0 +1,205 @@
+{
+ "group": "model",
+ "groups": [
+  "model",
+  "style",
+  "medium",
+  "translator",
+  "lora",
+  "pose",
+  "session"
+ ],
+ "criteria": [
+  "pose_adherence",
+  "source_identity",
+  "source_style"
+ ],
+ "minRated": 10,
+ "rows": [
+  {
+   "key": "pony",
+   "label": "Pony V6",
+   "n": 60,
+   "liked": 28,
+   "disliked": 6,
+   "unrated": 26,
+   "like": {
+    "up": 28,
+    "down": 6,
+    "rated": 34,
+    "eligible": 60,
+    "rate": 0.8235294117647058,
+    "lower": 0.6648626260015724,
+    "upper": 0.9165103095462768
+   },
+   "criteria": {
+    "pose_adherence": {
+     "up": 28,
+     "down": 3,
+     "rated": 31,
+     "eligible": 60,
+     "rate": 0.9032258064516129,
+     "lower": 0.7510006155660716,
+     "upper": 0.9665353558368026
+    },
+    "source_identity": {
+     "up": 8,
+     "down": 5,
+     "rated": 13,
+     "eligible": 60,
+     "rate": 0.6153846153846154,
+     "lower": 0.35522891512665694,
+     "upper": 0.8229029220223743
+    },
+    "source_style": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 60,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    }
+   }
+  },
+  {
+   "key": "juggernaut-xl",
+   "label": "Juggernaut XL",
+   "n": 58,
+   "liked": 24,
+   "disliked": 10,
+   "unrated": 24,
+   "like": {
+    "up": 24,
+    "down": 10,
+    "rated": 34,
+    "eligible": 58,
+    "rate": 0.7058823529411765,
+    "lower": 0.5383109020528556,
+    "upper": 0.8316536932957758
+   },
+   "criteria": {
+    "pose_adherence": {
+     "up": 8,
+     "down": 12,
+     "rated": 20,
+     "eligible": 58,
+     "rate": 0.4,
+     "lower": 0.2188065323728171,
+     "upper": 0.6134184992377469
+    },
+    "source_identity": {
+     "up": 11,
+     "down": 6,
+     "rated": 17,
+     "eligible": 58,
+     "rate": 0.6470588235294118,
+     "lower": 0.4130036348521869,
+     "upper": 0.8269027960275627
+    },
+    "source_style": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 58,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    }
+   }
+  },
+  {
+   "key": "",
+   "label": "(unknown model)",
+   "n": 4,
+   "liked": 1,
+   "disliked": 1,
+   "unrated": 2,
+   "like": {
+    "up": 1,
+    "down": 1,
+    "rated": 2,
+    "eligible": 4,
+    "rate": 0.5,
+    "lower": 0.09453120573423071,
+    "upper": 0.9054687942657693
+   },
+   "criteria": {
+    "pose_adherence": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 4,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_identity": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 4,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    },
+    "source_style": {
+     "up": 0,
+     "down": 0,
+     "rated": 0,
+     "eligible": 4,
+     "rate": null,
+     "lower": null,
+     "upper": null
+    }
+   }
+  }
+ ],
+ "total": {
+  "key": "*",
+  "label": "all",
+  "n": 122,
+  "liked": 53,
+  "disliked": 17,
+  "unrated": 52,
+  "like": {
+   "up": 53,
+   "down": 17,
+   "rated": 70,
+   "eligible": 122,
+   "rate": 0.7571428571428571,
+   "lower": 0.6450496077036256,
+   "upper": 0.8424813887710942
+  },
+  "criteria": {
+   "pose_adherence": {
+    "up": 36,
+    "down": 15,
+    "rated": 51,
+    "eligible": 122,
+    "rate": 0.7058823529411765,
+    "lower": 0.5700092442431359,
+    "upper": 0.8129127357986453
+   },
+   "source_identity": {
+    "up": 19,
+    "down": 11,
+    "rated": 30,
+    "eligible": 122,
+    "rate": 0.6333333333333333,
+    "lower": 0.45513563654794864,
+    "upper": 0.7812607919389929
+   },
+   "source_style": {
+    "up": 0,
+    "down": 0,
+    "rated": 0,
+    "eligible": 122,
+    "rate": null,
+    "lower": null,
+    "upper": null
+   }
+  }
+ },
+ "leaders": {}
+}
