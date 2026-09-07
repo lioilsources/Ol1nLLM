@@ -102,8 +102,8 @@ class LearnedModel {
   /// hodnoceních totéž co o třinácti stech, a to je přesně ta záměna, kvůli
   /// které se celý harness stavěl.
   ///
-  /// Null, když se nezměřilo nic — volající pak ukáže [ImageModelSpec.styleNote]
-  /// jako dřív.
+  /// Null, když se nezměřilo nic — volající pak ukáže
+  /// [ImageModelSpec.styleNote] jako dřív.
   String? get summary {
     final parts = <String>[
       if (poseAdherence != null) 'póza ${_cell(poseAdherence!)}',
@@ -131,8 +131,8 @@ class LearnedValue<T> {
   final String reason;
 }
 
-/// Naučená volba mezi kandidáty (model pro daný [GenIntent]). Jen jiné jméno pro
-/// [LearnedValue] nad id — aby generovaný soubor četl jako věta.
+/// Naučená volba mezi kandidáty (model pro daný [GenIntent]). Jen jiné
+/// jméno pro [LearnedValue] nad id — aby generovaný soubor četl jako věta.
 typedef LearnedChoice = LearnedValue<String>;
 
 /// Jak se styl chová na konkrétním modelu.

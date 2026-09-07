@@ -1495,8 +1495,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           // The style follows the *current* selection, like the model and
           // LoRA above — the rebuilt snapshot records what actually ran.
           prompt: composePrompt(parts.positive,
-            styleId: state.selectedStyleId,
-            mediumId: state.selectedMediumId),
+              styleId: state.selectedStyleId,
+              mediumId: state.selectedMediumId),
           n: _backend.variantCount,
           seed: seed,
           negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -1547,8 +1547,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           prompt: mask != null
               ? chained
               : composePrompt(chained,
-            styleId: state.selectedStyleId,
-            mediumId: state.selectedMediumId),
+                  styleId: state.selectedStyleId,
+                  mediumId: state.selectedMediumId),
           n: _backend.variantCount,
           seed: seed,
           negativePrompt: parts.negative.isEmpty ? null : parts.negative,

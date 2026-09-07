@@ -121,7 +121,8 @@ String composePrompt(String prompt, {String? styleId, String? mediumId}) =>
     );
 
 /// Totéž pro presety, které volající už drží — lab prověřuje kandidáty, kteří
-/// v registrech (zatím) nejsou, a hledání podle id by jejich text tiše zahodilo.
+/// v registrech (zatím) nejsou, a hledání podle id by jejich text tiše
+/// zahodilo.
 String composePromptWith(
   String prompt, {
   StylePreset? style,
