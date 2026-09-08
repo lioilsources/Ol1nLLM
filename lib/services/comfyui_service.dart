@@ -104,6 +104,7 @@ class ComfyUIService implements ImageBackend {
   String? _activePoseAsset;
   bool _autoPose = false;
   double? _editDenoise;
+  FaceIdentity _faceIdentity = FaceIdentity.none;
   ComfyPreset _preset = imageModelById(kDefaultImageModelId).preset!;
 
   /// Pose asset → server-side filename, so each skeleton uploads at most once
@@ -135,6 +136,13 @@ class ComfyUIService implements ImageBackend {
   /// pose template keeps [kPoseEditDenoise] regardless — it needs the high
   /// value to move limbs at all.
   void setEditDenoise(double? denoise) => _editDenoise = denoise;
+
+  /// Carry the source's *face* over on img2img and repose rounds, on top of
+  /// the pose. Only does anything where a depth reference gets injected —
+  /// SDXL img2img without a template pose (auto-depth), and repose — see
+  /// [_injectFaceIdentity]; a template skeleton has no face to read, so the
+  /// setting is a silent no-op there and the provider records it as such.
+  void setFaceIdentity(FaceIdentity mode) => _faceIdentity = mode;
 
   // OpenPose ControlNet for the template-override path (pre-made skeletons).
   // SDXL-only — callers must not set a template pose for non-SDXL presets.
@@ -386,6 +394,9 @@ class ComfyUIService implements ImageBackend {
       sourceDepth: sourceDepth,
       userNegative: negativePrompt,
       editDenoise: editDenoise,
+      // Rides on the auto-depth reference; with a template pose there is
+      // none, and _prepare() leaves it out (see [setFaceIdentity]).
+      faceIdentity: _faceIdentity,
     );
     yield* _run(wf);
   }
@@ -471,7 +482,9 @@ class ComfyUIService implements ImageBackend {
     required int seed,
     String? negativePrompt,
     LatentSize? latentSize,
-    FaceIdentity faceIdentity = FaceIdentity.none,
+    // Null = whatever [setFaceIdentity] holds (the app's chip); the lab
+    // passes it explicitly per cell.
+    FaceIdentity? faceIdentity,
     bool faceDetail = false,
   }) async* {
     if (!_reposeSupported) {
@@ -495,7 +508,7 @@ class ComfyUIService implements ImageBackend {
             fallback: (w: _preset.width, h: _preset.height),
           ),
       userNegative: negativePrompt,
-      faceIdentity: faceIdentity,
+      faceIdentity: faceIdentity ?? _faceIdentity,
       faceDetail: faceDetail,
     );
     yield* _run(wf);

@@ -49,4 +49,32 @@ void main() {
     expect(node.isRepose, isTrue);
     expect(node.status, GenStatus.ready);
   });
+
+  group('faceIdentity snapshot', () {
+    test('round-trips, and is carried through copyWith', () {
+      final node = GenNode.create(
+        parentId: 'p',
+        sourceImageId: 'ref',
+        prompt: 'a knight',
+        isRepose: true,
+        faceIdentity: 'instantid',
+      );
+      expect(node.toJson()['faceIdentity'], 'instantid');
+      final back = GenNode.fromJson(node.toJson())
+          .copyWith(status: GenStatus.ready);
+      expect(back.faceIdentity, 'instantid');
+    });
+
+    test('absent means it did not run — legacy nodes and off alike', () {
+      expect(GenNode.create(prompt: 'x').toJson().containsKey('faceIdentity'),
+          isFalse);
+      final legacy = GenNode.fromJson({
+        'id': 'n',
+        'prompt': 'x',
+        'status': 'ready',
+        'images': <Map<String, dynamic>>[],
+      });
+      expect(legacy.faceIdentity, isNull);
+    });
+  });
 }

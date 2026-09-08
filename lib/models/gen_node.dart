@@ -152,6 +152,14 @@ class GenNode {
   final double? loraStrength;
   final String? poseId;
 
+  /// Face-identity transfer that actually ran on this round
+  /// (`instantid` / `faceid` / `both`, the [FaceIdentity] name), or null
+  /// when off or where it could not apply (no depth reference: txt2img, a
+  /// template pose, inpaint, NIM backends). Recorded the way [loraStrength]
+  /// is — only when it had an effect — so the snapshot never claims a face
+  /// that wasn't read.
+  final String? faceIdentity;
+
   /// Base RNG seed passed to the backend. ComfyUI batches share one seed
   /// (variants differ by batch index); NIM sends seed+i for request i.
   final int? seed;
@@ -199,6 +207,7 @@ class GenNode {
     this.loraStrength,
     this.styleId,
     this.poseId,
+    this.faceIdentity,
     this.seed,
     this.negativePrompt,
     this.positivePrefix,
@@ -232,6 +241,7 @@ class GenNode {
     double? loraStrength,
     String? styleId,
     String? poseId,
+    String? faceIdentity,
     int? seed,
     String? negativePrompt,
     String? positivePrefix,
@@ -261,6 +271,7 @@ class GenNode {
     loraStrength: loraStrength,
     styleId: styleId,
     poseId: poseId,
+    faceIdentity: faceIdentity,
     seed: seed,
     negativePrompt: negativePrompt,
     positivePrefix: positivePrefix,
@@ -299,6 +310,7 @@ class GenNode {
     if (loraStrength != null) 'loraStrength': loraStrength,
     if (styleId != null) 'styleId': styleId,
     if (poseId != null) 'poseId': poseId,
+    if (faceIdentity != null) 'faceIdentity': faceIdentity,
     if (seed != null) 'seed': seed,
     if (negativePrompt != null) 'negativePrompt': negativePrompt,
     if (positivePrefix != null) 'positivePrefix': positivePrefix,
@@ -349,6 +361,7 @@ class GenNode {
       loraStrength: (json['loraStrength'] as num?)?.toDouble(),
       styleId: json['styleId'] as String?,
       poseId: json['poseId'] as String?,
+      faceIdentity: json['faceIdentity'] as String?,
       seed: json['seed'] as int?,
       negativePrompt: json['negativePrompt'] as String?,
       positivePrefix: json['positivePrefix'] as String?,
@@ -408,6 +421,7 @@ class GenNode {
     loraStrength: loraStrength,
     styleId: styleId,
     poseId: poseId,
+    faceIdentity: faceIdentity,
     seed: seed,
     negativePrompt: negativePrompt,
     positivePrefix: positivePrefix,

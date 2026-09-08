@@ -132,6 +132,13 @@ class ImageStudioState {
   /// value. See [ComfyUIService.setEditDenoise].
   final double? editDenoise;
 
+  /// „Zachovat tvář“: carry the source's face over on img2img and repose
+  /// rounds (see [ComfyUIService.setFaceIdentity]). A session setting like
+  /// [editDenoise] — not adopted from nodes, persisted as its name. Only has
+  /// an effect where a depth reference exists (SDXL img2img without a
+  /// template pose, and repose); the node snapshot records whether it did.
+  final FaceIdentity faceIdentity;
+
   /// Reference image for a pending repose round (the input bar is in repose
   /// mode while non-null). Transient UI state — never persisted, dropped by
   /// any full state rebuild (session switch/restore) — and mutually
@@ -169,6 +176,7 @@ class ImageStudioState {
     this.selectedPoseId,
     this.selectedStyleId,
     this.editDenoise,
+    this.faceIdentity = FaceIdentity.none,
     this.reposeSourceImageId,
     this.error,
     this.info,
@@ -245,6 +253,7 @@ class ImageStudioState {
     bool clearStyle = false,
     double? editDenoise,
     bool clearEditDenoise = false,
+    FaceIdentity? faceIdentity,
     String? reposeSourceImageId,
     bool clearRepose = false,
     String? error,
@@ -274,6 +283,7 @@ class ImageStudioState {
         clearStyle ? null : (selectedStyleId ?? this.selectedStyleId),
     editDenoise:
         clearEditDenoise ? null : (editDenoise ?? this.editDenoise),
+    faceIdentity: faceIdentity ?? this.faceIdentity,
     reposeSourceImageId: clearRepose
         ? null
         : (reposeSourceImageId ?? this.reposeSourceImageId),
@@ -408,6 +418,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     String? poseId, {
     double? strength,
     double? editDenoise,
+    FaceIdentity? faceIdentity,
   }) {
     final spec = imageModelById(modelId);
     final keepLora =
@@ -426,6 +437,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     // Session restore calls this *before* the new state exists, so the
     // caller passes the session's value; null falls back to the live state.
     _comfyui.setEditDenoise(editDenoise ?? state.editDenoise);
+    _comfyui.setFaceIdentity(faceIdentity ?? state.faceIdentity);
     return (appliedLora, pose?.id);
   }
 
@@ -459,6 +471,14 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       editDenoise: denoise,
       clearEditDenoise: denoise == null,
     );
+  }
+
+  /// „Zachovat tvář“ for img2img/repose rounds. Applies wherever the round
+  /// has a depth reference to read the face from — the chip is only shown
+  /// there, and [_createNodeWithMeta] records it only where it ran.
+  void setFaceIdentity(FaceIdentity mode) {
+    _comfyui.setFaceIdentity(mode);
+    state = state.copyWith(faceIdentity: mode);
   }
 
   void selectImage(String imageId) =>
@@ -550,6 +570,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       selectedPoseId: state.selectedPoseId,
       selectedStyleId: state.selectedStyleId,
       editDenoise: state.editDenoise,
+      faceIdentity: state.faceIdentity,
     );
   }
 
@@ -561,6 +582,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       session.selectedPoseId,
       strength: session.loraStrength,
       editDenoise: session.editDenoise,
+      faceIdentity: FaceIdentity.parse(session.faceIdentity),
     );
     state = ImageStudioState(
       sessions: state.sessions,
@@ -572,6 +594,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       selectedPoseId: poseId,
       selectedStyleId: session.selectedStyleId,
       editDenoise: session.editDenoise,
+      faceIdentity: FaceIdentity.parse(session.faceIdentity),
       modelId: session.modelId,
       availableLoras: state.availableLoras,
       availableCheckpoints: state.availableCheckpoints,
@@ -598,6 +621,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           next.selectedPoseId,
           strength: next.loraStrength,
           editDenoise: next.editDenoise,
+          faceIdentity: FaceIdentity.parse(next.faceIdentity),
         );
         state = ImageStudioState(
           sessions: updated,
@@ -609,6 +633,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           selectedPoseId: poseId,
           selectedStyleId: next.selectedStyleId,
           editDenoise: next.editDenoise,
+          faceIdentity: FaceIdentity.parse(next.faceIdentity),
           modelId: next.modelId,
           availableLoras: state.availableLoras,
           availableCheckpoints: state.availableCheckpoints,
@@ -646,6 +671,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           latest.selectedPoseId,
           strength: latest.loraStrength,
           editDenoise: latest.editDenoise,
+          faceIdentity: FaceIdentity.parse(latest.faceIdentity),
         );
         state = ImageStudioState(
           sessions: sessions,
@@ -657,6 +683,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           selectedPoseId: poseId,
           selectedStyleId: latest.selectedStyleId,
           editDenoise: latest.editDenoise,
+          faceIdentity: FaceIdentity.parse(latest.faceIdentity),
           modelId: latest.modelId,
           availableLoras: state.availableLoras,
           availableCheckpoints: state.availableCheckpoints,
@@ -688,6 +715,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       selectedPoseId: state.selectedPoseId,
       selectedStyleId: state.selectedStyleId,
       editDenoise: state.editDenoise,
+      faceIdentity:
+          state.faceIdentity.isOn ? state.faceIdentity.name : null,
       modelId: state.modelId,
       exportedAt: existing?.exportedAt,
       exportedImageCount: existing?.exportedImageCount,
@@ -857,6 +886,14 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     final styleId = isInpaint ? null : state.selectedStyleId;
     final appliedLora = isInpaint && !patched ? null : state.selectedLora;
     final poseActive = poseId != null && patched;
+    // Identity reads the face off the depth reference, so it only runs where
+    // one is injected: SDXL img2img on auto-depth (no template pose, not an
+    // inpaint) and repose. Mirror ComfyUIService._injectFaceIdentity's gate
+    // so the snapshot never claims a face that wasn't read.
+    final faceRan = state.faceIdentity.isOn &&
+        patched &&
+        spec.supportsPose &&
+        (isRepose || (isImg2img && !isInpaint && poseId == null));
     // Effective negative = preset negative + user ALL-CAPS tags. Recorded only
     // for generic-template models — elsewhere no negative is actually applied.
     final negative = patched
@@ -882,6 +919,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       loraStrength: appliedLora != null ? state.loraStrength : null,
       styleId: styleId,
       poseId: poseId,
+      faceIdentity: faceRan ? state.faceIdentity.name : null,
       seed: seed,
       negativePrompt: negative.isNotEmpty ? negative : null,
       positivePrefix:

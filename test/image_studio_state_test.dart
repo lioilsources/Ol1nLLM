@@ -4,6 +4,7 @@ import 'package:ol1n_llm/models/gen_node.dart';
 import 'package:ol1n_llm/models/image_model.dart';
 import 'package:ol1n_llm/models/image_session.dart';
 import 'package:ol1n_llm/providers/image_studio_provider.dart';
+import 'package:ol1n_llm/services/comfyui_service.dart' show FaceIdentity;
 
 void main() {
   const loras = [
@@ -220,6 +221,58 @@ void main() {
       });
       expect(back.selectedStyleId, isNull);
       expect(back.editDenoise, isNull);
+    });
+  });
+
+  group('„zachovat tvář“ is a session setting', () {
+    test('off by default, survives an unrelated copyWith', () {
+      const st = ImageStudioState();
+      expect(st.faceIdentity, FaceIdentity.none);
+      final on = st.copyWith(faceIdentity: FaceIdentity.instantid);
+      expect(on.copyWith(currentNodeId: 'n1').faceIdentity,
+          FaceIdentity.instantid);
+      expect(on.copyWith(faceIdentity: FaceIdentity.none).faceIdentity,
+          FaceIdentity.none);
+    });
+
+    test('round-trips through the persisted session by name', () {
+      final s = ImageSession.create(
+        nodes: [GenNode.create(prompt: 'x')],
+        modelId: 'pony',
+        faceIdentity: FaceIdentity.faceid.name,
+      );
+      final json = jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>;
+      expect(json['faceIdentity'], 'faceid');
+      expect(FaceIdentity.parse(ImageSession.fromJson(json).faceIdentity),
+          FaceIdentity.faceid);
+    });
+
+    test('a session saved before this version, or off, reads as none', () {
+      final legacy = ImageSession.fromJson({
+        'id': 'a', 'title': 't', 'nodes': <Map<String, dynamic>>[],
+        'modelId': 'pony', 'updatedAt': DateTime.now().toIso8601String(),
+      });
+      expect(legacy.faceIdentity, isNull);
+      expect(FaceIdentity.parse(legacy.faceIdentity), FaceIdentity.none);
+      // Off is not written at all, so an off session looks like a legacy one.
+      final off = ImageSession.create(
+        nodes: [GenNode.create(prompt: 'x')],
+        modelId: 'pony',
+      );
+      expect(off.toJson().containsKey('faceIdentity'), isFalse);
+    });
+
+    test('export bookkeeping keeps the session settings', () {
+      final s = ImageSession.create(
+        nodes: [GenNode.create(prompt: 'x')],
+        modelId: 'pony',
+        selectedStyleId: 'baroque',
+        editDenoise: kStyleEditDenoise,
+        faceIdentity: 'instantid',
+      ).copyWithExport(exportedAt: DateTime.now(), exportedImageCount: 0);
+      expect(s.selectedStyleId, 'baroque');
+      expect(s.editDenoise, kStyleEditDenoise);
+      expect(s.faceIdentity, 'instantid');
     });
   });
 }

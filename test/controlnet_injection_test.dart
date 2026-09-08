@@ -455,6 +455,60 @@ void main() {
       );
     });
 
+    test('img2img: identity rides on the auto-depth reference', () {
+      // The phone's „Zachovat tvář“ path: an SDXL edit with no template
+      // pose injects the source as `__depth_src__`, and the face is read off
+      // that same node — raw, not letterboxed, because the img2img latent
+      // *is* the source and there is nothing to fit.
+      final wf = sdxlSvc().prepareForTest(
+        _img2img(),
+        prompt: 'oil painting',
+        batch: 1,
+        seed: 7,
+        imageName: 'src.png',
+        sourceDepth: true,
+        faceIdentity: FaceIdentity.instantid,
+      );
+      final apply = wf['__face_apply__'] as Map;
+      expect(apply['class_type'], 'ApplyInstantIDAdvanced');
+      expect(apply['inputs']['image'], ['__depth_src__', 0]);
+      expect(wf.containsKey('__depth_fit__'), isFalse);
+      expect((wf['__cn_apply__'] as Map)['inputs']['positive'],
+          ['__face_apply__', 1]);
+      expect(_sampler(wf)['model'], ['__face_apply__', 0]);
+      for (final e in _allEdges(wf)) {
+        expect(wf.containsKey(e[0]), isTrue, reason: 'dangling edge $e');
+      }
+    });
+
+    test('img2img: a template pose or no depth leaves identity out', () {
+      // A skeleton is not a photo — no reference, no face to read. The chip
+      // is hidden in both cases and the node snapshot records null.
+      final withPose = sdxlSvc().prepareForTest(
+        _img2img(),
+        prompt: 'x',
+        batch: 1,
+        seed: 7,
+        imageName: 'src.png',
+        poseImageName: 'pose.png',
+        sourceDepth: true,
+        faceIdentity: FaceIdentity.both,
+      );
+      final noDepth = sdxlSvc().prepareForTest(
+        _img2img(),
+        prompt: 'x',
+        batch: 1,
+        seed: 7,
+        imageName: 'src.png',
+        faceIdentity: FaceIdentity.both,
+      );
+      for (final wf in [withPose, noDepth]) {
+        expect(_byClass(wf, 'ApplyInstantIDAdvanced'), isEmpty);
+        expect(_byClass(wf, 'IPAdapterFaceID'), isEmpty);
+        expect(wf.containsKey('__face_apply__'), isFalse);
+      }
+    });
+
     test('InstantID sits upstream of the depth apply, on both edges', () {
       final wf = repose(sdxlSvc(), face: FaceIdentity.instantid);
       final cn = (wf['__cn_apply__'] as Map)['inputs'] as Map;

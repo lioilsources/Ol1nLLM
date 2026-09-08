@@ -15,6 +15,7 @@ class ImageSession {
     this.selectedPoseId,
     this.selectedStyleId,
     this.editDenoise,
+    this.faceIdentity,
     required this.modelId,
     required this.updatedAt,
     this.exportedAt,
@@ -37,6 +38,11 @@ class ImageSession {
 
   /// img2img denoise chosen by the user; null = the model preset's value.
   final double? editDenoise;
+
+  /// Face-identity mode picked for img2img/repose rounds (a `FaceIdentity`
+  /// name); null = off. A session setting like [editDenoise], not adopted
+  /// from nodes.
+  final String? faceIdentity;
 
   /// [ImageModelSpec.id] the session was generated with (implies the backend).
   final String modelId;
@@ -81,6 +87,9 @@ class ImageSession {
     selectedLora: selectedLora,
     loraStrength: loraStrength,
     selectedPoseId: selectedPoseId,
+    selectedStyleId: selectedStyleId,
+    editDenoise: editDenoise,
+    faceIdentity: faceIdentity,
     modelId: modelId,
     updatedAt: updatedAt,
     exportedAt: exportedAt,
@@ -96,6 +105,7 @@ class ImageSession {
     String? selectedPoseId,
     String? selectedStyleId,
     double? editDenoise,
+    String? faceIdentity,
     required String modelId,
     DateTime? exportedAt,
     int? exportedImageCount,
@@ -124,6 +134,7 @@ class ImageSession {
       selectedPoseId: selectedPoseId,
       selectedStyleId: selectedStyleId,
       editDenoise: editDenoise,
+      faceIdentity: faceIdentity,
       modelId: modelId,
       updatedAt: DateTime.now(),
       exportedAt: exportedAt,
@@ -141,6 +152,7 @@ class ImageSession {
     if (selectedPoseId != null) 'selectedPoseId': selectedPoseId,
     if (selectedStyleId != null) 'selectedStyleId': selectedStyleId,
     if (editDenoise != null) 'editDenoise': editDenoise,
+    if (faceIdentity != null) 'faceIdentity': faceIdentity,
     'modelId': modelId,
     'updatedAt': updatedAt.toIso8601String(),
     if (exportedAt != null) 'exportedAt': exportedAt!.toIso8601String(),
@@ -159,6 +171,7 @@ class ImageSession {
     selectedPoseId: json['selectedPoseId'] as String?,
     selectedStyleId: json['selectedStyleId'] as String?,
     editDenoise: (json['editDenoise'] as num?)?.toDouble(),
+    faceIdentity: json['faceIdentity'] as String?,
     modelId: json['modelId'] as String? ??
         _legacyModelId(
           json['backendId'] as String?,

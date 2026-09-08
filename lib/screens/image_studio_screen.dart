@@ -15,6 +15,7 @@ import '../models/pose_template.dart';
 import '../models/style_preset.dart';
 import '../models/video_scene.dart';
 import '../providers/image_studio_provider.dart';
+import '../services/comfyui_service.dart' show FaceIdentity;
 import '../widgets/image_session_drawer.dart';
 import 'mask_editor_screen.dart';
 import 'model_viewer_screen.dart';
@@ -2229,6 +2230,105 @@ class _EditStrengthChip extends StatelessWidget {
       );
 }
 
+/// „Zachovat tvář“: carry the source's face over on an img2img / repose
+/// round. The face is read off the same upload the depth map comes from, so
+/// the chip only appears where that reference exists (SDXL, no template
+/// pose) — elsewhere it would be a silent no-op.
+class _FaceChip extends StatelessWidget {
+  const _FaceChip({required this.mode, required this.onChanged});
+
+  final FaceIdentity mode;
+  final ValueChanged<FaceIdentity> onChanged;
+
+  static String _title(FaceIdentity m) => switch (m) {
+        FaceIdentity.none => 'Nová',
+        FaceIdentity.instantid => 'InstantID',
+        FaceIdentity.faceid => 'FaceID',
+        FaceIdentity.both => 'Obojí',
+      };
+
+  void _pick(BuildContext context) {
+    _dismissKeyboard();
+    const options = <(FaceIdentity, String)>[
+      (FaceIdentity.none, 'tvář jde z promptu, předloha dává jen pózu'),
+      (
+        FaceIdentity.instantid,
+        'doporučené — drží, kde tvář je, i čí je; s výtvarným stylem '
+            'nejlíp na Juggernautu',
+      ),
+      (FaceIdentity.faceid, 'jen embedding podoby, bez klíčových bodů'),
+      (FaceIdentity.both, 'InstantID + FaceID; nejsilnější, nejvíc fotka'),
+    ];
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child: Text(
+                'Zachovat tvář',
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                'Tvář se čte ze zdrojového obrázku, ze kterého se drží i '
+                'póza. Když v něm žádná není, kolo selže.',
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+              ),
+            ),
+            for (final (value, sub) in options)
+              ListTile(
+                leading: Icon(
+                  value == mode
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  color: value == mode
+                      ? AppTheme.accent
+                      : AppTheme.textSecondary,
+                  size: 20,
+                ),
+                title: Text(_title(value),
+                    style: TextStyle(
+                      color: value == mode
+                          ? AppTheme.accent
+                          : AppTheme.textPrimary,
+                    )),
+                subtitle: Text(sub,
+                    style: const TextStyle(
+                        color: AppTheme.textSecondary, fontSize: 11)),
+                onTap: () {
+                  onChanged(value);
+                  Navigator.of(ctx).pop();
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => _ChipShell(
+        active: mode.isOn,
+        icon: Icons.face_retouching_natural,
+        label: 'Tvář: ${_title(mode)}',
+        onTap: () => _pick(context),
+      );
+}
+
 /// Shared chip look: accent-tinted when a non-default value is active.
 class _ChipShell extends StatelessWidget {
   const _ChipShell({
@@ -2509,6 +2609,23 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                         onChanged: (v) => ref
                             .read(imageStudioProvider.notifier)
                             .setEditDenoise(v),
+                      ),
+                    ],
+                    // „Zachovat tvář“ needs a depth reference to read the
+                    // face from: an SDXL img2img round on auto-depth (a
+                    // template pose swaps that reference for a skeleton,
+                    // which has no face) or a repose round.
+                    if (spec.supportsPose &&
+                        spec.preset?.ckptName != null &&
+                        (_isReposeMode ||
+                            (_isRefineMode &&
+                                widget.state.selectedPoseId == null))) ...[
+                      const SizedBox(width: 8),
+                      _FaceChip(
+                        mode: widget.state.faceIdentity,
+                        onChanged: (v) => ref
+                            .read(imageStudioProvider.notifier)
+                            .setFaceIdentity(v),
                       ),
                     ],
                     // Repose takes its pose from the reference — a template

@@ -289,7 +289,7 @@ hodnoty ověřené v MangaPrompts pro depth → txt2img). Proč ne 1.0: při pln
 síle přes celý schedule se zapeče objem těla/vlasů/oblečení z reference a
 pere se s novou postavou; posledních 10 % kroků bez hintu nechá dosednout
 detaily. Postava a styl jdou **celé z promptu** — přenos identity je
-volitelný (viz „Zachovat tvář“ níž, zatím jen v labu) a v telefonu vypnutý.
+volitelný (viz „Zachovat tvář“ níž) — v telefonu chip „Tvář“.
 Precedence injekce v `_prepare()`: **`depthImageName` > šablona
 pózy > auto depth** — v repose se vybraná šablona ignoruje (reference *je*
 póza), `_PoseChip` se v režimu skryje a `poseId` na nodu je null. Latent se
@@ -320,7 +320,7 @@ použitý SDXL v session (jinak první dostupný) a oznámí to přes `info`;
 `_ModelChip(needsPose)` šedí ne-SDXL. Režim je transientní (nepersistuje
 se, `selectImage`/`navigateTo`/přepnutí session ho ruší).
 
-**„Zachovat tvář“ (`FaceIdentity`, zatím jen lab)**: repose drží pózu a
+**„Zachovat tvář“ (`FaceIdentity`)**: repose drží pózu a
 postavu zahodí; tohle ji vrací. Tvář se čte z **téhož** uploadu jako
 hloubková mapa — uzel `__depth_src__`, který depth injekce už do grafu dala,
 takže žádný druhý upload a žádná možnost, aby si póza a tvář myslely jinou
@@ -329,6 +329,19 @@ hloubka**: repose vždy, `POSE_MODE=depth` na img2img i txt2img, a taky
 img2img u SDXL modelu bez vybrané pózy (tam auto-depth vzniká sám). Šablona
 kostry ne, ta není fotka a obličej v ní není. Jinde je to no-op, což zároveň
 drží hranu `['__depth_src__', 0]` bez visících konců.
+
+V telefonu: chip `_FaceChip` („Tvář: nová / InstantID / FaceID / obojí“)
+v input baru, viditelný jen tam, kde má odkud tvář číst — SDXL img2img bez
+šablony pózy, nebo repose. `ImageStudioNotifier.setFaceIdentity()` →
+`ComfyUIService.setFaceIdentity()` (vzor `setEditDenoise`); `edit()` ho
+předá do `_prepare()`, `repose()` ho použije, když volající nepředá vlastní
+(lab předává per buňku). Je to **session nastavení** jako styl a síla úpravy
+(`ImageSession.faceIdentity`, jméno enum hodnoty, null = vypnuto), nepřebírá
+se z nodu při navigaci. Na nodu se snapshotuje `GenNode.faceIdentity` **jen
+když opravdu běželo** (`faceRan` v `_createNodeWithMeta` zrcadlí gate
+služby: patched + `supportsPose` + repose, nebo img2img bez šablony a bez
+masky) — stejně jako `loraStrength` jen s LoRA. Dotažení tváře
+(`FaceDetailer`) v telefonu není, zůstává v labu.
 
 | | SDXL (`ckptName != null`) | flux-manga |
 |---|---|---|
