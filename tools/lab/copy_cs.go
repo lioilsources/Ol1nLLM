@@ -57,8 +57,11 @@ var copyCS = map[string]Copy{
 		Text: "Tvář se čte z téže předlohy jako hloubková mapa — žádný druhý " +
 			"upload. Drží přes celý rozvrh (na rozdíl od hloubky, která končí " +
 			"na 90 %): obličej nemá do čeho dosedat, takže pustit ho dřív " +
-			"znamená nechat prompt rysy zase odvést.",
-		Source: "lib/services/comfyui_service.dart — _faceIdentityEndAt",
+			"znamená nechat prompt rysy zase odvést. U InstantID jsou dvě " +
+			"síly: klíčové body (cn_strength, kde tvář je) a embedding " +
+			"(ip_weight, čí tvář to je). Embedding je obrazový embedding " +
+			"fotky, takže se pere se stylem — proto je nižší.",
+		Source: "lib/services/comfyui_service.dart — _instantIdIpWeight",
 	},
 	"face_detail": {
 		Text: "Druhý průchod jen přes nalezený obličej, denoise 0.4 — opraví " +

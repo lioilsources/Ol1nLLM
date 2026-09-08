@@ -415,7 +415,7 @@ void main() {
         sdxlSvc().prepareForTest(_txt2img(), prompt: 'x', batch: 1, seed: 1,
             depthImageName: 'ref.png'),
       ]) {
-        expect(_byClass(wf, 'ApplyInstantID'), isEmpty);
+        expect(_byClass(wf, 'ApplyInstantIDAdvanced'), isEmpty);
         expect(_byClass(wf, 'IPAdapterFaceID'), isEmpty);
         expect(_byClass(wf, 'ApplyPulidFlux'), isEmpty);
         expect(_byClass(wf, 'FaceDetailer'), isEmpty);
@@ -430,7 +430,7 @@ void main() {
         expect(wf.containsKey(id), isTrue, reason: '$id chybí');
       }
       final apply = wf['__face_apply__'] as Map;
-      expect(apply['class_type'], 'ApplyInstantID');
+      expect(apply['class_type'], 'ApplyInstantIDAdvanced');
       // The same (letterboxed) reference the depth map comes from — one
       // upload, and no way for the two to disagree about which photo they
       // mean. Fitted, so InstantID's keypoint hint is never center-cropped.
@@ -438,7 +438,15 @@ void main() {
       expect(apply['inputs']['instantid'], ['__face_id__', 0]);
       expect(apply['inputs']['insightface'], ['__face_analysis__', 0]);
       expect(apply['inputs']['control_net'], ['__face_cn__', 0]);
-      expect(apply['inputs']['weight'], 0.8);
+      // Keypoints firm, embedding lowered: the embedding is what carries the
+      // reference's *photo* look into a stylised render. The advanced node
+      // is the one that splits them; the basic node has a single `weight`.
+      expect(apply['inputs'].containsKey('weight'), isFalse);
+      expect(apply['inputs']['cn_strength'], 0.8);
+      expect(apply['inputs']['ip_weight'], 0.6);
+      // The basic node's built-in defaults, now spelled out as inputs.
+      expect(apply['inputs']['noise'], 0.35);
+      expect(apply['inputs']['combine_embeds'], 'average');
       // Identity holds to the end; the depth hint is the one released at 90 %.
       expect(apply['inputs']['end_at'], 1.0);
       expect(
@@ -462,7 +470,7 @@ void main() {
 
     test('SDXL/faceid: model edge only, no conditioning touched', () {
       final wf = repose(sdxlSvc(), face: FaceIdentity.faceid);
-      expect(_byClass(wf, 'ApplyInstantID'), isEmpty);
+      expect(_byClass(wf, 'ApplyInstantIDAdvanced'), isEmpty);
       final loader = (wf['__faceid_loader__'] as Map)['inputs'] as Map;
       expect(loader['preset'], 'FACEID PLUS V2');
       expect(loader['model'], ['1', 0]);
@@ -502,7 +510,8 @@ void main() {
         FaceIdentity.instantid, FaceIdentity.faceid, FaceIdentity.both,
       ]) {
         final wf = repose(fluxSvc(), face: mode, flux: true);
-        expect(_byClass(wf, 'ApplyInstantID'), isEmpty, reason: mode.name);
+        expect(_byClass(wf, 'ApplyInstantIDAdvanced'), isEmpty,
+            reason: mode.name);
         expect(_byClass(wf, 'IPAdapterFaceID'), isEmpty, reason: mode.name);
         final apply = (wf['__face_apply__'] as Map);
         expect(apply['class_type'], 'ApplyPulidFlux');
@@ -532,7 +541,7 @@ void main() {
         faceIdentity: FaceIdentity.both,
         faceDetail: true,
       );
-      expect(_byClass(wf, 'ApplyInstantID'), isEmpty);
+      expect(_byClass(wf, 'ApplyInstantIDAdvanced'), isEmpty);
       expect(_byClass(wf, 'IPAdapterFaceID'), isEmpty);
       expect(_byClass(wf, 'FaceDetailer'), isEmpty);
       for (final e in _allEdges(wf)) {

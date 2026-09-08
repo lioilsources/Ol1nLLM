@@ -198,10 +198,34 @@ class ComfyUIService implements ImageBackend {
   // dragging the reference's framing in with the identity.
   static const _pulidWeight = 0.9;
 
+  /// InstantID is two things behind one node: a keypoint ControlNet (where
+  /// the face sits) and an IP-Adapter embedding of the reference (whose face
+  /// it is). The basic `ApplyInstantID` drives both from a single `weight`,
+  /// and the embedding is the part that fights a style prompt: it is an image
+  /// embedding of a *photograph*, injected into cross-attention next to the
+  /// text tokens, so at 0.8 for the whole schedule it keeps saying "photo"
+  /// louder than the style block appended at the end of the prompt. In
+  /// img2img that stacks on the source latent and the auto-depth hint, and
+  /// only Juggernaut (a photoreal SDXL-base finetune, the domain the adapter
+  /// was trained on) had enough headroom left for the style to show.
+  ///
+  /// `ApplyInstantIDAdvanced` splits the two, which is InstantID's own advice
+  /// for stylisation: keep the keypoints firm, lower the embedding. 0.6 is a
+  /// starting point, not a measurement — sweep `__face_apply__.ip_weight` in
+  /// the lab before trusting it either way.
+  static const _instantIdIpWeight = 0.6;
+  static const _instantIdCnStrength = 0.8;
+
+  /// Noise on the face embedding and how multiple faces combine — the basic
+  /// node's built-in defaults, spelled out because the advanced node makes
+  /// them required inputs. Kept as they were so the split changes nothing
+  /// else.
+  static const _instantIdNoise = 0.35;
+  static const _instantIdCombineEmbeds = 'average';
+
   /// Identity holds for the whole schedule, unlike the depth hint (released at
   /// 90 % so textures can settle). A face has nothing to settle into — letting
   /// go early just lets the prompt drift the features back.
-  static const _faceIdentityWeight = 0.8;
   static const _faceIdentityStartAt = 0.0;
   static const _faceIdentityEndAt = 1.0;
 
@@ -1602,7 +1626,8 @@ class ComfyUIService implements ImageBackend {
   /// SDXL: InstantID. Takes conditioning in and hands it back with its own
   /// keypoint ControlNet applied, so it has to sit upstream of the depth
   /// apply — the two ControlNets then stack, face keypoints inside the depth
-  /// silhouette.
+  /// silhouette. The advanced node, so the embedding and the keypoint
+  /// ControlNet get separate strengths (see [_instantIdIpWeight]).
   void _injectInstantId(Map<String, dynamic> wf) {
     final sampler = _samplerInputs(wf);
     final cond = _condConsumer(wf);
@@ -1628,7 +1653,7 @@ class ComfyUIService implements ImageBackend {
       'inputs': {'control_net_name': _instantIdControlNet},
     };
     wf['__face_apply__'] = {
-      'class_type': 'ApplyInstantID',
+      'class_type': 'ApplyInstantIDAdvanced',
       '_meta': {'title': 'Tvář z předlohy (InstantID)'},
       'inputs': {
         'instantid': ['__face_id__', 0],
@@ -1638,9 +1663,12 @@ class ComfyUIService implements ImageBackend {
         'model': model,
         'positive': positive,
         'negative': negative,
-        'weight': _faceIdentityWeight,
+        'ip_weight': _instantIdIpWeight,
+        'cn_strength': _instantIdCnStrength,
         'start_at': _faceIdentityStartAt,
         'end_at': _faceIdentityEndAt,
+        'noise': _instantIdNoise,
+        'combine_embeds': _instantIdCombineEmbeds,
       },
     };
     sampler['model'] = ['__face_apply__', 0];

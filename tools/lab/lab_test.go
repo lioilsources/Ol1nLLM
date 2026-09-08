@@ -239,8 +239,8 @@ func TestExplainLabelsTheFaceChain(t *testing.T) {
 			"inputs": map[string]any{"instantid_file": "ip-adapter.bin"}},
 		"__face_analysis__": map[string]any{"class_type": "InstantIDFaceAnalysis",
 			"inputs": map[string]any{"provider": "CPU"}},
-		"__face_apply__": map[string]any{"class_type": "ApplyInstantID",
-			"inputs": map[string]any{"weight": 0.8, "end_at": 1.0,
+		"__face_apply__": map[string]any{"class_type": "ApplyInstantIDAdvanced",
+			"inputs": map[string]any{"ip_weight": 0.6, "cn_strength": 0.8, "end_at": 1.0,
 				"model": []any{"1", 0}, "image": []any{"__depth_src__", 0},
 				"instantid":   []any{"__face_id__", 0},
 				"insightface": []any{"__face_analysis__", 0}}},
@@ -277,8 +277,11 @@ func TestExplainLabelsTheFaceChain(t *testing.T) {
 	if !strings.Contains(steps["__face_apply__"].Note, "předlohy") {
 		t.Fatalf("tvář nemá vysvětlivku: %q", steps["__face_apply__"].Note)
 	}
-	if got := steps["__face_apply__"].Values["weight"]; got != 0.8 {
-		t.Fatalf("panel neukazuje sílu tváře: %v", got)
+	if got := steps["__face_apply__"].Values["ip_weight"]; got != 0.6 {
+		t.Fatalf("panel neukazuje sílu embeddingu tváře: %v", got)
+	}
+	if got := steps["__face_apply__"].Values["cn_strength"]; got != 0.8 {
+		t.Fatalf("panel neukazuje sílu klíčových bodů tváře: %v", got)
 	}
 	if got := steps["__face_detail__"].Values["denoise"]; got != 0.4 {
 		t.Fatalf("panel neukazuje sílu dotažení: %v", got)

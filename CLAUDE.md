@@ -332,7 +332,7 @@ drží hranu `['__depth_src__', 0]` bez visících konců.
 
 | | SDXL (`ckptName != null`) | flux-manga |
 |---|---|---|
-| `instantid` | `ApplyInstantID` (embedding + vlastní keypoint CN) | PuLID |
+| `instantid` | `ApplyInstantIDAdvanced` (embedding + vlastní keypoint CN, zvlášť síly) | PuLID |
 | `faceid` | `IPAdapterFaceID` PlusV2 (jen model hrana) | PuLID |
 | `both` | obě, FaceID první na model hraně | PuLID |
 
@@ -345,9 +345,24 @@ Model hrana se řetězí `loader → [__lora__] → [__faceid_apply__] →
 __face_apply__ → KSampler`; InstantID navíc vrací podmínění, takže sedí
 **před** `__cn_apply__` (`__cn_apply__.positive == ['__face_apply__', 1]`) a
 oba ControlNety se skládají — klíčové body obličeje uvnitř hloubkové siluety.
-Síla 0.8, `end_at` **1.0**: hloubka se pouští na 90 %, aby dosedly textury,
+`end_at` **1.0**: hloubka se pouští na 90 %, aby dosedly textury,
 ale tvář nemá do čeho dosedat a pustit ji dřív znamená nechat prompt rysy
-zase odvést. PuLID jede 0.9 (ne 1.0 jako v odeslaném face inpaintu — tam
+zase odvést.
+
+InstantID má **dvě síly**, proto `ApplyInstantIDAdvanced` a ne základní uzel
+(ten má jedno `weight` pro obojí): `cn_strength` 0.8 je keypoint ControlNet
+(kde tvář je), `ip_weight` 0.6 je IP-Adapter embedding předlohy (čí tvář to
+je). Embedding je obrazový embedding *fotografie* vstříknutý do
+cross-attention vedle textových tokenů, takže při 0.8 přes celý rozvrh
+přebíjí blok stylu (ten je na konci promptu, s nejnižší vahou). V img2img se
+to skládá se zdrojovým latentem (denoise 0.72) a auto-depth hintem (0.7) —
+tři kotvy k fotce proti jednomu stylu — a styl přežil jen na Juggernautu
+(fotoreal SDXL-base finetune, doména, na které je adaptér natrénovaný;
+booru modely jeho tokeny čtou jako šum a spadnou do výchozí scény). 0.6 je
+**odhad podle doporučení InstantID pro stylizaci, ne měření** — ladit sweepem
+`__face_apply__.ip_weight`. `noise` 0.35 a `combine_embeds` average jsou
+vestavěné defaulty základního uzlu, u advanced jen vypsané, aby se přechodem
+nezměnilo nic dalšího. PuLID jede 0.9 (ne 1.0 jako v odeslaném face inpaintu — tam
 maska drží všechno mimo obličej, tady se generuje celý obraz a plná síla
 začne táhnout i rámování reference).
 
@@ -521,8 +536,9 @@ při plánu.
 
 **Zachovat tvář**: `--face-identity=none|instantid|faceid|both` a
 `--face-detail` (v UI blok „tvář“ pod pózou; checkbox dotažení je aktivní jen
-s identitou). Osy sweepu `__face_apply__.weight`, `param.faceIdentity`,
-`__face_detail__.denoise`. Manifest u každé buňky nese `faceIdentity`
+s identitou). Osy sweepu `__face_apply__.ip_weight` a
+`__face_apply__.cn_strength` (InstantID), `__face_apply__.weight` (PuLID),
+`param.faceIdentity`, `__face_detail__.denoise`. Manifest u každé buňky nese `faceIdentity`
 a `faceDetail` **čtené z grafu**, takže flux napíše `pulid`, i když se
 objednal `faceid`. Odhad varuje předem tam, kde by přepínač tiše nic
 neudělal: bez repose/depth flow (není odkud tvář číst), detailer bez
