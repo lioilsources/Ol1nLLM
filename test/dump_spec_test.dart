@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ol1n_llm/models/style_preset.dart';
 
 import '../tools/lab/dump_spec.dart';
 
@@ -170,6 +172,96 @@ void main() {
       final parts = id.split('__');
       expect(parts.first, 'img2img');
       expect(parts[1], 'juggernaut-xl');
+    });
+  });
+
+  group('style candidates', () {
+    test('the real candidates file parses, extra keys and all', () {
+      final raw = jsonDecode(
+        File('tools/lab/candidates/artists.json').readAsStringSync(),
+      ) as List<dynamic>;
+      final styles = parseStyleCandidates(raw);
+      expect(styles.length, raw.length);
+      final vg = styles.firstWhere((s) => s.id == 'vangogh-arles');
+      expect(vg.artist, 'Vincent van Gogh');
+      expect(vg.block, contains('impasto'));
+    });
+
+    test('tags ride along, and the sweep can override the model dialect', () {
+      final c = parseStyleCandidates([
+        {
+          'id': 'x',
+          'block': 'thick impasto brushstrokes',
+          'booru': 'impasto, oil painting (medium)',
+        },
+      ]);
+      expect(c.single.blockFor(PromptDialect.booru),
+          'impasto, oil painting (medium)');
+      expect(styleDialectFor(null, PromptDialect.booru), PromptDialect.booru);
+      expect(styleDialectFor('natural', PromptDialect.booru),
+          PromptDialect.natural);
+      // A typo must not silently fall back to the model's own dialect.
+      expect(() => styleDialectFor('t5', PromptDialect.natural),
+          throwsFormatException);
+    });
+
+    test('a candidate without id or text is rejected', () {
+      expect(() => parseStyleCandidates(['x']), throwsFormatException);
+      expect(
+        () => parseStyleCandidates([
+          {'label': 'bez id', 'block': 'flat colour'},
+        ]),
+        throwsFormatException,
+      );
+      expect(
+        () => parseStyleCandidates([
+          {'id': 'x', 'block': '  '},
+        ]),
+        throwsFormatException,
+      );
+    });
+
+    test('no selection renders the whole pool', () {
+      final c = parseStyleCandidates([
+        {'id': 'a', 'block': 'flat colour'},
+        {'id': 'b', 'block': 'thick impasto'},
+      ]);
+      expect(
+        selectStyles(candidates: c, registry: kStylePresets, wanted: const [])
+            .map((s) => s.id),
+        ['a', 'b'],
+      );
+      expect(
+        selectStyles(candidates: null, registry: kStylePresets, wanted: const [])
+            .length,
+        kStylePresets.length,
+      );
+    });
+
+    test('an id the file lacks comes from the registry', () {
+      // The duplicate check needs the old style next to the candidate, under
+      // the same seed and reference — i.e. in the same run.
+      final c = parseStyleCandidates([
+        {'id': 'monet', 'block': 'plein air figure with parasol'},
+      ]);
+      final picked = selectStyles(
+        candidates: c,
+        registry: kStylePresets,
+        wanted: const ['impressionist', 'monet'],
+      );
+      expect(picked.map((s) => s.id), ['monet', 'impressionist']);
+      expect(picked.last.block, styleById('impressionist')!.block);
+    });
+
+    test('an id found nowhere fails before the GPU', () {
+      expect(
+        () => selectStyles(
+          candidates: null,
+          registry: kStylePresets,
+          wanted: const ['ukiyoe', 'ukyioe'],
+        ),
+        throwsFormatException,
+      );
     });
   });
 

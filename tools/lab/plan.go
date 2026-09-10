@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -82,6 +83,16 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 		}
 	}
 	styleCount := len(s.Styles)
+	if styleCount == 0 && s.StylesFile != "" {
+		// Without --styles a candidates run renders the whole file — 54 artists
+		// × five models is right under the ceiling, so it has to be counted,
+		// not taken for a baseline-only run.
+		n, err := countStyleCandidates(s.StylesFile)
+		if err != nil {
+			e.Blockers = append(e.Blockers, "styles-file: "+err.Error())
+		}
+		styleCount = n
+	}
 	if styleCount == 0 {
 		styleCount = 1 // baseline only
 	} else if !s.NoBaseline {
@@ -281,6 +292,28 @@ func (s *Spec) hasDepthSource(man *Manifest, picked map[string]bool) bool {
 		}
 	}
 	return false
+}
+
+// countStyleCandidates reads only the ids of a --styles-file. Every other key
+// (block, texts for other model families, notes) is the dump's business — the
+// plan needs the count, and must not choke on fields it does not know.
+func countStyleCandidates(path string) (int, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	var list []struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(data, &list); err != nil {
+		return 0, fmt.Errorf("%s: %w", filepath.Base(path), err)
+	}
+	for i, c := range list {
+		if c.ID == "" {
+			return 0, fmt.Errorf("%s: kandidát #%d nemá id", filepath.Base(path), i)
+		}
+	}
+	return len(list), nil
 }
 
 func (s *Spec) needsRef() bool {

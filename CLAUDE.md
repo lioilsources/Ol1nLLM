@@ -165,7 +165,8 @@ mimo pole řeší `GestureDetector` kolem těla obrazovky, ale ten se k dotykům
 potomky nedostane, proto ta explicitní volání. Repose režim klávesnici
 **neotevírá** sám.
 
-**Styly (`lib/models/style_preset.dart`)**: 40 výtvarných bloků ověřených
+**Styly (`lib/models/style_preset.dart`)**: 82 výtvarných bloků (40 kultur
+a epoch, 42 podle konkrétních umělců) ověřených
 měřením (`docs/style-matrix.md`) — každý prošel testem, že na něj aspoň jeden
 model skutečně reaguje, a že nedubluje jiný styl v seznamu, vybírané `_StyleChip` v input baru. Blok se
 připojuje **za** prompt (`applyStyle()`) — vlastní zadání má přednost; prázdný
@@ -173,6 +174,25 @@ prompt (foto root) zůstane prázdný, aby se styl nestal jediným obsahem. Na u
 se persistuje jen `GenNode.styleId`, text je z něj odvoditelný (stejný princip
 jako u póz). Platí pro generate/refine/repose, **ne pro inpaint** (ten popisuje
 jen zamalovanou oblast, celoobrazový styl by se s ním pral).
+
+**Dialekty stylu (`PromptDialect`)**: styl má dva texty — `block` (volná
+fráze, čte ji CLIP i T5) a volitelně `booru` (danbooru tagy **bez jména
+umělce**). Který se pošle, rozhoduje `ImageModelSpec.promptDialect` přes
+`StylePreset.blockFor()`; pole je výslovné, ne odvozené z `loraFamily`
+(animagine-xl je LoRA-rodina `sdxl`, ale čte tagy). V provideru o tom
+rozhoduje jediné místo, `_styled()`, vždy podle modelu, na kterém požadavek
+běží. Text je tak odvozený z `(styleId, modelId)` — obojí na uzlu je, takže
+retry i export zůstávají deterministické bez nového pole. Styl bez `booru`
+posílá `block` všem, kulturní styly se tím nezměnily. Proč dva texty a ne tři
+(věta pro FLUX nepřidala nic, tag umělce nepomohl, u NoobAI škodil): ablace
+třetí vlny v `docs/style-matrix.md`.
+
+**Picker stylů**: jedna zploštělá lista se sekcemi „Kultury a epochy" /
+„Umělci" (podle `StylePreset.artist`; `artist` a `period` jsou jen pro UI,
+do promptu nejdou) a hledáním podle labelu a autora bez ohledu na diakritiku
+(`styleMatchesQuery`). Vyhledávací pole se samo nefokusuje a seznam schovává
+klávesnici při tažení. Podtitulek je vždy `block`, i u anime modelu — tagy by
+se četly hůř.
 
 **Síla úpravy (`_EditStrengthChip`)**: `ComfyUIService.setEditDenoise()`
 přebíjí presetový `img2imgDenoise`. Měření ukázalo, že při presetových ~0.72 je
@@ -536,6 +556,15 @@ sweepů a overridů je v `tools/lab/dump_spec.dart` a testuje ji
 Metriky (reakce vůči baseline, rozptyl stylů, změna proti předchozí hodnotě
 sweepu) měří **barvu, ne převzetí stylu** — jsou k předvýběru, rozhodnout musí
 pohled na obrázky. Kalibrace z reálného měření: `docs/style-matrix.md`.
+
+**Kandidáti stylů**: `--styles-file` čte `id/label/block` a volitelně
+`booru/artist/period`, ostatní klíče toleruje. Id, které v souboru chybí, se
+vezme z registru — kandidát tak stojí ve stejné tabulce jako styl, se kterým
+by mohl být duplicitní; id, které není nikde, shodí dump před GPU. Text stylu
+se volí **per buňka** podle `promptDialect` modelu a manifest ho nese jako
+`styleText` (plus `params.styleDialect`); osa `param.styleDialect=natural|booru`
+dialekt přebije. Přerušený běh z terminálu dokončí `lab resume DIR` — totéž
+co *Pokračovat* v UI, bez nového dumpu.
 
 **LoRA a trigger words**: ovládací panel nabízí LoRA živě ze serveru,
 seřazené podle `loraFit` vůči vybraným modelům (bez modelu podle linie);

@@ -69,6 +69,98 @@ func TestEstimateBlocksBeforeSpendingGPU(t *testing.T) {
 	}
 }
 
+func TestEstimateCountsTheCandidatesFile(t *testing.T) {
+	// A candidates run without --styles renders the whole file. Counted as a
+	// baseline-only run, 54 artists × five models sailed past the ceiling —
+	// and the real file carries keys the plan knows nothing about (booru,
+	// prose, artist), which must not trip it either.
+	models := []ManifestModel{{ID: "a", Preset: map[string]any{}}}
+	man := &Manifest{Models: models}
+	s := Spec{
+		Models: []string{"a"}, Prompts: []string{"x"}, Flows: []string{"txt2img"},
+		StylesFile: filepath.Join("candidates", "artists.json"),
+	}
+	data, err := os.ReadFile(s.StylesFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var list []map[string]any
+	if err := json.Unmarshal(data, &list); err != nil {
+		t.Fatal(err)
+	}
+	e := s.Estimate(man, nil)
+	if len(e.Blockers) != 0 {
+		t.Fatalf("kandidáti s klíči navíc neprošli plánem: %v", e.Blockers)
+	}
+	if e.Cells != len(list)+1 {
+		t.Fatalf("cells = %d, want %d (kandidáti + baseline)", e.Cells, len(list)+1)
+	}
+
+	// --styles narrows the file, the same as in the dump.
+	narrow := s
+	narrow.Styles = []string{"monet", "impressionist"}
+	if got := narrow.Estimate(man, nil).Cells; got != 3 {
+		t.Fatalf("zúžený běh: cells = %d, want 3", got)
+	}
+
+	// A file that does not parse blocks before the GPU instead of failing the
+	// dump after it.
+	bad := filepath.Join(t.TempDir(), "bad.json")
+	if err := os.WriteFile(bad, []byte(`[{"label":"bez id","block":"x"}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	broken := s
+	broken.StylesFile = bad
+	if got := broken.Estimate(man, nil); len(got.Blockers) == 0 {
+		t.Fatal("kandidát bez id musí blokovat start")
+	}
+}
+
+func TestResumeCLINeverDumpsAgain(t *testing.T) {
+	// A run killed mid-flight picks up without the dump — the one heavy step,
+	// and the one whose output a started matrix must not swap. Flutter is
+	// unusable here on purpose: a resume that tried to re-dump would fail.
+	dir := t.TempDir()
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(os.MkdirAll(filepath.Join(dir, "wf"), 0o755))
+	must(os.MkdirAll(filepath.Join(dir, "img"), 0o755))
+	man, _ := json.Marshal(Manifest{Cells: []ManifestCell{
+		{ID: "repose__m____baseline", Flow: "repose", Model: "m", Style: "__baseline"},
+		{ID: "repose__m__ukiyoe", Flow: "repose", Model: "m", Style: "ukiyoe"},
+	}})
+	must(os.WriteFile(filepath.Join(dir, "wf", "manifest.json"), man, 0o644))
+	spec, _ := json.Marshal(Spec{Dry: true})
+	must(os.WriteFile(filepath.Join(dir, "spec.json"), spec, 0o644))
+	// Left "running" by the kill, with one cell already on disk.
+	st, _ := json.Marshal(RunState{ID: "r", Status: "running", Total: 2,
+		Cells: map[string]CellState{}})
+	must(os.WriteFile(filepath.Join(dir, "state.json"), st, 0o644))
+	kept := Placeholder(64, 96, "hotová buňka")
+	must(os.WriteFile(filepath.Join(dir, "img", "repose__m____baseline.png"), kept, 0o644))
+
+	env := &Env{Comfy: NewComfy("", "", ""), FlutterMsg: "v testu vypnutý"}
+	must(resumeCLI(env, []string{dir}))
+
+	if _, err := os.Stat(filepath.Join(dir, "img", "repose__m__ukiyoe.png")); err != nil {
+		t.Fatalf("chybějící buňka se nedopočítala: %v", err)
+	}
+	if got, _ := os.ReadFile(filepath.Join(dir, "img", "repose__m____baseline.png")); string(got) != string(kept) {
+		t.Fatal("hotová buňka se generovala znovu")
+	}
+	var final RunState
+	data, err := os.ReadFile(filepath.Join(dir, "state.json"))
+	must(err)
+	must(json.Unmarshal(data, &final))
+	if final.Status != "done" || final.Done != 2 {
+		t.Fatalf("stav = %s %d/%d, want done 2/2", final.Status, final.Done, final.Total)
+	}
+}
+
 func TestEstimateWarnsAboutPresetOverrideAndFluxSweep(t *testing.T) {
 	flux := ManifestModel{ID: "flux-manga", Label: "FLUX manga", CkptName: nil,
 		Preset: map[string]any{"steps": 20.0}}

@@ -462,6 +462,12 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     );
   }
 
+  /// [prompt] with [styleId]'s text in the dialect of the model the request
+  /// runs on. The one place that decides: an anime model never gets the phrase
+  /// block, and a retry on another model re-derives the text for that model.
+  String _styled(String prompt, String? styleId) =>
+      applyStyle(prompt, styleId, dialect: state.model.promptDialect);
+
   /// How hard an img2img round repaints. Null returns the model preset's
   /// value; [kStyleEditDenoise] is what actually lets an art style through
   /// (the preset's ~0.72 keeps the source's palette and lighting).
@@ -978,7 +984,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     await _runAsync(
       node.id,
       () => _backend.generate(
-        prompt: applyStyle(parts.positive, state.selectedStyleId),
+        prompt: _styled(parts.positive, state.selectedStyleId),
         n: _backend.variantCount,
         seed: seed,
         negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -1065,7 +1071,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       node.id,
       () => _backend.edit(
         image: base.bytes,
-        prompt: applyStyle(chained, state.selectedStyleId),
+        prompt: _styled(chained, state.selectedStyleId),
         n: _backend.variantCount,
         seed: seed,
         negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -1245,7 +1251,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       node.id,
       () => _comfyui.repose(
         image: base.bytes,
-        prompt: applyStyle(parts.positive, state.selectedStyleId),
+        prompt: _styled(parts.positive, state.selectedStyleId),
         n: _comfyui.variantCount,
         seed: seed,
         negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -1423,7 +1429,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         nodeId,
         () => _comfyui.repose(
           image: base.bytes,
-          prompt: applyStyle(parts.positive, node.styleId),
+          prompt: _styled(parts.positive, node.styleId),
           n: _comfyui.variantCount,
           seed: seed,
           negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -1453,7 +1459,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         () => _backend.generate(
           // The style follows the *current* selection, like the model and
           // LoRA above — the rebuilt snapshot records what actually ran.
-          prompt: applyStyle(parts.positive, state.selectedStyleId),
+          prompt: _styled(parts.positive, state.selectedStyleId),
           n: _backend.variantCount,
           seed: seed,
           negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -1503,7 +1509,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           image: base.bytes,
           prompt: mask != null
               ? chained
-              : applyStyle(chained, state.selectedStyleId),
+              : _styled(chained, state.selectedStyleId),
           n: _backend.variantCount,
           seed: seed,
           negativePrompt: parts.negative.isEmpty ? null : parts.negative,

@@ -16,6 +16,15 @@ Zásada z předchozích vln zůstává: **nic se do registru nedostane bez měř
 (`docs/style-matrix.md`). Tento plán proto má napřed experiment, který
 rozhodne o datovém modelu, a teprve pak kód.
 
+> **Stav po ablaci 3a (2026-09-10):** datový model má **dvě pole, ne tři** —
+> `block` (čte ho CLIP i T5; věta pro FLUX na flux-manga nic nepřidala, pole
+> `prose` nevzniklo) a `booru` (tagy bez jména; všechny tři anime modely z nich
+> převzaly styl lépe nebo stejně jako z popisu). `booruArtist` nevzniklo: tag
+> umělce nepomohl nikde, u NoobAI jednou škodil, a na Danbooru má `(style)` tag
+> jen Van Gogh (103 postů) a Picasso (12). `PromptDialect` má proto hodnoty
+> `natural` a `booru`, ne `clip/booru/t5`. Tabulka v §1 a náčrt v §4.1 níže
+> jsou původní odhad; naměřené výsledky jsou v `docs/style-matrix.md`.
+
 ---
 
 ## 1. Proč jeden `block` nestačí
