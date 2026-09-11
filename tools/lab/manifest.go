@@ -36,6 +36,9 @@ type ManifestCell struct {
 	ModelLabel  string              `json:"modelLabel"`
 	Style       string              `json:"style"`
 	StyleLabel  *string             `json:"styleLabel"`
+	// StyleText is the style block as sent. Per cell, not per row: which text
+	// a style sends can depend on the model reading it.
+	StyleText   *string             `json:"styleText"`
 	PromptIndex int                 `json:"promptIndex"`
 	Prompt      *string             `json:"prompt"`
 	Negative    *string             `json:"negative"`
@@ -59,18 +62,25 @@ type ManifestSkip struct {
 }
 
 type ManifestModel struct {
-	ID           string         `json:"id"`
-	Label        string         `json:"label"`
-	SupportsPose bool           `json:"supportsPose"`
-	StyleNote    *string        `json:"styleNote"`
-	CkptName     *string        `json:"ckptName"`
-	Preset       map[string]any `json:"preset"`
+	ID           string `json:"id"`
+	Label        string `json:"label"`
+	SupportsPose bool   `json:"supportsPose"`
+	// PromptDialect is how the model reads a style: "natural" or "booru".
+	PromptDialect string         `json:"promptDialect"`
+	StyleNote     *string        `json:"styleNote"`
+	CkptName      *string        `json:"ckptName"`
+	Preset        map[string]any `json:"preset"`
 }
 
 type ManifestStyle struct {
 	ID    string `json:"id"`
 	Label string `json:"label"`
 	Block string `json:"block"`
+	// Booru is the tag variant anime models get instead of Block.
+	Booru string `json:"booru,omitempty"`
+	// Artist is empty for cultures and epochs; the UI splits the chips on it.
+	Artist string `json:"artist,omitempty"`
+	Period string `json:"period,omitempty"`
 }
 
 type ManifestPose struct {

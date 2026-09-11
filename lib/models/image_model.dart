@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'lora_family.dart';
+import 'style_preset.dart';
 
 export 'lora_family.dart';
 
@@ -71,6 +72,7 @@ class ImageModelSpec {
     required this.kind,
     required this.txt2img,
     required this.img2img,
+    required this.promptDialect,
     this.inpaint = false,
     this.loraFamily = LoraFamily.none,
     this.styleNote,
@@ -101,6 +103,13 @@ class ImageModelSpec {
   /// files, but only the matching lineage transfers properly (see
   /// [loraFit]). Cross-architecture files are filtered out entirely.
   final LoraFamily loraFamily;
+
+  /// How this model reads a style's text — phrases or danbooru tags (see
+  /// [StylePreset.blockFor]). Explicit, not derived from [loraFamily]:
+  /// animagine-xl loads plain SDXL LoRAs but was captioned with tags. Measured
+  /// in the third style wave: the anime lineages took a style from its tags
+  /// far better than from the same description as phrases.
+  final PromptDialect promptDialect;
 
   /// One line on how this checkpoint treats an art-style prompt — measured,
   /// not guessed (10 models × 25 styles, see `docs/style-matrix.md`). Shown in
@@ -157,6 +166,7 @@ const kImageModels = <ImageModelSpec>[
   ImageModelSpec(
     id: 'flux-schnell',
     label: 'FLUX Schnell',
+    promptDialect: PromptDialect.natural,
     icon: Icons.bolt,
     color: Color(0xFF10A37F),
     kind: ImageBackendKind.fluxNim,
@@ -168,6 +178,7 @@ const kImageModels = <ImageModelSpec>[
   ImageModelSpec(
     id: 'flux-kontext',
     label: 'FLUX Kontext',
+    promptDialect: PromptDialect.natural,
     icon: Icons.auto_fix_high,
     color: Colors.orange,
     kind: ImageBackendKind.fluxKontextNim,
@@ -179,6 +190,7 @@ const kImageModels = <ImageModelSpec>[
   ImageModelSpec(
     id: 'flux-manga',
     label: 'FLUX manga',
+    promptDialect: PromptDialect.natural,
     icon: Icons.brush_outlined,
     color: Color(0xFF7E9CD8),
     kind: ImageBackendKind.comfyUi,
@@ -195,6 +207,9 @@ const kImageModels = <ImageModelSpec>[
   ImageModelSpec(
     id: 'flux-fill',
     label: 'FLUX Fill',
+    // Inpaint only, and inpaint never gets a style — natural just keeps the
+    // field honest.
+    promptDialect: PromptDialect.natural,
     icon: Icons.format_color_fill,
     color: Color(0xFFD19A66),
     kind: ImageBackendKind.comfyUi,
@@ -219,6 +234,7 @@ const kImageModels = <ImageModelSpec>[
   ImageModelSpec(
     id: 'pony',
     label: 'Pony V6',
+    promptDialect: PromptDialect.booru,
     icon: Icons.palette_outlined,
     color: Color(0xFFC678DD),
     kind: ImageBackendKind.comfyUi,
@@ -242,6 +258,7 @@ const kImageModels = <ImageModelSpec>[
   ImageModelSpec(
     id: 'juggernaut-xl',
     label: 'Juggernaut XL',
+    promptDialect: PromptDialect.natural,
     icon: Icons.photo_camera_outlined,
     color: Color(0xFFE5C07B),
     kind: ImageBackendKind.comfyUi,
@@ -267,6 +284,7 @@ const kImageModels = <ImageModelSpec>[
   ImageModelSpec(
     id: 'juggernaut-xl-lightning',
     label: 'Juggernaut XL Lightning',
+    promptDialect: PromptDialect.natural,
     icon: Icons.speed,
     color: Color(0xFF56B6C2),
     kind: ImageBackendKind.comfyUi,
@@ -299,6 +317,7 @@ const kImageModels = <ImageModelSpec>[
   ImageModelSpec(
     id: 'illustrious-xl',
     label: 'Illustrious XL',
+    promptDialect: PromptDialect.booru,
     icon: Icons.draw_outlined,
     color: Color(0xFF61AFEF),
     kind: ImageBackendKind.comfyUi,
@@ -331,6 +350,7 @@ const kImageModels = <ImageModelSpec>[
   ImageModelSpec(
     id: 'noobai-xl',
     label: 'NoobAI XL',
+    promptDialect: PromptDialect.booru,
     icon: Icons.diversity_2_outlined,
     color: Color(0xFF8FBCBB),
     kind: ImageBackendKind.comfyUi,
@@ -359,6 +379,7 @@ const kImageModels = <ImageModelSpec>[
   ImageModelSpec(
     id: 'wai-illustrious',
     label: 'WAI Illustrious',
+    promptDialect: PromptDialect.booru,
     icon: Icons.auto_fix_normal_outlined,
     color: Color(0xFFB48EAD),
     kind: ImageBackendKind.comfyUi,
@@ -390,6 +411,7 @@ const kImageModels = <ImageModelSpec>[
   ImageModelSpec(
     id: 'animagine-xl',
     label: 'Animagine XL 4',
+    promptDialect: PromptDialect.booru,
     icon: Icons.brush,
     color: Color(0xFFEBCB8B),
     kind: ImageBackendKind.comfyUi,
@@ -420,6 +442,7 @@ const kImageModels = <ImageModelSpec>[
   ImageModelSpec(
     id: 'atomix-pony-anime',
     label: 'Atomix Pony Anime',
+    promptDialect: PromptDialect.booru,
     icon: Icons.animation,
     color: Color(0xFFE06C75),
     kind: ImageBackendKind.comfyUi,
@@ -447,6 +470,7 @@ const kImageModels = <ImageModelSpec>[
   ImageModelSpec(
     id: 'sd15',
     label: 'SD 1.5',
+    promptDialect: PromptDialect.natural,
     icon: Icons.history_edu_outlined,
     color: Color(0xFF98C379),
     kind: ImageBackendKind.comfyUi,

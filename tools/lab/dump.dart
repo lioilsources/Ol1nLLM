@@ -81,21 +81,19 @@ void main() {
         : [env['SUBJECT']!];
     final indexPrompts = prompts.length > 1;
 
-    // Styles: the app registry, unless the caller vets candidates from a file.
-    final wantedStyles = _csv(env['STYLES']);
-    final styles = env['STYLES_FILE'] != null
-        ? (jsonDecode(File(env['STYLES_FILE']!).readAsStringSync()) as List)
-            .cast<Map<String, dynamic>>()
-            .map((m) => StylePreset(
-                  id: m['id'] as String,
-                  label: (m['label'] ?? m['id']) as String,
-                  block: m['block'] as String,
-                ))
-            .where((s) => wantedStyles.isEmpty || wantedStyles.contains(s.id))
-            .toList()
-        : kStylePresets
-            .where((s) => wantedStyles.isEmpty || wantedStyles.contains(s.id))
-            .toList();
+    // Styles: the app registry, unless the caller vets candidates from a file
+    // — and then an id the file lacks comes from the registry, so an existing
+    // style can share the table with the candidate it might duplicate.
+    final styles = selectStyles(
+      candidates: env['STYLES_FILE'] == null
+          ? null
+          : parseStyleCandidates(
+              jsonDecode(File(env['STYLES_FILE']!).readAsStringSync())
+                  as List<dynamic>,
+            ),
+      registry: kStylePresets,
+      wanted: _csv(env['STYLES']),
+    );
 
     final installed = env['CKPTS'] == null
         ? const <String>[]
@@ -135,7 +133,6 @@ void main() {
             continue;
           }
           final styleId = style?.id ?? '__baseline';
-          final prompt = applyStylePreset(prompts[pi], style);
 
           for (final flow in flows) {
             void emit(String? variantValue) {
@@ -209,6 +206,12 @@ void main() {
               if (params['faceDetail'] is bool) {
                 cellFaceDetail = params['faceDetail'] as bool;
               }
+              // Which text a style sends depends on how the model reads it
+              // (tags for the anime lineages), so it is per cell, not per row.
+              final dialect =
+                  styleDialectFor(params['styleDialect'], m.promptDialect);
+              final prompt =
+                  applyStylePreset(prompts[pi], style, dialect: dialect);
               if (cellLora != null &&
                   fitOfLora(cellLora, m.loraFamily) == LoraFit.incompatible) {
                 skipped.add({
@@ -343,6 +346,7 @@ void main() {
                 'modelLabel': m.label,
                 'style': styleId,
                 'styleLabel': style?.label,
+                'styleText': style?.blockFor(dialect),
                 'promptIndex': pi,
                 // Read back out of the graph, so the table can never show a
                 // prompt that differs from the one that was sent.
@@ -353,6 +357,8 @@ void main() {
                     : {'label': sweep.label, 'value': variantValue},
                 'params': {
                   'seed': cellSeed,
+                  // Null for the baseline: without a style there is no text.
+                  'styleDialect': style == null ? null : dialect.name,
                   'batch': batch,
                   'editDenoise': editDenoise,
                   'latent': latent == null ? null : '${latent.w}x${latent.h}',
@@ -398,6 +404,7 @@ void main() {
                 'id': m.id,
                 'label': m.label,
                 'supportsPose': m.supportsPose,
+                'promptDialect': m.promptDialect.name,
                 'styleNote': m.styleNote,
                 'ckptName': m.preset!.ckptName,
                 'preset': {
@@ -415,7 +422,14 @@ void main() {
           ],
           'styles': [
             for (final s in kStylePresets)
-              {'id': s.id, 'label': s.label, 'block': s.block},
+              {
+                'id': s.id,
+                'label': s.label,
+                'block': s.block,
+                if (s.booru != null) 'booru': s.booru,
+                if (s.artist != null) 'artist': s.artist,
+                if (s.period != null) 'period': s.period,
+              },
           ],
           'poses': [
             for (final p in kPoseTemplates)

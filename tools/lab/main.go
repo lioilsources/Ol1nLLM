@@ -114,6 +114,7 @@ func usage() {
   lab serve [--port 8765] [--open] [--force-dry]   webové UI
   lab check                                        ověří flutter, CF Access a ComfyUI
   lab run --out DIR [přepínače]                    dávka z terminálu
+  lab resume DIR                                   dopočítat přerušený běh (bez dumpu)
   lab score DIR                                    přepočítat metriky
   lab export DIR                                   odeslat běh do FINETUNE gallery
 
@@ -148,6 +149,8 @@ func main() {
 		fatal(check(env))
 	case "run":
 		fatal(runCLI(env, args))
+	case "resume":
+		fatal(resumeCLI(env, args))
 	case "score":
 		fatal(scoreCLI(env, args))
 	case "export":

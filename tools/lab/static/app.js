@@ -88,8 +88,18 @@ async function loadConfig() {
     </button>`).join('');
   $('models').onclick = (e) => toggle(e, 'model', state.models);
 
-  $('styles').innerHTML = cfg.styles.map((s) =>
-    `<button class="chip" data-style="${esc(s.id)}" aria-pressed="false" title="${esc(s.block)}">${esc(s.label)}</button>`).join('');
+  // Two rows, not one: with the artists the registry is ~90 chips, and a single
+  // wrap of them is unusable. Cultures and epochs are the styles without an
+  // artist; the tooltip is the CLIP block, the one text that reads as prose.
+  const styleChip = (s) =>
+    `<button class="chip" data-style="${esc(s.id)}" aria-pressed="false" title="${esc(s.block)}">${esc(s.label)}</button>`;
+  $('styles').innerHTML = [
+    ['kultury a epochy', cfg.styles.filter((s) => !s.artist)],
+    ['umělci', cfg.styles.filter((s) => s.artist)],
+  ].filter(([, list]) => list.length)
+    .map(([label, list]) =>
+      `<p class="grouplabel">${label}</p><div class="chips">${list.map(styleChip).join('')}</div>`)
+    .join('');
   $('styles').onclick = (e) => toggle(e, 'style', state.styles);
 
   $('flows').innerHTML = Object.entries(FLOW_LABEL).map(([id, label]) =>
@@ -636,8 +646,11 @@ function cellHTML(c) {
   const src = st.status === 'done' ? `/media/${state.runId}/thumb/${encodeURIComponent(c.id)}.jpg` : '';
   const variant = c.variant ? `<span class="vlabel">${esc(c.variant.value)}</span>` : '';
   const badge = c.presetOverridden ? '<span class="badge" title="preset přebit">≠</span>' : '';
+  // The style text the model actually got: anime models get tags, FLUX a
+  // sentence, so two cells of one style row can differ for a visible reason.
+  const tip = st.error || (c.styleText ? `${c.id}\n\n${c.styleText}` : c.id);
   return `<button class="cell" data-cell="${esc(c.id)}" data-status="${st.status}"
-      title="${esc(st.error || c.id)}">
+      title="${esc(tip)}">
       ${src ? `<img loading="lazy" src="${src}" alt="">` : ''}${variant}${badge}</button>`;
 }
 
@@ -652,7 +665,11 @@ function promptRowLabel(man, idx) {
 
 function styleLabel(id) {
   const s = (state.config?.styles || []).find((x) => x.id === id);
-  return s ? s.label : id;
+  if (s) return s.label;
+  // Candidates from --styles-file are not in the registry; their label travels
+  // with the cells instead.
+  const c = (state.manifest?.cells || []).find((x) => x.style === id && x.styleLabel);
+  return c ? c.styleLabel : id;
 }
 
 // ── drawer: parameters, metrics, and the wiring chain ──────
@@ -685,6 +702,7 @@ async function openCell(id) {
     ${c.presetOverridden ? `<p class="hint warnline">${esc(state.config.copy.preset_overridden.text)}</p>` : ''}
     <dl class="kv">
       <dt>prompt</dt><dd>${esc(c.prompt || '—')}</dd>
+      ${c.styleText ? `<dt>blok stylu</dt><dd>${esc(c.styleText)}</dd>` : ''}
       <dt>negativ</dt><dd>${esc(c.negative || '—')}</dd>
       ${Object.entries(c.params || {}).filter(([, v]) => v !== null && v !== '')
         .map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(String(v))}</dd>`).join('')}

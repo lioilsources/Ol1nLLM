@@ -45,9 +45,45 @@ lab check                                   # flutter, CF Access, fronta ComfyUI
 lab run --subject "a ballerina" --models juggernaut-xl,pony \
         --styles ukiyoe,baroque --flows txt2img,repose --ref foto.png
 lab run --ref-prompt "photo of a dancer" --sweep '__cn_apply__.strength=0.5|0.75|1.0'
+lab resume build/lab/20260826-0023          # dopočítat přerušený běh
 lab score build/lab/20260826-0023
 lab export build/lab/20260826-0023 --send   # do FINETUNE gallery
 ```
+
+`lab resume` je totéž co tlačítko *Pokračovat* v UI: generuje jen buňky bez
+obrázku a drží workflow, se kterými běh začal — znovu nedumpuje, takže
+navázání po zabitém terminálu stojí jen to, co opravdu chybí.
+
+## Kandidáti stylů
+
+Styly, které ještě nejsou v `kStylePresets`, se ověřují ze souboru:
+
+```bash
+lab run --subject "a ballerina" --models juggernaut-xl,pony --flows repose \
+        --ref foto.png --styles-file candidates/artists.json \
+        --styles monet,impressionist
+```
+
+Soubor je pole `{id, label, block, …}`; čte se i `artist` a `period`.
+Ostatní klíče se tolerují — kandidátský soubor je pracovní dokument a pole
+mu přibývají dřív než appce. Chybějící `id` nebo `block` je chyba už
+v odhadu, ne až v dumpu.
+
+`--styles` soubor zužuje a **id, které v souboru není, se vezme z registru**.
+Kandidát tak stojí ve stejné tabulce, pod stejným seedem a předlohou, jako
+existující styl, se kterým by mohl být duplicitní (`monet` × `impressionist`),
+nebo jako nejslabší styl registru, který určuje laťku reakce. Id, které není
+nikde, shodí dump dřív, než se sáhne na GPU.
+
+Kandidát může mít i `booru` — tentýž styl v danbooru tazích. Dostanou ho
+modely s `promptDialect: booru` (Pony, Illustrious, anime SDXL), ostatní
+`block`; bez `booru` jde `block` všem. Každá buňka manifestu proto nese
+`styleText` — text stylu, který model opravdu dostal — a v parametrech
+`styleDialect`. Ukazuje je tooltip buňky a zásuvka.
+
+Osa `param.styleDialect=natural|booru` pošle všem modelům tentýž dialekt bez
+ohledu na jejich vlastní. Tak jde srovnání tagů s frázemi zopakovat bez ručně
+psaných variant id (viz ablace třetí vlny v `docs/style-matrix.md`).
 
 ## Sweep a override
 
