@@ -36,6 +36,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from bench import analyser, sim  # noqa: E402  jádro facebenche = společná stupnice
 
+# Výchozí hranice čistoty. Jsou to **odhady**, ne kalibrace, a je potřeba
+# s nimi jít ven přes CLI: na benchovém couple klipu stojí oba lidé proti sobě,
+# takže |yaw| je 79–80° po celý klip a se 45° nezbude ani jeden čistý snímek.
 MIN_DET = 0.55       # pod tím je detekce nejistá — nepočítat do gate
 MAX_YAW = 45.0       # stupně; extrémní profil není selhání identity
 MIN_FACE = 48        # px kratší strany bboxu; menší tvář ArcFace nepřečte
@@ -175,7 +178,8 @@ def cmd_score(a):
         other = next(n for n in refs if n != name)
         for fidx, o in t["obs"]:
             clean = (fidx in clean_set) if clean_set is not None else (
-                o["det"] >= MIN_DET and abs(o["yaw"]) <= MAX_YAW and o["size"] >= MIN_FACE)
+                o["det"] >= a.min_det and abs(o["yaw"]) <= a.max_yaw
+                and o["size"] >= a.min_face)
             rows.append({
                 "action": a.action, "person": name, "frame": fidx,
                 "sim": round(sim(o["emb"], refs[name]), 3),
@@ -193,7 +197,9 @@ def cmd_score(a):
     res = summary(csvp, a.threshold)
     res.update({"video": os.path.abspath(a.video), "frames_read": n_read, "frames_total": idx,
                 "every": a.every, "fps": fps, "detect_sec": round(sec, 1),
-                "assign_margin": round(margin, 3), "threshold": a.threshold, "action": a.action})
+                "assign_margin": round(margin, 3), "threshold": a.threshold,
+                "action": a.action, "max_yaw": a.max_yaw, "min_det": a.min_det,
+                "min_face": a.min_face})
     json.dump(res, open(os.path.join(run_dir, "summary.json"), "w"), indent=2, ensure_ascii=False)
     print("  %s" % run_dir)
     return res
@@ -238,6 +244,9 @@ if __name__ == "__main__":
     p.add_argument("--action", default="", help="kiss/hug/gaze… — jen se zapíše, prahy se kalibrují z běhů")
     p.add_argument("--threshold", type=float, default=0.62)
     p.add_argument("--clean-frames", help="JSON se seznamem neokludovaných snímků z preprocesu")
+    p.add_argument("--max-yaw", type=float, default=MAX_YAW)
+    p.add_argument("--min-det", type=float, default=MIN_DET)
+    p.add_argument("--min-face", type=float, default=MIN_FACE)
     p.add_argument("--out")
     p = sub.add_parser("summary"); p.add_argument("csv"); p.add_argument("--threshold", type=float, default=0.62)
     a = ap.parse_args()

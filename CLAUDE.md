@@ -538,6 +538,14 @@ na pořadí `--refs`, margin 0.78 a cross-podobnost 0.17–0.20. **Rychlost gate
 200 snímků × 2 osoby = 69 s** (0,35 s/snímek) — InsightFace na SPARKu jede na
 `CPUExecutionProvider`, protože onnxruntime v ComfyUI venv nemá CUDA EP.
 
+⚠ **Stupnice je slepá na profil proti čelní referenci.** Změřeno na couple
+klipu: týž klip proti *profilovému* výřezu téhož člověka dá medián 0.52–0.61,
+ale proti **čelní** referenční fotce 0.05–0.17 — i pro obrázek, který
+z reference evidentně je. Rozdíl není v identitě, ale v úhlu. Proto jsou prahy
+čistoty (`--max-yaw`, `--min-det`, `--min-face`) parametry, ne konstanty, a
+proto gate u akcí, kde jsou obličeje z definice v profilu (polibek, objetí),
+nemá data — což je poctivější než vyrobit číslo, které nic neměří.
+
 ## Lab (`tools/lab/`)
 
 Nástroj pro otázku „co který model udělá s kterým promptem a nastavením".
