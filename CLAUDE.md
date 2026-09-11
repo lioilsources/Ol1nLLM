@@ -224,6 +224,15 @@ odvodit sampler/steps/cfg/negativ ani rodinu LoRA. Např.
 juggernaut-xl-lightning (distilovaný 4-step ckpt) potřebuje 6 kroků a cfg 2.0
 (`dpmpp_sde`/`karras`) — s generickými 30/6.0 by dal smetí.
 
+**Registr čte i druhé repo.** `lioilsources/SASVibeTemplate` (vibe platforma
+pro zákaznické appky) staví grafiku na tomtéž endpointu a svůj katalog
+modelů/presetů/stylů (`docs/SPARK_MODELS.md`, how-to v `docs/ARTWORK.md`)
+odvozuje z `kImageModels`, `kStylePresets` a `kPoseTemplates` — ručně
+opsaný, ne generovaný. Tahle appka je dogfeed: co je tady ověřené, tam se
+nabízí. Když se registr změní (nový model, jiný preset, vyhozený
+checkpoint), patří k tomu i úprava tamté tabulky, jinak tam zůstane
+hodnota, která už neplatí.
+
 **Negativní prompty (`lib/models/prompt_negatives.dart`)**: UI má jediné
 vstupní pole — tagy/slova psané celé VELKÝMI písmeny (≥2 velká písmena, žádné
 malé; `8K`/`I` zůstávají pozitivní) se přesunou do negativního promptu
