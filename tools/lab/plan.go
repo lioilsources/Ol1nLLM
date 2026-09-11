@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -82,6 +83,16 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 		}
 	}
 	styleCount := len(s.Styles)
+	if styleCount == 0 && s.StylesFile != "" {
+		// Without --styles a candidates run renders the whole file — 54 artists
+		// × five models is right under the ceiling, so it has to be counted,
+		// not taken for a baseline-only run.
+		n, err := countStyleCandidates(s.StylesFile)
+		if err != nil {
+			e.Blockers = append(e.Blockers, "styles-file: "+err.Error())
+		}
+		styleCount = n
+	}
 	if styleCount == 0 {
 		styleCount = 1 // baseline only
 	} else if !s.NoBaseline {
@@ -283,6 +294,28 @@ func (s *Spec) hasDepthSource(man *Manifest, picked map[string]bool) bool {
 	return false
 }
 
+// countStyleCandidates reads only the ids of a --styles-file. Every other key
+// (block, texts for other model families, notes) is the dump's business — the
+// plan needs the count, and must not choke on fields it does not know.
+func countStyleCandidates(path string) (int, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	var list []struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(data, &list); err != nil {
+		return 0, fmt.Errorf("%s: %w", filepath.Base(path), err)
+	}
+	for i, c := range list {
+		if c.ID == "" {
+			return 0, fmt.Errorf("%s: kandidát #%d nemá id", filepath.Base(path), i)
+		}
+	}
+	return len(list), nil
+}
+
 func (s *Spec) needsRef() bool {
 	for _, f := range s.Flows {
 		if f == "img2img" || f == "repose" {
@@ -290,6 +323,39 @@ func (s *Spec) needsRef() bool {
 		}
 	}
 	return s.PoseMode == "depth"
+}
+
+// resolvePose turns the chosen skeleton id into the file name LoadImage reads.
+// The browser only ever knows the id, so whoever starts a run has to do this —
+// skipping it left POSE_NAME empty and the dump died on every template run.
+// Same deterministic name as the app (ol1n_pose_*.png) with overwrite, so
+// doing it twice is free.
+func (s *Spec) resolvePose(env *Env) error {
+	if s.PoseMode != "template" {
+		return nil
+	}
+	if s.PoseID == "" {
+		return fmt.Errorf("vyber šablonu pózy")
+	}
+	// The id arrives in a POST body and becomes a path: only a bare name may
+	// reach filepath.Join.
+	if s.PoseID != filepath.Base(s.PoseID) || strings.HasPrefix(s.PoseID, ".") {
+		return fmt.Errorf("neplatné id šablony pózy: %q", s.PoseID)
+	}
+	asset := filepath.Join(env.RepoRoot, "assets", "poses", s.PoseID+".png")
+	if _, err := os.Stat(asset); err != nil {
+		return fmt.Errorf("šablona pózy %q neexistuje (%s)", s.PoseID, asset)
+	}
+	if s.Dry {
+		s.PoseName = s.PoseID + ".png"
+		return nil
+	}
+	name, err := env.Comfy.Upload(asset, "ol1n_pose_"+s.PoseID+".png")
+	if err != nil {
+		return fmt.Errorf("upload šablony pózy %s: %w", s.PoseID, err)
+	}
+	s.PoseName = name
+	return nil
 }
 
 func overridesTouchLatent(overrides []string, sweep string) bool {

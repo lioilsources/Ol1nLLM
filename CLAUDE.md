@@ -165,7 +165,8 @@ mimo pole řeší `GestureDetector` kolem těla obrazovky, ale ten se k dotykům
 potomky nedostane, proto ta explicitní volání. Repose režim klávesnici
 **neotevírá** sám.
 
-**Styly (`lib/models/style_preset.dart`)**: 40 výtvarných bloků ověřených
+**Styly (`lib/models/style_preset.dart`)**: 82 výtvarných bloků (40 kultur
+a epoch, 42 podle konkrétních umělců) ověřených
 měřením (`docs/style-matrix.md`) — každý prošel testem, že na něj aspoň jeden
 model skutečně reaguje, a že nedubluje jiný styl v seznamu, vybírané `_StyleChip` v input baru. Blok se
 připojuje **za** prompt (`applyStyle()`) — vlastní zadání má přednost; prázdný
@@ -173,6 +174,25 @@ prompt (foto root) zůstane prázdný, aby se styl nestal jediným obsahem. Na u
 se persistuje jen `GenNode.styleId`, text je z něj odvoditelný (stejný princip
 jako u póz). Platí pro generate/refine/repose, **ne pro inpaint** (ten popisuje
 jen zamalovanou oblast, celoobrazový styl by se s ním pral).
+
+**Dialekty stylu (`PromptDialect`)**: styl má dva texty — `block` (volná
+fráze, čte ji CLIP i T5) a volitelně `booru` (danbooru tagy **bez jména
+umělce**). Který se pošle, rozhoduje `ImageModelSpec.promptDialect` přes
+`StylePreset.blockFor()`; pole je výslovné, ne odvozené z `loraFamily`
+(animagine-xl je LoRA-rodina `sdxl`, ale čte tagy). V provideru o tom
+rozhoduje jediné místo, `_styled()`, vždy podle modelu, na kterém požadavek
+běží. Text je tak odvozený z `(styleId, modelId)` — obojí na uzlu je, takže
+retry i export zůstávají deterministické bez nového pole. Styl bez `booru`
+posílá `block` všem, kulturní styly se tím nezměnily. Proč dva texty a ne tři
+(věta pro FLUX nepřidala nic, tag umělce nepomohl, u NoobAI škodil): ablace
+třetí vlny v `docs/style-matrix.md`.
+
+**Picker stylů**: jedna zploštělá lista se sekcemi „Kultury a epochy" /
+„Umělci" (podle `StylePreset.artist`; `artist` a `period` jsou jen pro UI,
+do promptu nejdou) a hledáním podle labelu a autora bez ohledu na diakritiku
+(`styleMatchesQuery`). Vyhledávací pole se samo nefokusuje a seznam schovává
+klávesnici při tažení. Podtitulek je vždy `block`, i u anime modelu — tagy by
+se četly hůř.
 
 **Síla úpravy (`_EditStrengthChip`)**: `ComfyUIService.setEditDenoise()`
 přebíjí presetový `img2imgDenoise`. Měření ukázalo, že při presetových ~0.72 je
@@ -508,6 +528,44 @@ tvář vůbec nevymění). Strop téhle cesty je ~0.75–0.8: PuLID kóduje tvá
 jednoho embeddingu, tedy „typ" tváře, ne geometrii. Přes 0.9 by dal jen face
 swap (licence jen pro nekomerční použití) nebo LoRA na osobu (20+ fotek).
 
+### Identita ve videu (`tools/facebench/vidbench.py`)
+
+Tatáž stupnice, ale pro klip s **dvěma** lidmi (couple karta v Tsumiki,
+`MangaPrompts/reports/couple_phase0.md`). `bench.py` měří **největší** obličej
+v obrázku, takže u dvojice měří jednoho člověka a podle velikosti bboxu
+nedeterministicky jednou A a jednou B; `vidbench.py` proto doplňuje čtení po
+snímcích a párování detekcí na osoby, zatímco `embedding()`/`sim()` importuje,
+aby čísla zůstala porovnatelná s 0.48 / 0.72 z face inpaintu.
+
+Párování je **prostorové, ne podle podobnosti**: obličeje se skládají do stop
+přes IoU se snímkem předtím (stopa přežije 6 snímků výpadku) a teprve celá
+stopa se přiřadí referenci podle průměrného embeddingu. Přiřazovat každý snímek
+zvlášť „k té referenci, které je podobnější" by vybíralo maximum z dvojice a
+skóre by se samo nafouklo. `margin` v souhrnu říká, o kolik je vítězné
+přiřazení lepší než prohozené — pod ~0.05 jsou ti dva zaměnitelní a číslům
+se nedá věřit.
+
+Gate je **p10 čistých snímků**, ne minimum, a okludované snímky o pass/fail
+nerozhodují (polibek, profil a zavřené oči srážejí skóre z důvodů, které nejsou
+selhání identity). Bez okluzní mapy z preprocesu se čistota odhaduje z detekce
+(`det_score`, |yaw|, velikost tváře); pipeline může předat vlastní seznam přes
+`--clean-frames`. Práh patří kalibrovat per akce, proto se `--action` zapisuje
+do CSV — prahy se odvodí z naměřených běhů, nevymýšlejí se dopředu.
+
+Ověřeno na SPARKu na syntetickém klipu (dvě tváře, křížení, změna velikosti,
+mp4 komprese): stopy přežily přiblížení (200/200 snímků), přiřazení je nezávislé
+na pořadí `--refs`, margin 0.78 a cross-podobnost 0.17–0.20. **Rychlost gate:
+200 snímků × 2 osoby = 69 s** (0,35 s/snímek) — InsightFace na SPARKu jede na
+`CPUExecutionProvider`, protože onnxruntime v ComfyUI venv nemá CUDA EP.
+
+⚠ **Stupnice je slepá na profil proti čelní referenci.** Změřeno na couple
+klipu: týž klip proti *profilovému* výřezu téhož člověka dá medián 0.52–0.61,
+ale proti **čelní** referenční fotce 0.05–0.17 — i pro obrázek, který
+z reference evidentně je. Rozdíl není v identitě, ale v úhlu. Proto jsou prahy
+čistoty (`--max-yaw`, `--min-det`, `--min-face`) parametry, ne konstanty, a
+proto gate u akcí, kde jsou obličeje z definice v profilu (polibek, objetí),
+nemá data — což je poctivější než vyrobit číslo, které nic neměří.
+
 ## Lab (`tools/lab/`)
 
 Nástroj pro otázku „co který model udělá s kterým promptem a nastavením".
@@ -536,6 +594,15 @@ sweepů a overridů je v `tools/lab/dump_spec.dart` a testuje ji
 Metriky (reakce vůči baseline, rozptyl stylů, změna proti předchozí hodnotě
 sweepu) měří **barvu, ne převzetí stylu** — jsou k předvýběru, rozhodnout musí
 pohled na obrázky. Kalibrace z reálného měření: `docs/style-matrix.md`.
+
+**Kandidáti stylů**: `--styles-file` čte `id/label/block` a volitelně
+`booru/artist/period`, ostatní klíče toleruje. Id, které v souboru chybí, se
+vezme z registru — kandidát tak stojí ve stejné tabulce jako styl, se kterým
+by mohl být duplicitní; id, které není nikde, shodí dump před GPU. Text stylu
+se volí **per buňka** podle `promptDialect` modelu a manifest ho nese jako
+`styleText` (plus `params.styleDialect`); osa `param.styleDialect=natural|booru`
+dialekt přebije. Přerušený běh z terminálu dokončí `lab resume DIR` — totéž
+co *Pokračovat* v UI, bez nového dumpu.
 
 **LoRA a trigger words**: ovládací panel nabízí LoRA živě ze serveru,
 seřazené podle `loraFit` vůči vybraným modelům (bez modelu podle linie);

@@ -3,6 +3,83 @@
 /// unit-tested without booting a dump (`test/dump_spec_test.dart`).
 library;
 
+import 'package:ol1n_llm/models/style_preset.dart';
+
+/// Style candidates from `--styles-file`: `[{id, label, block, …}]`.
+///
+/// Keys beyond the ones read here are tolerated on purpose — the candidates
+/// file is a working document and grows fields (notes, texts for other model
+/// families) before the app does. A missing `id` or `block` is still an error:
+/// a candidate without text would dump as an unstyled cell labelled as styled.
+List<StylePreset> parseStyleCandidates(List<dynamic> json) => [
+      for (final (i, raw) in json.indexed) _candidate(i, raw),
+    ];
+
+StylePreset _candidate(int i, Object? raw) {
+  if (raw is! Map) throw FormatException('kandidát #$i není objekt');
+  final id = raw['id'];
+  final block = raw['block'];
+  if (id is! String || id.isEmpty) {
+    throw FormatException('kandidát #$i nemá id');
+  }
+  if (block is! String || block.trim().isEmpty) {
+    throw FormatException('kandidát "$id" nemá block');
+  }
+  return StylePreset(
+    id: id,
+    label: (raw['label'] as String?) ?? id,
+    block: block,
+    booru: raw['booru'] as String?,
+    artist: raw['artist'] as String?,
+    period: raw['period'] as String?,
+  );
+}
+
+/// The dialect a cell's style text is written in: the model's own, unless the
+/// `param.styleDialect` sweep asks for another — which is how the tags-vs-
+/// phrases comparison can be repeated without hand-written id variants.
+PromptDialect styleDialectFor(Object? param, PromptDialect model) {
+  if (param == null) return model;
+  for (final d in PromptDialect.values) {
+    if (d.name == param) return d;
+  }
+  throw FormatException('param.styleDialect musí být '
+      '${PromptDialect.values.map((d) => d.name).join('|')}, ne "$param"');
+}
+
+/// The styles one dump renders.
+///
+/// Without [wanted] that is every candidate, or the whole registry when there
+/// is no candidates file. With it, an id the file lacks falls back to the
+/// registry — so a candidate can run next to the existing style it might
+/// duplicate, under the same seed and reference, in one table. An id found
+/// nowhere is an error: silently dropping it would cost the row the run was
+/// started for, and that shows only after the GPU time.
+List<StylePreset> selectStyles({
+  required List<StylePreset>? candidates,
+  required List<StylePreset> registry,
+  required List<String> wanted,
+}) {
+  final pool = candidates ?? registry;
+  if (wanted.isEmpty) return pool;
+  // Pool order first, like before the fallback existed: the table keeps the
+  // file's (or the registry's) order rather than the order of the flag.
+  final picked = [for (final s in pool) if (wanted.contains(s.id)) s];
+  for (final id in wanted) {
+    if (picked.any((s) => s.id == id)) continue;
+    final fallback = candidates == null
+        ? null
+        : registry.where((s) => s.id == id).firstOrNull;
+    if (fallback == null) {
+      throw FormatException(candidates == null
+          ? 'styl "$id" není v registru'
+          : 'styl "$id" není v kandidátech ani v registru');
+    }
+    picked.add(fallback);
+  }
+  return picked;
+}
+
 /// Where a value should be written.
 enum OverrideKind {
   /// A real `_prepare` argument — re-enters the builder instead of editing the

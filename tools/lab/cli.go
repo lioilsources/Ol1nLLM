@@ -113,27 +113,51 @@ func runCLI(env *Env, args []string) error {
 			spec.RefName = filepath.Base(abs)
 		}
 	}
-	if spec.PoseMode == "template" {
-		if spec.PoseID == "" {
-			return fmt.Errorf("--pose template vyžaduje --pose-id (ol1..ol8)")
-		}
-		if !spec.Dry {
-			asset := filepath.Join(env.RepoRoot, "assets", "poses", spec.PoseID+".png")
-			name, err := env.Comfy.Upload(asset, "ol1n_pose_"+spec.PoseID+".png")
-			if err != nil {
-				return err
-			}
-			spec.PoseName = name
-		} else {
-			spec.PoseName = spec.PoseID + ".png"
-		}
+	if spec.PoseMode == "template" && spec.PoseID == "" {
+		return fmt.Errorf("--pose template vyžaduje --pose-id (ol1..ol8)")
+	}
+	if err := spec.resolvePose(env); err != nil {
+		return err
 	}
 
 	run := NewRun(env, dir, spec)
-	// Progress to stdout: the CLI has no SSE, so mirror the same state changes.
-	ch, stop := run.Subscribe()
+	stop := followInTerminal(run)
 	defer stop()
-	done := make(chan struct{})
+	if err := run.Dump(); err != nil {
+		return err
+	}
+	run.Generate()
+	fmt.Println("▸ hotovo:", dir)
+	return nil
+}
+
+// resumeCLI is the terminal twin of the UI's "Pokračovat": a run cut off
+// mid-flight — Ctrl+C, a closed terminal, the system reclaiming memory —
+// generates only the cells that have no image yet. It keeps the workflows the
+// run was dumped with, so it finishes the matrix it started, and it skips the
+// dump, which is the one heavy step.
+func resumeCLI(env *Env, args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("lab resume <adresář běhu>")
+	}
+	run, err := loadRunDir(env, args[0])
+	if err != nil {
+		return err
+	}
+	if !run.Spec.Dry && !env.Comfy.HasCreds() {
+		return fmt.Errorf("chybí CF Access creds v .env.local")
+	}
+	stop := followInTerminal(run)
+	defer stop()
+	run.Resume()
+	fmt.Println("▸ hotovo:", args[0])
+	return nil
+}
+
+// followInTerminal prints a run's state changes: the CLI has no SSE, so it
+// mirrors the snapshots the UI would receive, minus the repeats.
+func followInTerminal(run *Run) func() {
+	ch, stop := run.Subscribe()
 	go func() {
 		last := ""
 		for st := range ch {
@@ -144,14 +168,8 @@ func runCLI(env *Env, args []string) error {
 				last = line
 			}
 		}
-		close(done)
 	}()
-	if err := run.Dump(); err != nil {
-		return err
-	}
-	run.Generate()
-	fmt.Println("▸ hotovo:", dir)
-	return nil
+	return stop
 }
 
 // generateReference reuses the dump for a single txt2img cell, so the reference

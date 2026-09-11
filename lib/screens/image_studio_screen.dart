@@ -2027,6 +2027,10 @@ class _StyleChip extends StatelessWidget {
 
   void _pick(BuildContext context) {
     _dismissKeyboard();
+    var query = '';
+    // Sections only once there is something to split: cultures and epochs on
+    // one side, styles after a named artist on the other.
+    final sectioned = kStylePresets.any((s) => s.artist != null);
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppTheme.surface,
@@ -2034,94 +2038,188 @@ class _StyleChip extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (ctx) => SafeArea(
-        child: FractionallySizedBox(
-          heightFactor: 0.75,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 16, 16, 2),
-                child: Text(
-                  'Výtvarný styl',
-                  style: TextStyle(
-                    color: AppTheme.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Text(
-                  'Připojí se za tvůj prompt. Nejlíp funguje při zachování pózy; '
-                  'v úpravě zvyš sílu na „silná".',
-                  style: TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-              ListTile(
-                leading: Icon(
-                  selected == null
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_unchecked,
-                  color:
-                      selected == null ? AppTheme.accent : AppTheme.textSecondary,
-                  size: 20,
-                ),
-                title: const Text('Bez stylu',
-                    style: TextStyle(color: AppTheme.textPrimary)),
-                onTap: () {
-                  onChanged(null);
-                  Navigator.of(ctx).pop();
-                },
-              ),
-              const Divider(height: 1, color: Colors.white12),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: kStylePresets.length,
-                  itemBuilder: (_, i) {
-                    final st = kStylePresets[i];
-                    final isSel = st.id == selected;
-                    return ListTile(
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          final hits =
+              kStylePresets.where((s) => styleMatchesQuery(s, query)).toList();
+          final cultures = hits.where((s) => s.artist == null).toList();
+          final artists = hits.where((s) => s.artist != null).toList();
+          // One flat list of headers and presets — the split is what makes
+          // ~90 entries findable, it does not need a widget tree of its own.
+          final items = <Object>[
+            if (sectioned && cultures.isNotEmpty) 'Kultury a epochy',
+            ...cultures,
+            if (sectioned && artists.isNotEmpty) 'Umělci',
+            ...artists,
+          ];
+          return Padding(
+            // The search field is the only input here: once the user taps
+            // it, the sheet has to clear the keyboard.
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(ctx).bottom,
+            ),
+            child: SafeArea(
+              child: FractionallySizedBox(
+                heightFactor: 0.75,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 16, 16, 2),
+                      child: Text(
+                        'Výtvarný styl',
+                        style: TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: Text(
+                        'Připojí se za tvůj prompt. Nejlíp funguje při zachování pózy; '
+                        'v úpravě zvyš sílu na „silná". Anime modely dostanou styl '
+                        'jako danbooru tagy, pokud je styl má.',
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+                      child: TextField(
+                        // No autofocus: most picks are a scroll and a tap, and
+                        // an open keyboard would hide half the list.
+                        onChanged: (v) => setSheetState(() => query = v),
+                        textInputAction: TextInputAction.search,
+                        style: const TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 14,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Hledat styl nebo autora',
+                          hintStyle: const TextStyle(
+                            color: AppTheme.textSecondary,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.search,
+                            size: 18,
+                            color: AppTheme.textSecondary,
+                          ),
+                          isDense: true,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide.none,
+                          ),
+                          filled: true,
+                          fillColor: AppTheme.background,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                        ),
+                      ),
+                    ),
+                    ListTile(
                       leading: Icon(
-                        isSel
+                        selected == null
                             ? Icons.radio_button_checked
                             : Icons.radio_button_unchecked,
-                        color:
-                            isSel ? AppTheme.accent : AppTheme.textSecondary,
+                        color: selected == null
+                            ? AppTheme.accent
+                            : AppTheme.textSecondary,
                         size: 20,
                       ),
-                      title: Text(
-                        st.label,
-                        style: TextStyle(
-                          color:
-                              isSel ? AppTheme.accent : AppTheme.textPrimary,
-                        ),
-                      ),
-                      subtitle: Text(
-                        st.block,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 11,
-                        ),
-                      ),
+                      title: const Text('Bez stylu',
+                          style: TextStyle(color: AppTheme.textPrimary)),
                       onTap: () {
-                        onChanged(st.id);
+                        onChanged(null);
                         Navigator.of(ctx).pop();
                       },
-                    );
-                  },
+                    ),
+                    const Divider(height: 1, color: Colors.white12),
+                    Expanded(
+                      child: items.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Text(
+                                'Žádný styl tomu neodpovídá.',
+                                style: TextStyle(
+                                  color: AppTheme.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              keyboardDismissBehavior:
+                                  ScrollViewKeyboardDismissBehavior.onDrag,
+                              itemCount: items.length,
+                              itemBuilder: (_, i) {
+                                final item = items[i];
+                                if (item is String) {
+                                  return Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        16, 10, 16, 2),
+                                    child: Text(
+                                      item,
+                                      style: const TextStyle(
+                                        color: AppTheme.textSecondary,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  );
+                                }
+                                final st = item as StylePreset;
+                                final isSel = st.id == selected;
+                                return ListTile(
+                                  leading: Icon(
+                                    isSel
+                                        ? Icons.radio_button_checked
+                                        : Icons.radio_button_unchecked,
+                                    color: isSel
+                                        ? AppTheme.accent
+                                        : AppTheme.textSecondary,
+                                    size: 20,
+                                  ),
+                                  title: Text(
+                                    st.label,
+                                    style: TextStyle(
+                                      color: isSel
+                                          ? AppTheme.accent
+                                          : AppTheme.textPrimary,
+                                    ),
+                                  ),
+                                  // An artist's label names the manner; the
+                                  // period says which of their years it is.
+                                  subtitle: Text(
+                                    st.period == null
+                                        ? st.block
+                                        : '${st.period} · ${st.block}',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: AppTheme.textSecondary,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                  onTap: () {
+                                    onChanged(st.id);
+                                    Navigator.of(ctx).pop();
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }

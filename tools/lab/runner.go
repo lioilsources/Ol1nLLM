@@ -210,7 +210,7 @@ func (r *Run) Dump() error {
 	manPath := filepath.Join(r.Dir, "wf", "manifest.json")
 	if err != nil {
 		if _, statErr := os.Stat(manPath); statErr != nil {
-			return r.fail("dump", fmt.Errorf("%v — poslední řádky: %s", err, tailLines(string(out), 6)))
+			return r.fail("dump", fmt.Errorf("%v — %s", err, dumpError(string(out))))
 		}
 	}
 	man, err := ReadManifest(manPath)
@@ -478,6 +478,39 @@ func tailLines(s string, n int) string {
 		lines = lines[len(lines)-n:]
 	}
 	return strings.Join(lines, " / ")
+}
+
+// dumpError pulls the reason out of `flutter test` output. Its last lines are
+// the runner's summary ("Some tests failed", the file name), so a plain tail
+// cut away exactly the line that said what went wrong — that one sits under
+// the `[E]` marker, above the stack trace.
+func dumpError(out string) string {
+	lines := strings.Split(out, "\n")
+	for i, l := range lines {
+		if !strings.HasSuffix(strings.TrimSpace(l), "[E]") {
+			continue
+		}
+		var msg []string
+		for _, m := range lines[i+1:] {
+			m = strings.TrimSpace(m)
+			if m == "" || isDartFrame(m) || len(msg) == 4 {
+				break
+			}
+			msg = append(msg, m)
+		}
+		if len(msg) > 0 {
+			return strings.Join(msg, " / ")
+		}
+	}
+	return "poslední řádky: " + tailLines(out, 6)
+}
+
+// isDartFrame recognises a stack_trace line: `tools/lab/dump.dart 158:19  main`,
+// `package:matcher  expect`, `dart:core  List.[]`.
+func isDartFrame(line string) bool {
+	f := strings.Fields(line)
+	return len(f) >= 2 && (strings.HasSuffix(f[0], ".dart") ||
+		strings.HasPrefix(f[0], "package:") || strings.HasPrefix(f[0], "dart:"))
 }
 
 // StartExport validates and kicks off an upload to the FINETUNE gallery.

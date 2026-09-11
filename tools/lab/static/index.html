@@ -33,7 +33,7 @@
 
     <fieldset>
       <legend>styly</legend>
-      <div class="chips" id="styles"></div>
+      <div id="styles"></div>
       <p class="hint">Bez výběru se jede jen holý prompt. S výběrem se navíc
         vygeneruje baseline bez stylu — bez něj nejde poznat „model na styl
         reaguje" od „tohle maluje pokaždé".</p>
@@ -119,6 +119,7 @@
           <option value="__face_apply__.cn_strength">síla tváře — klíčové body (InstantID)</option>
           <option value="__face_apply__.weight">síla tváře (PuLID, flux)</option>
           <option value="param.faceIdentity">metoda tváře (none|instantid|faceid|both)</option>
+          <option value="param.styleDialect">text stylu (natural|booru)</option>
           <option value="__face_detail__.denoise">síla dotažení tváře</option>
         </select>
       </label>
