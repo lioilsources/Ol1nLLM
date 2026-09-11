@@ -428,6 +428,39 @@ až tam model bude, je to malý follow-up (bbox na obličej stačí).
 Buňka bez rozpoznatelného obličeje spadne na `execution_error` — per-buňka,
 řečeno v hintu.
 
+### „Rozhýbat" — video (a zvuk) přes `llm.ol1n.com/v1/video`
+
+`VideoService` posílá statický obrázek do video serveru na SPARKu
+(`video-stack/serve.py` za AiStack tunelem), který ho rozhýbe do krátkého
+klipu — řetěz ComfyUI segmentů + ffmpeg + RIFE, orchestrovaný serverem.
+Klient jen zadá job a pollí, se **stejným slovníkem událostí** jako obrazové
+backendy, takže provider to bere jako 3D mesh kolo.
+
+```
+GET  /v1/video/scenes           →  {"scenes":[{id,label,desc,beats,seconds,minutes_est,audio}]}
+POST /v1/video/jobs             →  202 {job_id}      telo: {scene, image (base64), seed}
+GET  /v1/video/jobs/{id}        →  {status: queued(position) | running(beat,beats) | done | error(error)}
+GET  /v1/video/jobs/{id}/result →  mp4 bytes
+```
+
+**Katalog scén je serverový** (`video-stack/scenes/*.json`) — stejný princip
+jako LoRA a checkpointy: prompty se ladí bez releasu appky. Na uzlu se
+persistuje jen `sceneId`, label a popis jsou display-only.
+
+**`audio: true` = klip přijde se zvukovou stopou.** Starší server pole
+neposílá, takže default je `false` (ticho, chování do té doby).
+
+Poll po 5 s, 6 chyb za sebou ⇒ `GenInterrupted` (job na serveru žije dál,
+provider se napojí přes `follow()`); `404` na job je naopak terminální —
+job už neexistuje. Progress je `GenRunning(beat, beats)`, klip se renderuje
+po pětisekundových segmentech.
+
+**Stažení se ověřuje dvakrát** (`mp4LooksComplete`): uříznuté stažení projde
+jako HTTP 200 a mp4 s `moov` vpředu se i uříznuté tváří přehratelně — ale
+import do Fotek na něm spadne („unsupported format"). Kontroluje se proto
+délka proti `content-length` **i** průchod top-level atomů (ftyp/moov/mdat
+musí sedět přesně na velikost souboru).
+
 ### gen-queue — NIM async job queue (`llm.ol1n.com/nim/*`)
 
 Go služba `gen-queue` (AiStack, port 8091) obsluhuje **oba** FLUX NIM modely
