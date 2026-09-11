@@ -508,6 +508,36 @@ tvář vůbec nevymění). Strop téhle cesty je ~0.75–0.8: PuLID kóduje tvá
 jednoho embeddingu, tedy „typ" tváře, ne geometrii. Přes 0.9 by dal jen face
 swap (licence jen pro nekomerční použití) nebo LoRA na osobu (20+ fotek).
 
+### Identita ve videu (`tools/facebench/vidbench.py`)
+
+Tatáž stupnice, ale pro klip s **dvěma** lidmi (couple karta v Tsumiki,
+`MangaPrompts/reports/couple_phase0.md`). `bench.py` měří **největší** obličej
+v obrázku, takže u dvojice měří jednoho člověka a podle velikosti bboxu
+nedeterministicky jednou A a jednou B; `vidbench.py` proto doplňuje čtení po
+snímcích a párování detekcí na osoby, zatímco `embedding()`/`sim()` importuje,
+aby čísla zůstala porovnatelná s 0.48 / 0.72 z face inpaintu.
+
+Párování je **prostorové, ne podle podobnosti**: obličeje se skládají do stop
+přes IoU se snímkem předtím (stopa přežije 6 snímků výpadku) a teprve celá
+stopa se přiřadí referenci podle průměrného embeddingu. Přiřazovat každý snímek
+zvlášť „k té referenci, které je podobnější" by vybíralo maximum z dvojice a
+skóre by se samo nafouklo. `margin` v souhrnu říká, o kolik je vítězné
+přiřazení lepší než prohozené — pod ~0.05 jsou ti dva zaměnitelní a číslům
+se nedá věřit.
+
+Gate je **p10 čistých snímků**, ne minimum, a okludované snímky o pass/fail
+nerozhodují (polibek, profil a zavřené oči srážejí skóre z důvodů, které nejsou
+selhání identity). Bez okluzní mapy z preprocesu se čistota odhaduje z detekce
+(`det_score`, |yaw|, velikost tváře); pipeline může předat vlastní seznam přes
+`--clean-frames`. Práh patří kalibrovat per akce, proto se `--action` zapisuje
+do CSV — prahy se odvodí z naměřených běhů, nevymýšlejí se dopředu.
+
+Ověřeno na SPARKu na syntetickém klipu (dvě tváře, křížení, změna velikosti,
+mp4 komprese): stopy přežily přiblížení (200/200 snímků), přiřazení je nezávislé
+na pořadí `--refs`, margin 0.78 a cross-podobnost 0.17–0.20. **Rychlost gate:
+200 snímků × 2 osoby = 69 s** (0,35 s/snímek) — InsightFace na SPARKu jede na
+`CPUExecutionProvider`, protože onnxruntime v ComfyUI venv nemá CUDA EP.
+
 ## Lab (`tools/lab/`)
 
 Nástroj pro otázku „co který model udělá s kterým promptem a nastavením".
