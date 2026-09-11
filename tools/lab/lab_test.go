@@ -1095,3 +1095,154 @@ func TestHumanBytes(t *testing.T) {
 		}
 	}
 }
+
+func TestDumpErrorSaysWhatFailed(t *testing.T) {
+	// A real failed dump. Its last lines are the runner's summary, so the old
+	// tail showed everything except the reason.
+	out := `Got dependencies!
+00:00 +0: loading /repo/tools/lab/dump.dart
+00:00 +0: dump matrix workflows
+00:00 +0 -1: dump matrix workflows [E]
+  Bad state: POSE_MODE=template vyžaduje POSE_NAME
+  tools/lab/dump.dart 158:19  main.<fn>.emit
+  tools/lab/dump.dart 379:15  main.<fn>
+
+
+00:00 +0 -1: Some tests failed.
+
+Failing tests:
+  /repo/tools/lab/dump.dart: dump matrix workflows
+`
+	if got := dumpError(out); got != "Bad state: POSE_MODE=template vyžaduje POSE_NAME" {
+		t.Fatalf("dumpError = %q", got)
+	}
+
+	// An expect() failure spans several lines before the blank one.
+	expectOut := `00:00 +0 -1: dump matrix workflows [E]
+  Expected: a value greater than <0>
+    Actual: <0>
+  dump nevyrobil žádné workflow
+
+  package:matcher  expect
+`
+	if got := dumpError(expectOut); got !=
+		"Expected: a value greater than <0> / Actual: <0> / dump nevyrobil žádné workflow" {
+		t.Fatalf("expect: %q", got)
+	}
+
+	// No marker (pub failed before any test ran): keep the tail.
+	if got := dumpError("Resolving dependencies...\nversion solving failed."); !strings.Contains(got, "version solving failed") {
+		t.Fatalf("bez [E] se ztratil konec: %q", got)
+	}
+}
+
+func TestResolvePoseNamesTheSkeleton(t *testing.T) {
+	env := &Env{RepoRoot: repoRootForTest(t)}
+	// What the browser sends: the id, never the file name.
+	s := &Spec{PoseMode: "template", PoseID: "ol3", Dry: true}
+	if err := s.resolvePose(env); err != nil {
+		t.Fatal(err)
+	}
+	if s.PoseName != "ol3.png" {
+		t.Fatalf("PoseName = %q, čekáno ol3.png", s.PoseName)
+	}
+	for _, id := range []string{"", "../../pubspec", "ol99", ".hidden"} {
+		bad := &Spec{PoseMode: "template", PoseID: id, Dry: true}
+		if err := bad.resolvePose(env); err == nil {
+			t.Errorf("id %q prošlo", id)
+		}
+	}
+	// Other modes have nothing to resolve and must not touch the name.
+	depth := &Spec{PoseMode: "depth", PoseName: "keep"}
+	if err := depth.resolvePose(env); err != nil || depth.PoseName != "keep" {
+		t.Fatalf("depth: %v, %q", err, depth.PoseName)
+	}
+}
+
+func TestResolvePoseUploadsUnderTheAppsName(t *testing.T) {
+	names := make(chan string, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, fh, err := r.FormFile("image")
+		if r.URL.Path != "/upload/image" || err != nil {
+			http.Error(w, "bad upload", 400)
+			return
+		}
+		names <- fh.Filename
+		fmt.Fprintf(w, `{"name":%q,"subfolder":""}`, fh.Filename)
+	}))
+	defer srv.Close()
+
+	env := &Env{RepoRoot: repoRootForTest(t), Comfy: NewComfy(srv.URL, "id", "secret")}
+	s := &Spec{PoseMode: "template", PoseID: "ol3"}
+	if err := s.resolvePose(env); err != nil {
+		t.Fatal(err)
+	}
+	if got := <-names; got != "ol1n_pose_ol3.png" {
+		t.Fatalf("nahráno jako %q", got)
+	}
+	if s.PoseName != "ol1n_pose_ol3.png" {
+		t.Fatalf("PoseName = %q", s.PoseName)
+	}
+}
+
+func TestStartRunResolvesThePoseTheBrowserOnlyNamesByID(t *testing.T) {
+	// The spec exactly as app.js posts it: poseId, no poseName. The server used
+	// to pass that straight on, and the dump died on a missing POSE_NAME.
+	root := t.TempDir()
+	poses := filepath.Join(root, "assets", "poses")
+	if err := os.MkdirAll(poses, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	png, err := os.ReadFile(filepath.Join(repoRootForTest(t), "assets", "poses", "ol3.png"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(poses, "ol3.png"), png, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// No flutter: the registry probe fails (so no estimate) and the dump fails
+	// fast — the run itself is not what this test is about.
+	s := &Server{
+		env:  &Env{RepoRoot: root, Comfy: NewComfy("http://127.0.0.1:1", "", "")},
+		runs: map[string]*Run{}, token: "t",
+	}
+	post := func(body string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		s.startRun(rec, httptest.NewRequest("POST", "/api/runs", strings.NewReader(body)))
+		return rec
+	}
+
+	rec := post(`{"models":["pony"],"prompts":["x"],"flows":["txt2img"],` +
+		`"poseMode":"template","poseId":"ol3","dry":true}`)
+	if rec.Code != 200 {
+		t.Fatalf("start: %d %s", rec.Code, rec.Body)
+	}
+	var resp struct {
+		RunID string `json:"runId"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	run := s.run(resp.RunID)
+	if run == nil {
+		t.Fatalf("běh %q nevznikl", resp.RunID)
+	}
+	if run.Spec.PoseName != "ol3.png" {
+		t.Fatalf("PoseName = %q — dump by spadl na POSE_NAME", run.Spec.PoseName)
+	}
+	// Let the doomed dump settle before TempDir cleanup removes its directory.
+	deadline := time.Now().Add(5 * time.Second)
+	for run.State().Status == "planning" && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// An id the assets do not have is refused before any run directory exists.
+	before := len(s.runs)
+	if rec := post(`{"models":["pony"],"prompts":["x"],"flows":["txt2img"],` +
+		`"poseMode":"template","poseId":"ol99","dry":true}`); rec.Code == 200 {
+		t.Fatalf("neznámá šablona prošla: %s", rec.Body)
+	}
+	if len(s.runs) != before {
+		t.Fatal("neznámá šablona založila běh")
+	}
+}

@@ -243,7 +243,7 @@ func (s *Server) registries() (*Manifest, error) {
 	cmd.Env = env
 	if out, err := cmd.CombinedOutput(); err != nil {
 		if _, statErr := os.Stat(manPath); statErr != nil {
-			return nil, fmt.Errorf("registry dump: %v — %s", err, tailLines(string(out), 4))
+			return nil, fmt.Errorf("registry dump: %v — %s", err, dumpError(string(out)))
 		}
 	}
 	return ReadManifest(manPath)
@@ -411,6 +411,12 @@ func (s *Server) startRun(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.mu.Unlock()
+	// Before the run exists, like the reference upload: a failed upload is an
+	// answer to this request, not a dead run directory.
+	if err := spec.resolvePose(s.env); err != nil {
+		writeJSON(w, 502, map[string]string{"error": err.Error()})
+		return
+	}
 
 	id := time.Now().Format("20060102-150405")
 	dir := filepath.Join(s.env.RepoRoot, "build", "lab", id)

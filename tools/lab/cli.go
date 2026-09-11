@@ -113,20 +113,11 @@ func runCLI(env *Env, args []string) error {
 			spec.RefName = filepath.Base(abs)
 		}
 	}
-	if spec.PoseMode == "template" {
-		if spec.PoseID == "" {
-			return fmt.Errorf("--pose template vyžaduje --pose-id (ol1..ol8)")
-		}
-		if !spec.Dry {
-			asset := filepath.Join(env.RepoRoot, "assets", "poses", spec.PoseID+".png")
-			name, err := env.Comfy.Upload(asset, "ol1n_pose_"+spec.PoseID+".png")
-			if err != nil {
-				return err
-			}
-			spec.PoseName = name
-		} else {
-			spec.PoseName = spec.PoseID + ".png"
-		}
+	if spec.PoseMode == "template" && spec.PoseID == "" {
+		return fmt.Errorf("--pose template vyžaduje --pose-id (ol1..ol8)")
+	}
+	if err := spec.resolvePose(env); err != nil {
+		return err
 	}
 
 	run := NewRun(env, dir, spec)

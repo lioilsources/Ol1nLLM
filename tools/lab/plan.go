@@ -292,6 +292,39 @@ func (s *Spec) needsRef() bool {
 	return s.PoseMode == "depth"
 }
 
+// resolvePose turns the chosen skeleton id into the file name LoadImage reads.
+// The browser only ever knows the id, so whoever starts a run has to do this —
+// skipping it left POSE_NAME empty and the dump died on every template run.
+// Same deterministic name as the app (ol1n_pose_*.png) with overwrite, so
+// doing it twice is free.
+func (s *Spec) resolvePose(env *Env) error {
+	if s.PoseMode != "template" {
+		return nil
+	}
+	if s.PoseID == "" {
+		return fmt.Errorf("vyber šablonu pózy")
+	}
+	// The id arrives in a POST body and becomes a path: only a bare name may
+	// reach filepath.Join.
+	if s.PoseID != filepath.Base(s.PoseID) || strings.HasPrefix(s.PoseID, ".") {
+		return fmt.Errorf("neplatné id šablony pózy: %q", s.PoseID)
+	}
+	asset := filepath.Join(env.RepoRoot, "assets", "poses", s.PoseID+".png")
+	if _, err := os.Stat(asset); err != nil {
+		return fmt.Errorf("šablona pózy %q neexistuje (%s)", s.PoseID, asset)
+	}
+	if s.Dry {
+		s.PoseName = s.PoseID + ".png"
+		return nil
+	}
+	name, err := env.Comfy.Upload(asset, "ol1n_pose_"+s.PoseID+".png")
+	if err != nil {
+		return fmt.Errorf("upload šablony pózy %s: %w", s.PoseID, err)
+	}
+	s.PoseName = name
+	return nil
+}
+
 func overridesTouchLatent(overrides []string, sweep string) bool {
 	all := append([]string{}, overrides...)
 	if sweep != "" {

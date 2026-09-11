@@ -355,7 +355,6 @@ function spec() {
     refFile: state.ref?.localPath || '',
     poseMode: state.poseMode,
     poseId: state.poseId,
-    poseName: state.poseName || '',
     faceIdentity: state.faceIdentity,
     faceDetail: state.faceDetail,
     seed: Number($('seed').value) || 777,
