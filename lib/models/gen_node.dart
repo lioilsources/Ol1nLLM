@@ -146,6 +146,11 @@ class GenNode {
   /// stored — the block text is derivable, like [poseId].
   final String? styleId;
 
+  /// Hairstyle of a Kadeřník round (see [kHairstyles]): an inpaint whose mask
+  /// was built from face parsing, not drawn. Only the id is stored — the prompt
+  /// is derivable from it, like [styleId]. Null on every other node.
+  final String? hairstyleId;
+
   /// Strength [loraName] was applied with (model + clip). Recorded only when
   /// a LoRA actually applies — the effect isn't reproducible from the name
   /// alone, and the strength is adjustable (including negative) since v1.4.0.
@@ -206,6 +211,7 @@ class GenNode {
     this.loraName,
     this.loraStrength,
     this.styleId,
+    this.hairstyleId,
     this.poseId,
     this.faceIdentity,
     this.seed,
@@ -240,6 +246,7 @@ class GenNode {
     String? loraName,
     double? loraStrength,
     String? styleId,
+    String? hairstyleId,
     String? poseId,
     String? faceIdentity,
     int? seed,
@@ -270,6 +277,7 @@ class GenNode {
     loraName: loraName,
     loraStrength: loraStrength,
     styleId: styleId,
+    hairstyleId: hairstyleId,
     poseId: poseId,
     faceIdentity: faceIdentity,
     seed: seed,
@@ -309,6 +317,7 @@ class GenNode {
     if (loraName != null) 'loraName': loraName,
     if (loraStrength != null) 'loraStrength': loraStrength,
     if (styleId != null) 'styleId': styleId,
+    if (hairstyleId != null) 'hairstyleId': hairstyleId,
     if (poseId != null) 'poseId': poseId,
     if (faceIdentity != null) 'faceIdentity': faceIdentity,
     if (seed != null) 'seed': seed,
@@ -360,6 +369,7 @@ class GenNode {
       loraName: json['loraName'] as String?,
       loraStrength: (json['loraStrength'] as num?)?.toDouble(),
       styleId: json['styleId'] as String?,
+      hairstyleId: json['hairstyleId'] as String?,
       poseId: json['poseId'] as String?,
       faceIdentity: json['faceIdentity'] as String?,
       seed: json['seed'] as int?,
@@ -420,6 +430,7 @@ class GenNode {
     loraName: loraName,
     loraStrength: loraStrength,
     styleId: styleId,
+    hairstyleId: hairstyleId,
     poseId: poseId,
     faceIdentity: faceIdentity,
     seed: seed,

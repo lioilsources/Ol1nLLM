@@ -7,6 +7,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
+import '../models/hair_mask.dart';
 import '../models/image_model.dart';
 import '../models/latent_bucket.dart';
 import '../models/pose_template.dart';
@@ -448,6 +449,159 @@ class ComfyUIService implements ImageBackend {
       userNegative: negativePrompt,
     );
     yield* _run(wf);
+  }
+
+  // ── Kadeřník ────────────────────────────────────────────────
+
+  static const _hairAnalyseAsset = 'assets/comfyui/hair_analyse.api.json';
+
+  /// SaveImage prefixes of [_hairAnalyseAsset] → the masks they carry.
+  static const kHairAnalysePrefixes = (
+    hair: 'tsumiki_hair_mask',
+    face: 'tsumiki_face_mask',
+    hat: 'tsumiki_hat_mask',
+    features: 'tsumiki_features_mask',
+  );
+
+  /// Face parsing of [image] (no diffusion, seconds): the four masks the
+  /// Kadeřník mask is built from. Not a node — nothing to resume, nothing
+  /// persisted; the caller builds the mask and then runs [hairInpaint].
+  Future<HairAnalysis> analyseHair(
+    Uint8List image, {
+    Duration timeout = const Duration(minutes: 3),
+  }) async {
+    final name = await _uploadImage(image, filename: 'hair_${_uuidV4()}.png');
+    final wf = _prepare(
+      await _template(_hairAnalyseAsset),
+      prompt: '',
+      batch: 1,
+      seed: 0,
+      imageName: name,
+    );
+    final promptId = await _queuePrompt(wf, clientId: _newClientId());
+    final deadline = DateTime.now().add(timeout);
+    Map<String, dynamic>? hist;
+    while (DateTime.now().isBefore(deadline)) {
+      await Future.delayed(_pollInterval);
+      try {
+        hist = await _history(promptId);
+      } catch (_) {
+        continue; // transient — keep polling
+      }
+      if (hist == null) continue;
+      final status = (hist['status'] as Map?)?.cast<String, dynamic>();
+      if (status?['status_str'] == 'error') {
+        throw StateError('[ComfyUI] analýza vlasů selhala');
+      }
+      if (((hist['outputs'] as Map?) ?? const {}).isNotEmpty) break;
+      hist = null;
+    }
+    if (hist == null) throw StateError('[ComfyUI] analýza vlasů nedoběhla');
+    final refs = hairOutputRefs(hist);
+    Future<BoolMask> mask(String prefix) async {
+      final r = refs[prefix];
+      if (r == null) throw StateError('[ComfyUI] chybí výstup $prefix');
+      return decodeMaskPng(await _view(
+        r['filename'] as String,
+        (r['subfolder'] as String?) ?? '',
+        (r['type'] as String?) ?? 'output',
+      ));
+    }
+
+    final p = kHairAnalysePrefixes;
+    return HairAnalysis(
+      hair: await mask(p.hair),
+      face: await mask(p.face),
+      hat: await mask(p.hat),
+      features: await mask(p.features),
+    );
+  }
+
+  /// First saved output ref per analysis prefix — matched by filename, never
+  /// by order (history keys outputs by node id and promises no ordering).
+  @visibleForTesting
+  static Map<String, Map<String, dynamic>> hairOutputRefs(
+      Map<String, dynamic> hist) {
+    final p = kHairAnalysePrefixes;
+    final prefixes = [p.hair, p.face, p.hat, p.features];
+    final out = <String, Map<String, dynamic>>{};
+    final outputs = (hist['outputs'] as Map?)?.cast<String, dynamic>() ?? {};
+    for (final node in outputs.values) {
+      for (final img in ((node as Map?)?['images'] as List?) ?? const []) {
+        final m = (img as Map).cast<String, dynamic>();
+        if (m['type'] == 'temp') continue;
+        final fn = m['filename'] as String? ?? '';
+        final hit = prefixes.where((pre) => fn.startsWith('${pre}_'));
+        if (hit.isNotEmpty) {
+          out.putIfAbsent(
+              hit.reduce((a, b) => a.length >= b.length ? a : b), () => m);
+        }
+      }
+    }
+    return out;
+  }
+
+  /// Inpaint with a Kadeřník mask. The same inpaint graphs as a drawn mask,
+  /// with two crop settings the Tsumiki bench measured for hair
+  /// (`MangaPrompts/docs/hair-matrix.md`): no hole filling — the face is a hole
+  /// in the mask and filling it repainted the face — and a tighter context
+  /// window. Not on [ImageBackend]: only ComfyUI can run it.
+  Stream<GenEvent> hairInpaint({
+    required Uint8List image,
+    required Uint8List mask,
+    required String prompt,
+    required int n,
+    required int seed,
+    String? negativePrompt,
+  }) async* {
+    final asset = _preset.inpaintAsset;
+    if (asset == null) {
+      yield const GenFailed('[ComfyUI] Aktivní model nepodporuje inpaint.');
+      return;
+    }
+    final imageName = await _uploadImage(image);
+    final maskName =
+        await _uploadImage(mask, filename: 'hairmask_${_uuidV4()}.png');
+    final wf = prepareHairInpaint(
+      await _template(asset),
+      prompt: prompt,
+      batch: n,
+      seed: seed,
+      imageName: imageName,
+      maskName: maskName,
+      userNegative: negativePrompt,
+    );
+    yield* _run(wf);
+  }
+
+  /// Graph for [hairInpaint]; public for tests and the lab.
+  @visibleForTesting
+  Map<String, dynamic> prepareHairInpaint(
+    Map<String, dynamic> template, {
+    required String prompt,
+    required int batch,
+    required int seed,
+    required String imageName,
+    required String maskName,
+    String? userNegative,
+  }) {
+    final wf = _prepare(
+      template,
+      prompt: prompt,
+      batch: batch,
+      seed: seed,
+      imageName: imageName,
+      maskName: maskName,
+      userNegative: userNegative,
+    );
+    for (final node in wf.values) {
+      final m = (node as Map).cast<String, dynamic>();
+      if (m['class_type'] != 'InpaintCropImproved') continue;
+      final inputs = (m['inputs'] as Map).cast<String, dynamic>();
+      inputs['mask_fill_holes'] = kHairMaskFillHoles;
+      inputs['context_from_mask_extend_factor'] = kHairContextFactor;
+    }
+    return wf;
   }
 
   static String _uuidV4() => const Uuid().v4();

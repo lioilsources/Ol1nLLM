@@ -1,0 +1,201 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Portrait"
+    },
+    "inputs": {
+      "image": "__IMAGE__",
+      "upload": "image"
+    }
+  },
+  "2": {
+    "class_type": "FaceSegment",
+    "_meta": {
+      "title": "Hair"
+    },
+    "inputs": {
+      "images": [
+        "1",
+        0
+      ],
+      "process_res": 512,
+      "mask_blur": 0,
+      "mask_offset": 0,
+      "invert_output": false,
+      "background": "Alpha",
+      "background_color": "#222222",
+      "Hair": true
+    }
+  },
+  "3": {
+    "class_type": "MaskToImage",
+    "_meta": {
+      "title": "Hair mask"
+    },
+    "inputs": {
+      "mask": [
+        "2",
+        1
+      ]
+    }
+  },
+  "4": {
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save hair mask"
+    },
+    "inputs": {
+      "images": [
+        "3",
+        0
+      ],
+      "filename_prefix": "tsumiki_hair_mask"
+    }
+  },
+  "5": {
+    "class_type": "FaceSegment",
+    "_meta": {
+      "title": "Face (skin + features)"
+    },
+    "inputs": {
+      "images": [
+        "1",
+        0
+      ],
+      "process_res": 512,
+      "mask_blur": 0,
+      "mask_offset": 0,
+      "invert_output": false,
+      "background": "Alpha",
+      "background_color": "#222222",
+      "Skin": true,
+      "Nose": true,
+      "Left-eye": true,
+      "Right-eye": true,
+      "Left-eyebrow": true,
+      "Right-eyebrow": true,
+      "Mouth": true,
+      "Upper-lip": true,
+      "Lower-lip": true,
+      "Eyeglasses": true
+    }
+  },
+  "6": {
+    "class_type": "MaskToImage",
+    "_meta": {
+      "title": "Face mask"
+    },
+    "inputs": {
+      "mask": [
+        "5",
+        1
+      ]
+    }
+  },
+  "7": {
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save face mask"
+    },
+    "inputs": {
+      "images": [
+        "6",
+        0
+      ],
+      "filename_prefix": "tsumiki_face_mask"
+    }
+  },
+  "8": {
+    "class_type": "ClothesSegment",
+    "_meta": {
+      "title": "Hat (FaceSegment does not expose it)"
+    },
+    "inputs": {
+      "images": [
+        "1",
+        0
+      ],
+      "Hat": true,
+      "process_res": 512,
+      "mask_blur": 0,
+      "mask_offset": 0,
+      "invert_output": false,
+      "background": "Alpha",
+      "background_color": "#222222"
+    }
+  },
+  "9": {
+    "class_type": "MaskToImage",
+    "_meta": {
+      "title": "Hat mask"
+    },
+    "inputs": {
+      "mask": [
+        "8",
+        1
+      ]
+    }
+  },
+  "10": {
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save hat mask"
+    },
+    "inputs": {
+      "images": [
+        "9",
+        0
+      ],
+      "filename_prefix": "tsumiki_hat_mask"
+    }
+  },
+  "11": {
+    "class_type": "FaceSegment",
+    "_meta": {
+      "title": "Eyes and brows"
+    },
+    "inputs": {
+      "images": [
+        "1",
+        0
+      ],
+      "process_res": 512,
+      "mask_blur": 0,
+      "mask_offset": 0,
+      "invert_output": false,
+      "background": "Alpha",
+      "background_color": "#222222",
+      "Left-eye": true,
+      "Right-eye": true,
+      "Left-eyebrow": true,
+      "Right-eyebrow": true,
+      "Eyeglasses": true
+    }
+  },
+  "12": {
+    "class_type": "MaskToImage",
+    "_meta": {
+      "title": "Features mask"
+    },
+    "inputs": {
+      "mask": [
+        "11",
+        1
+      ]
+    }
+  },
+  "13": {
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save features mask"
+    },
+    "inputs": {
+      "images": [
+        "12",
+        0
+      ],
+      "filename_prefix": "tsumiki_features_mask"
+    }
+  }
+}

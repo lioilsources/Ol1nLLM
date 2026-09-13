@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 import '../core/constants/theme.dart';
 import '../models/gen_node.dart';
+import '../models/hairstyle_preset.dart' show kHairstyles;
 import '../models/image_model.dart';
 import '../models/pose_template.dart';
 import '../models/style_preset.dart';
@@ -17,6 +18,7 @@ import '../models/video_scene.dart';
 import '../providers/image_studio_provider.dart';
 import '../services/comfyui_service.dart' show FaceIdentity;
 import '../widgets/image_session_drawer.dart';
+import 'hair_sheet.dart';
 import 'mask_editor_screen.dart';
 import 'model_viewer_screen.dart';
 import 'video_player_screen.dart' show VideoPlayerScreen, saveVideo;
@@ -27,7 +29,10 @@ void _copyToClipboard(BuildContext context, String text, String what) {
   if (text.trim().isEmpty) return;
   Clipboard.setData(ClipboardData(text: text));
   ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text('$what zkopírován do schránky'), duration: const Duration(seconds: 2)),
+    SnackBar(
+      content: Text('$what zkopírován do schránky'),
+      duration: const Duration(seconds: 2),
+    ),
   );
 }
 
@@ -81,8 +86,9 @@ class ImageStudioScreen extends ConsumerWidget {
     // generating, fall back to the first other in-flight node so background
     // work (parallel generations) is still visible. othersGenerating tells the
     // banner how many more are running so it can show "+N na pozadí".
-    final generating =
-        state.nodes.where((n) => n.status == GenStatus.generating).toList();
+    final generating = state.nodes
+        .where((n) => n.status == GenStatus.generating)
+        .toList();
     final bannerNode = current?.status == GenStatus.generating
         ? current
         : (generating.isNotEmpty ? generating.first : null);
@@ -123,10 +129,13 @@ class ImageStudioScreen extends ConsumerWidget {
             IconButton(
               icon: const Icon(Icons.cloud_upload_outlined),
               tooltip: 'Export do FINETUNE gallery',
-              onPressed: !state.isBusy &&
+              onPressed:
+                  !state.isBusy &&
                       state.activeSessionId != null &&
-                      state.nodes.any((n) =>
-                          n.status == GenStatus.ready && n.images.isNotEmpty)
+                      state.nodes.any(
+                        (n) =>
+                            n.status == GenStatus.ready && n.images.isNotEmpty,
+                      )
                   ? () => notifier.exportSession(state.activeSessionId!)
                   : null,
             ),
@@ -156,8 +165,9 @@ class ImageStudioScreen extends ConsumerWidget {
               _ProgressBanner(
                 key: ValueKey(bannerNode.id),
                 node: bannerNode,
-                othersGenerating:
-                    generating.where((n) => n.id != bannerNode.id).length,
+                othersGenerating: generating
+                    .where((n) => n.id != bannerNode.id)
+                    .length,
               ),
             _StudioInputBar(state: state),
           ],
@@ -225,7 +235,8 @@ class _ProgressBannerState extends State<_ProgressBanner> {
     // Only an indeterminate (NIM) run needs the ticking elapsed clock.
     if (widget.node.progress == null) {
       _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (mounted) setState(() => _elapsed = DateTime.now().difference(_start));
+        if (mounted)
+          setState(() => _elapsed = DateTime.now().difference(_start));
       });
     }
   }
@@ -321,9 +332,9 @@ class _LayoutNode {
 }
 
 class _TreeLayout {
-  static const double kNodeSize    = 48.0;
+  static const double kNodeSize = 48.0;
   static const double kLevelStride = 60.0;
-  static const double kUnitWidth   = 64.0;
+  static const double kUnitWidth = 64.0;
 
   static ({List<_LayoutNode> nodes, Size canvasSize}) compute(
     List<GenNode> all, {
@@ -352,9 +363,13 @@ class _TreeLayout {
         for (final k in kids) {
           calcWidth(k);
         }
-        subtreeWidths[n.id] = kids.fold(0, (acc, k) => acc + subtreeWidths[k.id]!);
+        subtreeWidths[n.id] = kids.fold(
+          0,
+          (acc, k) => acc + subtreeWidths[k.id]!,
+        );
       }
     }
+
     calcWidth(root);
 
     final rawWidth = subtreeWidths[root.id]! * kUnitWidth;
@@ -364,7 +379,12 @@ class _TreeLayout {
     final result = <_LayoutNode>[];
     void assignPos(GenNode n, double leftX, int level) {
       final w = subtreeWidths[n.id]! * kUnitWidth;
-      result.add(_LayoutNode(n, Offset(leftX + w / 2, kNodeSize / 2 + level * kLevelStride)));
+      result.add(
+        _LayoutNode(
+          n,
+          Offset(leftX + w / 2, kNodeSize / 2 + level * kLevelStride),
+        ),
+      );
       final kids = childrenMap[n.id] ?? [];
       double cursor = leftX;
       // Newest child first (left). Children arrive in creation order, so
@@ -376,6 +396,7 @@ class _TreeLayout {
         cursor += subtreeWidths[k.id]! * kUnitWidth;
       }
     }
+
     assignPos(root, xOffset, 0);
 
     double maxY = 0;
@@ -392,7 +413,7 @@ class _TreeLayout {
 
 class _TreeLinePainter extends CustomPainter {
   _TreeLinePainter(this.nodes)
-      : _posById = {for (final ln in nodes) ln.node.id: ln.position};
+    : _posById = {for (final ln in nodes) ln.node.id: ln.position};
 
   final List<_LayoutNode> nodes;
   final Map<String, Offset> _posById;
@@ -444,10 +465,17 @@ class _TreeNodeWidget extends StatelessWidget {
     if (node.status == GenStatus.generating) {
       inner = const Padding(
         padding: EdgeInsets.all(12),
-        child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.textSecondary),
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: AppTheme.textSecondary,
+        ),
       );
     } else if (node.status == GenStatus.error) {
-      inner = const Icon(Icons.error_outline, size: 22, color: Colors.redAccent);
+      inner = const Icon(
+        Icons.error_outline,
+        size: 22,
+        color: Colors.redAccent,
+      );
     } else if (node.images.isNotEmpty) {
       final displayImg = displayImageId != null
           ? node.images.firstWhere(
@@ -470,10 +498,10 @@ class _TreeNodeWidget extends StatelessWidget {
         node.isVideo
             ? Icons.movie_outlined
             : node.is3D
-                ? Icons.view_in_ar
-                : node.isRoot
-                    ? Icons.auto_awesome
-                    : Icons.brush_outlined,
+            ? Icons.view_in_ar
+            : node.isRoot
+            ? Icons.auto_awesome
+            : Icons.brush_outlined,
         size: 20,
         color: (node.is3D || node.isVideo) && node.status == GenStatus.ready
             ? AppTheme.accent
@@ -489,18 +517,27 @@ class _TreeNodeWidget extends StatelessWidget {
         color: isCurrent
             ? AppTheme.accent
             : isParent
-                ? AppTheme.accent.withValues(alpha: 0.12)
-                : AppTheme.surface,
+            ? AppTheme.accent.withValues(alpha: 0.12)
+            : AppTheme.surface,
         border: Border.all(
           color: isCurrent
               ? AppTheme.accent
               : isParent
-                  ? AppTheme.accent.withValues(alpha: 0.6)
-                  : Colors.white24,
-          width: isCurrent ? 2.5 : isParent ? 1.5 : 0.5,
+              ? AppTheme.accent.withValues(alpha: 0.6)
+              : Colors.white24,
+          width: isCurrent
+              ? 2.5
+              : isParent
+              ? 1.5
+              : 0.5,
         ),
         boxShadow: isCurrent
-            ? [BoxShadow(color: AppTheme.accent.withValues(alpha: 0.4), blurRadius: 8)]
+            ? [
+                BoxShadow(
+                  color: AppTheme.accent.withValues(alpha: 0.4),
+                  blurRadius: 8,
+                ),
+              ]
             : null,
       ),
       child: Center(child: inner),
@@ -534,6 +571,8 @@ class _TreeNodeWidget extends StatelessWidget {
                       child: Icon(
                         node.isRepose
                             ? Icons.directions_walk
+                            : node.hairstyleId != null
+                            ? Icons.content_cut
                             : Icons.auto_fix_high,
                         size: 10,
                         color: AppTheme.accent,
@@ -771,7 +810,11 @@ class _NodeGrid extends ConsumerWidget {
                 style: TextStyle(color: AppTheme.textSecondary),
               ),
             )
-          : _VideoNodeView(key: ValueKey(node.id), path: path, title: node.prompt);
+          : _VideoNodeView(
+              key: ValueKey(node.id),
+              path: path,
+              title: node.prompt,
+            );
     }
 
     if (node.is3D && node.status == GenStatus.ready) {
@@ -796,7 +839,11 @@ class _NodeGrid extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.view_in_ar, size: 56, color: AppTheme.accent),
+                  const Icon(
+                    Icons.view_in_ar,
+                    size: 56,
+                    color: AppTheme.accent,
+                  ),
                   const SizedBox(height: 12),
                   const Text(
                     '3D model je hotový',
@@ -804,18 +851,17 @@ class _NodeGrid extends ConsumerWidget {
                   ),
                   const SizedBox(height: 16),
                   FilledButton.icon(
-                    style:
-                        FilledButton.styleFrom(backgroundColor: AppTheme.accent),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppTheme.accent,
+                    ),
                     onPressed: glb == null || stl == null
                         ? null
                         : () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => ModelViewerScreen(
-                                  glbPath: glb,
-                                  stlPath: stl,
-                                ),
-                              ),
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  ModelViewerScreen(glbPath: glb, stlPath: stl),
                             ),
+                          ),
                     icon: const Icon(Icons.threed_rotation, size: 18),
                     label: const Text('Otevřít a otáčet'),
                   ),
@@ -832,6 +878,15 @@ class _NodeGrid extends ConsumerWidget {
         (s) => s.availableModels.any((m) => m.supportsPose),
       ),
     );
+    final canHair =
+        kHairstyles.isNotEmpty &&
+        ref.watch(
+          imageStudioProvider.select(
+            (s) => s.availableModels.any(
+              (m) => m.inpaint && m.kind == ImageBackendKind.comfyUi,
+            ),
+          ),
+        );
     // No scene catalog ⇒ the video server is down; hide rather than dead.
     final canAnimate = ref.watch(
       imageStudioProvider.select((s) => s.availableScenes.isNotEmpty),
@@ -862,9 +917,7 @@ class _NodeGrid extends ConsumerWidget {
           onSave: () => _saveImage(context, img),
           onInpaint: () => _startInpaint(context, ref, img),
           on3D: () => _start3D(context, ref, img),
-          onAnimate: canAnimate
-              ? () => _startAnimate(context, ref, img)
-              : null,
+          onAnimate: canAnimate ? () => _startAnimate(context, ref, img) : null,
           // Repose needs an SDXL model (depth ControlNet); without one on the
           // server the affordance is hidden rather than dead.
           onRepose: canRepose
@@ -873,6 +926,9 @@ class _NodeGrid extends ConsumerWidget {
                   ref.read(imageStudioProvider.notifier).startRepose(img.id);
                 }
               : null,
+          // Kadeřník: automatic hair mask + inpaint. Hidden without an
+          // inpaint model or before any hairstyle passed the bench gate.
+          onHair: canHair ? () => _startHair(context, ref, img) : null,
           // Long-press copies the prompt that produced this node's images,
           // so it can be reused.
           onLongPress: () => _copyToClipboard(context, node.prompt, 'Prompt'),
@@ -972,7 +1028,9 @@ class _NodeGrid extends ConsumerWidget {
                           Flexible(
                             child: Text(
                               s.label,
-                              style: const TextStyle(color: AppTheme.textPrimary),
+                              style: const TextStyle(
+                                color: AppTheme.textPrimary,
+                              ),
                             ),
                           ),
                           // Scény s vygenerovanou hudbou jsou novinka a jedou na
@@ -981,7 +1039,9 @@ class _NodeGrid extends ConsumerWidget {
                             Container(
                               margin: const EdgeInsets.only(left: 8),
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 2),
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: AppTheme.accent.withValues(alpha: 0.18),
                                 borderRadius: BorderRadius.circular(10),
@@ -989,14 +1049,19 @@ class _NodeGrid extends ConsumerWidget {
                               child: const Text(
                                 'se zvukem',
                                 style: TextStyle(
-                                    color: AppTheme.accent, fontSize: 11),
+                                  color: AppTheme.accent,
+                                  fontSize: 11,
+                                ),
                               ),
                             ),
                         ],
                       ),
                       subtitle: Text(
                         '${s.desc}\n~${s.seconds.round()} s · ${s.beats} beatů · ~${s.minutesEst} min',
-                        style: const TextStyle(color: AppTheme.textSecondary, height: 1.3),
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          height: 1.3,
+                        ),
                       ),
                       isThreeLine: true,
                       onTap: () => Navigator.of(context).pop(s),
@@ -1017,6 +1082,21 @@ class _NodeGrid extends ConsumerWidget {
   /// the SDXL family) is chosen inside its prompt sheet, so there is no
   /// pre-flight switching dialog. The tile's image becomes the selection —
   /// same contract as refine, which also works on the selected image.
+  /// Kadeřník entry: pick a hairstyle, the notifier does the rest (analysis →
+  /// mask → inpaint node). Errors (no face…) land in the usual error banner.
+  Future<void> _startHair(
+    BuildContext context,
+    WidgetRef ref,
+    GenImage img,
+  ) async {
+    _dismissKeyboard();
+    final notifier = ref.read(imageStudioProvider.notifier);
+    if (notifier.hairBusy) return;
+    final id = await HairSheet.show(context);
+    if (id == null) return;
+    await notifier.hairRestyle(img.id, id);
+  }
+
   Future<void> _startInpaint(
     BuildContext context,
     WidgetRef ref,
@@ -1025,17 +1105,18 @@ class _NodeGrid extends ConsumerWidget {
     _dismissKeyboard();
     final notifier = ref.read(imageStudioProvider.notifier);
     final state = ref.read(imageStudioProvider);
-    final candidates =
-        state.availableModels.where((m) => m.inpaint).toList();
+    final candidates = state.availableModels.where((m) => m.inpaint).toList();
     if (candidates.isEmpty) return;
     // Pre-select the session's model when it can inpaint; FLUX Fill (the
     // dedicated inpaint model) otherwise.
     final initial = state.model.inpaint
         ? state.model.id
         : candidates
-            .firstWhere((m) => m.id == 'flux-fill',
-                orElse: () => candidates.first)
-            .id;
+              .firstWhere(
+                (m) => m.id == 'flux-fill',
+                orElse: () => candidates.first,
+              )
+              .id;
     notifier.selectImage(img.id);
     final result = await Navigator.of(context).push<MaskEditorResult>(
       MaterialPageRoute(
@@ -1122,6 +1203,7 @@ class _ImageTile extends StatelessWidget {
     required this.on3D,
     this.onAnimate,
     this.onRepose,
+    this.onHair,
     this.onLongPress,
   });
 
@@ -1136,6 +1218,9 @@ class _ImageTile extends StatelessWidget {
   /// „Zachovej pózu“ — a new character on this image's pose (internally
   /// still `repose`). Null hides the button.
   final VoidCallback? onRepose;
+
+  /// „Kadeřník“ — the same photo with a new haircut. Null hides the button.
+  final VoidCallback? onHair;
 
   /// „Rozhýbat“ — animate this image into a clip. Null (no scene catalog)
   /// hides the button.
@@ -1190,7 +1275,37 @@ class _ImageTile extends StatelessWidget {
                   onTap: onAnimate,
                   child: const Padding(
                     padding: EdgeInsets.all(6),
-                    child: Icon(Icons.movie_outlined, size: 18, color: Colors.white),
+                    child: Icon(
+                      Icons.movie_outlined,
+                      size: 18,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          // Kadeřník joins the top-right row, left of animate/repose.
+          if (onHair != null)
+            Positioned(
+              top: 4,
+              right:
+                  4.0 +
+                  36 *
+                      ((onAnimate != null ? 1 : 0) +
+                          (onRepose != null ? 1 : 0)),
+              child: Material(
+                color: Colors.black54,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: onHair,
+                  child: const Padding(
+                    padding: EdgeInsets.all(6),
+                    child: Icon(
+                      Icons.content_cut,
+                      size: 18,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -1243,7 +1358,11 @@ class _ImageTile extends StatelessWidget {
                 onTap: onInpaint,
                 child: const Padding(
                   padding: EdgeInsets.all(6),
-                  child: Icon(Icons.auto_fix_high, size: 18, color: Colors.white),
+                  child: Icon(
+                    Icons.auto_fix_high,
+                    size: 18,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
@@ -1259,7 +1378,11 @@ class _ImageTile extends StatelessWidget {
                 onTap: onSave,
                 child: const Padding(
                   padding: EdgeInsets.all(6),
-                  child: Icon(Icons.download_outlined, size: 18, color: Colors.white),
+                  child: Icon(
+                    Icons.download_outlined,
+                    size: 18,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
@@ -1387,8 +1510,11 @@ class _LoraStrengthSlider extends StatelessWidget {
                   onTap: () => onChanged(kDefaultLoraStrength),
                   child: const Padding(
                     padding: EdgeInsets.all(2),
-                    child: Icon(Icons.restart_alt,
-                        size: 16, color: AppTheme.textSecondary),
+                    child: Icon(
+                      Icons.restart_alt,
+                      size: 16,
+                      color: AppTheme.textSecondary,
+                    ),
                   ),
                 ),
               ],
@@ -1460,112 +1586,112 @@ class _LoraChip extends StatelessWidget {
       builder: (_) => SafeArea(
         child: StatefulBuilder(
           builder: (context, setSheetState) => Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                'Vybrat LoRA',
-                style: TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(
+                  'Vybrat LoRA',
+                  style: TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ),
-            ListTile(
-              leading: Icon(
-                selected == null
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_unchecked,
-                color: selected == null
-                    ? AppTheme.accent
-                    : AppTheme.textSecondary,
-                size: 20,
+              ListTile(
+                leading: Icon(
+                  selected == null
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  color: selected == null
+                      ? AppTheme.accent
+                      : AppTheme.textSecondary,
+                  size: 20,
+                ),
+                title: const Text(
+                  'Žádná LoRA',
+                  style: TextStyle(color: AppTheme.textPrimary),
+                ),
+                onTap: () {
+                  onChanged(null);
+                  Navigator.of(context).pop();
+                },
               ),
-              title: const Text(
-                'Žádná LoRA',
-                style: TextStyle(color: AppTheme.textPrimary),
-              ),
-              onTap: () {
-                onChanged(null);
-                Navigator.of(context).pop();
-              },
-            ),
-            const Divider(height: 1, color: Colors.white12),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: loras.length,
-                itemBuilder: (_, i) {
-                  final lora = loras[i];
-                  final isSel = lora == selected;
-                  final fit = fitOfLora(lora, family);
-                  // The list is ordered by fit, so a change of fit starts a
-                  // new section — the header says why the rest is different.
-                  final newSection =
-                      i == 0 || fitOfLora(loras[i - 1], family) != fit;
-                  final tile = ListTile(
-                    leading: Icon(
-                      isSel
-                          ? Icons.radio_button_checked
-                          : Icons.radio_button_unchecked,
-                      color: isSel ? AppTheme.accent : AppTheme.textSecondary,
-                      size: 20,
-                    ),
-                    title: Text(
-                      lora.replaceAll('.safetensors', ''),
-                      style: TextStyle(
-                        color: isSel ? AppTheme.accent : AppTheme.textPrimary,
+              const Divider(height: 1, color: Colors.white12),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: loras.length,
+                  itemBuilder: (_, i) {
+                    final lora = loras[i];
+                    final isSel = lora == selected;
+                    final fit = fitOfLora(lora, family);
+                    // The list is ordered by fit, so a change of fit starts a
+                    // new section — the header says why the rest is different.
+                    final newSection =
+                        i == 0 || fitOfLora(loras[i - 1], family) != fit;
+                    final tile = ListTile(
+                      leading: Icon(
+                        isSel
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                        color: isSel ? AppTheme.accent : AppTheme.textSecondary,
+                        size: 20,
                       ),
-                    ),
-                    subtitle: Text(
-                      loraFamilyLabel(familyOfLora(lora)),
-                      style: const TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 11,
-                      ),
-                    ),
-                    onTap: () {
-                      onChanged(lora);
-                      Navigator.of(context).pop();
-                    },
-                  );
-                  if (!newSection) return tile;
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
-                        child: Text(
-                          _loraSectionTitle(fit, family),
-                          style: const TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      title: Text(
+                        lora.replaceAll('.safetensors', ''),
+                        style: TextStyle(
+                          color: isSel ? AppTheme.accent : AppTheme.textPrimary,
                         ),
                       ),
-                      tile,
-                    ],
-                  );
-                },
+                      subtitle: Text(
+                        loraFamilyLabel(familyOfLora(lora)),
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                      onTap: () {
+                        onChanged(lora);
+                        Navigator.of(context).pop();
+                      },
+                    );
+                    if (!newSection) return tile;
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+                          child: Text(
+                            _loraSectionTitle(fit, family),
+                            style: const TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        tile,
+                      ],
+                    );
+                  },
+                ),
               ),
-            ),
-            if (selected != null) ...[
-              const Divider(height: 1, color: Colors.white12),
-              _LoraStrengthSlider(
-                value: strength,
-                onChanged: (v) {
-                  setSheetState(() {});
-                  onStrengthChanged(v);
-                },
-              ),
+              if (selected != null) ...[
+                const Divider(height: 1, color: Colors.white12),
+                _LoraStrengthSlider(
+                  value: strength,
+                  onChanged: (v) {
+                    setSheetState(() {});
+                    onStrengthChanged(v);
+                  },
+                ),
+              ],
             ],
-          ],
-        ),
+          ),
         ),
       ),
     );
@@ -1618,8 +1744,9 @@ class _LoraChip extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color:
-                          strength < 0 ? Colors.orangeAccent : AppTheme.accent,
+                      color: strength < 0
+                          ? Colors.orangeAccent
+                          : AppTheme.accent,
                     ),
                   ),
                 ],
@@ -1772,8 +1899,7 @@ class _PoseChip extends StatelessWidget {
               label ?? 'Póza',
               style: TextStyle(
                 fontSize: 12,
-                color:
-                    label != null ? AppTheme.accent : AppTheme.textSecondary,
+                color: label != null ? AppTheme.accent : AppTheme.textSecondary,
               ),
             ),
             const SizedBox(width: 3),
@@ -1859,12 +1985,12 @@ class _ModelChip extends StatelessWidget {
                   final hint = inpaintOnly
                       ? 'inpaint — spustíš ikonou ✨ na obrázku'
                       : usable
-                          ? spec.capabilityLabel
-                          : needsPose
-                              ? '${spec.capabilityLabel} — „zachovej pózu“ umí jen SDXL'
-                              : spec.img2img
-                                  ? '${spec.capabilityLabel} — vyžaduje obrázek'
-                                  : '${spec.capabilityLabel} — jen nové generování';
+                      ? spec.capabilityLabel
+                      : needsPose
+                      ? '${spec.capabilityLabel} — „zachovej pózu“ umí jen SDXL'
+                      : spec.img2img
+                      ? '${spec.capabilityLabel} — vyžaduje obrázek'
+                      : '${spec.capabilityLabel} — jen nové generování';
                   final note = spec.styleNote;
                   return Opacity(
                     opacity: usable ? 1.0 : 0.38,
@@ -1875,8 +2001,7 @@ class _ModelChip extends StatelessWidget {
                       title: Text(
                         spec.label,
                         style: TextStyle(
-                          color:
-                              isSel ? AppTheme.accent : AppTheme.textPrimary,
+                          color: isSel ? AppTheme.accent : AppTheme.textPrimary,
                         ),
                       ),
                       subtitle: Column(
@@ -1898,8 +2023,9 @@ class _ModelChip extends StatelessWidget {
                               child: Text(
                                 note,
                                 style: TextStyle(
-                                  color: AppTheme.textSecondary
-                                      .withValues(alpha: 0.75),
+                                  color: AppTheme.textSecondary.withValues(
+                                    alpha: 0.75,
+                                  ),
                                   fontSize: 11,
                                   height: 1.25,
                                 ),
@@ -1911,8 +2037,7 @@ class _ModelChip extends StatelessWidget {
                         isSel
                             ? Icons.radio_button_checked
                             : Icons.radio_button_unchecked,
-                        color:
-                            isSel ? AppTheme.accent : AppTheme.textSecondary,
+                        color: isSel ? AppTheme.accent : AppTheme.textSecondary,
                         size: 20,
                       ),
                       onTap: () {
@@ -1947,10 +2072,7 @@ class _ModelChip extends StatelessWidget {
           children: [
             Icon(spec.icon, size: 14, color: spec.color),
             const SizedBox(width: 5),
-            Text(
-              spec.label,
-              style: TextStyle(fontSize: 12, color: spec.color),
-            ),
+            Text(spec.label, style: TextStyle(fontSize: 12, color: spec.color)),
             const SizedBox(width: 3),
             Icon(Icons.expand_more, size: 14, color: spec.color),
           ],
@@ -2040,8 +2162,9 @@ class _StyleChip extends StatelessWidget {
       ),
       builder: (_) => StatefulBuilder(
         builder: (ctx, setSheetState) {
-          final hits =
-              kStylePresets.where((s) => styleMatchesQuery(s, query)).toList();
+          final hits = kStylePresets
+              .where((s) => styleMatchesQuery(s, query))
+              .toList();
           final cultures = hits.where((s) => s.artist == null).toList();
           final artists = hits.where((s) => s.artist != null).toList();
           // One flat list of headers and presets — the split is what makes
@@ -2133,8 +2256,10 @@ class _StyleChip extends StatelessWidget {
                             : AppTheme.textSecondary,
                         size: 20,
                       ),
-                      title: const Text('Bez stylu',
-                          style: TextStyle(color: AppTheme.textPrimary)),
+                      title: const Text(
+                        'Bez stylu',
+                        style: TextStyle(color: AppTheme.textPrimary),
+                      ),
                       onTap: () {
                         onChanged(null);
                         Navigator.of(ctx).pop();
@@ -2162,7 +2287,11 @@ class _StyleChip extends StatelessWidget {
                                 if (item is String) {
                                   return Padding(
                                     padding: const EdgeInsets.fromLTRB(
-                                        16, 10, 16, 2),
+                                      16,
+                                      10,
+                                      16,
+                                      2,
+                                    ),
                                     child: Text(
                                       item,
                                       style: const TextStyle(
@@ -2251,20 +2380,31 @@ class _EditStrengthChip extends StatelessWidget {
   final ValueChanged<double?> onChanged;
 
   String get _label => switch (denoise) {
-        null => 'Úprava: běžná',
-        kGentleEditDenoise => 'Úprava: jemná',
-        kStyleEditDenoise => 'Úprava: silná',
-        _ => 'Úprava: ${denoise!.toStringAsFixed(2)}',
-      };
+    null => 'Úprava: běžná',
+    kGentleEditDenoise => 'Úprava: jemná',
+    kStyleEditDenoise => 'Úprava: silná',
+    _ => 'Úprava: ${denoise!.toStringAsFixed(2)}',
+  };
 
   void _pick(BuildContext context) {
     _dismissKeyboard();
     final options = <(String, String, double?)>[
-      ('Jemná', 'drží zdroj, mění detaily (${kGentleEditDenoise.toStringAsFixed(2)})',
-          kGentleEditDenoise),
-      ('Běžná', 'výchozí pro model (${presetDenoise.toStringAsFixed(2)})', null),
-      ('Silná', 'projde i výtvarný styl, pózu drží ControlNet '
-          '(${kStyleEditDenoise.toStringAsFixed(2)})', kStyleEditDenoise),
+      (
+        'Jemná',
+        'drží zdroj, mění detaily (${kGentleEditDenoise.toStringAsFixed(2)})',
+        kGentleEditDenoise,
+      ),
+      (
+        'Běžná',
+        'výchozí pro model (${presetDenoise.toStringAsFixed(2)})',
+        null,
+      ),
+      (
+        'Silná',
+        'projde i výtvarný styl, pózu drží ControlNet '
+            '(${kStyleEditDenoise.toStringAsFixed(2)})',
+        kStyleEditDenoise,
+      ),
     ];
     showModalBottomSheet<void>(
       context: context,
@@ -2299,15 +2439,21 @@ class _EditStrengthChip extends StatelessWidget {
                       : AppTheme.textSecondary,
                   size: 20,
                 ),
-                title: Text(title,
-                    style: TextStyle(
-                      color: value == denoise
-                          ? AppTheme.accent
-                          : AppTheme.textPrimary,
-                    )),
-                subtitle: Text(sub,
-                    style: const TextStyle(
-                        color: AppTheme.textSecondary, fontSize: 11)),
+                title: Text(
+                  title,
+                  style: TextStyle(
+                    color: value == denoise
+                        ? AppTheme.accent
+                        : AppTheme.textPrimary,
+                  ),
+                ),
+                subtitle: Text(
+                  sub,
+                  style: const TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 11,
+                  ),
+                ),
                 onTap: () {
                   onChanged(value);
                   Navigator.of(ctx).pop();
@@ -2321,11 +2467,11 @@ class _EditStrengthChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _ChipShell(
-        active: denoise != null,
-        icon: Icons.tune,
-        label: _label,
-        onTap: () => _pick(context),
-      );
+    active: denoise != null,
+    icon: Icons.tune,
+    label: _label,
+    onTap: () => _pick(context),
+  );
 }
 
 /// „Zachovat tvář“: carry the source's face over on an img2img / repose
@@ -2339,11 +2485,11 @@ class _FaceChip extends StatelessWidget {
   final ValueChanged<FaceIdentity> onChanged;
 
   static String _title(FaceIdentity m) => switch (m) {
-        FaceIdentity.none => 'Nová',
-        FaceIdentity.instantid => 'InstantID',
-        FaceIdentity.faceid => 'FaceID',
-        FaceIdentity.both => 'Obojí',
-      };
+    FaceIdentity.none => 'Nová',
+    FaceIdentity.instantid => 'InstantID',
+    FaceIdentity.faceid => 'FaceID',
+    FaceIdentity.both => 'Obojí',
+  };
 
   void _pick(BuildContext context) {
     _dismissKeyboard();
@@ -2398,15 +2544,21 @@ class _FaceChip extends StatelessWidget {
                       : AppTheme.textSecondary,
                   size: 20,
                 ),
-                title: Text(_title(value),
-                    style: TextStyle(
-                      color: value == mode
-                          ? AppTheme.accent
-                          : AppTheme.textPrimary,
-                    )),
-                subtitle: Text(sub,
-                    style: const TextStyle(
-                        color: AppTheme.textSecondary, fontSize: 11)),
+                title: Text(
+                  _title(value),
+                  style: TextStyle(
+                    color: value == mode
+                        ? AppTheme.accent
+                        : AppTheme.textPrimary,
+                  ),
+                ),
+                subtitle: Text(
+                  sub,
+                  style: const TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 11,
+                  ),
+                ),
                 onTap: () {
                   onChanged(value);
                   Navigator.of(ctx).pop();
@@ -2420,11 +2572,11 @@ class _FaceChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _ChipShell(
-        active: mode.isOn,
-        icon: Icons.face_retouching_natural,
-        label: 'Tvář: ${_title(mode)}',
-        onTap: () => _pick(context),
-      );
+    active: mode.isOn,
+    icon: Icons.face_retouching_natural,
+    label: 'Tvář: ${_title(mode)}',
+    onTap: () => _pick(context),
+  );
 }
 
 /// Shared chip look: accent-tinted when a non-default value is active.
@@ -2449,7 +2601,9 @@ class _ChipShell extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: active ? AppTheme.accent.withValues(alpha: 0.15) : AppTheme.surface,
+          color: active
+              ? AppTheme.accent.withValues(alpha: 0.15)
+              : AppTheme.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: active ? AppTheme.accent : Colors.white24,
@@ -2554,17 +2708,25 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.photo_camera_outlined,
-                  color: AppTheme.textPrimary),
-              title: const Text('Vyfotit',
-                  style: TextStyle(color: AppTheme.textPrimary)),
+              leading: const Icon(
+                Icons.photo_camera_outlined,
+                color: AppTheme.textPrimary,
+              ),
+              title: const Text(
+                'Vyfotit',
+                style: TextStyle(color: AppTheme.textPrimary),
+              ),
               onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library_outlined,
-                  color: AppTheme.textPrimary),
-              title: const Text('Vybrat z galerie',
-                  style: TextStyle(color: AppTheme.textPrimary)),
+              leading: const Icon(
+                Icons.photo_library_outlined,
+                color: AppTheme.textPrimary,
+              ),
+              title: const Text(
+                'Vybrat z galerie',
+                style: TextStyle(color: AppTheme.textPrimary),
+              ),
               onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
             ),
           ],
@@ -2585,7 +2747,9 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
       if (!spec.supportsPose) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('„Zachovej pózu“ funguje jen na SDXL modelech — vyber jiný.'),
+            content: Text(
+              '„Zachovej pózu“ funguje jen na SDXL modelech — vyber jiný.',
+            ),
             duration: Duration(seconds: 3),
           ),
         );
@@ -2753,7 +2917,6 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                       ),
                     ],
                   ],
-
                 ),
               ),
             ),
@@ -2850,16 +3013,14 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: IconButton(
-                          padding: EdgeInsets.zero,
-                          icon: Icon(
-                            Icons.arrow_upward_rounded,
-                            color: canSend
-                                ? Colors.white
-                                : AppTheme.textSecondary,
-                            size: 20,
-                          ),
-                          onPressed: canSend ? _send : null,
-                        ),
+                    padding: EdgeInsets.zero,
+                    icon: Icon(
+                      Icons.arrow_upward_rounded,
+                      color: canSend ? Colors.white : AppTheme.textSecondary,
+                      size: 20,
+                    ),
+                    onPressed: canSend ? _send : null,
+                  ),
                 ),
               ],
             ),
@@ -2869,7 +3030,6 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
     );
   }
 }
-
 
 /// Inline looping player for a ready video node, with save/share/fullscreen.
 /// Stateful so the controller lives with the node view; keyed by node id in
@@ -2905,7 +3065,6 @@ class _VideoNodeViewState extends State<_VideoNodeView> {
     super.dispose();
   }
 
-
   @override
   Widget build(BuildContext context) {
     final ready = _controller.value.isInitialized;
@@ -2940,26 +3099,36 @@ class _VideoNodeViewState extends State<_VideoNodeView> {
                 onPressed: () => saveVideo(context, widget.path),
                 icon: const Icon(Icons.download_outlined, size: 18),
                 label: const Text('Uložit'),
-                style: TextButton.styleFrom(foregroundColor: AppTheme.textSecondary),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.textSecondary,
+                ),
               ),
               TextButton.icon(
                 onPressed: () => SharePlus.instance.share(
-                  ShareParams(files: [XFile(widget.path, mimeType: 'video/mp4')]),
+                  ShareParams(
+                    files: [XFile(widget.path, mimeType: 'video/mp4')],
+                  ),
                 ),
                 icon: const Icon(Icons.ios_share, size: 18),
                 label: const Text('Sdílet'),
-                style: TextButton.styleFrom(foregroundColor: AppTheme.textSecondary),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.textSecondary,
+                ),
               ),
               TextButton.icon(
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (context) =>
-                        VideoPlayerScreen(path: widget.path, title: widget.title),
+                    builder: (context) => VideoPlayerScreen(
+                      path: widget.path,
+                      title: widget.title,
+                    ),
                   ),
                 ),
                 icon: const Icon(Icons.fullscreen, size: 18),
                 label: const Text('Celá obrazovka'),
-                style: TextButton.styleFrom(foregroundColor: AppTheme.textSecondary),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.textSecondary,
+                ),
               ),
             ],
           ),

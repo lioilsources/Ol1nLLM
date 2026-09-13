@@ -777,6 +777,10 @@ bool styleMatchesQuery(StylePreset style, String query) {
 const _accented = 'áäàâãåčćçďéěëèêíïìîľĺňñóöòôõřŕšśťúůüùûýÿžź';
 const _plain = 'aaaaaacccdeeeeeiiiillnnooooorrsstuuuuuyyzz';
 
+/// Lower-case without Czech/Slovak/common diacritics — shared by the style and
+/// hairstyle pickers' search.
+String foldDiacritics(String s) => _fold(s);
+
 String _fold(String s) {
   final buf = StringBuffer();
   for (final unit in s.toLowerCase().split('')) {

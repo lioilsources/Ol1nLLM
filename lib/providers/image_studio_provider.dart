@@ -8,9 +8,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 
 import '../models/gen_node.dart';
+import '../models/hair_mask.dart';
+import '../models/hairstyle_preset.dart';
 import '../models/image_model.dart';
 import '../models/image_session.dart';
 import '../models/latent_bucket.dart';
@@ -72,7 +75,8 @@ NodeSettings? adoptableSettings(
   if (!availableModels.any((m) => m.id == modelId)) return null;
   final spec = imageModelById(modelId);
   final lora = node.loraName;
-  final loraUsable = lora != null &&
+  final loraUsable =
+      lora != null &&
       (installedLoras.isEmpty || installedLoras.contains(lora)) &&
       lorasForFamily([lora], spec.loraFamily).isNotEmpty;
   return (
@@ -279,10 +283,10 @@ class ImageStudioState {
     selectedLora: clearLora ? null : (selectedLora ?? this.selectedLora),
     loraStrength: loraStrength ?? this.loraStrength,
     selectedPoseId: clearPose ? null : (selectedPoseId ?? this.selectedPoseId),
-    selectedStyleId:
-        clearStyle ? null : (selectedStyleId ?? this.selectedStyleId),
-    editDenoise:
-        clearEditDenoise ? null : (editDenoise ?? this.editDenoise),
+    selectedStyleId: clearStyle
+        ? null
+        : (selectedStyleId ?? this.selectedStyleId),
+    editDenoise: clearEditDenoise ? null : (editDenoise ?? this.editDenoise),
     faceIdentity: faceIdentity ?? this.faceIdentity,
     reposeSourceImageId: clearRepose
         ? null
@@ -331,7 +335,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     try {
       final dir = (await getApplicationDocumentsDirectory()).path;
       for (final suffix in ['.hive', '.hive.lock']) {
-        try { await File('$dir/$_legacyBoxName$suffix').delete(); } catch (_) {}
+        try {
+          await File('$dir/$_legacyBoxName$suffix').delete();
+        } catch (_) {}
       }
     } catch (_) {}
   }
@@ -396,10 +402,10 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       final run = node.isVideo
           ? () => _video.follow(node.jobId!)
           : node.is3D
-              ? () => _comfyui.followMesh(node.jobId!)
-              : node.isRepose
-                  ? () => _comfyui.follow(node.jobId!)
-                  : () => backend.follow(node.jobId!);
+          ? () => _comfyui.followMesh(node.jobId!)
+          : node.isRepose
+          ? () => _comfyui.follow(node.jobId!)
+          : () => backend.follow(node.jobId!);
       unawaited(_runAsync(node.id, run));
     }
   }
@@ -442,8 +448,11 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   }
 
   void setModel(String id) {
-    final (lora, poseId) =
-        _applyModelToServices(id, state.selectedLora, state.selectedPoseId);
+    final (lora, poseId) = _applyModelToServices(
+      id,
+      state.selectedLora,
+      state.selectedPoseId,
+    );
     state = state.copyWith(
       modelId: id,
       selectedLora: lora,
@@ -528,8 +537,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     if (_imageById(imageId) == null) return;
     String? info;
     if (!state.model.supportsPose) {
-      final candidates =
-          state.availableModels.where((m) => m.supportsPose).toList();
+      final candidates = state.availableModels
+          .where((m) => m.supportsPose)
+          .toList();
       if (candidates.isEmpty) {
         state = state.copyWith(
           error: '„Zachovej pózu“ vyžaduje SDXL model — na serveru žádný není.',
@@ -543,7 +553,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
             orElse: () => candidates.first.id,
           )!;
       setModel(lastUsed);
-      info = 'Přepnuto na ${imageModelById(lastUsed).label} — '
+      info =
+          'Přepnuto na ${imageModelById(lastUsed).label} — '
           '„zachovej pózu“ funguje jen na SDXL modelech.';
     }
     state = state.copyWith(
@@ -613,7 +624,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     if (toDelete != null) {
       for (final node in toDelete.nodes) {
         for (final image in node.images) {
-          try { await File(image.filePath).delete(); } catch (_) {}
+          try {
+            await File(image.filePath).delete();
+          } catch (_) {}
         }
       }
     }
@@ -665,10 +678,11 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       final box = await Hive.openBox(_boxName);
       final raw = box.get(_key);
       if (raw == null) return;
-      final sessions = (jsonDecode(raw as String) as List)
-          .map((e) => ImageSession.fromJson(e as Map<String, dynamic>))
-          .toList()
-        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      final sessions =
+          (jsonDecode(raw as String) as List)
+              .map((e) => ImageSession.fromJson(e as Map<String, dynamic>))
+              .toList()
+            ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       if (sessions.isNotEmpty) {
         final latest = sessions.first;
         final (lora, poseId) = _applyModelToServices(
@@ -721,8 +735,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       selectedPoseId: state.selectedPoseId,
       selectedStyleId: state.selectedStyleId,
       editDenoise: state.editDenoise,
-      faceIdentity:
-          state.faceIdentity.isOn ? state.faceIdentity.name : null,
+      faceIdentity: state.faceIdentity.isOn ? state.faceIdentity.name : null,
       modelId: state.modelId,
       exportedAt: existing?.exportedAt,
       exportedImageCount: existing?.exportedImageCount,
@@ -756,12 +769,13 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     // Exporting the live session: persist first so the stored session object
     // reflects the newest nodes.
     if (sessionId == state.activeSessionId) await _save();
-    final session =
-        state.sessions.where((s) => s.id == sessionId).firstOrNull;
+    final session = state.sessions.where((s) => s.id == sessionId).firstOrNull;
     if (session == null) return;
     final imageCount = session.readyImageCount;
     if (imageCount == 0) {
-      state = state.copyWith(error: 'Není co exportovat – žádné hotové obrázky');
+      state = state.copyWith(
+        error: 'Není co exportovat – žádné hotové obrázky',
+      );
       return;
     }
     state = state.copyWith(exportingSessionId: sessionId, clearError: true);
@@ -788,7 +802,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       state = state.copyWith(
         sessions: updated,
         clearExporting: true,
-        info: 'Exportováno ${summary.images} obrázků '
+        info:
+            'Exportováno ${summary.images} obrázků '
             '(${summary.newBlobs} nových)',
       );
       await _persistSessions(updated);
@@ -815,10 +830,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   void setPose(String? poseId) {
     final pose = poseById(poseId);
     _comfyui.setPose(pose?.asset);
-    state = state.copyWith(
-      selectedPoseId: pose?.id,
-      clearPose: pose == null,
-    );
+    state = state.copyWith(selectedPoseId: pose?.id, clearPose: pose == null);
   }
 
   /// What the ComfyUI server currently has installed, read once at startup:
@@ -878,6 +890,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     bool refIsFace = false,
     bool isRepose = false,
     LatentSize? latentSize,
+    String? hairstyleId,
   }) {
     final spec = state.model;
     final preset = spec.preset;
@@ -896,16 +909,18 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     // one is injected: SDXL img2img on auto-depth (no template pose, not an
     // inpaint) and repose. Mirror ComfyUIService._injectFaceIdentity's gate
     // so the snapshot never claims a face that wasn't read.
-    final faceRan = state.faceIdentity.isOn &&
+    final faceRan =
+        state.faceIdentity.isOn &&
         patched &&
         spec.supportsPose &&
         (isRepose || (isImg2img && !isInpaint && poseId == null));
     // Effective negative = preset negative + user ALL-CAPS tags. Recorded only
     // for generic-template models — elsewhere no negative is actually applied.
     final negative = patched
-        ? [preset!.negativePrompt, userNegative]
-            .where((s) => s.isNotEmpty)
-            .join(', ')
+        ? [
+            preset!.negativePrompt,
+            userNegative,
+          ].where((s) => s.isNotEmpty).join(', ')
         : '';
     return GenNode.create(
       id: id,
@@ -916,6 +931,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       refFileName: refFileName,
       refIsFace: refIsFace,
       isRepose: isRepose,
+      hairstyleId: hairstyleId,
       modelId: spec.id,
       // flux-fill: LoRA is banned for the dedicated Fill workflow (M5
       // experiment pending) — mirror what the service actually applies.
@@ -928,32 +944,31 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       faceIdentity: faceRan ? state.faceIdentity.name : null,
       seed: seed,
       negativePrompt: negative.isNotEmpty ? negative : null,
-      positivePrefix:
-          preset != null && preset.positivePrefix.isNotEmpty
-              ? preset.positivePrefix
-              : null,
+      positivePrefix: preset != null && preset.positivePrefix.isNotEmpty
+          ? preset.positivePrefix
+          : null,
       // img2img latents come from VAEEncode of the source image, so recorded
       // dimensions stay null (source-derived) even when a pose is active.
       // Repose records the bucket snapped to the reference's aspect.
       width: patched && !isImg2img
           ? (isRepose
-              ? latentSize?.w
-              : (poseActive ? kPoseWidth : preset!.width))
+                ? latentSize?.w
+                : (poseActive ? kPoseWidth : preset!.width))
           : null,
       height: patched && !isImg2img
           ? (isRepose
-              ? latentSize?.h
-              : (poseActive ? kPoseHeight : preset!.height))
+                ? latentSize?.h
+                : (poseActive ? kPoseHeight : preset!.height))
           : null,
       steps: patched ? preset!.steps : null,
       cfg: patched ? preset!.cfg : null,
       // Inpaint always samples at full denoise — the mask limits the change.
       denoise: patched
           ? (isImg2img && !isInpaint
-              ? (poseActive
-                  ? kPoseEditDenoise
-                  : (state.editDenoise ?? preset!.img2imgDenoise))
-              : 1.0)
+                ? (poseActive
+                      ? kPoseEditDenoise
+                      : (state.editDenoise ?? preset!.img2imgDenoise))
+                : 1.0)
           : null,
       samplerName: patched ? preset!.samplerName : null,
       scheduler: patched ? preset!.scheduler : null,
@@ -1000,10 +1015,10 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   Future<void> startFromImage(Uint8List bytes) async {
     final dir = await _dirFuture;
     final image = await GenImage.save(bytes, dir);
-    final node = GenNode.create(prompt: '', origin: 'upload').copyWith(
-      status: GenStatus.ready,
-      images: [image],
-    );
+    final node = GenNode.create(
+      prompt: '',
+      origin: 'upload',
+    ).copyWith(status: GenStatus.ready, images: [image]);
     state = state.copyWith(
       nodes: [...state.nodes, node],
       currentNodeId: node.id,
@@ -1087,8 +1102,13 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   /// the repaint (IPAdapter, SDXL models only). Mask and reference are
   /// persisted next to the session images so retry can re-send them and the
   /// UI can badge the node.
-  Future<void> inpaint(String prompt, Uint8List maskPng,
-      {Uint8List? refPng, bool refIsFace = false}) async {
+  Future<void> inpaint(
+    String prompt,
+    Uint8List maskPng, {
+    Uint8List? refPng,
+    bool refIsFace = false,
+    String? hairstyleId,
+  }) async {
     final text = prompt.trim();
     final base = _imageById(state.selectedImageId);
     if (text.isEmpty || base == null) return;
@@ -1100,8 +1120,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     }
     if (refPng != null && !state.model.inpaintRef) {
       state = state.copyWith(
-        error:
-            'Model ${state.model.label} nepodporuje referenční inpaint.',
+        error: 'Model ${state.model.label} nepodporuje referenční inpaint.',
       );
       return;
     }
@@ -1127,6 +1146,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       maskFileName: maskImage.fileName,
       refFileName: refImage?.fileName,
       refIsFace: refPng != null && refIsFace,
+      hairstyleId: hairstyleId,
     );
     state = state.copyWith(
       nodes: [...state.nodes, node],
@@ -1136,17 +1156,88 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     );
     await _runAsync(
       node.id,
-      () => _backend.edit(
-        image: base.bytes,
-        prompt: parts.positive,
-        n: _backend.variantCount,
-        seed: seed,
-        negativePrompt: parts.negative.isEmpty ? null : parts.negative,
-        mask: maskPng,
-        refImage: refPng,
-        refIsFace: refPng != null && refIsFace,
-      ),
+      () => hairstyleId != null
+          ? _comfyui.hairInpaint(
+              image: base.bytes,
+              prompt: parts.positive,
+              n: _comfyui.variantCount,
+              seed: seed,
+              negativePrompt: parts.negative.isEmpty ? null : parts.negative,
+              mask: maskPng,
+            )
+          : _backend.edit(
+              image: base.bytes,
+              prompt: parts.positive,
+              n: _backend.variantCount,
+              seed: seed,
+              negativePrompt: parts.negative.isEmpty ? null : parts.negative,
+              mask: maskPng,
+              refImage: refPng,
+              refIsFace: refPng != null && refIsFace,
+            ),
     );
+  }
+
+  bool _hairBusy = false;
+
+  /// Whether the Kadeřník analysis is running (between the tap and the node).
+  bool get hairBusy => _hairBusy;
+
+  /// Kadeřník: the tile [imageId] with the hairstyle [hairstyleId].
+  ///
+  /// Face parsing on the server (free, seconds) → the mask and the hair colour
+  /// are computed here ([buildHairMask], mirror of Tsumiki's hairmask.py) → an
+  /// ordinary inpaint node, so retry, resume, the tree badge and the FINETUNE
+  /// export all work unchanged. A photo without a usable face stops before any
+  /// node exists.
+  Future<void> hairRestyle(String imageId, String hairstyleId) async {
+    final base = _imageById(imageId);
+    final style = hairstyleById(hairstyleId);
+    if (base == null || style == null || _hairBusy) return;
+    String? info;
+    if (!state.model.inpaint || state.model.kind != ImageBackendKind.comfyUi) {
+      final candidates = state.availableModels
+          .where((m) => m.inpaint && m.kind == ImageBackendKind.comfyUi)
+          .toList();
+      if (candidates.isEmpty) {
+        state = state.copyWith(
+          error: 'Kadeřník potřebuje inpaint model — na serveru žádný není.',
+        );
+        return;
+      }
+      final target = candidates.firstWhere(
+        (m) => m.id == 'flux-fill',
+        orElse: () => candidates.first,
+      );
+      setModel(target.id);
+      info = 'Přepnuto na ${target.label} — účes se dělá přes inpaint.';
+    }
+    _hairBusy = true;
+    state = state.copyWith(
+      selectedImageId: imageId,
+      clearError: true,
+      info: info ?? 'Hledám tvář a vlasy…',
+    );
+    try {
+      final analysis = await _comfyui.analyseHair(base.bytes);
+      final (maskPng, colour) = await compute(_buildHairMaskIsolate, (
+        analysis,
+        style.shape,
+        base.bytes,
+      ));
+      state = state.copyWith(selectedImageId: imageId);
+      await inpaint(
+        hairPrompt(style, colour),
+        maskPng,
+        hairstyleId: hairstyleId,
+      );
+    } on HairMaskException catch (e) {
+      state = state.copyWith(error: e.message);
+    } catch (e) {
+      state = state.copyWith(error: 'Kadeřník: $e');
+    } finally {
+      _hairBusy = false;
+    }
   }
 
   /// Turn the selected image into a printable 3D model (Trellis2 on the
@@ -1185,7 +1276,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   Future<void> animate(String sceneId) async {
     final base = _imageById(state.selectedImageId);
     if (base == null) return;
-    final scene = state.availableScenes.where((s) => s.id == sceneId).firstOrNull;
+    final scene = state.availableScenes
+        .where((s) => s.id == sceneId)
+        .firstOrNull;
     _interruptRetries = 0;
     final seed = _newSeed();
     final node = GenNode.create(
@@ -1325,7 +1418,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       if (base == null || node.sceneId == null) {
         _patch(
           nodeId,
-          (n) => n.copyWith(status: GenStatus.error, error: 'Source image gone'),
+          (n) =>
+              n.copyWith(status: GenStatus.error, error: 'Source image gone'),
         );
         return;
       }
@@ -1340,7 +1434,11 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       );
       await _runAsync(
         nodeId,
-        () => _video.animate(image: base.bytes, sceneId: node.sceneId!, seed: seed),
+        () => _video.animate(
+          image: base.bytes,
+          sceneId: node.sceneId!,
+          seed: seed,
+        ),
       );
       return;
     }
@@ -1451,6 +1549,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       maskFileName: node.maskFileName,
       refFileName: node.refFileName,
       refIsFace: node.refIsFace,
+      hairstyleId: node.hairstyleId,
     ).copyWith(images: node.images);
     _patch(nodeId, (_) => refreshed);
     if (node.isRoot) {
@@ -1503,6 +1602,20 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       final chained = mask != null
           ? parts.positive
           : _chainedPrompt(node.parentId, node.prompt);
+      if (node.hairstyleId != null && mask != null) {
+        await _runAsync(
+          nodeId,
+          () => _comfyui.hairInpaint(
+            image: base.bytes,
+            prompt: parts.positive,
+            n: _comfyui.variantCount,
+            seed: seed,
+            negativePrompt: parts.negative.isEmpty ? null : parts.negative,
+            mask: mask!,
+          ),
+        );
+        return;
+      }
       await _runAsync(
         nodeId,
         () => _backend.edit(
@@ -1648,11 +1761,11 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
                 // is stitching + interpolating (ffmpeg + RIFE, ~1–2 min).
                 progressLabel: isVideo
                     ? (step < total
-                        ? 'Beat ${step + 1}/$total · ~${(total - step) * 2.5} min'
-                        : 'Slepuji a vyhlazuji…')
+                          ? 'Beat ${step + 1}/$total · ~${(total - step) * 2.5} min'
+                          : 'Slepuji a vyhlazuji…')
                     : fraction == null
-                        ? 'Generování…'
-                        : 'Generování ${(fraction * 100).round()} %',
+                    ? 'Generování…'
+                    : 'Generování ${(fraction * 100).round()} %',
               ),
             );
           case GenDownloading(:final done, :final total):
@@ -1795,4 +1908,23 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     _finetuneExport.dispose();
     super.dispose();
   }
+}
+
+/// Mask + colour off the UI thread: dilation and CIELAB over a ~1 MP photo
+/// take long enough on a phone to drop frames.
+(Uint8List, String?) _buildHairMaskIsolate(
+  (HairAnalysis, HairShape, Uint8List) args,
+) {
+  final (analysis, shape, photo) = args;
+  final result = buildHairMask(analysis, shape);
+  String? colour;
+  final decoded = img.decodeImage(photo);
+  if (decoded != null) {
+    final oriented = img.bakeOrientation(decoded);
+    if (oriented.width == analysis.hair.w &&
+        oriented.height == analysis.hair.h) {
+      colour = estimateHairColour(oriented, analysis.hair);
+    }
+  }
+  return (maskToPng(result.mask), colour);
 }
