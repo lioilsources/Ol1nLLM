@@ -10,7 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 import '../core/constants/theme.dart';
 import '../models/gen_node.dart';
-import '../models/hairstyle_preset.dart' show kHairstyles;
+import '../models/hairstyle_preset.dart' show kHairColours, kHairstyles;
 import '../models/image_model.dart';
 import '../models/pose_template.dart';
 import '../models/style_preset.dart';
@@ -879,7 +879,7 @@ class _NodeGrid extends ConsumerWidget {
       ),
     );
     final canHair =
-        kHairstyles.isNotEmpty &&
+        (kHairstyles.isNotEmpty || kHairColours.isNotEmpty) &&
         ref.watch(
           imageStudioProvider.select(
             (s) => s.availableModels.any(
@@ -1092,9 +1092,9 @@ class _NodeGrid extends ConsumerWidget {
     _dismissKeyboard();
     final notifier = ref.read(imageStudioProvider.notifier);
     if (notifier.hairBusy) return;
-    final id = await HairSheet.show(context);
-    if (id == null) return;
-    await notifier.hairRestyle(img.id, id);
+    final choice = await HairSheet.show(context);
+    if (choice == null) return;
+    await notifier.hairRestyle(img.id, choice.style, colourId: choice.colour);
   }
 
   Future<void> _startInpaint(

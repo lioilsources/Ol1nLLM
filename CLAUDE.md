@@ -552,6 +552,12 @@ Akce na dlaždici (nůžky, pravý horní roh vedle „Rozhýbat“/„Zachovej 
    `mask_fill_holes: false` (obličej je v masce díra a vyplnění ho přemalovalo —
    Tsumiki bench kolo 0b, identita 0.11) a kontext 1.5.
 
+**Barva vlasů**: list má nahoře řadu barev (`kHairColours`, `HairColourPreset`
+s frází do promptu, zrcadlo MangaPrompts `tgbot/haircolours.py`). Barva jde
+s účesem, nebo sama přes „Jen barva“ — pak `hairstyleId` = `keep-cut`
+(`kKeepCutPreset`) a maska je v režimu `hair` (jen stará silueta, bez obálky),
+protože střih zůstává. Katalog barev je generovaný z gate stejně jako účesy.
+
 Model: když aktivní neumí inpaint, přepne se na `flux-fill` (snackbar, LoRA
 padá stejně jako u inpaintu). Prompt = `hairPrompt()` z
 `lib/models/hairstyle_preset.dart`, doslova Tsumiki `hairPrompt` s dosazenou

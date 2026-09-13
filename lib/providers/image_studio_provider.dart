@@ -1195,10 +1195,19 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   /// ordinary inpaint node, so retry, resume, the tree badge and the FINETUNE
   /// export all work unchanged. A photo without a usable face stops before any
   /// node exists.
-  Future<void> hairRestyle(String imageId, String hairstyleId) async {
+  Future<void> hairRestyle(
+    String imageId,
+    String? hairstyleId, {
+    String? colourId,
+  }) async {
     final base = _imageById(imageId);
-    final style = hairstyleById(hairstyleId);
+    final newColour = hairColourById(colourId);
+    // No hairstyle = keep the cut; then a colour is the whole request.
+    final style = hairstyleId == null || hairstyleId == kKeepCutId
+        ? (newColour == null ? null : kKeepCutPreset)
+        : hairstyleById(hairstyleId);
     if (base == null || style == null || _hairBusy) return;
+    final keepCut = style.id == kKeepCutId;
     String? info;
     if (!state.model.inpaint || state.model.kind != ImageBackendKind.comfyUi) {
       final candidates = state.availableModels
@@ -1229,12 +1238,19 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         analysis,
         style.shape,
         base.bytes,
+        // Same cut: the old silhouette is exactly what to repaint.
+        keepCut ? 'hair' : kHairMaskMode,
       ));
       state = state.copyWith(selectedImageId: imageId);
       await inpaint(
-        hairPrompt(style, colour, instruction: _comfyui.hairUsesInstruction),
+        hairPrompt(
+          style,
+          colour,
+          instruction: _comfyui.hairUsesInstruction,
+          newColour: newColour,
+        ),
         maskPng,
-        hairstyleId: hairstyleId,
+        hairstyleId: style.id,
       );
     } on HairMaskException catch (e) {
       state = state.copyWith(error: e.message);
@@ -1918,10 +1934,10 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
 /// Mask + colour off the UI thread: dilation and CIELAB over a ~1 MP photo
 /// take long enough on a phone to drop frames.
 (Uint8List, String?) _buildHairMaskIsolate(
-  (HairAnalysis, HairShape, Uint8List) args,
+  (HairAnalysis, HairShape, Uint8List, String) args,
 ) {
-  final (analysis, shape, photo) = args;
-  final result = buildHairMask(analysis, shape);
+  final (analysis, shape, photo, mode) = args;
+  final result = buildHairMask(analysis, shape, mode: mode);
   String? colour;
   final decoded = img.decodeImage(photo);
   if (decoded != null) {

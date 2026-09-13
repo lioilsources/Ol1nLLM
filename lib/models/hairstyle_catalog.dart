@@ -6,3 +6,6 @@ import 'hairstyle_preset.dart';
 
 const kHairstyles = <HairstylePreset>[
 ];
+
+const kHairColours = <HairColourPreset>[
+];

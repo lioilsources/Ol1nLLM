@@ -3,16 +3,26 @@ import 'package:flutter/material.dart';
 import '../models/hairstyle_preset.dart';
 import '../core/constants/theme.dart';
 
-/// Kadeřník picker: Ženy / Muži, sections, search without diacritics.
-/// Pops with the chosen hairstyle id.
+/// What the Kadeřník sheet picked: a hairstyle id (null = keep the cut) and a
+/// colour id (null = keep the colour). Never both null.
+typedef HairChoice = ({String? style, String? colour});
+
+/// Kadeřník picker: colour chips, Ženy / Muži, sections, search without
+/// diacritics. Tapping a hairstyle pops it with the chosen colour; "Jen barva"
+/// pops the colour alone.
 class HairSheet extends StatefulWidget {
-  const HairSheet({super.key, this.catalog = kHairstyles});
+  const HairSheet({
+    super.key,
+    this.catalog = kHairstyles,
+    this.colours = kHairColours,
+  });
 
   /// Injectable for tests.
   final List<HairstylePreset> catalog;
+  final List<HairColourPreset> colours;
 
-  static Future<String?> show(BuildContext context) =>
-      showModalBottomSheet<String>(
+  static Future<HairChoice?> show(BuildContext context) =>
+      showModalBottomSheet<HairChoice>(
         context: context,
         backgroundColor: AppTheme.surface,
         showDragHandle: true,
@@ -27,6 +37,7 @@ class HairSheet extends StatefulWidget {
 class _HairSheetState extends State<HairSheet> {
   String _group = kHairGroupWomen;
   String _query = '';
+  String? _colour;
 
   @override
   Widget build(BuildContext context) {
@@ -57,11 +68,48 @@ class _HairSheetState extends State<HairSheet> {
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
               child: Text(
-                'Tvář a barva vlasů zůstanou, střih se změní. Nejlíp funguje '
-                'čelní portrét s celými vlasy, bez čepice.',
+                'Tvář zůstane; barva vlasů taky, pokud nevybereš novou. '
+                'Nejlíp funguje čelní portrét s celými vlasy, bez čepice.',
                 style: TextStyle(color: AppTheme.textSecondary, height: 1.4),
               ),
             ),
+            if (widget.colours.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 40,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          children: [
+                            for (final c in [null, ...widget.colours])
+                              Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: ChoiceChip(
+                                  label: Text(c?.label ?? 'Barva beze změny'),
+                                  selected: _colour == c?.id,
+                                  onSelected: (_) =>
+                                      setState(() => _colour = c?.id),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: _colour == null
+                          ? null
+                          : () => Navigator.of(
+                              context,
+                            ).pop((style: null, colour: _colour)),
+                      child: const Text('Jen barva'),
+                    ),
+                  ],
+                ),
+              ),
             if (widget.catalog.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(20),
@@ -126,7 +174,9 @@ class _HairSheetState extends State<HairSheet> {
                               height: 1.3,
                             ),
                           ),
-                          onTap: () => Navigator.of(context).pop(s.id),
+                          onTap: () => Navigator.of(
+                            context,
+                          ).pop((style: s.id, colour: _colour)),
                         ),
                     ],
                   ],

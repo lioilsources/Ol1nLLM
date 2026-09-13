@@ -159,6 +159,21 @@ void main() {
       block: "pixie cut, very short cropped women's haircut",
       shape: HairShape(length: HairLength.short),
     );
+    test('new colour and keep-cut mirror hairprompt.py', () {
+      const auburn = HairColourPreset(id: 'auburn', label: 'Kaštanově zrzavá', phrase: 'deep auburn');
+      expect(hairPrompt(pixie, 'brown', newColour: auburn), contains('deep auburn hair'));
+      expect(hairPrompt(pixie, 'brown', newColour: auburn), isNot(contains('brown hair')));
+      expect(hairPrompt(pixie, 'brown', instruction: true, newColour: auburn), contains('Dye the hair deep auburn.'));
+      expect(
+        hairPrompt(kKeepCutPreset, 'brown', instruction: true, newColour: auburn),
+        startsWith("Change the person's hair colour to deep auburn. Keep the haircut, length and hair texture."),
+      );
+      expect(
+        hairPrompt(kKeepCutPreset, 'brown', newColour: auburn),
+        startsWith('a photo of the same person with the same haircut as in the photo, deep auburn hair'),
+      );
+    });
+
     test('instruction variant for Kontext', () {
       final t = hairPrompt(pixie, null, instruction: true);
       expect(t, startsWith("Change the person's hairstyle to a pixie cut"));

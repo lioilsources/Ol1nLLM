@@ -10,7 +10,7 @@ import 'hair_mask.dart';
 import 'hairstyle_catalog.dart';
 import 'style_preset.dart' show foldDiacritics;
 
-export 'hairstyle_catalog.dart' show kHairstyles;
+export 'hairstyle_catalog.dart' show kHairstyles, kHairColours;
 
 const kHairGroupWomen = 'Ženy';
 const kHairGroupMen = 'Muži';
@@ -36,6 +36,39 @@ class HairstylePreset {
   final HairShape shape;
 }
 
+/// A hair colour (MangaPrompts `tgbot/haircolours.py`). The app writes its own
+/// prompt, so it carries the phrase, not just the id.
+class HairColourPreset {
+  const HairColourPreset({
+    required this.id,
+    required this.label,
+    required this.phrase,
+  });
+
+  final String id;
+  final String label;
+  final String phrase;
+}
+
+/// "Same haircut, new colour" (`haircolours.KEEP_CUT`).
+const kKeepCutId = 'keep-cut';
+const kKeepCutPreset = HairstylePreset(
+  id: kKeepCutId,
+  label: 'Stejný střih',
+  group: kHairGroupWomen,
+  section: '',
+  block: 'the same haircut as in the photo',
+  shape: HairShape(length: HairLength.keep),
+);
+
+HairColourPreset? hairColourById(String? id) {
+  if (id == null) return null;
+  for (final c in kHairColours) {
+    if (c.id == id) return c;
+  }
+  return null;
+}
+
 /// Mirror of MangaPrompts `tgbot/hairprompt.py` — the bot writes the Tsumiki
 /// prompt server-side; this app talks to ComfyUI directly and writes it here.
 String hairLengthClause(HairstylePreset s) {
@@ -58,24 +91,37 @@ const kHairNegative =
     'floating hair, extra face, second person, blurry, watermark, low quality';
 
 /// [instruction] = FLUX Kontext ("change X, keep Y"); otherwise a description
-/// of the finished photo (SDXL inpaint).
+/// of the finished photo (SDXL inpaint). [newColour] replaces the colour read
+/// off the photo; with [kKeepCutPreset] only the colour changes.
 String hairPrompt(
   HairstylePreset s,
   String? colour, {
   bool instruction = false,
+  HairColourPreset? newColour,
 }) {
+  final keepCut = s.id == kKeepCutId;
   final c = colour ?? 'natural';
-  final clause = hairLengthClause(s);
+  final target = newColour?.phrase;
+  final clause = keepCut ? '' : hairLengthClause(s);
   if (instruction) {
     final length = clause.isEmpty
         ? ''
         : '${clause[0].toUpperCase()}${clause.substring(1)}. ';
-    return "Change the person's hairstyle to a ${s.block}. ${length}Keep the $c hair colour. "
-        'Keep the face, facial features, expression, skin, clothes, lighting and background '
-        'exactly the same.';
+    final lead = keepCut
+        ? "Change the person's hair colour to $target. Keep the haircut, length and hair texture."
+        : "Change the person's hairstyle to a ${s.block}. $length"
+            '${target != null ? 'Dye the hair $target.' : 'Keep the $c hair colour.'}';
+    return '$lead Keep the face, facial features, expression, skin, clothes, lighting and '
+        'background exactly the same.';
+  }
+  final hair = '${target ?? c} hair';
+  if (keepCut) {
+    return 'a photo of the same person with the same haircut as in the photo, $hair, '
+        'natural hair texture, realistic strands, same clothes, same lighting and background, '
+        'photorealistic';
   }
   final length = clause.isEmpty ? '' : '$clause, ';
-  return 'a photo of the same person with a ${s.block}, $length$c hair, natural hair texture, '
+  return 'a photo of the same person with a ${s.block}, $length$hair, natural hair texture, '
       'realistic strands, same clothes, same lighting and background, photorealistic';
 }
 
