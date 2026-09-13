@@ -476,7 +476,7 @@ void main() {
               seed: seed,
               imageName: refName,
               maskName: shape['uploaded'] as String,
-              userNegative: negative,
+              userNegative: [kHairNegative, ?negative].join(', '),
             );
             // Param-kind overrides (seed, face identity…) mean nothing to an
             // inpaint of a fixed mask; only graph targets apply here.
