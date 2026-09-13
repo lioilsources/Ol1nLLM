@@ -28,6 +28,12 @@ type Spec struct {
 	Flows      []string `json:"flows"`
 	NoBaseline bool     `json:"noBaseline"`
 
+	// Kadeřník flow: hairstyle candidates and the directory `lab hairmasks`
+	// prepared for the reference (masks.json + uploaded mask names).
+	HairFile   string   `json:"hairFile"`
+	HairMasks  string   `json:"hairMasks"`
+	Hairstyles []string `json:"hairstyles"`
+
 	RefName string `json:"refName"` // server-side filename (after upload)
 	RefFile string `json:"refFile"` // local path, for the latent bucket
 
@@ -102,9 +108,29 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 	if prompts == 0 {
 		prompts = 1
 	}
-	flows := len(s.Flows)
-	if flows == 0 {
+	flows := 0
+	hairFlow := false
+	for _, f := range s.Flows {
+		if f == "hair" {
+			hairFlow = true
+		} else {
+			flows++
+		}
+	}
+	if flows == 0 && !hairFlow {
 		flows = 1
+	}
+	// Hair cells are model × hairstyle × variant — no styles or prompts.
+	hairCount := 0
+	if hairFlow {
+		n, err := countHairCandidates(s.HairFile, s.Hairstyles)
+		if err != nil {
+			e.Blockers = append(e.Blockers, "hair-file: "+err.Error())
+		}
+		hairCount = n
+		if s.HairMasks == "" {
+			e.Blockers = append(e.Blockers, "flow hair potřebuje --hair-masks (lab hairmasks)")
+		}
 	}
 
 	picked := map[string]bool{}
@@ -123,7 +149,7 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 				per = 12
 			}
 		}
-		cells := prompts * styleCount * flows * e.Variants
+		cells := (prompts*styleCount*flows + hairCount) * e.Variants
 		e.Cells += cells
 		est += float64(cells) * per
 	}
@@ -318,7 +344,7 @@ func countStyleCandidates(path string) (int, error) {
 
 func (s *Spec) needsRef() bool {
 	for _, f := range s.Flows {
-		if f == "img2img" || f == "repose" {
+		if f == "img2img" || f == "repose" || f == "hair" {
 			return true
 		}
 	}
@@ -430,6 +456,9 @@ func (s *Spec) DumpEnv(dir string) ([]string, error) {
 	set("MODELS", strings.Join(s.Models, ","))
 	set("STYLES", strings.Join(s.Styles, ","))
 	set("STYLES_FILE", abs(s.StylesFile))
+	set("HAIR_FILE", abs(s.HairFile))
+	set("HAIR_MASKS_DIR", abs(s.HairMasks))
+	set("HAIRSTYLES", strings.Join(s.Hairstyles, ","))
 	set("REF_NAME", s.RefName)
 	set("REF_FILE", abs(s.RefFile))
 	set("POSE_MODE", s.PoseMode)
@@ -474,4 +503,36 @@ func maxIntv(v, min int) int {
 		return min
 	}
 	return v
+}
+
+// countHairCandidates is the hair flow's share of the estimate: every
+// candidate, or the picked ones that exist in the file.
+func countHairCandidates(path string, picked []string) (int, error) {
+	if path == "" {
+		return 0, fmt.Errorf("chybí --hair-file")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	var cands []struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(data, &cands); err != nil {
+		return 0, err
+	}
+	if len(picked) == 0 {
+		return len(cands), nil
+	}
+	want := map[string]bool{}
+	for _, id := range picked {
+		want[id] = true
+	}
+	n := 0
+	for _, c := range cands {
+		if want[c.ID] {
+			n++
+		}
+	}
+	return n, nil
 }

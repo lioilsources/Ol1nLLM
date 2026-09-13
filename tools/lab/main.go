@@ -116,11 +116,13 @@ func usage() {
   lab run --out DIR [přepínače]                    dávka z terminálu
   lab resume DIR                                   dopočítat přerušený běh (bez dumpu)
   lab score DIR                                    přepočítat metriky
+  lab hairmasks --ref portrét.png                  masky Kadeřníka pro flow hair
   lab export DIR                                   odeslat běh do FINETUNE gallery
 
 Přepínače pro `+"`lab run`"+` odpovídají ovládacím prvkům v UI:
   --models a,b   --prompts soubor   --styles a,b   --styles-file f.json
-  --flows txt2img,img2img,repose    --pose none|depth|template  --pose-id ol3
+  --flows txt2img,img2img,repose,hair   --pose none|depth|template  --pose-id ol3
+  --hair-masks DIR (z lab hairmasks)    --hair-file f.json   --hairstyles a,b
   --ref obrázek.png | --ref-prompt "…"   --seed 777  --batch 1
   --sweep cíl=v1,v2,v3              --override cíl=hodnota   --dry
 `)
@@ -153,6 +155,8 @@ func main() {
 		fatal(resumeCLI(env, args))
 	case "score":
 		fatal(scoreCLI(env, args))
+	case "hairmasks":
+		fatal(hairmasksCLI(env, args))
 	case "export":
 		fatal(exportCLI(env, args))
 	case "-h", "--help", "help":

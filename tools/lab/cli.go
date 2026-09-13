@@ -19,7 +19,10 @@ func runCLI(env *Env, args []string) error {
 	subject := fs.String("subject", "", "jeden prompt (alternativa k --prompts)")
 	styles := fs.String("styles", "", "id stylů oddělená čárkou")
 	stylesFile := fs.String("styles-file", "", "JSON s kandidáty stylů [{id,label,block}]")
-	flows := fs.String("flows", "repose,img2img", "txt2img,img2img,repose")
+	flows := fs.String("flows", "repose,img2img", "txt2img,img2img,repose,hair")
+	hairFile := fs.String("hair-file", filepath.Join("tools", "lab", "candidates", "hairstyles.json"), "kandidáti účesů (flow hair)")
+	hairMasks := fs.String("hair-masks", "", "adresář z lab hairmasks (flow hair)")
+	hairstyles := fs.String("hairstyles", "", "id účesů oddělená čárkou (výchozí: všechny)")
 	ref := fs.String("ref", "", "referenční obrázek")
 	refPrompt := fs.String("ref-prompt", "", "vygenerovat referenci z promptu")
 	pose := fs.String("pose", "none", "none|depth|template")
@@ -52,6 +55,7 @@ func runCLI(env *Env, args []string) error {
 	spec := &Spec{
 		Models: splitCSV(*models), Styles: splitCSV(*styles), StylesFile: *stylesFile,
 		Flows: splitCSV(*flows), NoBaseline: *noBaseline,
+		HairFile: *hairFile, HairMasks: *hairMasks, Hairstyles: splitCSV(*hairstyles),
 		PoseMode: *pose, PoseID: *poseID,
 		FaceIdentity: *faceIdentity, FaceDetail: *faceDetail,
 		Seed: *seed, Batch: *batch, Negative: *negative, EditDenoise: *editDenoise,

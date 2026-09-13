@@ -85,6 +85,34 @@ Osa `param.styleDialect=natural|booru` pošle všem modelům tentýž dialekt be
 ohledu na jejich vlastní. Tak jde srovnání tagů s frázemi zopakovat bez ručně
 psaných variant id (viz ablace třetí vlny v `docs/style-matrix.md`).
 
+## Účesy (flow `hair`)
+
+Kadeřník v appce (dlaždice → nůžky) je inpaint s maskou, kterou nikdo
+nekreslí: face parsing na serveru najde vlasy a tvář, `lib/models/hair_mask.dart`
+z nich postaví masku podle tvaru účesu. Lab to rozděluje na dva kroky, protože
+dump běží bez sítě:
+
+```bash
+lab hairmasks --ref portret.png                 # analýza + masky pro všechny tvary
+lab run --flows hair --ref portret.png --hair-masks build/lab/hairmasks/portret \
+        --models flux-fill,juggernaut-xl --hairstyles pixie,wolf-cut,m-buzz \
+        --subject "-"
+```
+
+`hairmasks` nahraje referenci, pustí `assets/comfyui/hair_analyse.api.json`,
+stáhne čtyři masky (výstupy páruje podle prefixu jména, ne podle pořadí), přes
+`tools/lab/hairmask.dart` postaví masku pro každý **tvar** z kandidátů
+(`candidates/hairstyles.json`, kopie z MangaPrompts bench) a nahraje je na
+server. Odmítnutý tvar (bez tváře, málo vlasů) se zapíše do `masks.json` a dump
+jeho buňky přeskočí s důvodem. Buňka = model s `inpaint` × účes × varianta;
+styly ani prompty se nenásobí (`--subject` je jen formalita CLI). Graf staví
+`ComfyUIService.prepareHairInpaint`, tedy totéž, co pošle appka.
+
+Hodnocení účesů (ArcFace k předloze, délka, ofina, CLIP rozpoznání) lab
+nepočítá — dělá ho `MangaPrompts/tgbot/tools/bench/score.py` na SPARKu,
+výsledky jsou v `MangaPrompts/docs/hair-matrix.md`. Webové UI flow `hair`
+nenabízí, jen terminál.
+
 ## Sweep a override
 
 Jedna osa na běh. Cíl se míří **na uzel**, ne na jakýkoli vstup daného jména:

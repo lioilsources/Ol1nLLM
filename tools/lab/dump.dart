@@ -18,6 +18,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ol1n_llm/models/hairstyle_preset.dart';
 import 'package:ol1n_llm/models/image_model.dart';
 import 'package:ol1n_llm/models/latent_bucket.dart';
 import 'package:ol1n_llm/models/pose_template.dart';
@@ -25,6 +26,7 @@ import 'package:ol1n_llm/models/style_preset.dart';
 import 'package:ol1n_llm/services/comfyui_service.dart';
 
 import 'dump_spec.dart';
+import 'hair_candidates.dart';
 
 Map<String, dynamic> _load(String path) =>
     jsonDecode(File(path).readAsStringSync()) as Map<String, dynamic>;
@@ -62,10 +64,10 @@ void main() {
     final serverLoras = env['LORAS'] == null
         ? const <String>[]
         : File(env['LORAS']!)
-            .readAsLinesSync()
-            .map((l) => l.trim())
-            .where((l) => l.isNotEmpty)
-            .toList();
+              .readAsLinesSync()
+              .map((l) => l.trim())
+              .where((l) => l.isNotEmpty)
+              .toList();
     final flows = _csv(env['FLOWS']).isEmpty
         ? const ['repose', 'img2img']
         : _csv(env['FLOWS']);
@@ -74,10 +76,10 @@ void main() {
     // of the cell id so two prompts never collide.
     final prompts = env['PROMPTS_FILE'] != null
         ? File(env['PROMPTS_FILE']!)
-            .readAsLinesSync()
-            .map((l) => l.trim())
-            .where((l) => l.isNotEmpty)
-            .toList()
+              .readAsLinesSync()
+              .map((l) => l.trim())
+              .where((l) => l.isNotEmpty)
+              .toList()
         : [env['SUBJECT']!];
     final indexPrompts = prompts.length > 1;
 
@@ -97,10 +99,9 @@ void main() {
 
     final installed = env['CKPTS'] == null
         ? const <String>[]
-        : File(env['CKPTS']!)
-            .readAsLinesSync()
-            .where((l) => l.trim().isNotEmpty)
-            .toList();
+        : File(
+            env['CKPTS']!,
+          ).readAsLinesSync().where((l) => l.trim().isNotEmpty).toList();
     final wantedModels = _csv(env['MODELS']);
     final models = imageModelsFor(installed)
         .where((m) => m.kind == ImageBackendKind.comfyUi && m.preset != null)
@@ -122,9 +123,11 @@ void main() {
       // (union CN, so supportsPose too — sd15 has no ControlNet) or
       // flux-manga, the one dedicated template with a depth CN of its own.
       // Auto-depth follows supportsPose unless the caller forces it.
-      final canRepose = (generic && m.supportsPose) ||
+      final canRepose =
+          (generic && m.supportsPose) ||
           preset.txt2imgAsset == kFluxMangaTxt2img;
-      final autoDepth = sourceDepth == 'on' ||
+      final autoDepth =
+          sourceDepth == 'on' ||
           (sourceDepth == 'auto' && m.supportsPose && generic);
 
       for (var pi = 0; pi < prompts.length; pi++) {
@@ -135,6 +138,8 @@ void main() {
           final styleId = style?.id ?? '__baseline';
 
           for (final flow in flows) {
+            // Hair cells iterate hairstyles, not styles × prompts — below.
+            if (flow == 'hair') continue;
             void emit(String? variantValue) {
               if (limit != null && n >= limit) return;
 
@@ -145,8 +150,11 @@ void main() {
                 if (!m.supportsPose || !generic) {
                   skipped.add({
                     'cell': cellId(
-                        flow: flow, model: m.id, style: styleId,
-                        promptIndex: indexPrompts ? pi : null),
+                      flow: flow,
+                      model: m.id,
+                      style: styleId,
+                      promptIndex: indexPrompts ? pi : null,
+                    ),
                     'reason': 'šablona pózy je SDXL-only (${m.id})',
                   });
                   return;
@@ -208,19 +216,28 @@ void main() {
               }
               // Which text a style sends depends on how the model reads it
               // (tags for the anime lineages), so it is per cell, not per row.
-              final dialect =
-                  styleDialectFor(params['styleDialect'], m.promptDialect);
-              final prompt =
-                  applyStylePreset(prompts[pi], style, dialect: dialect);
+              final dialect = styleDialectFor(
+                params['styleDialect'],
+                m.promptDialect,
+              );
+              final prompt = applyStylePreset(
+                prompts[pi],
+                style,
+                dialect: dialect,
+              );
               if (cellLora != null &&
                   fitOfLora(cellLora, m.loraFamily) == LoraFit.incompatible) {
                 skipped.add({
                   'cell': cellId(
-                      flow: flow, model: m.id, style: styleId,
-                      variantLabel: variantValue == null ? null : sweep.label,
-                      variantValue: variantValue,
-                      promptIndex: indexPrompts ? pi : null),
-                  'reason': '$cellLora je ${loraFamilyLabel(familyOfLora(cellLora))} '
+                    flow: flow,
+                    model: m.id,
+                    style: styleId,
+                    variantLabel: variantValue == null ? null : sweep.label,
+                    variantValue: variantValue,
+                    promptIndex: indexPrompts ? pi : null,
+                  ),
+                  'reason':
+                      '$cellLora je ${loraFamilyLabel(familyOfLora(cellLora))} '
                       '— jiná architektura než ${m.id}, nešla by aplikovat',
                 });
                 return;
@@ -249,8 +266,11 @@ void main() {
                   if (!canRepose || refName == null) {
                     skipped.add({
                       'cell': cellId(
-                          flow: flow, model: m.id, style: styleId,
-                          promptIndex: indexPrompts ? pi : null),
+                        flow: flow,
+                        model: m.id,
+                        style: styleId,
+                        promptIndex: indexPrompts ? pi : null,
+                      ),
                       'reason': canRepose
                           ? 'chybí referenční obrázek'
                           : 'zachovej pózu je SDXL-only (${m.id})',
@@ -272,8 +292,11 @@ void main() {
                   if (refName == null) {
                     skipped.add({
                       'cell': cellId(
-                          flow: flow, model: m.id, style: styleId,
-                          promptIndex: indexPrompts ? pi : null),
+                        flow: flow,
+                        model: m.id,
+                        style: styleId,
+                        promptIndex: indexPrompts ? pi : null,
+                      ),
                       'reason': 'chybí referenční obrázek',
                     });
                     return;
@@ -285,9 +308,8 @@ void main() {
                     seed: cellSeed,
                     imageName: refName,
                     poseImageName: poseImage,
-                    sourceDepth: poseImage == null &&
-                        poseMode != 'depth' &&
-                        autoDepth,
+                    sourceDepth:
+                        poseImage == null && poseMode != 'depth' && autoDepth,
                     depthImageName: poseMode == 'depth' ? refName : null,
                     userNegative: negative,
                     editDenoise: editDenoise,
@@ -301,8 +323,7 @@ void main() {
                     batch: batch,
                     seed: cellSeed,
                     poseImageName: poseImage,
-                    depthImageName:
-                        poseMode == 'depth' ? refName : null,
+                    depthImageName: poseMode == 'depth' ? refName : null,
                     latentSize: latent,
                     userNegative: negative,
                     faceIdentity: cellFace,
@@ -322,10 +343,13 @@ void main() {
               } on StateError catch (e) {
                 skipped.add({
                   'cell': cellId(
-                      flow: flow, model: m.id, style: styleId,
-                      variantLabel: variantValue == null ? null : sweep.label,
-                      variantValue: variantValue,
-                      promptIndex: indexPrompts ? pi : null),
+                    flow: flow,
+                    model: m.id,
+                    style: styleId,
+                    variantLabel: variantValue == null ? null : sweep.label,
+                    variantValue: variantValue,
+                    promptIndex: indexPrompts ? pi : null,
+                  ),
                   'reason': e.message,
                 });
                 return;
@@ -366,7 +390,9 @@ void main() {
                   'refName': refName,
                   'lora': cellLora,
                   'loraStrength': cellLora == null ? null : cellLoraStrength,
-                  'sourceDepth': flow == 'img2img' && poseImage == null &&
+                  'sourceDepth':
+                      flow == 'img2img' &&
+                      poseImage == null &&
                       poseMode != 'depth' &&
                       autoDepth,
                   // Read back out of the graph, like the prompt: asking for
@@ -387,6 +413,116 @@ void main() {
               for (final v in sweep.values) {
                 emit(v);
               }
+            }
+          }
+        }
+      }
+    }
+
+    // ── Kadeřník: one cell per model × hairstyle × variant ────────────────
+    // Masks were built beforehand by `lab hairmasks` (network + app geometry);
+    // the dump only picks the uploaded mask for each hairstyle's shape.
+    if (flows.contains('hair')) {
+      final hairFile = env['HAIR_FILE'];
+      final masksDir = env['HAIR_MASKS_DIR'];
+      if (hairFile == null || masksDir == null || refName == null) {
+        fail(
+          'flow hair potřebuje HAIR_FILE, HAIR_MASKS_DIR (lab hairmasks) a referenci',
+        );
+      }
+      final masks =
+          jsonDecode(File('$masksDir/masks.json').readAsStringSync())
+              as Map<String, dynamic>;
+      final colour = masks['colour'] as String?;
+      final shapes = (masks['shapes'] as Map).cast<String, dynamic>();
+      final wantedHair = _csv(env['HAIRSTYLES']);
+      final hairCands = parseHairCandidates(
+        jsonDecode(File(hairFile).readAsStringSync()) as List<dynamic>,
+      ).where((c) => wantedHair.isEmpty || wantedHair.contains(c.id)).toList();
+      for (final m in models.where(
+        (m) => m.inpaint && m.preset!.inpaintAsset != null,
+      )) {
+        final preset = m.preset!;
+        for (final c in hairCands) {
+          final shape = (shapes[c.shape.key] as Map?)?.cast<String, dynamic>();
+          void emitHair(String? variantValue) {
+            if (limit != null && n >= limit) return;
+            final id = cellId(
+              flow: 'hair',
+              model: m.id,
+              style: c.id,
+              variantLabel: variantValue == null ? null : sweep.label,
+              variantValue: variantValue,
+            );
+            if (shape == null || shape['uploaded'] == null) {
+              skipped.add({
+                'cell': id,
+                'reason': shape?['error'] != null
+                    ? 'maska odmítnuta: ${shape!['error']}'
+                    : 'maska ${c.shape.key} chybí (spusť lab hairmasks)',
+              });
+              return;
+            }
+            final svc = ComfyUIService()..setPreset(preset);
+            final wf = svc.prepareHairInpaint(
+              _load(preset.inpaintAsset!),
+              prompt: hairPrompt(c, colour),
+              batch: batch,
+              seed: seed,
+              imageName: refName,
+              maskName: shape['uploaded'] as String,
+              userNegative: negative,
+            );
+            // Param-kind overrides (seed, face identity…) mean nothing to an
+            // inpaint of a fixed mask; only graph targets apply here.
+            final graphOverrides = [
+              ...overrides.where((o) => o.target.kind != OverrideKind.param),
+              if (variantValue != null &&
+                  sweep.target.kind != OverrideKind.param)
+                OverrideSpec(sweep.target, coerce(variantValue)),
+            ];
+            Map<String, List<String>> applied;
+            try {
+              applied = applyOverrides(wf, graphOverrides);
+            } on StateError catch (e) {
+              skipped.add({'cell': id, 'reason': e.message});
+              return;
+            }
+            File('${out.path}/$id.json').writeAsStringSync(jsonEncode(wf));
+            cells.add({
+              'id': id,
+              'flow': 'hair',
+              'model': m.id,
+              'modelLabel': m.label,
+              'style': c.id,
+              'styleLabel': c.label,
+              'styleText': c.block,
+              'promptIndex': 0,
+              'prompt': _encodedText(wf, positive: true),
+              'negative': _encodedText(wf, positive: false),
+              'variant': variantValue == null
+                  ? null
+                  : {'label': sweep.label, 'value': variantValue},
+              'params': {
+                'seed': seed,
+                'batch': batch,
+                'refName': refName,
+                'hairShape': c.shape.key,
+                'hairMask': shape['uploaded'],
+                'hairMaskArea': shape['area'],
+                'hairColour': colour,
+              },
+              'applied': applied,
+              'presetOverridden': graphOverrides.isNotEmpty,
+            });
+            n++;
+          }
+
+          if (sweep.isEmpty) {
+            emitHair(null);
+          } else {
+            for (final v in sweep.values) {
+              emitHair(v);
             }
           }
         }
@@ -444,24 +580,23 @@ void main() {
                 'family': familyOfLora(n).name,
                 'familyLabel': loraFamilyLabel(familyOfLora(n)),
                 'fit': {
-                  for (final m in models)
-                    m.id: fitOfLora(n, m.loraFamily).name,
+                  for (final m in models) m.id: fitOfLora(n, m.loraFamily).name,
                 },
               },
           ],
           'defaultLoraStrength': kDefaultLoraStrength,
-          'buckets': [
-            for (final b in kSdxlBuckets) '${b.w}x${b.h}',
-          ],
+          'buckets': [for (final b in kSdxlBuckets) '${b.w}x${b.h}'],
           'prompts': prompts,
         }),
       );
     }
-    stdout.writeln('DUMP $n workflows · ${models.length} modelů × '
-        '${prompts.length} promptů × ${styles.length + 1} stylů × '
-        '${flows.length} flow'
-        '${sweep.isEmpty ? '' : ' × ${sweep.values.length} variant'}'
-        '${skipped.isEmpty ? '' : ' · přeskočeno ${skipped.length}'}');
+    stdout.writeln(
+      'DUMP $n workflows · ${models.length} modelů × '
+      '${prompts.length} promptů × ${styles.length + 1} stylů × '
+      '${flows.length} flow'
+      '${sweep.isEmpty ? '' : ' × ${sweep.values.length} variant'}'
+      '${skipped.isEmpty ? '' : ' · přeskočeno ${skipped.length}'}',
+    );
     expect(n, greaterThan(0), reason: 'dump nevyrobil žádné workflow');
   });
 }

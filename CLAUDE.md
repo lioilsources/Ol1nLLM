@@ -528,6 +528,39 @@ tvář vůbec nevymění). Strop téhle cesty je ~0.75–0.8: PuLID kóduje tvá
 jednoho embeddingu, tedy „typ" tváře, ne geometrii. Přes 0.9 by dal jen face
 swap (licence jen pro nekomerční použití) nebo LoRA na osobu (20+ fotek).
 
+### Kadeřník (automatická maska + inpaint)
+
+Akce na dlaždici (nůžky, pravý horní roh vedle „Rozhýbat“/„Zachovej pózu“) →
+`HairSheet` (Ženy/Muži, sekce, hledání bez diakritiky) →
+`ImageStudioNotifier.hairRestyle(imageId, hairstyleId)`:
+
+1. `ComfyUIService.analyseHair` pustí `assets/comfyui/hair_analyse.api.json`
+   (face parsing přes ComfyUI-RMBG `FaceSegment` + `ClothesSegment` na čepici,
+   **bez difuze**, sekundy) a stáhne čtyři masky — hair, face, hat, features
+   (oči+obočí). Výstupy se párují podle prefixu jména souboru.
+2. `buildHairMask` + `estimateHairColour` (`lib/models/hair_mask.dart`) v
+   isolate: stará vlasy + čepice (dilatace), pás na čele u ofin, **obálka**
+   podle délky (kam nové vlasy smí dorůst), minus obličej. Barva z *nasvícených*
+   pramenů (50.–90. percentil jasu v jádru masky) — medián padal do stínů.
+   Soubor je **zrcadlo** `MangaPrompts/tgbot/hairmask.py`: stejné konstanty,
+   stejné kroky, stejná fixture v testech (`test/hair_mask_test.dart` ×
+   `tgbot/tests/test_hairmask.py`). Měnit spolu; čísla kalibruje Tsumiki bench.
+   Fotka bez použitelné tváře skončí `HairMaskException` dřív, než vznikne node.
+3. Běžný `inpaint()` s `hairstyleId` → node s maskou (retry, resume, badge ve
+   stromu i FINETUNE export fungují beze změny) → `ComfyUIService.hairInpaint`,
+   tj. `prepareHairInpaint`: tentýž inpaint graf modelu, ale
+   `mask_fill_holes: false` (obličej je v masce díra a vyplnění ho přemalovalo —
+   Tsumiki bench kolo 0b, identita 0.11) a kontext 1.5.
+
+Model: když aktivní neumí inpaint, přepne se na `flux-fill` (snackbar, LoRA
+padá stejně jako u inpaintu). Prompt = `hairPrompt()` z
+`lib/models/hairstyle_preset.dart`, doslova Tsumiki `hairPrompt` s dosazenou
+barvou. Katalog `kHairstyles` (`hairstyle_catalog.dart`) je **generovaný**
+(`MangaPrompts/tgbot/tools/bench/export_catalog.py --ol1nllm`) a obsahuje jen
+účesy, které prošly gate na obou enginech (`MangaPrompts/docs/hair-matrix.md`);
+s prázdným katalogem je akce skrytá. Lab: flow `hair` + `lab hairmasks`
+(`tools/lab/README.md`).
+
 ### Identita ve videu (`tools/facebench/vidbench.py`)
 
 Tatáž stupnice, ale pro klip s **dvěma** lidmi (couple karta v Tsumiki,
