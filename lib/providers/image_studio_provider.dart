@@ -1162,7 +1162,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
               prompt: parts.positive,
               n: _comfyui.variantCount,
               seed: seed,
-              negativePrompt: parts.negative.isEmpty ? null : parts.negative,
+              negativePrompt: _hairNegative(parts.negative),
               mask: maskPng,
             )
           : _backend.edit(
@@ -1177,6 +1177,11 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
             ),
     );
   }
+
+  /// Kadeřník negative (SDXL reads it; Kontext runs cfg 1 and ignores it) plus
+  /// whatever ALL-CAPS negatives the prompt carried.
+  static String _hairNegative(String user) =>
+      [kHairNegative, user].where((s) => s.trim().isNotEmpty).join(', ');
 
   bool _hairBusy = false;
 
@@ -1610,7 +1615,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
             prompt: parts.positive,
             n: _comfyui.variantCount,
             seed: seed,
-            negativePrompt: parts.negative.isEmpty ? null : parts.negative,
+            negativePrompt: _hairNegative(parts.negative),
             mask: mask!,
           ),
         );

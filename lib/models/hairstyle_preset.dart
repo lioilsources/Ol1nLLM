@@ -54,8 +54,8 @@ String hairLengthClause(HairstylePreset s) {
 }
 
 const kHairNegative =
-    'hat, cap, helmet, headband, deformed hair, floating hair, '
-    'extra face, second person, blurry, watermark, low quality';
+    'nude, naked, nsfw, hat, cap, helmet, headband, deformed hair, '
+    'floating hair, extra face, second person, blurry, watermark, low quality';
 
 /// [instruction] = FLUX Kontext ("change X, keep Y"); otherwise a description
 /// of the finished photo (SDXL inpaint).
