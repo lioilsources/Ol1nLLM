@@ -13,44 +13,64 @@ Map<String, dynamic> _load(String path) =>
 
 void main() {
   group('hairInpaint graph', () {
-    for (final id in ['flux-fill', 'juggernaut-xl']) {
-      test('$id: no hole filling, bench context, mask substituted', () {
-        final spec = imageModelById(id);
-        final svc = ComfyUIService()..setPreset(spec.preset!);
-        final wf = svc.prepareHairInpaint(
-          _load(spec.preset!.inpaintAsset!),
-          prompt: 'a photo of the same person with a pixie cut',
-          batch: 1,
-          seed: 7,
-          imageName: 'photo.png',
-          maskName: 'hairmask.png',
-        );
-        final dump = jsonEncode(wf);
-        expect(dump, isNot(contains('__MASK__')));
-        expect(dump, isNot(contains('__IMAGE__')));
-        final crop = wf.values.cast<Map<String, dynamic>>().firstWhere(
-          (n) => n['class_type'] == 'InpaintCropImproved',
-        );
-        expect(crop['inputs']['mask_fill_holes'], isFalse);
-        expect(
-          crop['inputs']['context_from_mask_extend_factor'],
-          kHairContextFactor,
-        );
-        // a drawn-mask inpaint keeps its own crop settings
-        final plain = svc.prepareForTest(
-          _load(spec.preset!.inpaintAsset!),
-          prompt: 'x',
-          batch: 1,
-          seed: 7,
-          imageName: 'p.png',
-          maskName: 'm.png',
-        );
-        final plainCrop = plain.values.cast<Map<String, dynamic>>().firstWhere(
-          (n) => n['class_type'] == 'InpaintCropImproved',
-        );
-        expect(plainCrop['inputs']['mask_fill_holes'], isTrue);
-      });
-    }
+    test('SDXL: no hole filling, bench context, inpaint-nodes encoder', () {
+      final spec = imageModelById('juggernaut-xl');
+      final svc = ComfyUIService()..setPreset(spec.preset!);
+      expect(svc.hairUsesInstruction, isFalse);
+      final wf = svc.prepareHairInpaint(
+        _load(spec.preset!.inpaintAsset!),
+        prompt: 'a photo of the same person with a pixie cut',
+        batch: 2,
+        seed: 7,
+        imageName: 'photo.png',
+        maskName: 'hairmask.png',
+      );
+      final dump = jsonEncode(wf);
+      expect(dump, isNot(contains('__MASK__')));
+      expect(dump, isNot(contains('VAEEncodeForInpaint')));
+      Map<String, dynamic> byClass(String c) => wf.values
+          .cast<Map<String, dynamic>>()
+          .firstWhere((n) => n['class_type'] == c);
+      final crop = byClass('InpaintCropImproved')['inputs'];
+      expect(crop['mask_fill_holes'], isFalse);
+      expect(crop['context_from_mask_extend_factor'], kHairContextFactor);
+      final encId = wf.entries
+          .firstWhere((e) => e.value['class_type'] == 'INPAINT_VAEEncodeInpaintConditioning')
+          .key;
+      final ks = byClass('KSampler')['inputs'];
+      expect(ks['positive'], [encId, 0]);
+      expect(ks['negative'], [encId, 1]);
+      expect(byClass('INPAINT_ApplyFooocusInpaint')['inputs']['latent'], [encId, 2]);
+      // the batch repeat now reads the sampling latent
+      expect(byClass('RepeatLatentBatch')['inputs']['samples'], [encId, 3]);
+      final enc = wf[encId]['inputs'];
+      expect(enc['positive'], isNot([encId, 0]));
+      // a drawn-mask inpaint keeps its own graph
+      final plain = svc.prepareForTest(
+        _load(spec.preset!.inpaintAsset!),
+        prompt: 'x', batch: 1, seed: 7, imageName: 'p.png', maskName: 'm.png',
+      );
+      expect(jsonEncode(plain), contains('VAEEncodeForInpaint'));
+    });
+
+    test('FLUX: Kontext edit pasted back through the mask', () {
+      final spec = imageModelById('flux-fill');
+      final svc = ComfyUIService()..setPreset(spec.preset!);
+      expect(svc.hairUsesInstruction, isTrue);
+      final wf = svc.prepareHairInpaint(
+        _load('assets/comfyui/flux_hair_kontext.api.json'),
+        prompt: "Change the person's hairstyle to a pixie cut.",
+        batch: 1,
+        seed: 7,
+        imageName: 'photo.png',
+        maskName: 'hairmask.png',
+      );
+      final nodes = wf.values.cast<Map<String, dynamic>>();
+      final loads = nodes.where((n) => n['class_type'] == 'LoadImage').map((n) => n['inputs']['image']).toSet();
+      expect(loads, {'photo.png', 'hairmask.png'});
+      expect(nodes.any((n) => n['class_type'] == 'ImageCompositeMasked'), isTrue);
+      expect(jsonEncode(wf), contains("Change the person's hairstyle"));
+    });
 
     test('analysis graph has no sampler and passes _prepare untouched', () {
       final svc = ComfyUIService()
@@ -139,6 +159,12 @@ void main() {
       block: "pixie cut, very short cropped women's haircut",
       shape: HairShape(length: HairLength.short),
     );
+    test('instruction variant for Kontext', () {
+      final t = hairPrompt(pixie, null, instruction: true);
+      expect(t, startsWith("Change the person's hairstyle to a pixie cut"));
+      expect(t, contains('Keep the natural hair colour.'));
+    });
+
     test('matches Tsumiki with the colour filled in', () {
       expect(
         hairPrompt(pixie, 'brown'),

@@ -58,8 +58,8 @@ bool anyOverlap(BoolMask a, BoolMask b) {
   return false;
 }
 
-double area(HairShape shape, [HairAnalysis? a]) =>
-    buildHairMask(a ?? synthetic(), shape).area;
+double area(HairShape shape, [HairAnalysis? a, String mode = 'hair']) =>
+    buildHairMask(a ?? synthetic(), shape, mode: mode).area;
 
 void main() {
   test('face box ignores stray pixels', () {
@@ -247,6 +247,22 @@ void main() {
     final (x0, _, _, y1) = r.faceBox;
     expect((x0 - 3 * (cx - rx)).abs(), lessThan(24));
     expect((y1 - 3 * (cy + ry)).abs(), lessThan(24));
+  });
+
+  test('blob mode (the default) hides the old silhouette', () {
+    expect(kHairMaskMode, 'blob');
+    final a = synthetic();
+    final blob = buildHairMask(a, const HairShape(length: HairLength.short));
+    final hair = buildHairMask(
+      a,
+      const HairShape(length: HairLength.short),
+      mode: 'hair',
+    );
+    expect(blob.area, greaterThan(hair.area));
+    for (var i = 0; i < blob.mask.data.length; i++) {
+      if (hair.mask.data[i] == 1) expect(blob.mask.data[i], 1);
+    }
+    expect(anyOverlap(blob.mask, a.features), isFalse);
   });
 
   test('png round trip and python rounding', () {

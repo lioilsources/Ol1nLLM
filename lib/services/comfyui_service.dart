@@ -541,11 +541,20 @@ class ComfyUIService implements ImageBackend {
     return out;
   }
 
-  /// Inpaint with a Kadeřník mask. The same inpaint graphs as a drawn mask,
-  /// with two crop settings the Tsumiki bench measured for hair
-  /// (`MangaPrompts/docs/hair-matrix.md`): no hole filling — the face is a hole
-  /// in the mask and filling it repainted the face — and a tighter context
-  /// window. Not on [ImageBackend]: only ComfyUI can run it.
+  static const _hairKontextAsset = 'assets/comfyui/flux_hair_kontext.api.json';
+
+  /// Whether [hairInpaint] runs as an instruction edit (FLUX Kontext) — true
+  /// for the FLUX family, whose Fill model barely changed a cut in the Tsumiki
+  /// bench (a pixie came back as a bob, a wolf cut as long waves).
+  bool get hairUsesInstruction => _preset.ckptName == null;
+
+  /// Kadeřník render. SDXL: the model's own inpaint graph with the Tsumiki
+  /// bench fixes (no hole filling — the face is a hole in the mask and got
+  /// repainted; inpaint-nodes encoder instead of VAEEncodeForInpaint, whose
+  /// grey fill tinted hair olive). FLUX: `flux_hair_kontext.api.json`, a Kontext
+  /// edit pasted back through the mask so the face and backdrop stay the
+  /// original pixels. Results: MangaPrompts/docs/hair-matrix.md. Not on
+  /// [ImageBackend]: only ComfyUI can run it.
   Stream<GenEvent> hairInpaint({
     required Uint8List image,
     required Uint8List mask,
@@ -554,7 +563,8 @@ class ComfyUIService implements ImageBackend {
     required int seed,
     String? negativePrompt,
   }) async* {
-    final asset = _preset.inpaintAsset;
+    final asset =
+        hairUsesInstruction ? _hairKontextAsset : _preset.inpaintAsset;
     if (asset == null) {
       yield const GenFailed('[ComfyUI] Aktivní model nepodporuje inpaint.');
       return;
@@ -601,7 +611,52 @@ class ComfyUIService implements ImageBackend {
       inputs['mask_fill_holes'] = kHairMaskFillHoles;
       inputs['context_from_mask_extend_factor'] = kHairContextFactor;
     }
+    _swapInpaintEncoder(wf);
     return wf;
+  }
+
+  /// VAEEncodeForInpaint → INPAINT_VAEEncodeInpaintConditioning. Outputs:
+  /// 0/1 conditioning, 2 inpaint latent (for the Fooocus patch), 3 latent to
+  /// sample. Every former consumer of the encoder's latent takes output 3.
+  static void _swapInpaintEncoder(Map<String, dynamic> wf) {
+    String? encId;
+    for (final e in wf.entries) {
+      if ((e.value as Map)['class_type'] == 'VAEEncodeForInpaint') encId = e.key;
+    }
+    if (encId == null) return;
+    Map<String, dynamic>? ks;
+    for (final n in wf.values) {
+      final node = (n as Map).cast<String, dynamic>();
+      if (node['class_type'] == 'KSampler') {
+        ks = (node['inputs'] as Map).cast<String, dynamic>();
+      }
+    }
+    if (ks == null) return;
+    for (final n in wf.values) {
+      final node = (n as Map).cast<String, dynamic>();
+      final inputs = (node['inputs'] as Map).cast<String, dynamic>();
+      for (final k in inputs.keys.toList()) {
+        final v = inputs[k];
+        if (v is! List || v.length != 2 || v[0] != encId) continue;
+        inputs[k] = node['class_type'] == 'INPAINT_ApplyFooocusInpaint'
+            ? [encId, 2]
+            : [encId, 3];
+      }
+    }
+    final enc = ((wf[encId] as Map)['inputs'] as Map).cast<String, dynamic>();
+    wf[encId] = {
+      'class_type': 'INPAINT_VAEEncodeInpaintConditioning',
+      '_meta': {'title': 'Inpaint conditioning (Kadeřník)'},
+      'inputs': {
+        'positive': ks['positive'],
+        'negative': ks['negative'],
+        'vae': enc['vae'],
+        'pixels': enc['pixels'],
+        'mask': enc['mask'],
+      },
+    };
+    ks['positive'] = [encId, 0];
+    ks['negative'] = [encId, 1];
   }
 
   static String _uuidV4() => const Uuid().v4();

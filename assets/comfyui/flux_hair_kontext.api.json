@@ -1,0 +1,284 @@
+{
+  "1": {
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "FLUX Kontext"
+    },
+    "inputs": {
+      "unet_name": "flux1-dev-kontext_fp8_scaled.safetensors",
+      "weight_dtype": "fp8_e4m3fn"
+    }
+  },
+  "2": {
+    "class_type": "DualCLIPLoader",
+    "_meta": {
+      "title": "T5 + CLIP-L"
+    },
+    "inputs": {
+      "clip_name1": "t5xxl_fp16.safetensors",
+      "clip_name2": "clip_l.safetensors",
+      "type": "flux"
+    }
+  },
+  "3": {
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "FLUX VAE"
+    },
+    "inputs": {
+      "vae_name": "ae.safetensors"
+    }
+  },
+  "4": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Portrait"
+    },
+    "inputs": {
+      "image": "__IMAGE__",
+      "upload": "image"
+    }
+  },
+  "5": {
+    "class_type": "GetImageSize",
+    "_meta": {
+      "title": "Original size"
+    },
+    "inputs": {
+      "image": [
+        "4",
+        0
+      ]
+    }
+  },
+  "6": {
+    "class_type": "FluxKontextImageScale",
+    "_meta": {
+      "title": "Kontext resolution"
+    },
+    "inputs": {
+      "image": [
+        "4",
+        0
+      ]
+    }
+  },
+  "7": {
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "Encode portrait"
+    },
+    "inputs": {
+      "pixels": [
+        "6",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ]
+    }
+  },
+  "8": {
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Edit instruction"
+    },
+    "inputs": {
+      "clip": [
+        "2",
+        0
+      ],
+      "text": "__PROMPT__"
+    }
+  },
+  "9": {
+    "class_type": "ReferenceLatent",
+    "_meta": {
+      "title": "Portrait as reference"
+    },
+    "inputs": {
+      "conditioning": [
+        "8",
+        0
+      ],
+      "latent": [
+        "7",
+        0
+      ]
+    }
+  },
+  "10": {
+    "class_type": "FluxGuidance",
+    "_meta": {
+      "title": "Guidance"
+    },
+    "inputs": {
+      "conditioning": [
+        "9",
+        0
+      ],
+      "guidance": 2.5
+    }
+  },
+  "11": {
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Negative (unused at cfg 1)"
+    },
+    "inputs": {
+      "clip": [
+        "2",
+        0
+      ],
+      "text": ""
+    }
+  },
+  "12": {
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler (Kontext)"
+    },
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "positive": [
+        "10",
+        0
+      ],
+      "negative": [
+        "11",
+        0
+      ],
+      "latent_image": [
+        "7",
+        0
+      ],
+      "seed": 0,
+      "steps": 28,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1.0
+    }
+  },
+  "13": {
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    },
+    "inputs": {
+      "samples": [
+        "12",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ]
+    }
+  },
+  "14": {
+    "class_type": "ImageScale",
+    "_meta": {
+      "title": "Back to the original size"
+    },
+    "inputs": {
+      "image": [
+        "13",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": [
+        "5",
+        0
+      ],
+      "height": [
+        "5",
+        1
+      ],
+      "crop": "disabled"
+    }
+  },
+  "15": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Hair mask (white = new hair)"
+    },
+    "inputs": {
+      "image": "__MASK__",
+      "upload": "image"
+    }
+  },
+  "16": {
+    "class_type": "ImageToMask",
+    "_meta": {
+      "title": "Mask PNG to MASK"
+    },
+    "inputs": {
+      "image": [
+        "15",
+        0
+      ],
+      "channel": "red"
+    }
+  },
+  "17": {
+    "class_type": "GrowMaskWithBlur",
+    "_meta": {
+      "title": "Soften the seam"
+    },
+    "inputs": {
+      "mask": [
+        "16",
+        0
+      ],
+      "expand": 6,
+      "incremental_expandrate": 0.0,
+      "tapered_corners": true,
+      "flip_input": false,
+      "blur_radius": 12.0,
+      "lerp_alpha": 1.0,
+      "decay_factor": 1.0,
+      "fill_holes": false
+    }
+  },
+  "18": {
+    "class_type": "ImageCompositeMasked",
+    "_meta": {
+      "title": "Edit inside the mask, original face outside"
+    },
+    "inputs": {
+      "destination": [
+        "4",
+        0
+      ],
+      "source": [
+        "14",
+        0
+      ],
+      "x": 0,
+      "y": 0,
+      "resize_source": false,
+      "mask": [
+        "17",
+        0
+      ]
+    }
+  },
+  "19": {
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save"
+    },
+    "inputs": {
+      "images": [
+        "18",
+        0
+      ],
+      "filename_prefix": "tsumiki_hair_kontext"
+    }
+  }
+}

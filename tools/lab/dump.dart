@@ -464,9 +464,14 @@ void main() {
               return;
             }
             final svc = ComfyUIService()..setPreset(preset);
+            // Same engine choice as the app: FLUX runs the Kontext edit graph,
+            // SDXL its own inpaint graph (see ComfyUIService.hairInpaint).
+            final kontext = svc.hairUsesInstruction;
             final wf = svc.prepareHairInpaint(
-              _load(preset.inpaintAsset!),
-              prompt: hairPrompt(c, colour),
+              _load(kontext
+                  ? 'assets/comfyui/flux_hair_kontext.api.json'
+                  : preset.inpaintAsset!),
+              prompt: hairPrompt(c, colour, instruction: kontext),
               batch: batch,
               seed: seed,
               imageName: refName,

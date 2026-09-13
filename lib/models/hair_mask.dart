@@ -50,6 +50,11 @@ const kHairEnvelopes = <HairLength, (double, double, double)?>{
   HairLength.medium: (0.5, 0.35, 0.7),
   HairLength.long: (0.6, 0.35, 1.8),
 };
+
+/// "blob" = the bounding rounded rectangle of the union (minus the face);
+/// "hair" = the union itself. FLUX paints the mask's shape and SDXL left old
+/// strands on the shoulders, so the shipped default is the rectangle.
+const kHairMaskMode = 'blob';
 const kHairUpdoAboveFh = 0.8;
 const kHairUpdoSideFw = 0.3;
 const kHairCornerFw = 0.3;
@@ -317,7 +322,11 @@ BoolMask roundedRect(
   return out;
 }
 
-HairMaskResult buildHairMask(HairAnalysis a, HairShape shape) {
+HairMaskResult buildHairMask(
+  HairAnalysis a,
+  HairShape shape, {
+  String mode = kHairMaskMode,
+}) {
   final fullW = a.face.w, fullH = a.face.h;
   final scale = math.min(1.0, kHairWorkSide / math.max(fullH, fullW));
   final w = math.max(1, pyRound(fullW * scale));
@@ -376,6 +385,30 @@ HairMaskResult buildHairMask(HairAnalysis a, HairShape shape) {
         y0 - kHairUpdoAboveFh * fh,
         x1 + kHairUpdoSideFw * fw,
         y0 + 0.2 * fh,
+        kHairCornerFw * fw,
+      ),
+    );
+  }
+
+  if (mode == 'blob' && mask.count > 0) {
+    var bx0 = w, by0 = h, bx1 = -1, by1 = -1;
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        if (!mask.at(x, y)) continue;
+        if (x < bx0) bx0 = x;
+        if (x > bx1) bx1 = x;
+        if (y < by0) by0 = y;
+        if (y > by1) by1 = y;
+      }
+    }
+    mask = mask.or(
+      roundedRect(
+        h,
+        w,
+        bx0.toDouble(),
+        by0.toDouble(),
+        bx1.toDouble(),
+        by1.toDouble(),
         kHairCornerFw * fw,
       ),
     );

@@ -36,28 +36,48 @@ class HairstylePreset {
   final HairShape shape;
 }
 
-/// Mirror of Tsumiki `hairLengthClause` — see lib/config/hairstyles.dart there.
+/// Mirror of MangaPrompts `tgbot/hairprompt.py` — the bot writes the Tsumiki
+/// prompt server-side; this app talks to ComfyUI directly and writes it here.
 String hairLengthClause(HairstylePreset s) {
   if (s.shape.updo) {
     return s.id == 'half-up'
         ? ''
-        : 'all hair gathered up and away from the neck and shoulders, ';
+        : 'all hair gathered up and away from the neck and shoulders';
   }
   return switch (s.shape.length) {
     HairLength.short =>
-      'short hair ending above the jaw with the neck clear of hair, ',
-    HairLength.medium => 'hair ending between the chin and the shoulders, ',
-    HairLength.long => 'long hair falling past the shoulders, ',
+      'short hair ending above the jaw with the neck clear of hair',
+    HairLength.medium => 'hair ending between the chin and the shoulders',
+    HairLength.long => 'long hair falling past the shoulders',
     HairLength.keep => '',
   };
 }
 
-/// The Tsumiki prompt with the colour already read off the photo.
-String hairPrompt(HairstylePreset s, String? colour) =>
-    'a photo of the same person with a ${s.block}, '
-    '${hairLengthClause(s)}${colour ?? 'natural'} hair, '
-    'natural hair texture, realistic strands, same clothes, '
-    'same lighting and background, photorealistic';
+const kHairNegative =
+    'hat, cap, helmet, headband, deformed hair, floating hair, '
+    'extra face, second person, blurry, watermark, low quality';
+
+/// [instruction] = FLUX Kontext ("change X, keep Y"); otherwise a description
+/// of the finished photo (SDXL inpaint).
+String hairPrompt(
+  HairstylePreset s,
+  String? colour, {
+  bool instruction = false,
+}) {
+  final c = colour ?? 'natural';
+  final clause = hairLengthClause(s);
+  if (instruction) {
+    final length = clause.isEmpty
+        ? ''
+        : '${clause[0].toUpperCase()}${clause.substring(1)}. ';
+    return "Change the person's hairstyle to a ${s.block}. ${length}Keep the $c hair colour. "
+        'Keep the face, facial features, expression, skin, clothes, lighting and background '
+        'exactly the same.';
+  }
+  final length = clause.isEmpty ? '' : '$clause, ';
+  return 'a photo of the same person with a ${s.block}, $length$c hair, natural hair texture, '
+      'realistic strands, same clothes, same lighting and background, photorealistic';
+}
 
 HairstylePreset? hairstyleById(String? id) {
   if (id == null) return null;
@@ -71,5 +91,6 @@ HairstylePreset? hairstyleById(String? id) {
 bool hairstyleMatchesQuery(HairstylePreset s, String query) {
   final q = foldDiacritics(query.trim());
   if (q.isEmpty) return true;
-  return foldDiacritics(s.label).contains(q) || s.block.toLowerCase().contains(q);
+  return foldDiacritics(s.label).contains(q) ||
+      s.block.toLowerCase().contains(q);
 }

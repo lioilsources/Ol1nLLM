@@ -1227,7 +1227,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       ));
       state = state.copyWith(selectedImageId: imageId);
       await inpaint(
-        hairPrompt(style, colour),
+        hairPrompt(style, colour, instruction: _comfyui.hairUsesInstruction),
         maskPng,
         hairstyleId: hairstyleId,
       );
