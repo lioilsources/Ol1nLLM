@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ol1n_llm/models/image_model.dart';
 import 'package:ol1n_llm/models/style_preset.dart';
+import 'package:ol1n_llm/services/comfyui_service.dart';
 
 import '../tools/lab/dump_spec.dart';
 
@@ -203,6 +205,54 @@ void main() {
       // A typo must not silently fall back to the model's own dialect.
       expect(() => styleDialectFor('t5', PromptDialect.natural),
           throwsFormatException);
+    });
+
+    test('style position and quality prefix: default is the app, the rest is exact', () {
+      const style = StylePreset(id: 'u', label: 'u', block: 'ukiyo-e, flat color');
+      String sent(StylePosition pos, bool prefixOn) {
+        final c = composeCellPrompt(
+          subject: 'a dancer',
+          styleText: style.block,
+          prefix: 'masterpiece, best quality',
+          position: pos,
+          qualityPrefix: prefixOn,
+        );
+        // What _prepare then writes: the prefix only where the builder adds it.
+        return c.builderPrefix ? 'masterpiece, best quality, ${c.prompt}' : c.prompt;
+      }
+
+      expect(sent(StylePosition.end, true),
+          'masterpiece, best quality, ${applyStylePreset('a dancer', style)}');
+      expect(sent(StylePosition.front, true),
+          'masterpiece, best quality, ukiyo-e, flat color, a dancer');
+      expect(sent(StylePosition.first, true),
+          'ukiyo-e, flat color, masterpiece, best quality, a dancer');
+      expect(sent(StylePosition.end, false), 'a dancer, ukiyo-e, flat color');
+      expect(sent(StylePosition.first, false), 'ukiyo-e, flat color, a dancer');
+
+      // A baseline has no style to move; an empty subject stays empty.
+      final base = composeCellPrompt(subject: 'a dancer', styleText: null,
+          prefix: 'p', position: StylePosition.first, qualityPrefix: false);
+      expect((base.prompt, base.builderPrefix), ('a dancer', false));
+      expect(composeCellPrompt(subject: ' ', styleText: 'x', prefix: 'p').prompt, ' ');
+
+      expect(stylePositionFor(null), StylePosition.end);
+      expect(qualityPrefixFor(null), isTrue);
+      expect(qualityPrefixFor('off'), isFalse);
+      expect(() => stylePositionFor('start'), throwsFormatException);
+      expect(() => qualityPrefixFor('no'), throwsFormatException);
+    });
+
+    test('the builder drops the preset prefix only when asked', () {
+      final spec = imageModelById('noobai-xl');
+      final svc = ComfyUIService()..setPreset(spec.preset!);
+      final template = jsonDecode(File('assets/comfyui/sdxl_txt2img.api.json')
+          .readAsStringSync()) as Map<String, dynamic>;
+      String positive(bool prefix) => jsonEncode(svc.prepareForTest(template,
+          prompt: 'a dancer', batch: 1, seed: 1, positivePrefix: prefix));
+      expect(positive(true), contains('${spec.preset!.positivePrefix}, a dancer'));
+      expect(positive(false), isNot(contains(spec.preset!.positivePrefix)));
+      expect(positive(false), contains('a dancer'));
     });
 
     test('a candidate without id or text is rejected', () {

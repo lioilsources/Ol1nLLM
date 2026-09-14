@@ -220,11 +220,18 @@ void main() {
                 params['styleDialect'],
                 m.promptDialect,
               );
-              final prompt = applyStylePreset(
-                prompts[pi],
-                style,
-                dialect: dialect,
+              // Style position and the quality prefix are lab-only axes; with
+              // neither set this is exactly the app's applyStylePreset.
+              final stylePosition = stylePositionFor(params['stylePosition']);
+              final qualityPrefix = qualityPrefixFor(params['qualityPrefix']);
+              final composed = composeCellPrompt(
+                subject: prompts[pi],
+                styleText: style?.blockFor(dialect),
+                prefix: preset.positivePrefix,
+                position: stylePosition,
+                qualityPrefix: qualityPrefix,
               );
+              final prompt = composed.prompt;
               if (cellLora != null &&
                   fitOfLora(cellLora, m.loraFamily) == LoraFit.incompatible) {
                 skipped.add({
@@ -287,6 +294,7 @@ void main() {
                     userNegative: negative,
                     faceIdentity: cellFace,
                     faceDetail: cellFaceDetail,
+                    positivePrefix: composed.builderPrefix,
                   );
                 case 'img2img':
                   if (refName == null) {
@@ -315,6 +323,7 @@ void main() {
                     editDenoise: editDenoise,
                     faceIdentity: cellFace,
                     faceDetail: cellFaceDetail,
+                    positivePrefix: composed.builderPrefix,
                   );
                 case 'txt2img':
                   wf = svc.prepareForTest(
@@ -328,6 +337,7 @@ void main() {
                     userNegative: negative,
                     faceIdentity: cellFace,
                     faceDetail: cellFaceDetail,
+                    positivePrefix: composed.builderPrefix,
                   );
                 default:
                   fail('neznámá flow: $flow');
@@ -383,6 +393,8 @@ void main() {
                   'seed': cellSeed,
                   // Null for the baseline: without a style there is no text.
                   'styleDialect': style == null ? null : dialect.name,
+                  'stylePosition': style == null ? null : stylePosition.name,
+                  'qualityPrefix': qualityPrefix,
                   'batch': batch,
                   'editDenoise': editDenoise,
                   'latent': latent == null ? null : '${latent.w}x${latent.h}',

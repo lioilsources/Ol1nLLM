@@ -1400,6 +1400,7 @@ class ComfyUIService implements ImageBackend {
     double? editDenoise,
     FaceIdentity faceIdentity = FaceIdentity.none,
     bool faceDetail = false,
+    bool positivePrefix = true,
   }) => _prepare(
     template,
     prompt: prompt,
@@ -1416,6 +1417,7 @@ class ComfyUIService implements ImageBackend {
     editDenoise: editDenoise,
     faceIdentity: faceIdentity,
     faceDetail: faceDetail,
+    positivePrefix: positivePrefix,
   );
 
   Map<String, dynamic> _prepare(
@@ -1445,11 +1447,15 @@ class ComfyUIService implements ImageBackend {
     // Second, cropped pass over the detected face. Only with an identity
     // active: detailing a face nothing pins just re-rolls it.
     bool faceDetail = false,
+    // The preset's quality tags in front of the prompt. Always on in the app;
+    // the lab turns it off to measure how much those tags hold a model in its
+    // house style (`param.qualityPrefix`).
+    bool positivePrefix = true,
   }) {
     final wf = jsonDecode(jsonEncode(template)) as Map<String, dynamic>;
     final lora = _activeLora;
     final preset = _preset;
-    final fullPrompt = preset.positivePrefix.isEmpty
+    final fullPrompt = !positivePrefix || preset.positivePrefix.isEmpty
         ? prompt
         : '${preset.positivePrefix}, $prompt';
     // Preset negative + user ALL-CAPS negatives. Only applied where the

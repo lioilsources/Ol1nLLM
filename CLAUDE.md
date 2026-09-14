@@ -659,6 +659,19 @@ se volí **per buňka** podle `promptDialect` modelu a manifest ho nese jako
 dialekt přebije. Přerušený běh z terminálu dokončí `lab resume DIR` — totéž
 co *Pokračovat* v UI, bez nového dumpu.
 
+**Proč anime modely styl nepřevezmou** — dvě laboratorní osy a jeden soubor:
+`param.stylePosition=end|front|first` (appka posílá `end` = prefix, námět,
+styl) a `param.qualityPrefix=on|off` (tagy estetického hodnocení z
+`positivePrefix`, u NoobAI `very awa`, jdou první a CLIP je váží nejvíc).
+Skládá je `composeCellPrompt()` v `dump_spec.dart`; builder má kvůli tomu
+`positivePrefix: false`, výchozí `true` appku nemění. A
+`tools/lab/candidates/cultural-booru.json`: booru tagy pro 39 kulturních stylů,
+které je v registru nemají (booru text měli jen umělci), s bloky převzatými
+z registru — sweep `param.styleDialect=natural|booru` nad tímto souborem je
+přímé srovnání. Tagy jsou **návrh k měření**, ne verdikt; motivy, které by
+měnily obsah místo stylu (vousy, tetování mimo polynéský styl, roucha, tygr,
+„x-ray“, anatomie), jsou vynechané a zapsané v poli `note`.
+
 **LoRA a trigger words**: ovládací panel nabízí LoRA živě ze serveru,
 seřazené podle `loraFit` vůči vybraným modelům (bez modelu podle linie);
 za jménem jsou v závorce **trigger words** čtené z hlavičky souboru

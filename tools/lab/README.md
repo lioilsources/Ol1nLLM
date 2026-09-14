@@ -81,6 +81,11 @@ modely s `promptDialect: booru` (Pony, Illustrious, anime SDXL), ostatní
 `styleText` — text stylu, který model opravdu dostal — a v parametrech
 `styleDialect`. Ukazuje je tooltip buňky a zásuvka.
 
+`candidates/cultural-booru.json` doplňuje booru text 39 kulturním stylům, které
+ho v registru nemají (s bloky převzatými z registru, takže `natural` pošle
+přesně to, co appka). Tagy jsou návrh k měření; co by měnilo obsah místo stylu
+(vousy, roucha, tygr, „x-ray“, anatomie), je vynechané a popsané v `note`.
+
 Osa `param.styleDialect=natural|booru` pošle všem modelům tentýž dialekt bez
 ohledu na jejich vlastní. Tak jde srovnání tagů s frázemi zopakovat bez ručně
 psaných variant id (viz ablace třetí vlny v `docs/style-matrix.md`).
@@ -183,6 +188,18 @@ a přitom čte tagy.
 | metoda tváře | `param.faceIdentity` | `none` | SDXL: tři různé mechanismy; flux: každá hodnota je PuLID (manifest píše, co doopravdy běželo) |
 | text stylu | `param.styleDialect` | jazyk modelu | jen s vybraným stylem; rozdíl dává jen styl s `booru` textem (umělci), kulturní styly posílají obě hodnoty stejně |
 | síla dotažení tváře | `__face_detail__.denoise` | 0.4 | jen se zapnutou identitou **a** dotažením; SDXL i flux |
+| pozice stylu | `param.stylePosition` | `end` (appka) | jen s vybraným stylem: `end` = prefix, námět, styl; `front` = prefix, styl, námět; `first` = styl, prefix, námět. Bez prefixu (Juggernaut, flux, nebo `qualityPrefix=off`) je `front` totéž co `first` |
+| kvalitativní prefix | `param.qualityPrefix` | `on` (appka) | modely s `positivePrefix`: anime SDXL (`masterpiece, best quality…`, u NoobAI `very awa`) a pony score tagy. Juggernaut a flux žádný nemají, buňky vyjdou stejné |
+
+Pozice stylu a prefix jsou **jen laboratorní osy** — appka posílá vždy
+`prefix, námět, styl` (`applyStylePreset`, `_prepare`). Existují kvůli otázce,
+proč anime modely styl nepřevezmou: CLIP váží dřívější tokeny víc a tagy
+estetického hodnocení v prefixu jdou první. Skládání je v
+`composeCellPrompt()` (`dump_spec.dart`), builder dostane `positivePrefix:
+false`, když prefix píše buňka sama (`first`) nebo je vypnutý. Hodnoty jdou
+i jako override pro celý běh: `--override 'param.qualityPrefix=off'`
+a sweep pozice vedle toho. Manifest je u buňky nese v `params`, prompt
+v tabulce je čtený zpátky z grafu.
 
 „Odkud číst tvář“ = uzel `__depth_src__`: repose, `POSE_MODE=depth`, nebo SDXL
 img2img bez šablony pózy (auto hloubka). Šablona kostry fotka není — tvářové

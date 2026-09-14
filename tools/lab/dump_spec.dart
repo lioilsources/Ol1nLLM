@@ -47,6 +47,71 @@ PromptDialect styleDialectFor(Object? param, PromptDialect model) {
       '${PromptDialect.values.map((d) => d.name).join('|')}, ne "$param"');
 }
 
+/// Where a cell's style text sits in the prompt. The app always sends
+/// `end` (prefix, subject, style — [applyStylePreset]); the other two exist
+/// for the lab, because CLIP weights early tokens more and the quality prefix
+/// of the anime lineages comes first.
+enum StylePosition {
+  /// `prefix, subject, style` — what the app sends.
+  end,
+
+  /// `prefix, style, subject` — style ahead of the subject, prefix still first.
+  front,
+
+  /// `style, prefix, subject` — style ahead of everything.
+  first,
+}
+
+StylePosition stylePositionFor(Object? param) {
+  if (param == null) return StylePosition.end;
+  for (final p in StylePosition.values) {
+    if (p.name == param) return p;
+  }
+  throw FormatException('param.stylePosition musí být '
+      '${StylePosition.values.map((p) => p.name).join('|')}, ne "$param"');
+}
+
+/// `param.qualityPrefix=on|off` — whether the preset's quality tags go in.
+bool qualityPrefixFor(Object? param) => switch (param) {
+      null || true || 'on' => true,
+      false || 'off' => false,
+      _ => throw FormatException(
+          'param.qualityPrefix musí být on|off, ne "$param"'),
+    };
+
+/// The prompt a cell hands to the builder, and whether the builder should
+/// still put the quality prefix in front of it.
+///
+/// `end` with the prefix on is exactly the app. `first` has to place the style
+/// ahead of the prefix, so it writes the prefix itself and tells the builder
+/// not to add it again. An empty subject stays empty, like in the app — a
+/// style must never become the whole prompt.
+({String prompt, bool builderPrefix}) composeCellPrompt({
+  required String subject,
+  required String? styleText,
+  required String prefix,
+  StylePosition position = StylePosition.end,
+  bool qualityPrefix = true,
+}) {
+  if (styleText == null || subject.trim().isEmpty) {
+    return (prompt: subject, builderPrefix: qualityPrefix);
+  }
+  return switch (position) {
+    StylePosition.end =>
+      (prompt: '$subject, $styleText', builderPrefix: qualityPrefix),
+    StylePosition.front =>
+      (prompt: '$styleText, $subject', builderPrefix: qualityPrefix),
+    StylePosition.first => (
+        prompt: [
+          styleText,
+          if (qualityPrefix && prefix.isNotEmpty) prefix,
+          subject,
+        ].join(', '),
+        builderPrefix: false,
+      ),
+  };
+}
+
 /// The styles one dump renders.
 ///
 /// Without [wanted] that is every candidate, or the whole registry when there
