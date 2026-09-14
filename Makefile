@@ -1,4 +1,4 @@
-.PHONY: run debug build-ios build-android lab lab-dry lab-check
+.PHONY: run debug build-ios build-android lab lab-dry lab-check lab-arcface
 
 -include .env.local
 
@@ -36,3 +36,13 @@ lab-dry:
 
 lab-check:
 	cd tools/lab && go run . check
+
+# ArcFace metric for the lab (tools/lab/arcface.py): a local venv with
+# insightface on CPU and the antelopev2 models copied from SPARK, the same
+# files ComfyUI and the benches use — so identity numbers stay comparable.
+# First install builds wheels for a while; the pip cache makes reruns fast.
+lab-arcface:
+	python3 -m venv tools/lab/.venv
+	tools/lab/.venv/bin/pip install -q insightface onnxruntime opencv-python-headless numpy
+	mkdir -p $(HOME)/.insightface/models
+	rsync -a spark:Code/ComfyUI/models/insightface/models/antelopev2 $(HOME)/.insightface/models/

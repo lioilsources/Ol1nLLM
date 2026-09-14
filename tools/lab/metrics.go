@@ -55,6 +55,11 @@ type CellMetric struct {
 	// NeighbourDelta is the distance from the previous sweep value — the number
 	// that answers "did that knob do anything".
 	NeighbourDelta *float64 `json:"neighbourDelta,omitempty"`
+	// Identity is the ArcFace similarity of the largest face to the run's
+	// reference (see identity.go); nil with Faces == 0 means no face was found.
+	Identity *float64 `json:"identity,omitempty"`
+	Faces    *int     `json:"faces,omitempty"`
+	FacePx   int      `json:"facePx,omitempty"`
 }
 
 type GroupMetric struct {
@@ -69,6 +74,8 @@ type Metrics struct {
 	Groups map[string]GroupMetric `json:"groups"`
 	// Note is shown next to the numbers; without it they get over-read.
 	Note string `json:"note"`
+	// IdentityNote explains the face numbers — or why there are none.
+	IdentityNote string `json:"identityNote,omitempty"`
 }
 
 // ComputeMetrics needs the histogram of every finished cell plus the manifest

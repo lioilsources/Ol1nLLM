@@ -638,6 +638,18 @@ Metriky (reakce vůči baseline, rozptyl stylů, změna proti předchozí hodnot
 sweepu) měří **barvu, ne převzetí stylu** — jsou k předvýběru, rozhodnout musí
 pohled na obrázky. Kalibrace z reálného měření: `docs/style-matrix.md`.
 
+**Tvář (ArcFace)**: v běhu s referencí se ke každé buňce spočítá podobnost
+největší tváře k referenci — `tools/lab/arcface.py` přes lokální venv
+(`make lab-arcface`, insightface **antelopev2** na CPU, modely zkopírované ze
+SPARKu), volaný z `identity.go` při výpočtu metrik, cache `identity.json`
+v adresáři běhu. Detekce i výběr největší tváře jsou stejné jako
+`tools/facebench` a bench Kadeřníka, takže čísla sedí na stupnici 0.48 / 0.72
+(šest buněk benche do 0.006). Chybějící venv nebo pád skriptu běh neshodí, jen
+se místo čísel ukáže poznámka. **Mezi modely čísla nesrovnávat**: ArcFace je
+naučený na fotkách a u anime modelů vychází blízko nuly (noobai-xl s InstantID
+0.06, juggernaut-xl 0.68) — nízké číslo tam neodliší jiného člověka od
+nakreslené tváře; čte se hodnota sweepu v rámci modelu.
+
 **Kandidáti stylů**: `--styles-file` čte `id/label/block` a volitelně
 `booru/artist/period`, ostatní klíče toleruje. Id, které v souboru chybí, se
 vezme z registru — kandidát tak stojí ve stejné tabulce jako styl, se kterým

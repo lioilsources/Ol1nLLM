@@ -169,11 +169,23 @@ func TestEstimateWarnsAboutPresetOverrideAndFluxSweep(t *testing.T) {
 		Flows: []string{"txt2img"}, Sweep: "KSampler.cfg=5|6",
 	}
 	e := s.Estimate(&Manifest{Models: []ManifestModel{flux}}, nil)
-	if len(e.Warnings) == 0 || !strings.Contains(strings.Join(e.Warnings, " "), "vlastní šabloně") {
-		t.Fatalf("sweep přes model bez KSampleru musí varovat, dostal jsem %v", e.Warnings)
+	if !strings.Contains(strings.Join(e.Warnings, " "), "zapečený") {
+		t.Fatalf("sweep KSampleru přes flux-manga musí varovat, že přepíše zapečený sampler, dostal jsem %v", e.Warnings)
+	}
+	if strings.Contains(strings.Join(e.Warnings, " "), "se přeskočí") {
+		t.Fatalf("flux-manga KSampler má, buňky se nepřeskočí — varování to nesmí tvrdit: %v", e.Warnings)
 	}
 	if e.Variants != 2 {
 		t.Fatalf("variants = %d, want 2", e.Variants)
+	}
+
+	// A flow parameter reaches flux-manga like any other model: nothing to warn.
+	for _, sweep := range []string{"param.seed=1|2", "?KSamplerAdvanced.cfg=1|2"} {
+		s.Sweep = sweep
+		e = s.Estimate(&Manifest{Models: []ManifestModel{flux}}, nil)
+		if strings.Contains(strings.Join(e.Warnings, " "), "zapečený") {
+			t.Fatalf("%s na flux-manga nesmí varovat o sampleru: %v", sweep, e.Warnings)
+		}
 	}
 }
 
@@ -1336,5 +1348,82 @@ func TestStartRunResolvesThePoseTheBrowserOnlyNamesByID(t *testing.T) {
 	}
 	if len(s.runs) != before {
 		t.Fatal("neznámá šablona založila běh")
+	}
+}
+
+func TestIdentityScoresCellsOnceAndExplainsWhenItCannot(t *testing.T) {
+	// ArcFace runs out of process; a fake interpreter stands in for it and
+	// counts how often it is called, so the cache is what gets tested.
+	dir := t.TempDir()
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(os.MkdirAll(filepath.Join(dir, "wf"), 0o755))
+	must(os.MkdirAll(filepath.Join(dir, "img"), 0o755))
+	man := &Manifest{Cells: []ManifestCell{
+		{ID: "repose__m____baseline", Flow: "repose", Model: "m", Style: "__baseline"},
+		{ID: "repose__m__ukiyoe", Flow: "repose", Model: "m", Style: "ukiyoe"},
+	}}
+	for _, c := range man.Cells {
+		must(os.WriteFile(filepath.Join(dir, "img", c.ID+".png"), Placeholder(64, 96, c.ID), 0o644))
+	}
+	ref := filepath.Join(dir, "ref.png")
+	must(os.WriteFile(ref, Placeholder(64, 96, "ref"), 0o644))
+	calls := filepath.Join(dir, "calls")
+	fake := filepath.Join(dir, "fakepython")
+	must(os.WriteFile(fake, []byte(`#!/bin/sh
+cat > /dev/null
+echo x >> `+calls+`
+echo '{"cells":{"repose__m____baseline":{"identity":0.71,"faces":1,"face":212},"repose__m__ukiyoe":{"identity":null,"faces":0}}}'
+`), 0o755))
+	t.Setenv("LAB_ARCFACE_PYTHON", fake)
+
+	env := &Env{RepoRoot: dir}
+	read := func() Metrics {
+		t.Helper()
+		data, err := os.ReadFile(filepath.Join(dir, "metrics.json"))
+		must(err)
+		var m Metrics
+		must(json.Unmarshal(data, &m))
+		return m
+	}
+	run := &Run{Dir: dir, env: env, man: man, Spec: &Spec{RefFile: ref}}
+	run.computeMetrics()
+	m := read()
+	base, styled := m.Cells["repose__m____baseline"], m.Cells["repose__m__ukiyoe"]
+	if base.Identity == nil || *base.Identity != 0.71 || base.Faces == nil || *base.Faces != 1 || base.FacePx != 212 {
+		t.Fatalf("baseline = %+v, want identity 0.71, 1 tvář, 212 px", base)
+	}
+	if styled.Identity != nil || styled.Faces == nil || *styled.Faces != 0 {
+		t.Fatalf("buňka bez tváře = %+v, want identity nil a 0 tváří", styled)
+	}
+	if !strings.Contains(m.IdentityNote, "ArcFace") {
+		t.Fatalf("poznámka = %q, má vysvětlit stupnici", m.IdentityNote)
+	}
+
+	run.computeMetrics()
+	if n, _ := os.ReadFile(calls); strings.Count(string(n), "x") != 1 {
+		t.Fatalf("arcface volán %d×, nezměněné buňky se mají brát z identity.json", strings.Count(string(n), "x"))
+	}
+	if read().Cells["repose__m____baseline"].Identity == nil {
+		t.Fatal("skóre z cache se do metrik nepropsalo")
+	}
+
+	// Without the setup, and for a dry run, the run still gets its metrics —
+	// only with a note saying why the face numbers are missing.
+	must(os.Remove(filepath.Join(dir, "identity.json")))
+	t.Setenv("LAB_ARCFACE_PYTHON", filepath.Join(dir, "chybi"))
+	run.computeMetrics()
+	m = read()
+	if m.Cells["repose__m____baseline"].Faces != nil || !strings.Contains(m.IdentityNote, "make lab-arcface") {
+		t.Fatalf("bez ArcFace: cell=%+v note=%q", m.Cells["repose__m____baseline"], m.IdentityNote)
+	}
+	run.Spec.Dry = true
+	run.computeMetrics()
+	if note := read().IdentityNote; !strings.Contains(note, "nanečisto") {
+		t.Fatalf("nanečisto: note=%q", note)
 	}
 }

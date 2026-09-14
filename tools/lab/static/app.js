@@ -597,6 +597,7 @@ function renderInner() {
       run.dry ? ' · nanečisto (placeholdery)' : ''}</p>
      ${actions ? `<p style="margin:6px 0 10px">${actions}</p>` : ''}
      ${skipped}
+     ${state.metrics?.identityNote ? `<p class="hint">${esc(state.metrics.identityNote)}</p>` : ''}
      <div class="ordering">
        <span class="grouplabel" style="margin:0">řádky</span>
        <button class="chip" data-order="style" aria-pressed="${byStyle}">styl → prompty pod sebou</button>
@@ -646,12 +647,24 @@ function cellHTML(c) {
   const src = st.status === 'done' ? `/media/${state.runId}/thumb/${encodeURIComponent(c.id)}.jpg` : '';
   const variant = c.variant ? `<span class="vlabel">${esc(c.variant.value)}</span>` : '';
   const badge = c.presetOverridden ? '<span class="badge" title="preset přebit">≠</span>' : '';
+  const face = identityChip((state.metrics?.cells || {})[c.id]);
   // The style text the model actually got: anime models get tags, FLUX a
   // sentence, so two cells of one style row can differ for a visible reason.
   const tip = st.error || (c.styleText ? `${c.id}\n\n${c.styleText}` : c.id);
   return `<button class="cell" data-cell="${esc(c.id)}" data-status="${st.status}"
       title="${esc(tip)}">
-      ${src ? `<img loading="lazy" src="${src}" alt="">` : ''}${variant}${badge}</button>`;
+      ${src ? `<img loading="lazy" src="${src}" alt="">` : ''}${variant}${badge}${face}</button>`;
+}
+
+// ArcFace similarity to the reference, on the scale facebench uses: ≥ 0.6 is
+// still the same person, below 0.4 someone else. No face is its own state —
+// a style that paints the face away is not a low score.
+function identityChip(m) {
+  if (!m || m.faces == null) return '';
+  if (m.identity == null) return '<span class="idchip none" title="tvář nenalezena">bez tváře</span>';
+  const band = m.identity >= 0.6 ? 'hi' : m.identity >= 0.4 ? 'mid' : 'lo';
+  const small = m.facePx && m.facePx < 40 ? ' · tvář menší než 40 px' : '';
+  return `<span class="idchip ${band}" title="tvář k referenci (ArcFace)${small}">${m.identity.toFixed(2)}</span>`;
 }
 
 function styleRowLabel(styleId) {
@@ -689,6 +702,8 @@ async function openCell(id) {
   const metrics = [
     m.reaction != null ? metric(m.reaction.toFixed(3), 'reakce na styl') : '',
     m.neighbourDelta != null ? metric(m.neighbourDelta.toFixed(3), 'změna proti předchozí hodnotě') : '',
+    m.faces != null ? metric(m.identity != null ? m.identity.toFixed(3) : '—',
+      m.identity != null ? `tvář k referenci (${m.faces} ${m.faces === 1 ? 'tvář' : 'tváře'}, ${m.facePx} px)` : 'tvář nenalezena') : '',
     g ? metric(g.spread.toFixed(3), `rozptyl stylů (${g.n})`) : '',
   ].filter(Boolean).join('');
 
@@ -699,6 +714,7 @@ async function openCell(id) {
     ${st.error ? `<p class="danger">${esc(st.error)}</p>` : ''}
     ${metrics ? `<div class="metricrow">${metrics}</div>
       <p class="hint">${esc(state.config.copy.metrics.text)}</p>` : ''}
+    ${m.faces != null && state.metrics?.identityNote ? `<p class="hint">${esc(state.metrics.identityNote)}</p>` : ''}
     ${c.presetOverridden ? `<p class="hint warnline">${esc(state.config.copy.preset_overridden.text)}</p>` : ''}
     <dl class="kv">
       <dt>prompt</dt><dd>${esc(c.prompt || '—')}</dd>

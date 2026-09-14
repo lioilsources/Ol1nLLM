@@ -403,6 +403,7 @@ func (r *Run) computeMetrics() {
 		return
 	}
 	hist := map[string][]float64{}
+	images := map[string]string{}
 	for _, c := range man.Cells {
 		data, err := os.ReadFile(r.imgPath(c.ID))
 		if err != nil {
@@ -413,8 +414,17 @@ func (r *Run) computeMetrics() {
 			continue
 		}
 		hist[c.ID] = h
+		images[c.ID] = r.imgPath(c.ID)
 	}
 	m := ComputeMetrics(man.Cells, hist)
+	faces, note := r.scoreIdentity(images)
+	m.IdentityNote = note
+	for id, f := range faces {
+		cm := m.Cells[id]
+		n := f.Faces
+		cm.Identity, cm.Faces, cm.FacePx = f.Identity, &n, f.Face
+		m.Cells[id] = cm
+	}
 	data, _ := json.MarshalIndent(m, "", " ")
 	_ = os.WriteFile(filepath.Join(r.Dir, "metrics.json"), data, 0o644)
 }

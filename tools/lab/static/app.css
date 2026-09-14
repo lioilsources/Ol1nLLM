@@ -189,6 +189,14 @@ button.cell .vlabel {
   position: absolute; left: 0; right: 0; bottom: 0; font-size: 9.5px;
   background: rgba(10,9,8,.78); color: var(--muted); padding: 1px 3px;
 }
+button.cell .idchip {
+  position: absolute; top: 2px; left: 2px; font: 9.5px/1.3 var(--mono); padding: 0 3px;
+  border-radius: 2px; background: rgba(10,9,8,.82); font-variant-numeric: tabular-nums;
+}
+button.cell .idchip.hi { color: var(--ok); }
+button.cell .idchip.mid { color: var(--warn); }
+button.cell .idchip.lo { color: var(--bad); }
+button.cell .idchip.none { color: var(--muted); }
 button.cell .badge {
   position: absolute; top: 2px; right: 2px; font-size: 9px; padding: 0 3px;
   border-radius: 2px; background: rgba(10,9,8,.8); color: var(--warn);

@@ -193,9 +193,13 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 		if !picked[m.ID] {
 			continue
 		}
-		if m.CkptName == nil && (s.Sweep != "" || len(s.Overrides) > 0) {
+		// A dedicated template (flux-manga) keeps its sampler baked in and
+		// _prepare never patches it — but the KSampler node is there, so a
+		// KSampler sweep does not skip these cells, it overwrites values the
+		// template was built around (FLUX is distilled for cfg 1).
+		if m.CkptName == nil && overridesTouchSampler(s.Overrides, s.Sweep) {
 			e.Warnings = append(e.Warnings, fmt.Sprintf(
-				"%s jede na vlastní šabloně (bez KSampleru) — sweep na něj nesedne a buňky se přeskočí",
+				"%s má sampler zapečený v šabloně (cfg 1.0) — sweep KSampleru ho přepíše, buňky se nepřeskočí",
 				m.Label))
 		}
 	}
@@ -382,6 +386,24 @@ func (s *Spec) resolvePose(env *Env) error {
 	}
 	s.PoseName = name
 	return nil
+}
+
+// overridesTouchSampler reports whether any override or the sweep aims at the
+// KSampler class — the one target a dedicated template has but never gets
+// patched from a preset.
+func overridesTouchSampler(overrides []string, sweep string) bool {
+	all := append([]string{}, overrides...)
+	if sweep != "" {
+		all = append(all, sweep)
+	}
+	for _, o := range all {
+		target, _, _ := strings.Cut(o, "=")
+		scope, _, _ := strings.Cut(strings.TrimPrefix(strings.TrimSpace(target), "?"), ".")
+		if scope == "KSampler" {
+			return true
+		}
+	}
+	return false
 }
 
 func overridesTouchLatent(overrides []string, sweep string) bool {

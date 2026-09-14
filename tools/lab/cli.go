@@ -218,7 +218,13 @@ func scoreCLI(env *Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	run := &Run{Dir: dir, env: env, man: man}
+	// The reference path lives in spec.json; without it there is no face to
+	// compare against and identity stays out of the output.
+	spec := &Spec{}
+	if sd, err := os.ReadFile(filepath.Join(dir, "spec.json")); err == nil {
+		_ = json.Unmarshal(sd, spec)
+	}
+	run := &Run{Dir: dir, env: env, man: man, Spec: spec}
 	run.computeMetrics()
 	data, err := os.ReadFile(filepath.Join(dir, "metrics.json"))
 	if err != nil {
@@ -233,7 +239,61 @@ func scoreCLI(env *Env, args []string) error {
 		fmt.Printf("%-42s %8.3f %5d\n", k, g.Spread, g.N)
 	}
 	fmt.Println("\n" + m.Note)
+	printIdentity(man, m)
 	return nil
+}
+
+// printIdentity sums the face numbers per model and sweep value — the shape
+// a face sweep is read in: does identity climb with the knob, and where does
+// a model stop finding a face at all.
+func printIdentity(man *Manifest, m Metrics) {
+	type row struct {
+		sum, min float64
+		n, none  int
+	}
+	rows := map[string]*row{}
+	var order []string
+	for _, c := range man.Cells {
+		cm, ok := m.Cells[c.ID]
+		if !ok || cm.Faces == nil {
+			continue
+		}
+		k := c.Flow + "|" + c.Model
+		if c.Variant != nil {
+			k += "|" + c.Variant.Label + "=" + c.Variant.Value
+		}
+		r := rows[k]
+		if r == nil {
+			r = &row{min: 2}
+			rows[k] = r
+			order = append(order, k)
+		}
+		if cm.Identity == nil {
+			r.none++
+			continue
+		}
+		r.sum += *cm.Identity
+		r.n++
+		if *cm.Identity < r.min {
+			r.min = *cm.Identity
+		}
+	}
+	if len(rows) == 0 {
+		if m.IdentityNote != "" {
+			fmt.Println("\n" + m.IdentityNote)
+		}
+		return
+	}
+	fmt.Printf("\n%-52s %6s %6s %4s %9s\n", "tvář (flow|model|sweep)", "průměr", "min", "n", "bez tváře")
+	for _, k := range order {
+		r := rows[k]
+		if r.n == 0 {
+			fmt.Printf("%-52s %6s %6s %4d %9d\n", k, "—", "—", 0, r.none)
+			continue
+		}
+		fmt.Printf("%-52s %6.3f %6.3f %4d %9d\n", k, r.sum/float64(r.n), r.min, r.n, r.none)
+	}
+	fmt.Println("\n" + m.IdentityNote)
 }
 
 func splitCSV(s string) []string {

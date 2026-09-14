@@ -108,8 +108,9 @@ jeho buňky přeskočí s důvodem. Buňka = model s `inpaint` × účes × vari
 styly ani prompty se nenásobí (`--subject` je jen formalita CLI). Graf staví
 `ComfyUIService.prepareHairInpaint`, tedy totéž, co pošle appka.
 
-Hodnocení účesů (ArcFace k předloze, délka, ofina, CLIP rozpoznání) lab
-nepočítá — dělá ho `MangaPrompts/tgbot/tools/bench/score.py` na SPARKu,
+Z hodnocení účesů lab spočítá jen identitu (metrika *tvář*, stejná stupnice
+jako bench); délku, ofinu a CLIP rozpoznání dělá
+`MangaPrompts/tgbot/tools/bench/score.py` na SPARKu,
 výsledky jsou v `MangaPrompts/docs/hair-matrix.md`. Webové UI flow `hair`
 nenabízí, jen terminál.
 
@@ -141,7 +142,9 @@ sampler zapečený (cfg 1.0, euler/simple, 20 kroků txt2img, 28 img2img) a
 `_prepare` ho nepatchuje, protože `ckptName == null`. Sweep `KSampler.cfg`
 nebo `.steps` ho ale **zasáhne** — ověřeno nanečisto, uzel `18`, 0 přeskočených
 buněk. FLUX je distilovaný na cfg 1: vyšší hodnota zdvojí čas a obraz zhorší.
-(Varování v odhadu běhu, že se buňky „bez KSampleru přeskočí“, je nepravdivé.)
+Odhad běhu na to varuje jen u sweepu nebo overridu `KSampler.*` („sampler
+zapečený v šabloně … přepíše“); jiné cíle (seed, LoRA) flux-manga dostane jako
+každý jiný model.
 
 ### Modely: architektura a jazyk promptu jsou dvě osy
 
@@ -302,6 +305,35 @@ podle nich filtrovat, dokud ten model někdo do galerie nepřidá.
 
 Všechny tři měří **barvu, ne převzetí stylu**. Slouží k předvýběru; rozhodnout
 musí pohled na obrázky. Kalibrace z reálného měření je v `docs/style-matrix.md`.
+
+- **tvář** — ArcFace podobnost největší tváře v buňce k referenci běhu
+  (`tools/lab/arcface.py`): 1.0 táž tvář, ~0.6 pořád táž osoba, pod 0.4 jiný
+  člověk. Na dlaždici vlevo nahoře (zelená ≥ 0.6, žlutá 0.4–0.6, červená pod
+  0.4, „bez tváře“, když detektor nic nenašel), v detailu buňky i s počtem tváří
+  a výškou v px, a v `lab score` průměr a minimum po modelech a hodnotách sweepu.
+
+Stejné modely (insightface **antelopev2**), detekce 640×640 a výběr největší
+tváře jako `tools/facebench` a bench Kadeřníka, takže čísla sedí na jejich
+stupnici: šest buněk benche na Macu vyšlo do 0.006 od hodnot ze SPARKu
+(insightface 2.0 vs. 1.0.1 na výsledku nic nemění).
+
+Jak číslo nečíst:
+
+- **Mezi modely ne.** ArcFace je naučený na fotkách; u anime modelů vychází
+  blízko nuly (běh `20260911-060721`: juggernaut-xl s InstantID 0.68, flux-manga
+  0.32, noobai-xl 0.06) a nízké číslo tam neodliší jiného člověka od nakreslené
+  tváře. Porovnávej hodnoty sweepu **v rámci jednoho modelu**.
+- **Pod ~40 px výšky tváře** (celá postava v txt2img) je číslo šum.
+- Počítá se jen v běhu s referencí (repose, img2img, depth), ne nanečisto.
+
+Nastavení jednou: `make lab-arcface` — venv v `tools/lab/.venv` (insightface,
+onnxruntime, OpenCV; první instalace chvíli sestavuje balíčky) a modely
+zkopírované ze SPARKu do `~/.insightface/models/antelopev2` (437 MB). Jiné
+cesty přes `LAB_ARCFACE_PYTHON` a `LAB_INSIGHTFACE_ROOT`. Bez nastavení běh
+doběhne normálně a místo čísel ukáže, co chybí. Jede na CPU, ~0.4 s na buňku;
+výsledky se ukládají do `identity.json` v adresáři běhu podle velikosti a času
+obrázku, takže `lab score` nad hotovým během nic nepřepočítává a navázaný běh
+spočítá jen nové buňky. Starší běh dostane čísla přes `lab score <adresář>`.
 
 ## Poznámky k prostředí
 
