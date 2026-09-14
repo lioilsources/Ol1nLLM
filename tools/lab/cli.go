@@ -140,22 +140,78 @@ func runCLI(env *Env, args []string) error {
 // generates only the cells that have no image yet. It keeps the workflows the
 // run was dumped with, so it finishes the matrix it started, and it skips the
 // dump, which is the one heavy step.
-func resumeCLI(env *Env, args []string) error {
-	if len(args) < 1 {
-		return fmt.Errorf("lab resume <adresář běhu>")
+// resolveRunDir turns what a person types into a run directory: nothing or
+// "last" is the newest run, a bare id like 20260914-200437 lives under
+// build/lab, anything else is a path. Typing the id is the common case —
+// it is what the UI and the terminal output show.
+func resolveRunDir(env *Env, arg string) (string, error) {
+	base := filepath.Join(env.RepoRoot, "build", "lab")
+	if arg == "" || arg == "last" {
+		entries, err := os.ReadDir(base)
+		if err != nil {
+			return "", fmt.Errorf("žádné běhy v %s", base)
+		}
+		// Run ids are timestamps, so the lexically last one is the newest.
+		for i := len(entries) - 1; i >= 0; i-- {
+			e := entries[i]
+			if !e.IsDir() || strings.HasPrefix(e.Name(), "_") {
+				continue
+			}
+			if _, err := os.Stat(filepath.Join(base, e.Name(), "state.json")); err == nil {
+				return filepath.Join(base, e.Name()), nil
+			}
+		}
+		return "", fmt.Errorf("žádné běhy v %s", base)
 	}
-	run, err := loadRunDir(env, args[0])
+	if st, err := os.Stat(arg); err == nil && st.IsDir() {
+		return arg, nil
+	}
+	if !strings.ContainsRune(arg, os.PathSeparator) {
+		if st, err := os.Stat(filepath.Join(base, arg)); err == nil && st.IsDir() {
+			return filepath.Join(base, arg), nil
+		}
+	}
+	return "", fmt.Errorf("běh %q nenalezen (ani jako cesta, ani v %s)", arg, base)
+}
+
+// resumeCLI generates every cell without an image — interrupted cells and
+// failed ones alike, since state comes from the images on disk.
+func resumeCLI(env *Env, args []string) error {
+	arg := ""
+	if len(args) > 0 {
+		arg = args[0]
+	}
+	dir, err := resolveRunDir(env, arg)
 	if err != nil {
 		return err
 	}
+	run, err := loadRunDir(env, dir)
+	if err != nil {
+		return err
+	}
+	st := run.State()
+	fmt.Printf("▸ %s: %d z %d buněk má obrázek, doplním zbytek\n",
+		filepath.Base(dir), countImages(run), st.Total)
 	if !run.Spec.Dry && !env.Comfy.HasCreds() {
 		return fmt.Errorf("chybí CF Access creds v .env.local")
 	}
 	stop := followInTerminal(run)
 	defer stop()
 	run.Resume()
-	fmt.Println("▸ hotovo:", args[0])
+	fmt.Println("▸ hotovo:", dir)
 	return nil
+}
+
+func countImages(run *Run) int {
+	n := 0
+	if man := run.Manifest(); man != nil {
+		for _, c := range man.Cells {
+			if _, err := os.Stat(run.imgPath(c.ID)); err == nil {
+				n++
+			}
+		}
+	}
+	return n
 }
 
 // followInTerminal prints a run's state changes: the CLI has no SSE, so it
@@ -210,10 +266,14 @@ func generateReference(env *Env, dir, prompt string, seed int) (string, error) {
 }
 
 func scoreCLI(env *Env, args []string) error {
-	if len(args) < 1 {
-		return fmt.Errorf("lab score <adresář běhu>")
+	arg := ""
+	if len(args) > 0 {
+		arg = args[0]
 	}
-	dir := args[0]
+	dir, err := resolveRunDir(env, arg)
+	if err != nil {
+		return err
+	}
 	man, err := ReadManifest(filepath.Join(dir, "wf", "manifest.json"))
 	if err != nil {
 		return err

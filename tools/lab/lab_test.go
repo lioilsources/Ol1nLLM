@@ -1427,3 +1427,37 @@ echo '{"cells":{"repose__m____baseline":{"identity":0.71,"faces":1,"face":212},"
 		t.Fatalf("nanečisto: note=%q", note)
 	}
 }
+
+func TestResolveRunDirTakesIdPathOrNewest(t *testing.T) {
+	root := t.TempDir()
+	base := filepath.Join(root, "build", "lab")
+	for _, id := range []string{"20260913-100000", "20260914-200437", "_refs"} {
+		if err := os.MkdirAll(filepath.Join(base, id), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if id != "_refs" {
+			if err := os.WriteFile(filepath.Join(base, id, "state.json"), []byte("{}"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	// A newer directory without state.json is a run still being planned, not "last".
+	if err := os.MkdirAll(filepath.Join(base, "20260915-000000"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env := &Env{RepoRoot: root}
+	for arg, want := range map[string]string{
+		"":                                     "20260914-200437",
+		"last":                                 "20260914-200437",
+		"20260913-100000":                      "20260913-100000",
+		filepath.Join(base, "20260913-100000"): "20260913-100000",
+	} {
+		got, err := resolveRunDir(env, arg)
+		if err != nil || filepath.Base(got) != want {
+			t.Fatalf("resolveRunDir(%q) = %q, %v; want …/%s", arg, got, err, want)
+		}
+	}
+	if _, err := resolveRunDir(env, "20990101-000000"); err == nil {
+		t.Fatal("neexistující běh musí být chyba")
+	}
+}

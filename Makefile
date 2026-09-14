@@ -1,4 +1,4 @@
-.PHONY: run debug build-ios build-android lab lab-dry lab-check lab-arcface
+.PHONY: run debug build-ios build-android lab lab-dry lab-check lab-arcface lab-resume lab-score
 
 -include .env.local
 
@@ -36,6 +36,16 @@ lab-dry:
 
 lab-check:
 	cd tools/lab && go run . check
+
+# Fill in every cell of a run that has no image — interrupted and failed alike
+# (a ComfyUI restart mid-run fails cells in seconds). RUN is a run id from
+# build/lab, a path, or empty for the newest run:
+#   make lab-resume                  make lab-resume RUN=20260914-200437
+lab-resume:
+	cd tools/lab && go run . resume $(RUN)
+
+lab-score:
+	cd tools/lab && go run . score $(RUN)
 
 # ArcFace metric for the lab (tools/lab/arcface.py): a local venv with
 # insightface on CPU and the antelopev2 models copied from SPARK, the same

@@ -114,8 +114,8 @@ func usage() {
   lab serve [--port 8765] [--open] [--force-dry]   webové UI
   lab check                                        ověří flutter, CF Access a ComfyUI
   lab run --out DIR [přepínače]                    dávka z terminálu
-  lab resume DIR                                   dopočítat přerušený běh (bez dumpu)
-  lab score DIR                                    přepočítat metriky
+  lab resume [ID|DIR|last]                         doplnit buňky bez obrázku — přerušené i selhané
+  lab score [ID|DIR|last]                          přepočítat metriky (bez argumentu poslední běh)
   lab hairmasks --ref portrét.png                  masky Kadeřníka pro flow hair
   lab export DIR                                   odeslat běh do FINETUNE gallery
 

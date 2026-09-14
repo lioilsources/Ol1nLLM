@@ -657,7 +657,10 @@ by mohl být duplicitní; id, které není nikde, shodí dump před GPU. Text st
 se volí **per buňka** podle `promptDialect` modelu a manifest ho nese jako
 `styleText` (plus `params.styleDialect`); osa `param.styleDialect=natural|booru`
 dialekt přebije. Přerušený běh z terminálu dokončí `lab resume DIR` — totéž
-co *Pokračovat* v UI, bez nového dumpu.
+co *Pokračovat* v UI, bez nového dumpu. Doplní každou buňku bez obrázku, tedy
+i selhané (restart ComfyUI uprostřed běhu odepíše zbytek fronty na HTTP 502
+během vteřin); z kořene repa `make lab-resume [RUN=<id>]`, bez RUN poslední
+běh. UI u doběhlého běhu s chybami nabízí *Doplnit selhané*.
 
 **Proč anime modely styl nepřevezmou** — dvě laboratorní osy a jeden soubor:
 `param.stylePosition=end|front|first` (appka posílá `end` = prefix, námět,

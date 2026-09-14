@@ -52,7 +52,23 @@ lab export build/lab/20260826-0023 --send   # do FINETUNE gallery
 
 `lab resume` je totéž co tlačítko *Pokračovat* v UI: generuje jen buňky bez
 obrázku a drží workflow, se kterými běh začal — znovu nedumpuje, takže
-navázání po zabitém terminálu stojí jen to, co opravdu chybí.
+navázání po zabitém terminálu stojí jen to, co opravdu chybí. Stav se bere
+z obrázků na disku, takže doplní i **selhané** buňky: restart ComfyUI uprostřed
+běhu odepíše zbytek fronty během vteřin (HTTP 502) a běh skončí jako „hotovo“
+s chybami — UI pak nabídne *Doplnit selhané*.
+
+`lab` není nainstalovaný příkaz; z kořene repa jde přes make, jinak
+`cd tools/lab && go run . <příkaz>`. `resume` a `score` berou id běhu,
+cestu, nebo nic (= poslední běh):
+
+```bash
+make lab-resume                          # poslední běh
+make lab-resume RUN=20260914-200437      # konkrétní běh podle id
+make lab-score RUN=20260914-200437
+```
+
+Neposílej `resume` na běh, který ještě jede v jiném terminálu nebo v UI — buňky
+by se renderovaly dvakrát.
 
 ## Kandidáti stylů
 

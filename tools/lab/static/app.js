@@ -579,14 +579,19 @@ function renderInner() {
 
   // A run that was interrupted (server restart, cancel, a failed cell) can be
   // picked up: only the cells without an image are generated again.
-  const resumable = ['interrupted', 'cancelled', 'failed', 'stalled', 'dumped'].includes(run.status);
+  // A finished run with failed cells (a ComfyUI restart fails the rest of the
+  // queue in seconds) is just as resumable: resume fills every cell without an
+  // image, failed ones included.
+  const resumable = ['interrupted', 'cancelled', 'failed', 'stalled', 'dumped'].includes(run.status)
+    || (run.status === 'done' && run.failed > 0);
   const missing = run.total - run.done;
   // Shown for any resumable run, not only when the counter says something is
   // missing: a run killed mid-flight leaves a stale count, and the truth comes
   // from the images on disk when it actually resumes.
   const actions = (resumable
     ? `<button id="resumebtn" class="chip" style="padding:6px 12px">
-         ${missing > 0 ? `Pokračovat — zbývá ${missing} buněk` : 'Pokračovat — dopočítat chybějící'}</button>`
+         ${run.status === 'done' && run.failed > 0 ? `Doplnit selhané — ${run.failed} buněk`
+           : missing > 0 ? `Pokračovat — zbývá ${missing} buněk` : 'Pokračovat — dopočítat chybějící'}</button>`
     : run.status === 'running'
       ? '<button id="cancelbtn" class="chip" style="padding:6px 12px">Zastavit</button>'
       : '') + exportHTML(run);
