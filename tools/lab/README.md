@@ -127,14 +127,66 @@ Jedna osa na běh. Cíl se míří **na uzel**, ne na jakýkoli vstup daného jm
 
 **Cíl bez jediné shody je chyba.** Sweep síly ControlNetu nad flow, kde žádný
 ControlNet není, je nesmyslný běh a má spadnout před GPU. Když cíl chybí jen
-u některých modelů (flux nemá `KSampler`), přeskočí se ty buňky a důvod je
-vidět v tabulce.
+u některých modelů (flux-manga mimo repose nemá `__cn_apply__`), přeskočí se
+ty buňky a důvod je vidět v tabulce.
 
 Rozdíl, na kterém záleží: `steps/cfg/sampler/scheduler/rozměry` **přebíjejí
 preset modelu** — sweep je nastaví všem stejně, takže rozbije kalibraci
 (juggernaut-lightning má 6 kroků schválně) a výsledek pak není verdikt
 o modelu; takové buňky mají v tabulce odznak. Naproti tomu
 `editDenoise/seed/latent/pose` jsou parametry flow a chovají se jako v appce.
+
+**`KSampler` má i flux-manga.** Jeho šablony (`flux_manga_*.api.json`) mají
+sampler zapečený (cfg 1.0, euler/simple, 20 kroků txt2img, 28 img2img) a
+`_prepare` ho nepatchuje, protože `ckptName == null`. Sweep `KSampler.cfg`
+nebo `.steps` ho ale **zasáhne** — ověřeno nanečisto, uzel `18`, 0 přeskočených
+buněk. FLUX je distilovaný na cfg 1: vyšší hodnota zdvojí čas a obraz zhorší.
+(Varování v odhadu běhu, že se buňky „bez KSampleru přeskočí“, je nepravdivé.)
+
+### Modely: architektura a jazyk promptu jsou dvě osy
+
+Lab nabízí jen ComfyUI modely (NIM flux-schnell / flux-kontext ne), prořezané
+podle checkpointů na serveru.
+
+| skupina | modely | jazyk promptu (`promptDialect`) |
+|---|---|---|
+| SDXL, fotoreal | `juggernaut-xl`, `juggernaut-xl-lightning` | věta (`natural`) |
+| SDXL, anime | `pony`, `atomix-pony-anime`, `illustrious-xl`, `noobai-xl`, `wai-illustrious`, `animagine-xl` | booru tagy |
+| FLUX | `flux-manga` (txt2img, img2img, repose), `flux-fill` (jen inpaint) | věta |
+| SD 1.5 | `sd15` (bez ControlNetu, bez pózy) | věta |
+
+**Architektura** (SDXL / FLUX / SD 1.5) rozhoduje, co se do grafu dá zapojit:
+LoRA (`loraFamily`, viz níž), ControlNety, metodu tváře. **Jazyk** rozhoduje,
+jak se píše prompt a který text stylu se pošle. Všechny booru modely jsou SDXL,
+ale ne každý SDXL je booru — Juggernaut čte věty a tagy mu nepomáhají. Obě osy
+se nekryjí ani u LoRA: `animagine-xl` má LoRA rodinu `sdxl` jako Juggernaut,
+a přitom čte tagy.
+
+### Nabídka „sweep — jedna osa“ v UI
+
+| volba | cíl | výchozí hodnota | koho zasáhne |
+|---|---|---|---|
+| síla ControlNetu | `__cn_apply__.strength` | šablona pózy 1.0, auto hloubka 0.7, repose 0.75, repose flux 0.55 (odhad) | SDXL se šablonou pózy, SDXL img2img bez šablony (auto hloubka), repose a `POSE_MODE=depth`; flux-manga jen v repose. `sd15` nikdy |
+| konec ControlNetu | `__cn_apply__.end_percent` | 1.0, repose 0.9 | jako řádek výš |
+| síla úpravy | `param.editDenoise` | preset `img2imgDenoise` (~0.72) | jen **img2img** u generické šablony (SDXL + `sd15`). Šablona pózy ji přebije (0.9), inpaint jede na 1.0, flux-manga má denoise zapečený. V txt2img a repose se builderu vůbec nepředá — buňky vzniknou, ale jsou totožné |
+| cfg ⚠ | `KSampler.cfg` | preset (SDXL 5–6.5, Lightning 2.0, flux 1.0) | **všechny** modely včetně flux-manga (viz výš) |
+| kroky ⚠ | `KSampler.steps` | preset (SDXL 28–30, Lightning 6, flux 20/28) | všechny |
+| seed | `param.seed` | 777 | všechny; na odhad, jestli je rozdíl styl, nebo šum |
+| LoRA | `param.lora` | — (`none` = bez LoRA) | kombinace z jiné architektury (`loraFit` incompatible) se přeskočí už v plánu |
+| síla LoRA | `param.loraStrength` | `kDefaultLoraStrength` 0.9, rozsah −1…2 | jen s vybranou LoRA |
+| síla tváře — embedding | `__face_apply__.ip_weight` | 0.6 (odhad, ne měření) | **jen SDXL**, metoda `instantid`/`both`, a jen kde je odkud číst tvář (níž) |
+| síla tváře — klíčové body | `__face_apply__.cn_strength` | 0.8 | jako řádek výš |
+| síla tváře (PuLID) | `__face_apply__.weight` | 0.9 | **jen flux-manga** se zapnutou tváří v repose |
+| metoda tváře | `param.faceIdentity` | `none` | SDXL: tři různé mechanismy; flux: každá hodnota je PuLID (manifest píše, co doopravdy běželo) |
+| text stylu | `param.styleDialect` | jazyk modelu | jen s vybraným stylem; rozdíl dává jen styl s `booru` textem (umělci), kulturní styly posílají obě hodnoty stejně |
+| síla dotažení tváře | `__face_detail__.denoise` | 0.4 | jen se zapnutou identitou **a** dotažením; SDXL i flux |
+
+„Odkud číst tvář“ = uzel `__depth_src__`: repose, `POSE_MODE=depth`, nebo SDXL
+img2img bez šablony pózy (auto hloubka). Šablona kostry fotka není — tvářové
+cíle tam nemají uzel a buňky se přeskočí. Síla FaceID
+(`__faceid_apply__.weight`, 0.8) v nabídce není; z terminálu jde
+`--sweep '__faceid_apply__.weight=0.6|0.8|1.0'`, stejně jako tvary `#id.vstup`
+a `?cíl`.
 
 ## LoRA a trigger words
 

@@ -626,9 +626,13 @@ styl reaguje" od „tohle maluje pokaždé". Generování je resumovatelné.
 Sweep míří **na uzel** (`__cn_apply__.strength`, `KSampler.cfg`, `#5.steps`,
 `param.editDenoise`), ne na jakýkoli vstup daného jména; cíl bez shody je
 chyba, aby nesmyslný běh spadl před GPU, a chybí-li jen u některých modelů
-(flux nemá `KSampler`), přeskočí se ty buňky s uvedeným důvodem. Čistá logika
-sweepů a overridů je v `tools/lab/dump_spec.dart` a testuje ji
-`test/dump_spec_test.dart`.
+(flux-manga mimo repose nemá `__cn_apply__`), přeskočí se ty buňky s uvedeným
+důvodem. **`KSampler` ale flux-manga má** (zapečené cfg 1.0) — sweep
+`KSampler.cfg/steps` ho zasáhne, nepřeskočí. `param.editDenoise` dostane jen
+img2img; v txt2img a repose vzniknou totožné buňky. Co která volba sweepu
+zasáhne (architektura × jazyk promptu × flow) je tabulka v
+`tools/lab/README.md` („Nabídka sweep“). Čistá logika sweepů a overridů je
+v `tools/lab/dump_spec.dart` a testuje ji `test/dump_spec_test.dart`.
 
 Metriky (reakce vůči baseline, rozptyl stylů, změna proti předchozí hodnotě
 sweepu) měří **barvu, ne převzetí stylu** — jsou k předvýběru, rozhodnout musí
