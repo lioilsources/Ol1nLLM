@@ -551,6 +551,11 @@ Akce na dlaždici (nůžky, pravý horní roh vedle „Rozhýbat“/„Zachovej 
    tj. `prepareHairInpaint`: tentýž inpaint graf modelu, ale
    `mask_fill_holes: false` (obličej je v masce díra a vyplnění ho přemalovalo —
    Tsumiki bench kolo 0b, identita 0.11) a kontext 1.5.
+   FLUX presety jedou `flux_hair_kontext.api.json` (Kontext + složení přes
+   masku). Kontext výstup posune/zmenší až o 6 % — bez zarovnání byl přes čelo
+   pruh starých vlasů a u krku dvojitý límec. Graf proto volá node
+   `TsumikiAlignToReference` (MangaPrompts `comfyui_nodes/ComfyUI-Tsumiki`,
+   nasazuje `comfyui_nodes/deploy.sh`); ComfyUI bez něj graf odmítne.
 
 **Barva vlasů**: list má nahoře řadu barev (`kHairColours`, `HairColourPreset`
 s frází do promptu, zrcadlo MangaPrompts `tgbot/haircolours.py`). Barva jde

@@ -460,6 +460,15 @@ String hairColourName(double l, double a, double b) {
   if (l < 22 && chroma < 10) return 'black';
   if (chroma < 8 && l > 75) return 'white';
   if (chroma < 8 && l > 38) return 'grey';
+  // Dyed colours sit outside natural hair's 30–90° hue: read as auburn, a
+  // pink or purple head asked for a new cut came back auburn.
+  if (chroma >= 15) {
+    final hue = (math.atan2(b, a) * 180 / math.pi) % 360;
+    if (hue >= 160 && hue < 245) return 'teal';
+    if (hue >= 245 && hue < 295) return l < 22 ? 'blue-black' : 'blue';
+    if (hue >= 295 && hue < 335) return 'purple';
+    if ((hue >= 335 || hue < 25) && l >= 40 && a > 20) return 'pink';
+  }
   if (a > 16) return 'auburn';
   if (l < 22) return 'dark brown';
   if (l < 33) return 'brown';

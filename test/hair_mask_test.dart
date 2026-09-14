@@ -297,6 +297,12 @@ void main() {
       (150, 148, 146): 'grey',
       (235, 235, 235): 'white',
       (170, 80, 40): 'auburn',
+      (120, 40, 35): 'auburn',
+      (255, 120, 180): 'pink',
+      (150, 90, 200): 'purple',
+      (60, 120, 230): 'blue',
+      (20, 25, 60): 'blue-black',
+      (20, 140, 140): 'teal',
     };
     img.Image canvas(
       HairAnalysis a,

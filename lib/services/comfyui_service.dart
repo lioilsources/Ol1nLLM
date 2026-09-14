@@ -553,7 +553,10 @@ class ComfyUIService implements ImageBackend {
   /// repainted; inpaint-nodes encoder instead of VAEEncodeForInpaint, whose
   /// grey fill tinted hair olive). FLUX: `flux_hair_kontext.api.json`, a Kontext
   /// edit pasted back through the mask so the face and backdrop stay the
-  /// original pixels. Results: MangaPrompts/docs/hair-matrix.md. Not on
+  /// original pixels. Kontext re-frames the edit by up to 6 %, so the graph
+  /// first warps it back onto the photo with `TsumikiAlignToReference`
+  /// (MangaPrompts `comfyui_nodes/`, must be installed on the server).
+  /// Results: MangaPrompts/docs/hair-matrix.md. Not on
   /// [ImageBackend]: only ComfyUI can run it.
   Stream<GenEvent> hairInpaint({
     required Uint8List image,

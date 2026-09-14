@@ -256,7 +256,7 @@
         0
       ],
       "source": [
-        "14",
+        "20",
         0
       ],
       "x": 0,
@@ -279,6 +279,23 @@
         0
       ],
       "filename_prefix": "tsumiki_hair_kontext"
+    }
+  },
+  "20": {
+    "class_type": "TsumikiAlignToReference",
+    "inputs": {
+      "image": [
+        "14",
+        0
+      ],
+      "reference": [
+        "4",
+        0
+      ],
+      "mask": [
+        "16",
+        0
+      ]
     }
   }
 }
