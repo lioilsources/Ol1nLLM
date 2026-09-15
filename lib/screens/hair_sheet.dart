@@ -88,6 +88,11 @@ class _HairSheetState extends State<HairSheet> {
                               Padding(
                                 padding: const EdgeInsets.only(right: 6),
                                 child: ChoiceChip(
+                                  avatar: c?.swatch == null
+                                      ? null
+                                      : CircleAvatar(
+                                          backgroundColor: Color(c!.swatch!),
+                                        ),
                                   label: Text(c?.label ?? 'Barva beze změny'),
                                   selected: _colour == c?.id,
                                   onSelected: (_) =>
@@ -157,10 +162,7 @@ class _HairSheetState extends State<HairSheet> {
                       ),
                       for (final s in shown.where((s) => s.section == section))
                         ListTile(
-                          leading: const Icon(
-                            Icons.content_cut,
-                            color: AppTheme.accent,
-                          ),
+                          leading: _Preview(style: s),
                           title: Text(
                             s.label,
                             style: const TextStyle(color: AppTheme.textPrimary),
@@ -188,4 +190,30 @@ class _HairSheetState extends State<HairSheet> {
       ),
     );
   }
+}
+
+/// The bench's own output for the style, on the same synthetic face for every
+/// style — the sheet compares hair, nothing else. The scissors stay as the
+/// fallback for a catalog entry whose picture was not exported.
+class _Preview extends StatelessWidget {
+  const _Preview({required this.style});
+
+  final HairstylePreset style;
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(6),
+    child: SizedBox(
+      width: 48,
+      height: 60,
+      child: Image.asset(
+        style.preview,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const ColoredBox(
+          color: AppTheme.surfaceAlt,
+          child: Icon(Icons.content_cut, color: AppTheme.accent),
+        ),
+      ),
+    ),
+  );
 }

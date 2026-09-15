@@ -75,40 +75,48 @@ const kHairColours = <HairColourPreset>[
     id: 'copper-red',
     label: 'Měděná zrzavá',
     phrase: 'vibrant copper red, natural redhead',
+    swatch: 0xFF742C16,
   ),
   HairColourPreset(
     id: 'fox-red',
     label: 'Liščí zrzavá',
     phrase: 'bright fox red, vivid orange ginger',
+    swatch: 0xFFB03919,
   ),
   HairColourPreset(
     id: 'auburn',
     label: 'Kaštanově zrzavá',
     phrase: 'deep auburn',
+    swatch: 0xFF56261A,
   ),
   HairColourPreset(
     id: 'burgundy',
     label: 'Vínová',
     phrase: 'burgundy wine red',
+    swatch: 0xFF421115,
   ),
   HairColourPreset(
     id: 'honey-balayage',
     label: 'Hnědá s medovým balayage',
     phrase: 'brown hair with soft honey blonde balayage highlights toward the ends',
+    swatch: 0xFF61442F,
   ),
   HairColourPreset(
     id: 'jet-black',
     label: 'Uhlově černá',
     phrase: 'glossy jet black',
+    swatch: 0xFF111112,
   ),
   HairColourPreset(
     id: 'blue-black',
     label: 'Modročerná',
     phrase: 'blue-black with a cool blue sheen',
+    swatch: 0xFF132441,
   ),
   HairColourPreset(
     id: 'pastel-pink',
     label: 'Pastelově růžová',
     phrase: 'pastel pink',
+    swatch: 0xFFCD7988,
   ),
 ];

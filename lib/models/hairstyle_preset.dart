@@ -34,6 +34,11 @@ class HairstylePreset {
   /// English prompt fragment (name + look), shown as the subtitle.
   final String block;
   final HairShape shape;
+
+  /// Bundled preview: the bench's own output for this style on the group's
+  /// primary synthetic portrait (export_catalog.py --bench). Same face under
+  /// every style, so the sheet compares hair and nothing else.
+  String get preview => 'assets/hair/$id.jpg';
 }
 
 /// A hair colour (MangaPrompts `tgbot/haircolours.py`). The app writes its own
@@ -43,11 +48,16 @@ class HairColourPreset {
     required this.id,
     required this.label,
     required this.phrase,
+    this.swatch,
   });
 
   final String id;
   final String label;
   final String phrase;
+
+  /// ARGB of the colour the bench *measured* on the accepted cells — what the
+  /// model paints, not the target range. Null while unmeasured.
+  final int? swatch;
 }
 
 /// "Same haircut, new colour" (`haircolours.KEEP_CUT`).

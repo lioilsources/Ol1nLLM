@@ -576,7 +576,14 @@ padá stejně jako u inpaintu). Prompt = `hairPrompt()` z
 barvou. Katalog `kHairstyles` (`hairstyle_catalog.dart`) je **generovaný**
 (`MangaPrompts/tgbot/tools/bench/export_catalog.py --ol1nllm`) a obsahuje jen
 účesy, které prošly gate na obou enginech (`MangaPrompts/docs/hair-matrix.md`);
-s prázdným katalogem je akce skrytá. Lab: flow `hair` + `lab hairmasks`
+s prázdným katalogem je akce skrytá. Řádek účesu v `HairSheet` má **náhled**
+(`assets/hair/<id>.jpg`, `HairstylePreset.preview`): výstup benche pro ten
+účes na primárním syntetickém portrétu skupiny — na každém řádku tatáž tvář,
+takže oko srovnává jen vlasy; žádné stock fotky ani osobní data. Chip barvy
+nese **vzorek** (`HairColourPreset.swatch`): barvu, kterou bench na přijatých
+buňkách *naměřil*, ne cílový rozsah. Obojí generuje `export_catalog.py
+--bench/--colours-bench` spolu s katalogem; `test/hairstyle_catalog_test.dart`
+spadne na položce bez náhledu nebo vzorku i na náhledu bez položky. Lab: flow `hair` + `lab hairmasks`
 (`tools/lab/README.md`).
 
 ### Identita ve videu (`tools/facebench/vidbench.py`)
