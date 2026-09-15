@@ -6,33 +6,6 @@ import 'hairstyle_preset.dart';
 
 const kHairstyles = <HairstylePreset>[
   HairstylePreset(
-    id: 'curtain-bangs',
-    label: 'Záclonová ofina',
-    group: kHairGroupWomen,
-    section: 'Ofiny',
-    block:
-        'curtain bangs, soft face-framing fringe parted in the middle and swept to both sides, blending into the lengths',
-    shape: HairShape(length: HairLength.keep, bangs: HairBangs.curtain, updo: false),
-  ),
-  HairstylePreset(
-    id: 'lob',
-    label: 'Dlouhé mikádo',
-    group: kHairGroupWomen,
-    section: 'Střihy',
-    block:
-        'long bob haircut (lob), one-length hair ending at the collarbone, sleek and slightly longer in front',
-    shape: HairShape(length: HairLength.medium, bangs: HairBangs.none, updo: false),
-  ),
-  HairstylePreset(
-    id: 'french-bob',
-    label: 'Krátké francouzské mikádo',
-    group: kHairGroupWomen,
-    section: 'Střihy',
-    block:
-        'french bob, short chin-length bob with a full straight fringe, effortless parisian look',
-    shape: HairShape(length: HairLength.medium, bangs: HairBangs.full, updo: false),
-  ),
-  HairstylePreset(
     id: 'face-framing',
     label: 'Vrstvy rámující obličej',
     group: kHairGroupWomen,
@@ -42,44 +15,77 @@ const kHairstyles = <HairstylePreset>[
     shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: false),
   ),
   HairstylePreset(
-    id: 'beach-waves',
-    label: 'Volné plážové vlny',
+    id: 'box-braids',
+    label: 'Box braids',
     group: kHairGroupWomen,
-    section: 'Textura',
+    section: 'Copánky',
     block:
-        'beach waves, loose undone tousled waves with natural texture, effortless surf look',
+        'long box braids, many small neat three-strand braids falling past the shoulders',
+    shape: HairShape(length: HairLength.long, bangs: HairBangs.none, updo: false),
+  ),
+  HairstylePreset(
+    id: 'dutch-braids',
+    label: 'Dva holandské copy',
+    group: kHairGroupWomen,
+    section: 'Copánky',
+    block:
+        'two dutch braids, tight raised braids running from the hairline back along both sides of the head',
     shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: false),
   ),
   HairstylePreset(
-    id: 'soft-curls',
-    label: 'Jemné kudrliny',
+    id: 'crown-braid',
+    label: 'Korunkový cop',
     group: kHairGroupWomen,
-    section: 'Textura',
+    section: 'Copánky',
     block:
-        'soft curls, bouncy loose curls with defined ringlets and shine',
-    shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: false),
+        'crown braid, a thick braid wrapped around the head like a halo with all the hair up',
+    shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: true),
   ),
   HairstylePreset(
-    id: 'm-skin-fade',
-    label: 'Vysoký skin fade',
+    id: 'm-man-bun',
+    label: 'Pánský drdol',
+    group: kHairGroupMen,
+    section: 'Účesy nahoru',
+    block:
+        'man bun, long hair pulled back and tied into a bun at the back of the head',
+    shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: true),
+  ),
+  HairstylePreset(
+    id: 'm-spiky',
+    label: 'Ježek',
     group: kHairGroupMen,
     section: 'Krátké',
     block:
-        'high skin fade, sides shaved down to the skin and blended up high, short textured hair on top',
+        'spiky hair, short hair styled straight up into sharp textured spikes all over the top',
     shape: HairShape(length: HairLength.short, bangs: HairBangs.none, updo: false),
   ),
   HairstylePreset(
-    id: 'm-quiff',
-    label: 'Quiff',
+    id: 'm-cornrows',
+    label: 'Cornrows',
     group: kHairGroupMen,
-    section: 'Střední',
+    section: 'Krátké',
     block:
-        'quiff hairstyle, hair on top brushed up and back into a voluminous quiff, shorter tapered sides',
+        'cornrows, hair braided flat to the scalp in straight neat rows running back from the hairline',
     shape: HairShape(length: HairLength.short, bangs: HairBangs.none, updo: false),
   ),
 ];
 
 const kHairColours = <HairColourPreset>[
+  HairColourPreset(
+    id: 'copper-red',
+    label: 'Měděná zrzavá',
+    phrase: 'vibrant copper red, natural redhead',
+  ),
+  HairColourPreset(
+    id: 'fox-red',
+    label: 'Liščí zrzavá',
+    phrase: 'bright fox red, vivid orange ginger',
+  ),
+  HairColourPreset(
+    id: 'auburn',
+    label: 'Kaštanově zrzavá',
+    phrase: 'deep auburn',
+  ),
   HairColourPreset(
     id: 'burgundy',
     label: 'Vínová',
@@ -99,5 +105,10 @@ const kHairColours = <HairColourPreset>[
     id: 'blue-black',
     label: 'Modročerná',
     phrase: 'blue-black with a cool blue sheen',
+  ),
+  HairColourPreset(
+    id: 'pastel-pink',
+    label: 'Pastelově růžová',
+    phrase: 'pastel pink',
   ),
 ];
