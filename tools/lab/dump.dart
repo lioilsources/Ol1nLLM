@@ -86,16 +86,20 @@ void main() {
     // Styles: the app registry, unless the caller vets candidates from a file
     // — and then an id the file lacks comes from the registry, so an existing
     // style can share the table with the candidate it might duplicate.
-    final styles = selectStyles(
-      candidates: env['STYLES_FILE'] == null
-          ? null
-          : parseStyleCandidates(
-              jsonDecode(File(env['STYLES_FILE']!).readAsStringSync())
-                  as List<dynamic>,
-            ),
-      registry: kStylePresets,
-      wanted: _csv(env['STYLES']),
-    );
+    // NO_STYLES: the baseline alone (the reference generator). Without it an
+    // empty STYLES is the whole registry.
+    final styles = env['NO_STYLES'] == '1'
+        ? const <StylePreset>[]
+        : selectStyles(
+            candidates: env['STYLES_FILE'] == null
+                ? null
+                : parseStyleCandidates(
+                    jsonDecode(File(env['STYLES_FILE']!).readAsStringSync())
+                        as List<dynamic>,
+                  ),
+            registry: kStylePresets,
+            wanted: _csv(env['STYLES']),
+          );
 
     final installed = env['CKPTS'] == null
         ? const <String>[]
@@ -480,9 +484,11 @@ void main() {
             // SDXL its own inpaint graph (see ComfyUIService.hairInpaint).
             final kontext = svc.hairUsesInstruction;
             final wf = svc.prepareHairInpaint(
-              _load(kontext
-                  ? 'assets/comfyui/flux_hair_kontext.api.json'
-                  : preset.inpaintAsset!),
+              _load(
+                kontext
+                    ? 'assets/comfyui/flux_hair_kontext.api.json'
+                    : preset.inpaintAsset!,
+              ),
               prompt: hairPrompt(c, colour, instruction: kontext),
               batch: batch,
               seed: seed,

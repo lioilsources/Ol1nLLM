@@ -27,6 +27,10 @@ type Spec struct {
 	StylesFile string   `json:"stylesFile"`
 	Flows      []string `json:"flows"`
 	NoBaseline bool     `json:"noBaseline"`
+	// NoStyles renders the baseline alone. An empty Styles list means the
+	// whole registry (the dump's long-standing reading), so "no styles" has to
+	// be said out loud — the reference generator needs one image, not 83.
+	NoStyles bool `json:"noStyles,omitempty"`
 
 	// Kadeřník flow: hairstyle candidates and the directory `lab hairmasks`
 	// prepared for the reference (masks.json + uploaded mask names).
@@ -89,7 +93,14 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 		}
 	}
 	styleCount := len(s.Styles)
-	if styleCount == 0 && s.StylesFile != "" {
+	if s.NoStyles {
+		styleCount = 0
+	} else if styleCount == 0 && s.StylesFile == "" {
+		// No list and no file is the whole registry — that is what the dump
+		// renders, and counting it as baseline-only under-reported it 83×.
+		styleCount = len(man.Styles)
+	}
+	if styleCount == 0 && s.StylesFile != "" && !s.NoStyles {
 		// Without --styles a candidates run renders the whole file — 54 artists
 		// × five models is right under the ceiling, so it has to be counted,
 		// not taken for a baseline-only run.
@@ -506,6 +517,9 @@ func (s *Spec) DumpEnv(dir string) ([]string, error) {
 	set("SWEEP_LABEL", s.SweepLabel)
 	if s.NoBaseline {
 		set("NO_BASELINE", "1")
+	}
+	if s.NoStyles {
+		set("NO_STYLES", "1")
 	}
 	if s.EditDenoise > 0 {
 		set("EDIT_DENOISE", strconv.FormatFloat(s.EditDenoise, 'f', -1, 64))

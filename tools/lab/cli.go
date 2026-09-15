@@ -239,7 +239,7 @@ func generateReference(env *Env, dir, prompt string, seed int) (string, error) {
 	spec := &Spec{
 		Prompts: []string{prompt}, Flows: []string{"txt2img"},
 		Models: []string{"juggernaut-xl"}, Seed: seed, Batch: 1,
-		Latent: "832x1216", Title: "reference",
+		Latent: "832x1216", Title: "reference", NoStyles: true,
 	}
 	run := NewRun(env, refDir, spec)
 	if err := os.MkdirAll(refDir, 0o755); err != nil {

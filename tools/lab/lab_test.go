@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -1459,5 +1460,30 @@ func TestResolveRunDirTakesIdPathOrNewest(t *testing.T) {
 	}
 	if _, err := resolveRunDir(env, "20990101-000000"); err == nil {
 		t.Fatal("neexistující běh musí být chyba")
+	}
+}
+
+func TestEstimateCountsTheRegistryWhenNoStylesAreListed(t *testing.T) {
+	// The dump reads an empty style list as the whole registry; the estimate
+	// used to count it as baseline-only, and the reference generator rendered
+	// every style while promising one image.
+	man := &Manifest{
+		Models: []ManifestModel{{ID: "juggernaut-xl", Label: "Juggernaut"}},
+		Styles: []ManifestStyle{{ID: "a"}, {ID: "b"}, {ID: "c"}},
+	}
+	s := Spec{Models: []string{"juggernaut-xl"}, Prompts: []string{"x"}, Flows: []string{"txt2img"}}
+	if e := s.Estimate(man, nil); e.Cells != 4 {
+		t.Fatalf("bez seznamu stylů = celý registr + baseline: cells = %d, want 4", e.Cells)
+	}
+	s.NoStyles = true
+	if e := s.Estimate(man, nil); e.Cells != 1 {
+		t.Fatalf("NoStyles = jen baseline: cells = %d, want 1", e.Cells)
+	}
+	env, err := s.DumpEnv(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(env, "NO_STYLES=1") {
+		t.Fatalf("NoStyles se musí dostat do dumpu jako NO_STYLES=1, env = %v", env)
 	}
 }
