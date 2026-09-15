@@ -17,7 +17,7 @@ make run
 
 Volitelné URL overrides (`.env.local`, Makefile je propouští jen když jsou
 neprázdné): `COMFYUI_URL`, `FINETUNE_URL`, `FLUX_NIM_URL`, `VLLM_URL`,
-`LIBRARY_CHAT_URL`. Pro vývoj knihovny proti SPARKu na LAN:
+`LIBRARY_CHAT_URL`, `UGC_FC_URL`. Pro vývoj knihovny proti SPARKu na LAN:
 `LIBRARY_CHAT_URL=http://192.168.88.66:8090` — pak ale **jen `make debug`**
 (release Android manifest nemá `usesCleartextTraffic` a iOS nemá výjimku
 v `Info.plist`, takže čistý HTTP tam neprojde).
@@ -585,6 +585,36 @@ buňkách *naměřil*, ne cílový rozsah. Obojí generuje `export_catalog.py
 --bench/--colours-bench` spolu s katalogem; `test/hairstyle_catalog_test.dart`
 spadne na položce bez náhledu nebo vzorku i na náhledu bez položky. Lab: flow `hair` + `lab hairmasks`
 (`tools/lab/README.md`).
+
+### Tančící figurka (`FigureService`, UGCFactory `ugc.ol1n.com/v1/fc`)
+
+Tlačítko 3D na dlaždici nabízí dvě věci: **3D model k tisku** (Trellis2 →
+STL/GLB, beze změny) a **tančící 3D figurku**. Figurku dělá fantasy-character
+pipeline z repa UGCFactory na NAS: RMBG a TRELLIS na SPARKu, pak v Blenderu
+na NAS úklid meshe, kostra (šablona i MIA, vyhraje ta, co se v tanci míň trhá),
+přenos tanců a export GLB. 6–10 min. Stejný CF Access token jako zbytek —
+`ugc.ol1n.com` pouští jakýkoli platný service token účtu. URL jde přebít
+`UGC_FC_URL` (LAN `http://joda:8095` jen s `make debug`).
+
+- Figurka dostane **všechny tance** z `GET /animations?category=dance`
+  (katalog `availableDances`, app-scoped jako `availableScenes` — každé místo,
+  které staví stav znovu, ho musí přenést; hlídá to `test/figure_test.dart`).
+  Jedno GLB tak nese všechny klipy a v prohlížeči se přepínají bez nového kola.
+- **glTF animace se jmenují podle id klipu** (server tak pojmenuje NLA tracky),
+  takže `FigureViewerScreen` přehrává tanec jen přes `animation-name`. Při
+  změně tance se `<model-viewer>` staví znovu (klíč podle klipu): měnit atribut
+  živě by chtělo `WebViewController`, a ten model_viewer_plus dává jen přes
+  přímou závislost na webview_flutter.
+- Uzel `GenNode.isFigure` se chová jako 3D/video: `jobId` = id postavy na
+  serveru, obnova přes `FigureService.follow`, retry s id jen dotáhne výsledek.
+  Po dokončení zůstane `figureId` (jobId se maže) a `clipIds` v pořadí na časové
+  ose. Průběh: stav postavy říká **poslední hotový** krok, běžící je ten další
+  (`figureProgress` → `figureStageLabel`).
+- Stažení GLB se kontroluje proti délce v hlavičce glTF (`glbLooksComplete`) —
+  uříznuté stažení projde jako 200 a prohlížeč by pak ukázal prázdno.
+- Tvář z TRELLISu je rozmazaná a mesh se v tanci trochu natahuje; jako figurka
+  obstojí, jako fotka ne. Nejlepší vstup je celá postava stojící čelem. Měření
+  kvality koster a přenosu tanců: UGCFactory `nas/docs/FANTASYCHARACTER_PLAN.md` §13.
 
 ### Identita ve videu (`tools/facebench/vidbench.py`)
 

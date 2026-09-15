@@ -11,6 +11,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 
+import '../models/figure_clip.dart';
 import '../models/gen_node.dart';
 import '../models/hair_mask.dart';
 import '../models/hairstyle_preset.dart';
@@ -22,6 +23,7 @@ import '../models/prompt_negatives.dart';
 import '../models/style_preset.dart';
 import '../models/video_scene.dart';
 import '../services/comfyui_service.dart';
+import '../services/figure_service.dart';
 import '../services/finetune_export_service.dart';
 import '../services/flux_kontext_nim_service.dart';
 import '../services/flux_nim_service.dart';
@@ -112,9 +114,9 @@ class ImageStudioState {
 
   /// LoRAs available on the ComfyUI server (unfiltered).
   ///
-  /// This, [availableCheckpoints] and [availableScenes] are app-scoped, not
-  /// session-scoped: every site that rebuilds the state from scratch
-  /// (new/select/delete session, restore) has to carry ALL THREE over by hand,
+  /// This, [availableCheckpoints], [availableScenes] and [availableDances] are
+  /// app-scoped, not session-scoped: every site that rebuilds the state from
+  /// scratch (new/select/delete session, restore) has to carry ALL FOUR over by hand,
   /// or the chips/actions silently empty out. Dropping [availableScenes] here
   /// is what hid the „Rozhýbat" button in 1.12.0 — the catalog loaded fine and
   /// _load() then rebuilt the state without it.
@@ -127,6 +129,11 @@ class ImageStudioState {
   /// server is unreachable or has none; the studio then hides the action.
   /// App-scoped like [availableLoras] — carried over on every state rebuild.
   final List<VideoScene> availableScenes;
+
+  /// Dances of the figure library („Tančící figurka", UGCFactory). Empty = the
+  /// server is unreachable; the 3D action then only offers the print model.
+  /// App-scoped like [availableScenes] — carried over on every state rebuild.
+  final List<FigureClip> availableDances;
 
   /// Currently selected LoRA name, or null for no LoRA.
   final String? selectedLora;
@@ -184,6 +191,7 @@ class ImageStudioState {
     this.availableLoras = const [],
     this.availableCheckpoints = const [],
     this.availableScenes = const [],
+    this.availableDances = const [],
     this.selectedLora,
     this.loraStrength = kDefaultLoraStrength,
     this.selectedPoseId,
@@ -257,6 +265,7 @@ class ImageStudioState {
     List<String>? availableLoras,
     List<String>? availableCheckpoints,
     List<VideoScene>? availableScenes,
+    List<FigureClip>? availableDances,
     String? selectedLora,
     bool clearLora = false,
     double? loraStrength,
@@ -289,6 +298,7 @@ class ImageStudioState {
     availableLoras: availableLoras ?? this.availableLoras,
     availableCheckpoints: availableCheckpoints ?? this.availableCheckpoints,
     availableScenes: availableScenes ?? this.availableScenes,
+    availableDances: availableDances ?? this.availableDances,
     selectedLora: clearLora ? null : (selectedLora ?? this.selectedLora),
     loraStrength: loraStrength ?? this.loraStrength,
     selectedPoseId: clearPose ? null : (selectedPoseId ?? this.selectedPoseId),
@@ -365,6 +375,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
 
   final ComfyUIService _comfyui = ComfyUIService();
   final VideoService _video = VideoService();
+  final FigureService _figure = FigureService();
   final FluxNimService _fluxNim = FluxNimService();
   final FluxKontextNimService _fluxKontextNim = FluxKontextNimService();
   final FinetuneExportService _finetuneExport = FinetuneExportService();
@@ -410,6 +421,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       // from the current selection.
       final run = node.isVideo
           ? () => _video.follow(node.jobId!)
+          : node.isFigure
+          ? () => _figure.follow(node.jobId!)
           : node.is3D
           ? () => _comfyui.followMesh(node.jobId!)
           : node.isRepose
@@ -601,6 +614,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       availableLoras: state.availableLoras,
       availableCheckpoints: state.availableCheckpoints,
       availableScenes: state.availableScenes,
+      availableDances: state.availableDances,
       selectedLora: state.selectedLora,
       loraStrength: state.loraStrength,
       selectedPoseId: state.selectedPoseId,
@@ -635,6 +649,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       availableLoras: state.availableLoras,
       availableCheckpoints: state.availableCheckpoints,
       availableScenes: state.availableScenes,
+      availableDances: state.availableDances,
     );
   }
 
@@ -676,6 +691,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           availableLoras: state.availableLoras,
           availableCheckpoints: state.availableCheckpoints,
           availableScenes: state.availableScenes,
+          availableDances: state.availableDances,
         );
       } else {
         state = ImageStudioState(
@@ -684,6 +700,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           availableLoras: state.availableLoras,
           availableCheckpoints: state.availableCheckpoints,
           availableScenes: state.availableScenes,
+          availableDances: state.availableDances,
         );
       }
     } else {
@@ -727,6 +744,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           availableLoras: state.availableLoras,
           availableCheckpoints: state.availableCheckpoints,
           availableScenes: state.availableScenes,
+          availableDances: state.availableDances,
         );
         _resumeInFlightJob();
       } else {
@@ -884,6 +902,16 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       debugPrint('Video catalog: ${scenes.length} scenes');
     } catch (e) {
       debugPrint('Video catalog unavailable: $e');
+    }
+
+    // Third server (UGCFactory on the NAS); same isolation as the scenes.
+    try {
+      final dances = await _figure.fetchDances();
+      if (!mounted) return;
+      state = state.copyWith(availableDances: dances);
+      debugPrint('Figure catalog: ${dances.length} dances');
+    } catch (e) {
+      debugPrint('Figure catalog unavailable: $e');
     }
   }
 
@@ -1346,6 +1374,36 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     );
   }
 
+  /// Dancing-figure round („Tančící figurka"): the selected image becomes a
+  /// rigged 3D figure that knows every dance of the catalog (see
+  /// [FigureService]). Mirrors [make3D] — a child node flagged
+  /// [GenNode.isFigure], resumable by the server id after an app suspension.
+  Future<void> makeFigure() async {
+    final base = _imageById(state.selectedImageId);
+    if (base == null || state.availableDances.isEmpty) return;
+    _interruptRetries = 0;
+    final node = GenNode.create(
+      parentId: state.currentNodeId,
+      sourceImageId: base.id,
+      prompt: 'Tančící figurka',
+      isFigure: true,
+    );
+    state = state.copyWith(
+      nodes: [...state.nodes, node],
+      currentNodeId: node.id,
+      clearSelected: true,
+      clearError: true,
+    );
+    await _runAsync(node.id, () => _createFigure(node.id, base));
+  }
+
+  Stream<GenEvent> _createFigure(String nodeId, GenImage base) =>
+      _figure.create(
+        image: base.bytes,
+        name: 'Ol1nLLM ${nodeId.substring(0, 8)}',
+        clipIds: [for (final d in state.availableDances) d.id],
+      );
+
   /// Repose round: a new character/style from [prompt] in the pose of the
   /// reference picked via [startRepose] (depth ControlNet over a txt2img
   /// render, denoise 1.0 — see [ComfyUIService.repose]).
@@ -1419,7 +1477,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     // A stuck 3D node may legitimately sit in `generating` (its job outlived
     // an app suspension); re-attaching to it is safe and is the whole point
     // of the manual retry there. Everything else stays guarded.
-    final durableJob = node.is3D || node.isVideo;
+    final durableJob = node.is3D || node.isVideo || node.isFigure;
     if (node.status == GenStatus.generating && !durableJob) return;
     if (durableJob && _activeSubs.containsKey(nodeId)) {
       // Already re-attached and working — don't stack a second stream.
@@ -1485,6 +1543,48 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           seed: seed,
         ),
       );
+      return;
+    }
+    // Figure retry: with a server id the figure is (or will be) finished on the
+    // NAS — re-attach; without one re-create it from the source image.
+    if (node.isFigure) {
+      final jobId = node.jobId ?? node.figureId;
+      if (jobId != null) {
+        _patch(
+          nodeId,
+          (n) => n.copyWith(
+            status: GenStatus.generating,
+            clearError: true,
+            clearProgress: true,
+            jobId: jobId,
+            progressLabel: 'Obnovuji figurku…',
+          ),
+        );
+        await _runAsync(nodeId, () => _figure.follow(jobId));
+        return;
+      }
+      final base = _imageById(node.sourceImageId);
+      if (base == null || state.availableDances.isEmpty) {
+        _patch(
+          nodeId,
+          (n) => n.copyWith(
+            status: GenStatus.error,
+            error: base == null
+                ? 'Source image gone'
+                : 'Knihovna tanců není dostupná',
+          ),
+        );
+        return;
+      }
+      _patch(
+        nodeId,
+        (n) => n.copyWith(
+          status: GenStatus.generating,
+          clearError: true,
+          clearProgress: true,
+        ),
+      );
+      await _runAsync(nodeId, () => _createFigure(nodeId, base));
       return;
     }
     // 3D mesh retry. With a job id the artifacts are (or will be) on the
@@ -1723,7 +1823,10 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       // Keep the job id on 3D nodes: the mesh artifacts are durable on the
       // server, so retry can still just download them (see [retry]).
       final n0 = _nodeById(nodeId);
-      final keepJobId = (n0?.is3D ?? false) || (n0?.isVideo ?? false);
+      final keepJobId =
+          (n0?.is3D ?? false) ||
+          (n0?.isVideo ?? false) ||
+          (n0?.isFigure ?? false);
       _patch(
         nodeId,
         (n) => n.copyWith(
@@ -1760,7 +1863,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           if (mounted) _resumeInFlightJob();
         });
       } else if (_nodeById(nodeId)?.is3D == true ||
-          _nodeById(nodeId)?.isVideo == true) {
+          _nodeById(nodeId)?.isVideo == true ||
+          _nodeById(nodeId)?.isFigure == true) {
         // A mesh/video job is durable server-side and recoverable from its output
         // files at any time — never hard-fail it on a burnt retry budget.
         // Keep the node generating with its jobId; the next app foreground
@@ -1798,6 +1902,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
             // Real progress ⇒ the connection is healthy again.
             _interruptRetries = 0;
             final isVideo = _nodeById(nodeId)?.isVideo ?? false;
+            final isFigure = _nodeById(nodeId)?.isFigure ?? false;
             _patch(
               nodeId,
               (n) => n.copyWith(
@@ -1805,7 +1910,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
                 clearProgress: fraction == null,
                 // Video: step = beats finished of total; all in ⇒ the server
                 // is stitching + interpolating (ffmpeg + RIFE, ~1–2 min).
-                progressLabel: isVideo
+                progressLabel: isFigure
+                    ? '${figureStageLabel(step)} · ${step + 1}/$total'
+                    : isVideo
                     ? (step < total
                           ? 'Beat ${step + 1}/$total · ~${(total - step) * 2.5} min'
                           : 'Slepuji a vyhlazuji…')
@@ -1858,6 +1965,28 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
                 (n) => n.copyWith(
                   status: GenStatus.ready,
                   videoFileName: name,
+                  clearError: true,
+                  clearProgress: true,
+                  clearJobId: true,
+                ),
+              );
+              unawaited(_save());
+              finish();
+            }());
+          case GenFigureComplete(:final glb, :final clipIds):
+            completedByEvent = true;
+            unawaited(() async {
+              final dir = await _dirFuture;
+              final name = '$nodeId.glb';
+              await File('${dir.path}/$name').writeAsBytes(glb, flush: true);
+              if (!mounted) return;
+              _patch(
+                nodeId,
+                (n) => n.copyWith(
+                  status: GenStatus.ready,
+                  glbFileName: name,
+                  figureId: n.jobId,
+                  clipIds: clipIds,
                   clearError: true,
                   clearProgress: true,
                   clearJobId: true,
@@ -1949,6 +2078,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     _activeSubs.clear();
     _comfyui.dispose();
     _video.dispose();
+    _figure.dispose();
     _fluxNim.dispose();
     _fluxKontextNim.dispose();
     _finetuneExport.dispose();

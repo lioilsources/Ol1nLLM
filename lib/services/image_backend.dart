@@ -71,6 +71,15 @@ class GenVideoComplete extends GenEvent {
   const GenVideoComplete(this.mp4);
 }
 
+/// Terminal success of a dancing-figure job — a skinned GLB whose glTF
+/// animations are named by [clipIds] (timeline order). Emitted by
+/// [FigureService.create]/[FigureService.follow] instead of [GenComplete].
+class GenFigureComplete extends GenEvent {
+  final Uint8List glb;
+  final List<String> clipIds;
+  const GenFigureComplete({required this.glb, required this.clipIds});
+}
+
 /// Terminal failure with a human-readable [message].
 class GenFailed extends GenEvent {
   final String message;

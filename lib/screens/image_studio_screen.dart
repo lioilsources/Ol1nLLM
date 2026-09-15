@@ -18,6 +18,7 @@ import '../models/video_scene.dart';
 import '../providers/image_studio_provider.dart';
 import '../services/comfyui_service.dart' show FaceIdentity;
 import '../widgets/image_session_drawer.dart';
+import 'figure_viewer_screen.dart';
 import 'hair_sheet.dart';
 import 'mask_editor_screen.dart';
 import 'model_viewer_screen.dart';
@@ -497,13 +498,17 @@ class _TreeNodeWidget extends StatelessWidget {
       inner = Icon(
         node.isVideo
             ? Icons.movie_outlined
+            : node.isFigure
+            ? Icons.accessibility_new
             : node.is3D
             ? Icons.view_in_ar
             : node.isRoot
             ? Icons.auto_awesome
             : Icons.brush_outlined,
         size: 20,
-        color: (node.is3D || node.isVideo) && node.status == GenStatus.ready
+        color:
+            (node.is3D || node.isVideo || node.isFigure) &&
+                node.status == GenStatus.ready
             ? AppTheme.accent
             : AppTheme.textSecondary,
       );
@@ -782,7 +787,7 @@ class _NodeGrid extends ConsumerWidget {
                 color: AppTheme.accent,
               ),
             ),
-            if (node.is3D || node.isVideo) ...[
+            if (node.is3D || node.isVideo || node.isFigure) ...[
               const SizedBox(height: 20),
               TextButton.icon(
                 onPressed: () =>
@@ -815,6 +820,61 @@ class _NodeGrid extends ConsumerWidget {
               path: path,
               title: node.prompt,
             );
+    }
+
+    if (node.isFigure && node.status == GenStatus.ready) {
+      final glb = node.glbFileName == null
+          ? null
+          : '${GenImage.baseDir}/${node.glbFileName}';
+      return LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.accessibility_new,
+                    size: 56,
+                    color: AppTheme.accent,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Figurka umí ${node.clipIds.length} '
+                    '${node.clipIds.length == 1 ? 'tanec' : (node.clipIds.length < 5 ? 'tance' : 'tanců')}',
+                    style: const TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppTheme.accent,
+                    ),
+                    onPressed: glb == null
+                        ? null
+                        : () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => FigureViewerScreen(
+                                glbPath: glb,
+                                clipIds: node.clipIds,
+                                catalog: ref
+                                    .read(imageStudioProvider)
+                                    .availableDances,
+                              ),
+                            ),
+                          ),
+                    icon: const Icon(Icons.play_arrow, size: 18),
+                    label: const Text('Otevřít a tančit'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
     }
 
     if (node.is3D && node.status == GenStatus.ready) {
@@ -946,6 +1006,60 @@ class _NodeGrid extends ConsumerWidget {
   ) async {
     _dismissKeyboard();
     final notifier = ref.read(imageStudioProvider.notifier);
+    // With the figure library reachable the 3D action offers both products;
+    // without it the print model is the only one and keeps its dialog.
+    if (ref.read(imageStudioProvider).availableDances.isNotEmpty) {
+      final choice = await showModalBottomSheet<_ThreeDChoice>(
+        context: context,
+        backgroundColor: AppTheme.surface,
+        showDragHandle: true,
+        builder: (context) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.view_in_ar, color: AppTheme.accent),
+                title: const Text(
+                  '3D model k tisku',
+                  style: TextStyle(color: AppTheme.textPrimary),
+                ),
+                subtitle: const Text(
+                  'Otočitelný náhled + STL pro Prusa Slicer (100 mm). 4–7 min.',
+                  style: TextStyle(color: AppTheme.textSecondary, height: 1.3),
+                ),
+                onTap: () => Navigator.of(context).pop(_ThreeDChoice.print),
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.accessibility_new,
+                  color: AppTheme.accent,
+                ),
+                title: const Text(
+                  'Tančící 3D figurka',
+                  style: TextStyle(color: AppTheme.textPrimary),
+                ),
+                subtitle: const Text(
+                  'Postava s kostrou, která umí všechny tance z knihovny. '
+                  '6–10 min. Nejlépe z celé postavy stojící čelem; tvář '
+                  'bude spíš jako u figurky než fotka.',
+                  style: TextStyle(color: AppTheme.textSecondary, height: 1.3),
+                ),
+                isThreeLine: true,
+                onTap: () => Navigator.of(context).pop(_ThreeDChoice.figure),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (choice == null) return;
+      notifier.selectImage(img.id);
+      if (choice == _ThreeDChoice.figure) {
+        await notifier.makeFigure();
+      } else {
+        await notifier.make3D();
+      }
+      return;
+    }
     final go = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -3143,3 +3257,6 @@ class _VideoNodeViewState extends State<_VideoNodeView> {
     );
   }
 }
+
+/// What the 3D tile action makes: the printable model or a dancing figure.
+enum _ThreeDChoice { print, figure }

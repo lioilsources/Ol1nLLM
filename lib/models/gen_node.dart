@@ -55,7 +55,8 @@ class GenImage {
     // Backward compat: legacy boxes stored an absolute 'filePath'. Derive the
     // relative name from its basename so old sessions self-heal on the same
     // install (where the files still exist).
-    final fileName = (json['fileName'] as String?) ??
+    final fileName =
+        (json['fileName'] as String?) ??
         (json['filePath'] as String).split('/').last;
     return GenImage(id: json['id'] as String, fileName: fileName);
   }
@@ -134,6 +135,20 @@ class GenNode {
   /// [GenImage.fileName]).
   final String? videoFileName;
 
+  /// True for a dancing-figure round („Tančící figurka"): UGCFactory turned
+  /// the source image into a rigged 3D figure; [glbFileName] holds the GLB
+  /// (no STL), [clipIds] the dances it knows — the names of its glTF
+  /// animations — and resume goes through [FigureService.follow]. Persisted
+  /// only when true.
+  final bool isFigure;
+
+  /// Server id of the figure (UGCFactory character). Unlike [jobId] it stays
+  /// after completion, so the finished figure can be fetched again.
+  final String? figureId;
+
+  /// Dances inside the figure's GLB, in timeline order. Empty on other nodes.
+  final List<String> clipIds;
+
   // ── Generation metadata (nullable — nodes written before this existed
   //    stay valid; NIM models leave preset-derived fields null because their
   //    values are service constants recoverable from [modelId]) ──
@@ -207,6 +222,9 @@ class GenNode {
     this.isVideo = false,
     this.sceneId,
     this.videoFileName,
+    this.isFigure = false,
+    this.figureId,
+    this.clipIds = const [],
     this.modelId,
     this.loraName,
     this.loraStrength,
@@ -242,6 +260,7 @@ class GenNode {
     bool isRepose = false,
     bool isVideo = false,
     String? sceneId,
+    bool isFigure = false,
     String? modelId,
     String? loraName,
     double? loraStrength,
@@ -273,6 +292,7 @@ class GenNode {
     isRepose: isRepose,
     isVideo: isVideo,
     sceneId: sceneId,
+    isFigure: isFigure,
     modelId: modelId,
     loraName: loraName,
     loraStrength: loraStrength,
@@ -313,6 +333,9 @@ class GenNode {
     if (isVideo) 'isVideo': true,
     if (sceneId != null) 'sceneId': sceneId,
     if (videoFileName != null) 'videoFileName': videoFileName,
+    if (isFigure) 'isFigure': true,
+    if (figureId != null) 'figureId': figureId,
+    if (clipIds.isNotEmpty) 'clipIds': clipIds,
     if (modelId != null) 'modelId': modelId,
     if (loraName != null) 'loraName': loraName,
     if (loraStrength != null) 'loraStrength': loraStrength,
@@ -365,6 +388,9 @@ class GenNode {
       isVideo: json['isVideo'] as bool? ?? false,
       sceneId: json['sceneId'] as String?,
       videoFileName: json['videoFileName'] as String?,
+      isFigure: json['isFigure'] as bool? ?? false,
+      figureId: json['figureId'] as String?,
+      clipIds: (json['clipIds'] as List?)?.cast<String>() ?? const [],
       modelId: json['modelId'] as String?,
       loraName: json['loraName'] as String?,
       loraStrength: (json['loraStrength'] as num?)?.toDouble(),
@@ -395,6 +421,8 @@ class GenNode {
     String? glbFileName,
     String? stlFileName,
     String? videoFileName,
+    String? figureId,
+    List<String>? clipIds,
     String? error,
     bool clearError = false,
     double? progress,
@@ -426,6 +454,9 @@ class GenNode {
     isVideo: isVideo,
     sceneId: sceneId,
     videoFileName: videoFileName ?? this.videoFileName,
+    isFigure: isFigure,
+    figureId: figureId ?? this.figureId,
+    clipIds: clipIds ?? this.clipIds,
     modelId: modelId,
     loraName: loraName,
     loraStrength: loraStrength,

@@ -1,0 +1,169 @@
+{
+ "animations": [
+  {
+   "animation_id": "booty_hip_hop_dance",
+   "name": "Hip hop · boky",
+   "category": "dance",
+   "loop": true,
+   "frame_start": 1,
+   "frame_end": 148
+  },
+  {
+   "animation_id": "chicken_dance",
+   "name": "Ptačí tanec",
+   "category": "dance",
+   "loop": true,
+   "frame_start": 153,
+   "frame_end": 296
+  },
+  {
+   "animation_id": "dancing_maraschino_step",
+   "name": "Hip hop · Maraschino",
+   "category": "dance",
+   "loop": true,
+   "frame_start": 301,
+   "frame_end": 422
+  },
+  {
+   "animation_id": "dancing_twerk",
+   "name": "Twerk",
+   "category": "dance",
+   "loop": true,
+   "frame_start": 427,
+   "frame_end": 685
+  },
+  {
+   "animation_id": "macarena_dance",
+   "name": "Macarena",
+   "category": "dance",
+   "loop": true,
+   "frame_start": 690,
+   "frame_end": 991
+  },
+  {
+   "animation_id": "rumba_dancing",
+   "name": "Rumba",
+   "category": "dance",
+   "loop": true,
+   "frame_start": 996,
+   "frame_end": 1067
+  },
+  {
+   "animation_id": "salsa_dancing",
+   "name": "Salsa",
+   "category": "dance",
+   "loop": true,
+   "frame_start": 1072,
+   "frame_end": 1202
+  },
+  {
+   "animation_id": "samba_dancing",
+   "name": "Samba",
+   "category": "dance",
+   "loop": true,
+   "frame_start": 1207,
+   "frame_end": 1954
+  },
+  {
+   "animation_id": "snake_hip_hop_dance",
+   "name": "Hip hop · had",
+   "category": "dance",
+   "loop": true,
+   "frame_start": 1959,
+   "frame_end": 2524
+  },
+  {
+   "animation_id": "zombie_walk",
+   "name": "Zombie Walk",
+   "category": "locomotion",
+   "loop": true,
+   "frame_start": 2529,
+   "frame_end": 2650
+  }
+ ],
+ "artifacts": {
+  "apose_image": "/v1/fc/characters/bea877f45cf297d69170ae81ca0ae77d/file/apose_image",
+  "clean_glb": "/v1/fc/characters/bea877f45cf297d69170ae81ca0ae77d/file/clean_glb",
+  "final_fbx": "/v1/fc/characters/bea877f45cf297d69170ae81ca0ae77d/file/final_fbx",
+  "final_glb": "/v1/fc/characters/bea877f45cf297d69170ae81ca0ae77d/file/final_glb",
+  "mesh_glb": "/v1/fc/characters/bea877f45cf297d69170ae81ca0ae77d/file/mesh_glb",
+  "rigged_fbx": "/v1/fc/characters/bea877f45cf297d69170ae81ca0ae77d/file/rigged_fbx",
+  "source_image": "/v1/fc/characters/bea877f45cf297d69170ae81ca0ae77d/file/source_image",
+  "thumb_png": "/v1/fc/characters/bea877f45cf297d69170ae81ca0ae77d/file/thumb_png"
+ },
+ "character": {
+  "id": "bea877f45cf297d69170ae81ca0ae77d",
+  "owner_id": "",
+  "name": "Image Picker 0B99376E EA3F 4A3D B592 3840EFC6F8EE 13037 00000312FB5E5CC0",
+  "status": "done",
+  "source_image": "/data/characters/bea877f45cf297d69170ae81ca0ae77d/source.png",
+  "apose_image": "/data/characters/bea877f45cf297d69170ae81ca0ae77d/apose.png",
+  "mesh_glb": "/data/characters/bea877f45cf297d69170ae81ca0ae77d/mesh.glb",
+  "clean_glb": "/data/characters/bea877f45cf297d69170ae81ca0ae77d/clean.glb",
+  "rigged_fbx": "/data/characters/bea877f45cf297d69170ae81ca0ae77d/rigged.fbx",
+  "final_glb": "/data/characters/bea877f45cf297d69170ae81ca0ae77d/model.glb",
+  "final_fbx": "/data/characters/bea877f45cf297d69170ae81ca0ae77d/model.fbx",
+  "thumb_png": "/data/characters/bea877f45cf297d69170ae81ca0ae77d/thumb.png",
+  "tri_count": 7200,
+  "auto_apose": true,
+  "created_at": "2026-09-14T23:04:44Z",
+  "updated_at": "2026-09-15T18:14:45Z"
+ },
+ "exports": [],
+ "steps": [
+  {
+   "id": 87,
+   "character_id": "bea877f45cf297d69170ae81ca0ae77d",
+   "step": "char.animate",
+   "status": "done",
+   "attempt": 3,
+   "created_at": "2026-09-15T16:02:50Z",
+   "updated_at": "2026-09-15T16:03:50Z"
+  },
+  {
+   "id": 92,
+   "character_id": "bea877f45cf297d69170ae81ca0ae77d",
+   "step": "char.export.user",
+   "status": "done",
+   "attempt": 3,
+   "created_at": "2026-09-15T16:03:50Z",
+   "updated_at": "2026-09-15T16:04:21Z"
+  },
+  {
+   "id": 97,
+   "character_id": "bea877f45cf297d69170ae81ca0ae77d",
+   "step": "char.animate",
+   "status": "done",
+   "attempt": 4,
+   "created_at": "2026-09-15T16:14:01Z",
+   "updated_at": "2026-09-15T16:14:14Z"
+  },
+  {
+   "id": 102,
+   "character_id": "bea877f45cf297d69170ae81ca0ae77d",
+   "step": "char.export.user",
+   "status": "done",
+   "attempt": 4,
+   "created_at": "2026-09-15T16:14:14Z",
+   "updated_at": "2026-09-15T16:14:48Z"
+  },
+  {
+   "id": 113,
+   "character_id": "bea877f45cf297d69170ae81ca0ae77d",
+   "step": "char.animate",
+   "status": "done",
+   "attempt": 5,
+   "created_at": "2026-09-15T18:13:14Z",
+   "updated_at": "2026-09-15T18:14:04Z"
+  },
+  {
+   "id": 114,
+   "character_id": "bea877f45cf297d69170ae81ca0ae77d",
+   "step": "char.export.user",
+   "status": "done",
+   "attempt": 5,
+   "created_at": "2026-09-15T18:14:05Z",
+   "updated_at": "2026-09-15T18:14:45Z"
+  }
+ ]
+}
