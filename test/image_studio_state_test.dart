@@ -214,6 +214,17 @@ void main() {
       expect(back.editDenoise, kStyleEditDenoise);
     });
 
+    test('„automaticky" runs strong only with a style; a manual pick wins', () {
+      // No style: null hands the preset back to the service.
+      expect(effectiveEditDenoise(null, styled: false), isNull);
+      // A style at the preset's ~0.72 would not land — auto goes strong.
+      expect(effectiveEditDenoise(null, styled: true), kStyleEditDenoise);
+      expect(effectiveEditDenoise(kGentleEditDenoise, styled: true),
+          kGentleEditDenoise);
+      expect(effectiveEditDenoise(kStyleEditDenoise, styled: false),
+          kStyleEditDenoise);
+    });
+
     test('a session saved before this version reads as defaults', () {
       final back = ImageSession.fromJson({
         'id': 'a', 'title': 't', 'nodes': <Map<String, dynamic>>[],

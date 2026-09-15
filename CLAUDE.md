@@ -198,9 +198,16 @@ se četly hůř.
 přebíjí presetový `img2imgDenoise`. Měření ukázalo, že při presetových ~0.72 je
 img2img stylově skoro slepý (rozptyl 5–50× nižší než repose, u pony 0.011),
 zatímco při `kStyleEditDenoise` 0.9 styl projde a pózu dál drží auto-depth.
-Nabídka: jemná 0.5 / běžná (preset) / silná 0.9. Šablona pózy si drží
-`kPoseEditDenoise` bez ohledu na volbu a inpaint jede vždy na 1.0. Chip se
-ukazuje jen u ComfyUI img2img kola (NIM backendy denoise nemají).
+Nabídka: jemná 0.5 / **automaticky** (null) / silná 0.9. „Automaticky" je
+preset bez stylu a `kStyleEditDenoise` se stylem (`effectiveEditDenoise()`),
+protože slabší úprava styl nepustí — ověřeno znovu na NoobAI a WAI přes 24
+kulturních stylů (reakce img2img 0.16–0.18 proti 0.64–0.71 v repose). Rozhoduje
+se až při odeslání (`_armEditDenoise()` v refine/retry) a stejnou funkcí se
+zapisuje `GenNode.denoise`, takže snapshot odpovídá tomu, co běželo. Dřívější
+volba „běžná" byla taky null, staré session tedy dostanou automatiku. Šablona
+pózy si drží `kPoseEditDenoise` bez ohledu na volbu a inpaint jede vždy na 1.0.
+Chip se ukazuje jen u ComfyUI img2img kola (NIM backendy denoise nemají);
+se stylem ukazuje „auto · silná".
 
 **Popisky modelů (`ImageModelSpec.styleNote`)**: jedna věta o tom, co model
 udělá se stylovým promptem, ukazuje se v pickeru pod schopnostmi. Není odhad —

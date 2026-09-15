@@ -2371,16 +2371,20 @@ class _EditStrengthChip extends StatelessWidget {
   const _EditStrengthChip({
     required this.denoise,
     required this.presetDenoise,
+    required this.styled,
     required this.onChanged,
   });
 
-  /// Null = the model preset's own value.
+  /// Null = „automaticky" — see [effectiveEditDenoise].
   final double? denoise;
   final double presetDenoise;
+
+  /// An art style is on, so „automaticky" runs strong.
+  final bool styled;
   final ValueChanged<double?> onChanged;
 
   String get _label => switch (denoise) {
-    null => 'Úprava: běžná',
+    null => styled ? 'Úprava: auto · silná' : 'Úprava: auto',
     kGentleEditDenoise => 'Úprava: jemná',
     kStyleEditDenoise => 'Úprava: silná',
     _ => 'Úprava: ${denoise!.toStringAsFixed(2)}',
@@ -2395,8 +2399,9 @@ class _EditStrengthChip extends StatelessWidget {
         kGentleEditDenoise,
       ),
       (
-        'Běžná',
-        'výchozí pro model (${presetDenoise.toStringAsFixed(2)})',
+        'Automaticky',
+        'bez stylu výchozí pro model (${presetDenoise.toStringAsFixed(2)}), '
+            'se stylem silná — slabší úprava styl nepustí',
         null,
       ),
       (
@@ -2868,6 +2873,7 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                       _EditStrengthChip(
                         denoise: widget.state.editDenoise,
                         presetDenoise: spec.preset!.img2imgDenoise,
+                        styled: widget.state.selectedStyleId != null,
                         onChanged: (v) => ref
                             .read(imageStudioProvider.notifier)
                             .setEditDenoise(v),

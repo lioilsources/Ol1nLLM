@@ -45,6 +45,15 @@ const kVariantCount = 4;
 const kGentleEditDenoise = 0.5;
 const kStyleEditDenoise = 0.9;
 
+/// The img2img denoise a round actually runs with. [chosen] null is
+/// „automaticky": the model preset's own value, except when an art style is
+/// active — at the preset's ~0.72 img2img is style-blind (the 10 × 25 matrix,
+/// and again on NoobAI and WAI over 24 styles: reaction 0.16–0.18 against
+/// 0.64–0.71 in repose), so a styled round gets [kStyleEditDenoise]. Null
+/// back means "the preset", which the service reads off it itself.
+double? effectiveEditDenoise(double? chosen, {required bool styled}) =>
+    chosen ?? (styled ? kStyleEditDenoise : null);
+
 /// Model/LoRA/pose a node was generated with, reduced to what the app can
 /// actually apply right now.
 typedef NodeSettings = ({
@@ -477,9 +486,19 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   String _styled(String prompt, String? styleId) =>
       applyStyle(prompt, styleId, dialect: state.model.promptDialect);
 
-  /// How hard an img2img round repaints. Null returns the model preset's
-  /// value; [kStyleEditDenoise] is what actually lets an art style through
-  /// (the preset's ~0.72 keeps the source's palette and lighting).
+  /// Arms the service with the denoise this round runs at — decided at
+  /// request time, because „automaticky" depends on whether a style is on.
+  void _armEditDenoise() => _comfyui.setEditDenoise(
+    effectiveEditDenoise(
+      state.editDenoise,
+      styled: state.selectedStyleId != null,
+    ),
+  );
+
+  /// How hard an img2img round repaints. Null is „automaticky" (see
+  /// [effectiveEditDenoise]); [kStyleEditDenoise] is what actually lets an
+  /// art style through (the preset's ~0.72 keeps the source's palette and
+  /// lighting).
   void setEditDenoise(double? denoise) {
     _comfyui.setEditDenoise(denoise);
     state = state.copyWith(
@@ -967,7 +986,11 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           ? (isImg2img && !isInpaint
                 ? (poseActive
                       ? kPoseEditDenoise
-                      : (state.editDenoise ?? preset!.img2imgDenoise))
+                      : (effectiveEditDenoise(
+                              state.editDenoise,
+                              styled: styleId != null,
+                            ) ??
+                            preset!.img2imgDenoise))
                 : 1.0)
           : null,
       samplerName: patched ? preset!.samplerName : null,
@@ -1082,6 +1105,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       clearSelected: true,
       clearError: true,
     );
+    _armEditDenoise();
     await _runAsync(
       node.id,
       () => _backend.edit(
@@ -1637,6 +1661,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         );
         return;
       }
+      _armEditDenoise();
       await _runAsync(
         nodeId,
         () => _backend.edit(
