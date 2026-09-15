@@ -150,3 +150,45 @@ na baletce v „zachovej pózu", kde postavu drží hloubková mapa a rekvizity
 skončí v kostýmu a pozadí. V txt2img na jiném námětu můžou obsah přepsat —
 Degas je krajní případ. Až se styly začnou používat mimo repose, ověřit je
 druhým námětem.
+
+## Čtvrtá vlna — booru text pro kulturní styly (2026-09-15)
+
+Kulturní styly (39 z registru, tehdy bez tagové varianty) měřeny v labu
+proti 4 anime SDXL modelům (NoobAI, WAI, Animagine, Illustrious), `param.styleDialect=natural|booru`,
+repose, neutrální předloha (oblečená postava v pokoji, vygenerovaná labem —
+dřívější vlny běžely na fotce v plavkách, což mohlo zkreslovat reakci
+u stylů, které mění oblečení). Kandidátské tagy: `tools/lab/candidates/cultural-booru.json`,
+odvozené z bloku, motivy měnící obsah (vousy, roucha, tygr, „x-ray“,
+anatomie) vynechané. Seed 777, jeden běh (320 buněk), verdikt z pohledu na
+archy — metrika (barevná reakce vůči baseline) jen řadí a u vzorových stylů
+podhodnotila skutečný rozdíl (viz egyptian níž).
+
+| dialekt | NoobAI | WAI | Animagine | Illustrious |
+|---|---|---|---|---|
+| věta | 0.66 | 0.39 | 0.69 | 0.69 |
+| tagy | **0.86** | **0.76** | **0.82** | **0.93** |
+
+**Do registru (19, `StylePreset.booru`):** aboriginal, polynesian, maasai,
+hebrew, indian, secession, aztec, rinpa, mesopotamian, constructivist,
+huichol, arabian, artdeco, ashanti, papercut, burmese, himba, byzantine,
+stainedglass — tagy prošly na 3–4 modelech ze 4 a arch potvrdil viditelný
+rozdíl (patterny, ornament, sytost barev, které věta nedala — aboriginal
+tečkovaný vzor, aztec geometrie a červená, secession plátkové zlato,
+stainedglass sytá barevná okna). U slabších případů (arabian, himba, hebrew,
+huichol) je rozdíl menší, ale směr shodný na všech modelech.
+
+**Neopraveno — chyba je v popisu, ne v dialektu (2):** `dunhuang`, `romanfresco` —
+oba dialekty dají prakticky totéž (plochý pastelový oděv), styl nepřijde ani
+jednou cestou. Kandidát na přepsání bloku, ne na booru text.
+
+**Smíšené, ponecháno beze změny (18):** assyrian, ledger, maya, inca,
+thangka, dogon, minoan, egyptian, minhwa, greek, filipino, baroque, woodcut,
+persian, impressionist, chineseink, ukiyoe, illumination — na některém
+modelu tagy pomohly, na jiném uškodily nebo nic neudělaly. `egyptian`
+je zvláštní případ: metrika vyšla skoro na nule (0.00–0.06) u tří modelů, ale
+arch ukazuje jasné hieroglyfické vzory na rukávu a lemu, které věta nedala —
+barevná metrika lokální detail podhodnotí, když nezmění celkovou paletu.
+Kandidát na ruční přidání při příští revizi, ne na automatický export.
+Jeden seed nerozliší efekt od šumu tam, kde je rozptyl mezi modely (viz #0,
+`juggernaut-xl-lightning` 0.13–0.27, `illustrious-xl` 0.33–0.40) srovnatelný
+s naměřeným rozdílem — než se tahle skupina zapíše, chce to druhý seed.

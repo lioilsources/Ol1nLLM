@@ -56,9 +56,9 @@ class StylePreset {
 
   /// Text, který dostane model daného dialektu.
   String blockFor(PromptDialect dialect) => switch (dialect) {
-        PromptDialect.booru => booru ?? block,
-        PromptDialect.natural => block,
-      };
+    PromptDialect.booru => booru ?? block,
+    PromptDialect.natural => block,
+  };
 }
 
 const kStylePresets = <StylePreset>[
@@ -73,6 +73,8 @@ const kStylePresets = <StylePreset>[
     label: 'Aztec codex / stone relief',
     block:
         'aztec codex and stone relief style, bold black outlines, vibrant red turquoise and gold accents, geometric feather and sun motifs, formal stylized figures',
+    booru:
+        'codex, mesoamerican, stone relief, black outline, thick outlines, flat color, red theme, turquoise, gold, geometric pattern, sun symbol, feather pattern, traditional media',
   ),
   StylePreset(
     id: 'inca',
@@ -91,6 +93,8 @@ const kStylePresets = <StylePreset>[
     label: 'Ashanti (Ghana)',
     block:
         'ashanti inspired style, rich gold tones, geometric textile patterns, strong stylized figures, decorative symbols, warm earth and gold palette',
+    booru:
+        'kente, african, geometric pattern, patterned background, gold, yellow theme, orange theme, warm colors, symbols, stylized, traditional media',
   ),
   StylePreset(
     id: 'dogon',
@@ -103,24 +107,32 @@ const kStylePresets = <StylePreset>[
     label: 'Himba (Namibia)',
     block:
         'himba inspired style, rich red ochre skin tones, minimal clothing emphasis, strong natural anatomy, warm desert light, textured skin details',
+    booru:
+        'african, red ochre, earth tones, orange theme, warm lighting, desert, textured, painting (medium), traditional media',
   ),
   StylePreset(
     id: 'maasai',
     label: 'Maasai',
     block:
         'maasai inspired style, bold red and beadwork patterns, elongated elegant figures, strong vertical composition, vibrant contrasting colors',
+    booru:
+        'african, beadwork, beads, red theme, geometric pattern, vertical composition, vibrant colors, high contrast, stylized, traditional media',
   ),
   StylePreset(
     id: 'aboriginal',
     label: 'Aboriginal dot painting',
     block:
         'australian aboriginal dot painting style, intricate dot patterns, earth pigment colors, x-ray style internal forms, symbolic story elements, flat ceremonial composition',
+    booru:
+        'aboriginal art, dot painting, pointillism, dots, earth tones, brown theme, orange theme, symbols, abstract, flat color, traditional media',
   ),
   StylePreset(
     id: 'polynesian',
     label: 'Traditional Polynesian',
     block:
         'traditional polynesian style, bold geometric tattoos, strong black outlines, stylized powerful bodies, warm skin tones, carved wood aesthetic',
+    booru:
+        'polynesian, tribal tattoo, tribal pattern, geometric pattern, black outline, thick outlines, wood carving, warm colors, brown theme, stylized, traditional media',
   ),
   StylePreset(
     id: 'filipino',
@@ -133,6 +145,8 @@ const kStylePresets = <StylePreset>[
     label: 'Burmese temple painting',
     block:
         'traditional burmese temple painting style, flowing elegant lines, rich gold and red tones, ornate decorative details, soft idealized faces, luminous atmosphere',
+    booru:
+        'temple mural, southeast asian, gold, red theme, ornate, flowing lines, glowing, soft lighting, painting (medium), traditional media',
   ),
   StylePreset(
     id: 'assyrian',
@@ -145,24 +159,32 @@ const kStylePresets = <StylePreset>[
     label: 'Mesopotamian relief',
     block:
         'mesopotamian relief style, composite profile views, formal hierarchical proportions, detailed patterned hair, carved stone texture, earthy tones',
+    booru:
+        'ancient, stone relief, carved, from side, profile, patterned hair, stone texture, brown theme, sepia, stylized, traditional media',
   ),
   StylePreset(
     id: 'arabian',
     label: 'Pre-Islamic Arabian',
     block:
         'pre-islamic arabian style, elegant elongated figures, soft desert tones, flowing drapery, refined facial features, calm monumental presence',
+    booru:
+        'ancient, desert, brown theme, beige, muted colors, flowing lines, elongated, elegant, soft lighting, painting (medium), traditional media',
   ),
   StylePreset(
     id: 'hebrew',
     label: 'Ancient Near Eastern Hebrew',
     block:
         'ancient near eastern hebrew inspired style, simple strong outlines, modest earth palette, solemn dignified figures, subtle patterned textiles, formal composition',
+    booru:
+        'ancient, lineart, thick outlines, earth tones, brown theme, muted colors, textile pattern, flat color, solemn, traditional media',
   ),
   StylePreset(
     id: 'indian',
     label: 'Classical Indian miniature',
     block:
         'detailed indian miniature painting, flat vibrant colors, intricate decorative patterns, stylized elongated figures, ornate borders, rich reds and golds',
+    booru:
+        'indian miniature, miniature painting, gouache (medium), flat color, intricate pattern, ornate border, border, red theme, gold, stylized, traditional media',
   ),
   StylePreset(
     id: 'ukiyoe',
@@ -222,6 +244,8 @@ const kStylePresets = <StylePreset>[
     label: 'Byzantská ikona',
     block:
         'byzantine icon style, flat gold leaf ground, elongated solemn figures, stylized drapery folds, red and deep blue robes, hieratic frontal composition',
+    booru:
+        'byzantine art, religious icon, gold background, tempera, flat color, elongated, stylized, red and blue, symmetry, facing viewer, traditional media',
   ),
   StylePreset(
     id: 'illumination',
@@ -234,6 +258,8 @@ const kStylePresets = <StylePreset>[
     label: 'Vitráž',
     block:
         'gothic stained glass window style, bold black lead lines, luminous saturated colour panels, flat shapes, backlit glow, geometric tracery',
+    booru:
+        'stained glass, mosaic, lead lines, black outline, vibrant colors, flat color, backlighting, glowing, geometric pattern, gothic',
   ),
   StylePreset(
     id: 'impressionist',
@@ -252,18 +278,24 @@ const kStylePresets = <StylePreset>[
     label: 'Art Deco plakát',
     block:
         'art deco poster style, streamlined geometric forms, strong symmetry, metallic gold and black, flat colour blocks, elegant stylized figure',
+    booru:
+        'art deco, 1920s (style), retro artstyle, poster (medium), geometric, symmetry, gold, black and gold, flat color, streamlined',
   ),
   StylePreset(
     id: 'constructivist',
     label: 'Konstruktivistický plakát',
     block:
         'russian constructivist poster style, bold diagonal composition, red black and cream, geometric shapes, photomontage feel, heavy sans-serif blocks',
+    booru:
+        'constructivism, soviet poster, poster (medium), diagonal composition, red theme, black and white, geometric shapes, photomontage, limited palette, retro artstyle',
   ),
   StylePreset(
     id: 'secession',
     label: 'Vídeňská secese',
     block:
         'vienna secession style, flat gilded ornament, geometric mosaic patterns, elongated figure, decorative square motifs, gold and muted green',
+    booru:
+        'vienna secession, art nouveau, gold, gilded, mosaic, geometric pattern, square pattern, ornate, flat color, green and gold, elongated',
   ),
   StylePreset(
     id: 'minoan',
@@ -282,6 +314,8 @@ const kStylePresets = <StylePreset>[
     label: 'Rinpa zlatý paraván',
     block:
         'japanese rinpa screen style, gold leaf background, bold flat silhouettes, stylized waves and grasses, mineral pigments, decorative asymmetry',
+    booru:
+        'rinpa, folding screen, japanese art, gold background, gold leaf, flat color, silhouette, stylized waves, grass, asymmetry, traditional media',
   ),
   StylePreset(
     id: 'dunhuang',
@@ -300,12 +334,16 @@ const kStylePresets = <StylePreset>[
     label: 'Vystřihovánka',
     block:
         'traditional paper cut style, single flat colour silhouette, intricate symmetrical cutouts, sharp negative space, decorative floral lattice',
+    booru:
+        'paper cutout, papercraft, silhouette, single color, limited palette, symmetry, negative space, floral pattern, lattice, flat color',
   ),
   StylePreset(
     id: 'huichol',
     label: 'Huichol příze',
     block:
         'huichol yarn painting style, dense parallel yarn lines, vivid contrasting colours, symbolic peyote and deer motifs, flat filled forms',
+    booru:
+        'yarn art, yarn, string art, parallel lines, vibrant colors, high contrast, psychedelic, symbols, flat color, mexican folk art',
   ),
   // Třetí vlna — styly podle konkrétních umělců, po autorech jako
   // v tools/lab/candidates/artists.json. Zahozené a proč: docs/style-matrix.md.
@@ -748,8 +786,7 @@ String applyStyle(
   String prompt,
   String? styleId, {
   PromptDialect dialect = PromptDialect.natural,
-}) =>
-    applyStylePreset(prompt, styleById(styleId), dialect: dialect);
+}) => applyStylePreset(prompt, styleById(styleId), dialect: dialect);
 
 /// Same rule, but for a preset the caller already holds — the lab vets style
 /// candidates that are not (yet) in [kStylePresets], and looking them up by id
