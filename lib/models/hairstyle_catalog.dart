@@ -186,16 +186,6 @@ const kHairstyles = <HairstylePreset>[
     engines: [HairEngine.kontext],
   ),
   HairstylePreset(
-    id: 'm-crew',
-    label: 'Crew cut',
-    group: kHairGroupMen,
-    section: 'Krátké',
-    block:
-        'crew cut, short hair slightly longer on top and tapered on the sides and back, clean and neat',
-    shape: HairShape(length: HairLength.short, bangs: HairBangs.none, updo: false),
-    engines: [HairEngine.kontext],
-  ),
-  HairstylePreset(
     id: 'm-caesar',
     label: 'César',
     group: kHairGroupMen,
