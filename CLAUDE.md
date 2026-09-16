@@ -570,13 +570,33 @@ s účesem, nebo sama přes „Jen barva“ — pak `hairstyleId` = `keep-cut`
 (`kKeepCutPreset`) a maska je v režimu `hair` (jen stará silueta, bez obálky),
 protože střih zůstává. Katalog barev je generovaný z gate stejně jako účesy.
 
-Model: když aktivní neumí inpaint, přepne se na `flux-fill` (snackbar, LoRA
-padá stejně jako u inpaintu). Prompt = `hairPrompt()` z
+Prompt = `hairPrompt()` z
 `lib/models/hairstyle_preset.dart`, doslova Tsumiki `hairPrompt` s dosazenou
 barvou. Katalog `kHairstyles` (`hairstyle_catalog.dart`) je **generovaný**
-(`MangaPrompts/tgbot/tools/bench/export_catalog.py --ol1nllm`) a obsahuje jen
-účesy, které prošly gate na obou enginech (`MangaPrompts/docs/hair-matrix.md`);
-s prázdným katalogem je akce skrytá. Řádek účesu v `HairSheet` má **náhled**
+(`MangaPrompts/tgbot/tools/bench/export_catalog.py --ol1nllm`) z verdiktů
+benche (`MangaPrompts/docs/hair-matrix.md`); s prázdným katalogem je akce
+skrytá.
+
+**Gate je per engine, ne průnik** (`HairstylePreset.engines`,
+`HairColourPreset.engines`): položka se veze, jakmile ji přijme *jeden* engine,
+a nese který. Enginy si totiž protiřečí v obou směrech — Kontext udrží
+platinovou blond, kde ji SDXL přemaluje na hnědou (`colour_ok 0%`), a SDXL
+udrží rozpoznatelné mikádo nebo pixie, kde je Kontext ztratí
+(`recognised 33%`). Průnik zahazoval 20 změřených položek, většinu běžných
+střihů: katalog vyrostl ze 7 účesů + 8 barev na **29 + 17** (15 na obou,
+11 jen Kontext, 20 jen SDXL).
+
+Model proto vybírá **účes, ne naopak** (`planHairRun()`): styl určí engine,
+engine určí model. Kdyby rozhodoval vybraný model, byl by styl změřený jen na
+SDXL dostupný náhodou — podle toho, čím uživatel zrovna generoval. Enginy mají
+napevno svůj model, `kHairEngineModel`: Kontext = `flux-fill`, SDXL =
+`juggernaut-xl`, protože právě `Juggernaut-XL_v9_RunDiffusionPhoto_v2` bench
+měřil; jiný SDXL checkpoint tentýž graf vyrenderuje, ale žádný verdikt ho
+nepokrývá. Model už vybraný se drží, jen když je jedním z těch dvou.
+Když styl a barva nemají společný engine (blond lob — blond prošla jen na
+Kontextu, lob jen na SDXL), **vyhraje styl** a `HairPlan.note` to řekne:
+odmítnout věrohodný požadavek je horší než ho spustit s výhradou, a úkol gate
+je říkat pravdu, ne zakazovat. Řádek účesu v `HairSheet` má **náhled**
 (`assets/hair/<id>.jpg`, `HairstylePreset.preview`): výstup benche pro ten
 účes na primárním syntetickém portrétu skupiny — na každém řádku tatáž tvář,
 takže oko srovnává jen vlasy; žádné stock fotky ani osobní data. Chip barvy

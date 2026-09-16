@@ -1260,23 +1260,30 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         : hairstyleById(hairstyleId);
     if (base == null || style == null || _hairBusy) return;
     final keepCut = style.id == kKeepCutId;
-    String? info;
-    if (!state.model.inpaint || state.model.kind != ImageBackendKind.comfyUi) {
-      final candidates = state.availableModels
-          .where((m) => m.inpaint && m.kind == ImageBackendKind.comfyUi)
-          .toList();
-      if (candidates.isEmpty) {
-        state = state.copyWith(
-          error: 'Kadeřník potřebuje inpaint model — na serveru žádný není.',
-        );
-        return;
-      }
-      final target = candidates.firstWhere(
-        (m) => m.id == 'flux-fill',
-        orElse: () => candidates.first,
+    // The style picks the engine, the engine picks the model — the gate is per
+    // engine, so running a style on the other one would ship what no verdict
+    // covers. See [planHairRun].
+    final plan = planHairRun(
+      available: state.availableModels,
+      currentModelId: state.model.id,
+      style: style,
+      colour: newColour,
+    );
+    if (plan == null) {
+      state = state.copyWith(
+        error:
+            'Kadeřník potřebuje FLUX Fill nebo Juggernaut XL — '
+            'na serveru není ani jeden.',
       );
-      setModel(target.id);
-      info = 'Přepnuto na ${target.label} — účes se dělá přes inpaint.';
+      return;
+    }
+    String? info = plan.note;
+    if (plan.modelId != state.model.id) {
+      setModel(plan.modelId);
+      info = [
+        'Přepnuto na ${state.model.label} — na něm je účes změřený.',
+        ?plan.note,
+      ].join(' ');
     }
     _hairBusy = true;
     state = state.copyWith(

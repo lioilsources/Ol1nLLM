@@ -6,6 +6,66 @@ import 'hairstyle_preset.dart';
 
 const kHairstyles = <HairstylePreset>[
   HairstylePreset(
+    id: 'curtain-bangs',
+    label: 'Záclonová ofina',
+    group: kHairGroupWomen,
+    section: 'Ofiny',
+    block:
+        'curtain bangs, soft face-framing fringe parted in the middle and swept to both sides, blending into the lengths',
+    shape: HairShape(length: HairLength.keep, bangs: HairBangs.curtain, updo: false),
+    engines: [HairEngine.sdxl],
+  ),
+  HairstylePreset(
+    id: 'lob',
+    label: 'Dlouhé mikádo',
+    group: kHairGroupWomen,
+    section: 'Střihy',
+    block:
+        'long bob haircut (lob), one-length hair ending at the collarbone, sleek and slightly longer in front',
+    shape: HairShape(length: HairLength.medium, bangs: HairBangs.none, updo: false),
+    engines: [HairEngine.sdxl],
+  ),
+  HairstylePreset(
+    id: 'bob',
+    label: 'Klasické mikádo',
+    group: kHairGroupWomen,
+    section: 'Střihy',
+    block:
+        'classic bob haircut, chin-length hair cut straight around the head, smooth and even',
+    shape: HairShape(length: HairLength.medium, bangs: HairBangs.none, updo: false),
+    engines: [HairEngine.sdxl],
+  ),
+  HairstylePreset(
+    id: 'french-bob',
+    label: 'Krátké francouzské mikádo',
+    group: kHairGroupWomen,
+    section: 'Střihy',
+    block:
+        'french bob, short chin-length bob with a full straight fringe, effortless parisian look',
+    shape: HairShape(length: HairLength.medium, bangs: HairBangs.full, updo: false),
+    engines: [HairEngine.sdxl],
+  ),
+  HairstylePreset(
+    id: 'pixie',
+    label: 'Velmi krátký dámský střih',
+    group: kHairGroupWomen,
+    section: 'Střihy',
+    block:
+        'pixie cut, very short cropped women\'s haircut, short layers on top, tapered at the nape and around the ears',
+    shape: HairShape(length: HairLength.short, bangs: HairBangs.none, updo: false),
+    engines: [HairEngine.sdxl],
+  ),
+  HairstylePreset(
+    id: 'blunt-bangs',
+    label: 'Rovná hustá ofina',
+    group: kHairGroupWomen,
+    section: 'Ofiny',
+    block:
+        'blunt bangs, thick straight-across fringe cut in a sharp horizontal line at the eyebrows',
+    shape: HairShape(length: HairLength.keep, bangs: HairBangs.full, updo: false),
+    engines: [HairEngine.sdxl],
+  ),
+  HairstylePreset(
     id: 'face-framing',
     label: 'Vrstvy rámující obličej',
     group: kHairGroupWomen,
@@ -13,6 +73,47 @@ const kHairstyles = <HairstylePreset>[
     block:
         'face-framing layers, shorter layered pieces around the face blending into the lengths, soft and flattering',
     shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: false),
+    engines: [HairEngine.kontext, HairEngine.sdxl],
+  ),
+  HairstylePreset(
+    id: 'soft-curls',
+    label: 'Jemné kudrliny',
+    group: kHairGroupWomen,
+    section: 'Textura',
+    block:
+        'soft curls, bouncy loose curls with defined ringlets and shine',
+    shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: false),
+    engines: [HairEngine.sdxl],
+  ),
+  HairstylePreset(
+    id: 'messy-bun',
+    label: 'Rozcuchaný drdol',
+    group: kHairGroupWomen,
+    section: 'Účesy nahoru',
+    block:
+        'messy bun, hair twisted into a loose casual bun on top of the head with soft strands falling out',
+    shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: true),
+    engines: [HairEngine.sdxl],
+  ),
+  HairstylePreset(
+    id: 'top-knot',
+    label: 'Drdol vysoko na hlavě',
+    group: kHairGroupWomen,
+    section: 'Účesy nahoru',
+    block:
+        'top knot, hair pulled up into a tight neat knot high on top of the head',
+    shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: true),
+    engines: [HairEngine.sdxl],
+  ),
+  HairstylePreset(
+    id: 'hollywood-waves',
+    label: 'Hollywoodské vlny',
+    group: kHairGroupWomen,
+    section: 'Textura',
+    block:
+        'old hollywood waves, glossy sculpted s-shaped waves swept to one side, 1940s glamour',
+    shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: false),
+    engines: [HairEngine.sdxl],
   ),
   HairstylePreset(
     id: 'box-braids',
@@ -22,6 +123,7 @@ const kHairstyles = <HairstylePreset>[
     block:
         'long box braids, many small neat three-strand braids falling past the shoulders',
     shape: HairShape(length: HairLength.long, bangs: HairBangs.none, updo: false),
+    engines: [HairEngine.kontext, HairEngine.sdxl],
   ),
   HairstylePreset(
     id: 'dutch-braids',
@@ -31,6 +133,17 @@ const kHairstyles = <HairstylePreset>[
     block:
         'two dutch braids, tight raised braids running from the hairline back along both sides of the head',
     shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: false),
+    engines: [HairEngine.kontext, HairEngine.sdxl],
+  ),
+  HairstylePreset(
+    id: 'french-braid',
+    label: 'Francouzský cop',
+    group: kHairGroupWomen,
+    section: 'Copánky',
+    block:
+        'single french braid, hair woven tightly from the crown into one braid that hangs down the back',
+    shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: true),
+    engines: [HairEngine.sdxl],
   ),
   HairstylePreset(
     id: 'crown-braid',
@@ -40,6 +153,97 @@ const kHairstyles = <HairstylePreset>[
     block:
         'crown braid, a thick braid wrapped around the head like a halo with all the hair up',
     shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: true),
+    engines: [HairEngine.kontext, HairEngine.sdxl],
+  ),
+  HairstylePreset(
+    id: 'space-buns',
+    label: 'Dva drdůlky',
+    group: kHairGroupWomen,
+    section: 'Účesy nahoru',
+    block:
+        'space buns, two small round buns high on top of the head, one on each side',
+    shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: true),
+    engines: [HairEngine.sdxl],
+  ),
+  HairstylePreset(
+    id: 'sleek-bun',
+    label: 'Uhlazený nízký drdol',
+    group: kHairGroupWomen,
+    section: 'Účesy nahoru',
+    block:
+        'sleek low bun, hair pulled back smoothly with a middle part into a tight low bun at the nape',
+    shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: true),
+    engines: [HairEngine.sdxl],
+  ),
+  HairstylePreset(
+    id: 'm-buzz',
+    label: 'Ježek',
+    group: kHairGroupMen,
+    section: 'Krátké',
+    block:
+        'buzz cut, hair clipped uniformly very short all over the head',
+    shape: HairShape(length: HairLength.short, bangs: HairBangs.none, updo: false),
+    engines: [HairEngine.kontext],
+  ),
+  HairstylePreset(
+    id: 'm-crew',
+    label: 'Crew cut',
+    group: kHairGroupMen,
+    section: 'Krátké',
+    block:
+        'crew cut, short hair slightly longer on top and tapered on the sides and back, clean and neat',
+    shape: HairShape(length: HairLength.short, bangs: HairBangs.none, updo: false),
+    engines: [HairEngine.kontext],
+  ),
+  HairstylePreset(
+    id: 'm-caesar',
+    label: 'César',
+    group: kHairGroupMen,
+    section: 'Krátké',
+    block:
+        'caesar cut, short hair with a short horizontally cut fringe combed forward over the forehead',
+    shape: HairShape(length: HairLength.short, bangs: HairBangs.full, updo: false),
+    engines: [HairEngine.sdxl],
+  ),
+  HairstylePreset(
+    id: 'm-textured-fringe',
+    label: 'Texturovaná ofina (Edgar / fluffy fringe)',
+    group: kHairGroupMen,
+    section: 'Krátké',
+    block:
+        'textured fringe haircut, short hair with a full piecey fringe pushed forward over the forehead, skin fade sides',
+    shape: HairShape(length: HairLength.short, bangs: HairBangs.full, updo: false),
+    engines: [HairEngine.sdxl],
+  ),
+  HairstylePreset(
+    id: 'm-curly-fade',
+    label: 'Kudrnatý vršek s fade',
+    group: kHairGroupMen,
+    section: 'Krátké',
+    block:
+        'curly top with fade, defined natural curls left on top with the sides faded short',
+    shape: HairShape(length: HairLength.short, bangs: HairBangs.none, updo: false),
+    engines: [HairEngine.sdxl],
+  ),
+  HairstylePreset(
+    id: 'm-shag',
+    label: 'Rozcuchaný střední střih',
+    group: kHairGroupMen,
+    section: 'Střední',
+    block:
+        'men\'s shaggy mid-length haircut, layered messy hair down to the ears with tousled texture',
+    shape: HairShape(length: HairLength.medium, bangs: HairBangs.wispy, updo: false),
+    engines: [HairEngine.sdxl],
+  ),
+  HairstylePreset(
+    id: 'm-two-block',
+    label: 'Two-block (K-pop)',
+    group: kHairGroupMen,
+    section: 'Střední',
+    block:
+        'two-block haircut, korean style with longer layered hair on top and a fringe over the forehead, sides and back clipped short underneath',
+    shape: HairShape(length: HairLength.medium, bangs: HairBangs.full, updo: false),
+    engines: [HairEngine.sdxl],
   ),
   HairstylePreset(
     id: 'm-man-bun',
@@ -49,6 +253,17 @@ const kHairstyles = <HairstylePreset>[
     block:
         'man bun, long hair pulled back and tied into a bun at the back of the head',
     shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: true),
+    engines: [HairEngine.kontext, HairEngine.sdxl],
+  ),
+  HairstylePreset(
+    id: 'm-top-knot',
+    label: 'Top knot',
+    group: kHairGroupMen,
+    section: 'Účesy nahoru',
+    block:
+        'men\'s top knot, long hair on top tied into a knot on the crown with shaved undercut sides',
+    shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: true),
+    engines: [HairEngine.kontext],
   ),
   HairstylePreset(
     id: 'm-spiky',
@@ -58,6 +273,7 @@ const kHairstyles = <HairstylePreset>[
     block:
         'spiky hair, short hair styled straight up into sharp textured spikes all over the top',
     shape: HairShape(length: HairLength.short, bangs: HairBangs.none, updo: false),
+    engines: [HairEngine.kontext, HairEngine.sdxl],
   ),
   HairstylePreset(
     id: 'm-cornrows',
@@ -67,56 +283,138 @@ const kHairstyles = <HairstylePreset>[
     block:
         'cornrows, hair braided flat to the scalp in straight neat rows running back from the hairline',
     shape: HairShape(length: HairLength.short, bangs: HairBangs.none, updo: false),
+    engines: [HairEngine.kontext, HairEngine.sdxl],
+  ),
+  HairstylePreset(
+    id: 'm-twists',
+    label: 'Twisty s fade',
+    group: kHairGroupMen,
+    section: 'Krátké',
+    block:
+        'two-strand twists, short twisted coils on top with a tapered fade on the sides',
+    shape: HairShape(length: HairLength.short, bangs: HairBangs.none, updo: false),
+    engines: [HairEngine.sdxl],
   ),
 ];
 
 const kHairColours = <HairColourPreset>[
   HairColourPreset(
+    id: 'platinum-blonde',
+    label: 'Platinová blond',
+    phrase: 'icy platinum blonde',
+    swatch: 0xFFDAD7DF,
+    engines: [HairEngine.kontext],
+  ),
+  HairColourPreset(
+    id: 'ash-blonde',
+    label: 'Popelavá blond',
+    phrase: 'cool ash blonde',
+    swatch: 0xFFD4C4BB,
+    engines: [HairEngine.kontext],
+  ),
+  HairColourPreset(
+    id: 'honey-blonde',
+    label: 'Medová blond',
+    phrase: 'warm honey blonde',
+    swatch: 0xFFCD903B,
+    engines: [HairEngine.kontext],
+  ),
+  HairColourPreset(
     id: 'copper-red',
     label: 'Měděná zrzavá',
     phrase: 'vibrant copper red, natural redhead',
     swatch: 0xFF742C16,
+    engines: [HairEngine.kontext, HairEngine.sdxl],
   ),
   HairColourPreset(
     id: 'fox-red',
     label: 'Liščí zrzavá',
     phrase: 'bright fox red, vivid orange ginger',
     swatch: 0xFFB03919,
+    engines: [HairEngine.kontext, HairEngine.sdxl],
   ),
   HairColourPreset(
     id: 'auburn',
     label: 'Kaštanově zrzavá',
     phrase: 'deep auburn',
     swatch: 0xFF56261A,
+    engines: [HairEngine.kontext, HairEngine.sdxl],
   ),
   HairColourPreset(
     id: 'burgundy',
     label: 'Vínová',
     phrase: 'burgundy wine red',
     swatch: 0xFF421115,
+    engines: [HairEngine.kontext, HairEngine.sdxl],
+  ),
+  HairColourPreset(
+    id: 'chocolate-brown',
+    label: 'Čokoládová hnědá',
+    phrase: 'rich chocolate brown',
+    swatch: 0xFF3A251E,
+    engines: [HairEngine.sdxl],
   ),
   HairColourPreset(
     id: 'honey-balayage',
     label: 'Hnědá s medovým balayage',
     phrase: 'brown hair with soft honey blonde balayage highlights toward the ends',
     swatch: 0xFF61442F,
+    engines: [HairEngine.kontext, HairEngine.sdxl],
   ),
   HairColourPreset(
     id: 'jet-black',
     label: 'Uhlově černá',
     phrase: 'glossy jet black',
     swatch: 0xFF111112,
+    engines: [HairEngine.kontext, HairEngine.sdxl],
   ),
   HairColourPreset(
     id: 'blue-black',
     label: 'Modročerná',
     phrase: 'blue-black with a cool blue sheen',
     swatch: 0xFF132441,
+    engines: [HairEngine.kontext, HairEngine.sdxl],
+  ),
+  HairColourPreset(
+    id: 'silver-grey',
+    label: 'Stříbrně šedá',
+    phrase: 'silver grey',
+    swatch: 0xFFA6A3A8,
+    engines: [HairEngine.kontext],
   ),
   HairColourPreset(
     id: 'pastel-pink',
     label: 'Pastelově růžová',
     phrase: 'pastel pink',
     swatch: 0xFFCD7988,
+    engines: [HairEngine.kontext, HairEngine.sdxl],
+  ),
+  HairColourPreset(
+    id: 'hot-pink',
+    label: 'Sytě růžová',
+    phrase: 'vivid hot pink',
+    swatch: 0xFFC52F6D,
+    engines: [HairEngine.kontext],
+  ),
+  HairColourPreset(
+    id: 'lavender',
+    label: 'Levandulová',
+    phrase: 'pastel lavender purple',
+    swatch: 0xFFA079BE,
+    engines: [HairEngine.kontext],
+  ),
+  HairColourPreset(
+    id: 'electric-blue',
+    label: 'Elektricky modrá',
+    phrase: 'vivid electric blue',
+    swatch: 0xFF1641C1,
+    engines: [HairEngine.kontext],
+  ),
+  HairColourPreset(
+    id: 'teal',
+    label: 'Mořsky tyrkysová',
+    phrase: 'vivid mermaid teal, blue-green',
+    swatch: 0xFF318280,
+    engines: [HairEngine.kontext],
   ),
 ];

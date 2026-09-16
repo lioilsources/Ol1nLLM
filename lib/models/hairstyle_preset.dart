@@ -1,16 +1,43 @@
 // Kadeřník: hairstyles for the Image Studio tile action.
 //
 // The same catalog as Tsumiki's Hairdresser card — ids, blocks and shapes come
-// from MangaPrompts `tgbot/tools/bench/candidates/hairstyles.json` and only the
-// styles that passed the bench gate on both engines are exported here
-// (`export_catalog.py --ol1nllm`, verdicts in MangaPrompts/docs/hair-matrix.md).
+// from MangaPrompts `tgbot/tools/bench/candidates/hairstyles.json` and every
+// style that passed the bench gate on *either* engine is exported here, with
+// [HairstylePreset.engines] saying which (`export_catalog.py --ol1nllm`,
+// verdicts in MangaPrompts/docs/hair-matrix.md).
 // Labels are Czech, like the rest of this app.
 
 import 'hair_mask.dart';
 import 'hairstyle_catalog.dart';
+import 'image_model.dart';
 import 'style_preset.dart' show foldDiacritics;
 
 export 'hairstyle_catalog.dart' show kHairstyles, kHairColours;
+
+/// Which engine the bench measured a catalog entry on.
+///
+/// The gate is per engine, and the two disagree in both directions: Kontext
+/// keeps platinum blonde platinum where SDXL paints it brown (`colour_ok 0%`),
+/// while SDXL keeps a lob or a pixie recognisable where Kontext loses it
+/// (`recognised 33%`). Demanding both would throw away 20 measured, passing
+/// entries — most of the everyday haircuts.
+enum HairEngine {
+  /// FLUX presets — `flux_hair_kontext.api.json`, instruction-style prompts.
+  kontext,
+
+  /// SDXL inpaint through the preset's `inpaintAsset`.
+  sdxl,
+}
+
+/// The model each engine was measured on: the bench ran Kontext through
+/// flux-fill's graph and SDXL on `Juggernaut-XL_v9_RunDiffusionPhoto_v2`. Those
+/// two are therefore the models the Kadeřník runs on. Another SDXL checkpoint
+/// renders the same graph, but no verdict covers it — and a catalog is only as
+/// true as the model underneath it.
+const kHairEngineModel = <HairEngine, String>{
+  HairEngine.kontext: 'flux-fill',
+  HairEngine.sdxl: 'juggernaut-xl',
+};
 
 const kHairGroupWomen = 'Ženy';
 const kHairGroupMen = 'Muži';
@@ -24,12 +51,17 @@ class HairstylePreset {
     required this.section,
     required this.block,
     required this.shape,
+    this.engines = HairEngine.values,
   });
 
   final String id;
   final String label;
   final String group;
   final String section;
+
+  /// Engines whose gate accepted this style. Never empty — an entry that
+  /// passed nowhere is not exported at all.
+  final List<HairEngine> engines;
 
   /// English prompt fragment (name + look), shown as the subtitle.
   final String block;
@@ -49,11 +81,15 @@ class HairColourPreset {
     required this.label,
     required this.phrase,
     this.swatch,
+    this.engines = HairEngine.values,
   });
 
   final String id;
   final String label;
   final String phrase;
+
+  /// Engines whose gate accepted this colour — see [HairstylePreset.engines].
+  final List<HairEngine> engines;
 
   /// ARGB of the colour the bench *measured* on the accepted cells — what the
   /// model paints, not the target range. Null while unmeasured.
@@ -77,6 +113,66 @@ HairColourPreset? hairColourById(String? id) {
     if (c.id == id) return c;
   }
   return null;
+}
+
+/// What a Kadeřník request will actually run on.
+typedef HairPlan = ({String modelId, HairEngine engine, String? note});
+
+/// Pick the engine from the **style**, then the model from the engine — never
+/// the other way round.
+///
+/// With the model deciding, a style measured only on SDXL would be reachable
+/// by accident (whatever the user last generated with) and invisible
+/// otherwise; the user picks a haircut, not a checkpoint.
+///
+/// [colour] narrows the choice further when it passed on only one engine.
+/// When style and colour share no engine the **style wins** and [HairPlan.note]
+/// says so: refusing a plausible request (a blond lob — blonde passes only on
+/// Kontext, a lob only on SDXL) would be worse than running it with a caveat,
+/// and the gate's job is to tell the truth, not to forbid.
+///
+/// Keeps [currentModelId] when it is already one of the two measured models,
+/// so a style that passed everywhere doesn't shuffle the picker for nothing.
+/// Null = the server has neither engine's model.
+HairPlan? planHairRun({
+  required List<ImageModelSpec> available,
+  required String currentModelId,
+  required HairstylePreset style,
+  HairColourPreset? colour,
+}) {
+  bool installed(HairEngine e) => available.any(
+    (m) =>
+        m.id == kHairEngineModel[e] &&
+        m.inpaint &&
+        m.kind == ImageBackendKind.comfyUi,
+  );
+
+  final wanted = [
+    for (final e in HairEngine.values)
+      if (style.engines.contains(e)) e,
+  ];
+  final shared = colour == null
+      ? wanted
+      : [
+          for (final e in wanted)
+            if (colour.engines.contains(e)) e,
+        ];
+  final usable = [
+    for (final e in (shared.isEmpty ? wanted : shared))
+      if (installed(e)) e,
+  ];
+  if (usable.isEmpty) return null;
+  var engine = usable.first;
+  for (final e in usable) {
+    if (kHairEngineModel[e] == currentModelId) engine = e;
+  }
+  return (
+    modelId: kHairEngineModel[engine]!,
+    engine: engine,
+    note: shared.isEmpty && colour != null
+        ? '${colour.label} není na tomhle enginu změřená — barva může vyjít jinak.'
+        : null,
+  );
 }
 
 /// Mirror of MangaPrompts `tgbot/hairprompt.py` — the bot writes the Tsumiki
