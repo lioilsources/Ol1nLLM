@@ -863,6 +863,12 @@ class _NodeGrid extends ConsumerWidget {
                                 catalog: ref
                                     .read(imageStudioProvider)
                                     .availableDances,
+                                // Stejný string, jaký FigureService.create()
+                                // poslal serveru jako `name` - jde dohledat
+                                // v UGCFactory seznamu postav.
+                                serverName:
+                                    'Ol1nLLM ${node.id.substring(0, 8)}',
+                                figureId: node.figureId,
                               ),
                             ),
                           ),
