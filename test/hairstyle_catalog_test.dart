@@ -48,6 +48,21 @@ void main() {
     }
   });
 
+  test('a down style always carries a length', () {
+    // `keep` has no envelope: the mask is the old hair's silhouette. Right for
+    // a fringe or an updo, which change what is there; wrong for waves or
+    // braids on a tied-back or short source, where the new hair had no room
+    // and came back as a clipped bob. Such a style needs a length.
+    for (final s in kHairstyles) {
+      if (s.shape.length != HairLength.keep) continue;
+      expect(
+        s.shape.bangs != HairBangs.none || s.shape.updo,
+        isTrue,
+        reason: '${s.id}: keep without bangs or updo',
+      );
+    }
+  });
+
   test('every catalog entry names at least one engine', () {
     // An entry that passed nowhere must not be exported at all — an empty list
     // would make planHairRun return null and the action would just fail.

@@ -7,11 +7,18 @@
 // (`tgbot/tools/bench`, results in `MangaPrompts/docs/hair-matrix.md`).
 //
 // `assets/comfyui/hair_analyse.api.json` saves four binary masks of the
-// portrait (hair, face, hat, eyes+brows). The repaint mask is:
+// portrait (hair, face, hat, eyes+brows). The hair mask is the union of two
+// parsers: FaceSegment (CelebAMask-HQ, face crops) stops at the chest on a
+// phone selfie — 1.0 face heights below the chin where the hair reached 1.4 —
+// and whatever it misses survives the repaint; ClothesSegment (ATR, full
+// body) reaches the ends. The repaint mask is:
 //   1. old hair + hat, dilated so no stray strands survive;
 //   2. a forehead band when the new style has a fringe;
 //   3. an envelope where the new hair may grow (a longer cut needs room the
-//      old hair never had);
+//      old hair never had). `keep` has none — right for a fringe, an updo or
+//      a colour change, which live where the old hair is; a down style
+//      (waves, braids) always carries a length, or on a tied-back source it
+//      has no room and comes back as a clipped bob (hairstyle_catalog_test);
 //   4. minus the face, so the pixels that carry identity are never touched.
 
 import 'dart:math' as math;
@@ -68,6 +75,23 @@ const kHairMinForColour = 0.005;
 /// holes repainted it; 1.5 is the context window the bench ran with.
 const kHairMaskFillHoles = false;
 const kHairContextFactor = 1.5;
+
+/// Soft edge of the Kontext composite (`GrowMaskWithBlur` in
+/// `flux_hair_kontext.api.json`) as a share of the photo's long side. The
+/// graph ships 6 px expand / 12 px blur: right for the bench's 1216 px
+/// portraits, half a percent of a 2576 px phone photo — a hard seam there.
+/// Mirror of `feather_px` in hairmask.py.
+const kHairFeatherExpand = 0.006;
+const kHairFeatherBlur = 0.015;
+
+/// (expand, blur) in pixels for a photo of [w]×[h].
+(int, int) hairFeatherPx(int w, int h) {
+  final side = math.max(w, h);
+  return (
+    math.max(1, pyRound(kHairFeatherExpand * side)),
+    math.max(1, pyRound(kHairFeatherBlur * side)),
+  );
+}
 
 /// A photo the Kadeřník cannot work with; [message] is shown to the user.
 class HairMaskException implements Exception {

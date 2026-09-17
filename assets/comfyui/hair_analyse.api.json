@@ -28,6 +28,44 @@
       "Hair": true
     }
   },
+  "14": {
+    "class_type": "ClothesSegment",
+    "_meta": {
+      "title": "Hair over the body (ATR full-body parsing; FaceSegment stops at the chest)"
+    },
+    "inputs": {
+      "images": [
+        "1",
+        0
+      ],
+      "Hair": true,
+      "process_res": 512,
+      "mask_blur": 0,
+      "mask_offset": 0,
+      "invert_output": false,
+      "background": "Alpha",
+      "background_color": "#222222"
+    }
+  },
+  "15": {
+    "class_type": "MaskComposite",
+    "_meta": {
+      "title": "Hair = FaceSegment or ClothesSegment"
+    },
+    "inputs": {
+      "destination": [
+        "2",
+        1
+      ],
+      "source": [
+        "14",
+        1
+      ],
+      "x": 0,
+      "y": 0,
+      "operation": "or"
+    }
+  },
   "3": {
     "class_type": "MaskToImage",
     "_meta": {
@@ -35,8 +73,8 @@
     },
     "inputs": {
       "mask": [
-        "2",
-        1
+        "15",
+        0
       ]
     }
   },
