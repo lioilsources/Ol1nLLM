@@ -542,13 +542,28 @@ Akce na dlaždici (nůžky, pravý horní roh vedle „Rozhýbat“/„Zachovej 
 `ImageStudioNotifier.hairRestyle(imageId, hairstyleId)`:
 
 1. `ComfyUIService.analyseHair` pustí `assets/comfyui/hair_analyse.api.json`
-   (face parsing přes ComfyUI-RMBG `FaceSegment` + `ClothesSegment` na čepici,
+   (face parsing přes ComfyUI-RMBG `FaceSegment` + `ClothesSegment`,
    **bez difuze**, sekundy) a stáhne čtyři masky — hair, face, hat, features
    (oči+obočí). Výstupy se párují podle prefixu jména souboru.
+   Maska vlasů je **sjednocení dvou parserů** (`MaskComposite` `or`):
+   `FaceSegment` (SegFormer na CelebAMask-HQ, tj. výřezy obličejů, vstup
+   zmáčknutý na 512×512) na selfie z telefonu končí u hrudníku — 1,0 výšky
+   tváře pod bradou, kde vlasy sahaly do 1,4 — a co nenajde, přežije
+   přemalování (blond konce pod stříbrnými vlasy, dlouhé vlasy pod drdolem).
+   `ClothesSegment` (SegFormer-B2 na ATR, celé tělo) dosáhne až ke koncům.
+   Bench to nevidí: jeho předlohy mají vlasy oříznuté rámem přesně tam, kam
+   face parsing dosáhne (`w-long` 1,02 = spodní okraj). Změřeno 2026-09-17
+   na reálných selfie, `MangaPrompts/docs/hair-matrix.md`.
 2. `buildHairMask` + `estimateHairColour` (`lib/models/hair_mask.dart`) v
    isolate: stará vlasy + čepice (dilatace), pás na čele u ofin, **obálka**
    podle délky (kam nové vlasy smí dorůst), minus obličej. Barva z *nasvícených*
    pramenů (50.–90. percentil jasu v jádru masky) — medián padal do stínů.
+   **`keep` nemá obálku**: maska je jen stará silueta. To je správně pro
+   ofinu, drdol a „Jen barva“, které žijí tam, kde staré vlasy jsou; styl
+   bez ofiny a bez `updo` (vlny, kudrliny, copy) s `keep` neměl na staženém
+   nebo krátkém účesu kam růst a vrátil se jako useknuté mikádo. Takové
+   styly proto v katalogu nesou `long`; `test/hairstyle_catalog_test.dart`
+   i `tgbot/tests/test_bench_catalog.py` invariant hlídají.
    Soubor je **zrcadlo** `MangaPrompts/tgbot/hairmask.py`: stejné konstanty,
    stejné kroky, stejná fixture v testech (`test/hair_mask_test.dart` ×
    `tgbot/tests/test_hairmask.py`). Měnit spolu; čísla kalibruje Tsumiki bench.
@@ -563,6 +578,12 @@ Akce na dlaždici (nůžky, pravý horní roh vedle „Rozhýbat“/„Zachovej 
    pruh starých vlasů a u krku dvojitý límec. Graf proto volá node
    `TsumikiAlignToReference` (MangaPrompts `comfyui_nodes/ComfyUI-Tsumiki`,
    nasazuje `comfyui_nodes/deploy.sh`); ComfyUI bez něj graf odmítne.
+   Měkký okraj kompozitu (`GrowMaskWithBlur`) se škáluje podle fotky
+   (`hairFeatherPx`: 0,6 % / 1,5 % delší strany, čte se z hlavičky masky,
+   takže funguje i pro retry). Šablona má 6/12 px, což sedí benchi s 1216 px
+   předlohami a na 2576 px fotce to byl tvrdý šev; SDXL crop si mísí sám
+   (`mask_blend_pixels`). Blob zůstává i pro Kontext: jeden rovný šev je
+   lepší než šev kolem každého pramene, který by zbyl po siluetě.
 
 **Barva vlasů**: list má nahoře řadu barev (`kHairColours`, `HairColourPreset`
 s frází do promptu, zrcadlo MangaPrompts `tgbot/haircolours.py`). Barva jde

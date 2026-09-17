@@ -555,8 +555,10 @@ class ComfyUIService implements ImageBackend {
   /// edit pasted back through the mask so the face and backdrop stay the
   /// original pixels. Kontext re-frames the edit by up to 6 %, so the graph
   /// first warps it back onto the photo with `TsumikiAlignToReference`
-  /// (MangaPrompts `comfyui_nodes/`, must be installed on the server).
-  /// Results: MangaPrompts/docs/hair-matrix.md. Not on
+  /// (MangaPrompts `comfyui_nodes/`, must be installed on the server). The
+  /// composite's soft edge follows the photo size ([hairFeatherPx]) — the
+  /// template's 6/12 px suit the bench portraits and were a hard seam on a
+  /// phone photo. Results: MangaPrompts/docs/hair-matrix.md. Not on
   /// [ImageBackend]: only ComfyUI can run it.
   Stream<GenEvent> hairInpaint({
     required Uint8List image,
@@ -583,11 +585,14 @@ class ComfyUIService implements ImageBackend {
       imageName: imageName,
       maskName: maskName,
       userNegative: negativePrompt,
+      // The mask is the photo's size (retry has no other record of it).
+      imageSize: decodeImageSize(mask),
     );
     yield* _run(wf);
   }
 
-  /// Graph for [hairInpaint]; public for tests and the lab.
+  /// Graph for [hairInpaint]; public for tests and the lab. [imageSize]
+  /// scales the Kontext composite edge; null keeps the template's values.
   @visibleForTesting
   Map<String, dynamic> prepareHairInpaint(
     Map<String, dynamic> template, {
@@ -597,6 +602,7 @@ class ComfyUIService implements ImageBackend {
     required String imageName,
     required String maskName,
     String? userNegative,
+    LatentSize? imageSize,
   }) {
     final wf = _prepare(
       template,
@@ -607,12 +613,24 @@ class ComfyUIService implements ImageBackend {
       maskName: maskName,
       userNegative: userNegative,
     );
+    final feather = imageSize == null
+        ? null
+        : hairFeatherPx(imageSize.w, imageSize.h);
     for (final node in wf.values) {
       final m = (node as Map).cast<String, dynamic>();
-      if (m['class_type'] != 'InpaintCropImproved') continue;
-      final inputs = (m['inputs'] as Map).cast<String, dynamic>();
-      inputs['mask_fill_holes'] = kHairMaskFillHoles;
-      inputs['context_from_mask_extend_factor'] = kHairContextFactor;
+      final inputs = (m['inputs'] as Map?)?.cast<String, dynamic>();
+      if (inputs == null) continue;
+      switch (m['class_type']) {
+        case 'InpaintCropImproved':
+          inputs['mask_fill_holes'] = kHairMaskFillHoles;
+          inputs['context_from_mask_extend_factor'] = kHairContextFactor;
+        case 'GrowMaskWithBlur':
+          // Only the Kontext graph has one; the SDXL crop blends on its own.
+          if (feather != null) {
+            inputs['expand'] = feather.$1;
+            inputs['blur_radius'] = feather.$2.toDouble();
+          }
+      }
     }
     _swapInpaintEncoder(wf);
     return wf;

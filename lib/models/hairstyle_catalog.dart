@@ -152,7 +152,7 @@ const kHairstyles = <HairstylePreset>[
     section: 'Textura',
     block:
         'beach waves, loose undone tousled waves with natural texture, effortless surf look',
-    shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: false),
+    shape: HairShape(length: HairLength.long, bangs: HairBangs.none, updo: false),
     engines: [HairEngine.kontext, HairEngine.sdxl],
   ),
   HairstylePreset(
@@ -162,7 +162,7 @@ const kHairstyles = <HairstylePreset>[
     section: 'Textura',
     block:
         'soft curls, bouncy loose curls with defined ringlets and shine',
-    shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: false),
+    shape: HairShape(length: HairLength.long, bangs: HairBangs.none, updo: false),
     engines: [HairEngine.kontext, HairEngine.sdxl],
   ),
   HairstylePreset(
@@ -172,7 +172,7 @@ const kHairstyles = <HairstylePreset>[
     section: 'Textura',
     block:
         'messy waves, casual undone wavy hair with volume and piecey texture',
-    shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: false),
+    shape: HairShape(length: HairLength.long, bangs: HairBangs.none, updo: false),
     engines: [HairEngine.sdxl],
   ),
   HairstylePreset(
@@ -232,7 +232,7 @@ const kHairstyles = <HairstylePreset>[
     section: 'Střihy',
     block:
         'hime cut, long straight hair with a blunt full fringe and blunt cheek-length side locks framing the face',
-    shape: HairShape(length: HairLength.keep, bangs: HairBangs.full, updo: false),
+    shape: HairShape(length: HairLength.long, bangs: HairBangs.full, updo: false),
     engines: [HairEngine.kontext, HairEngine.sdxl],
   ),
   HairstylePreset(
@@ -242,7 +242,7 @@ const kHairstyles = <HairstylePreset>[
     section: 'Textura',
     block:
         'old hollywood waves, glossy sculpted s-shaped waves swept to one side, 1940s glamour',
-    shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: false),
+    shape: HairShape(length: HairLength.long, bangs: HairBangs.none, updo: false),
     engines: [HairEngine.kontext, HairEngine.sdxl],
   ),
   HairstylePreset(
@@ -262,7 +262,7 @@ const kHairstyles = <HairstylePreset>[
     section: 'Copánky',
     block:
         'two dutch braids, tight raised braids running from the hairline back along both sides of the head',
-    shape: HairShape(length: HairLength.keep, bangs: HairBangs.none, updo: false),
+    shape: HairShape(length: HairLength.long, bangs: HairBangs.none, updo: false),
     engines: [HairEngine.kontext, HairEngine.sdxl],
   ),
   HairstylePreset(
@@ -533,28 +533,28 @@ const kHairColours = <HairColourPreset>[
     id: 'copper-red',
     label: 'Měděná zrzavá',
     phrase: 'vibrant copper red, natural redhead',
-    swatch: 0xFF742C16,
+    swatch: 0xFF792E17,
     engines: [HairEngine.kontext, HairEngine.sdxl],
   ),
   HairColourPreset(
     id: 'fox-red',
     label: 'Liščí zrzavá',
     phrase: 'bright fox red, vivid orange ginger',
-    swatch: 0xFFB03919,
+    swatch: 0xFFC23D1C,
     engines: [HairEngine.kontext, HairEngine.sdxl],
   ),
   HairColourPreset(
     id: 'auburn',
     label: 'Kaštanově zrzavá',
     phrase: 'deep auburn',
-    swatch: 0xFF56261A,
+    swatch: 0xFF642C1E,
     engines: [HairEngine.kontext, HairEngine.sdxl],
   ),
   HairColourPreset(
     id: 'burgundy',
     label: 'Vínová',
     phrase: 'burgundy wine red',
-    swatch: 0xFF421115,
+    swatch: 0xFF420D10,
     engines: [HairEngine.kontext, HairEngine.sdxl],
   ),
   HairColourPreset(
@@ -568,21 +568,21 @@ const kHairColours = <HairColourPreset>[
     id: 'honey-balayage',
     label: 'Hnědá s medovým balayage',
     phrase: 'brown hair with soft honey blonde balayage highlights toward the ends',
-    swatch: 0xFF61442F,
+    swatch: 0xFF5B3F2D,
     engines: [HairEngine.kontext, HairEngine.sdxl],
   ),
   HairColourPreset(
     id: 'jet-black',
     label: 'Uhlově černá',
     phrase: 'glossy jet black',
-    swatch: 0xFF111112,
+    swatch: 0xFF0A0807,
     engines: [HairEngine.kontext, HairEngine.sdxl],
   ),
   HairColourPreset(
     id: 'blue-black',
     label: 'Modročerná',
     phrase: 'blue-black with a cool blue sheen',
-    swatch: 0xFF132441,
+    swatch: 0xFF152546,
     engines: [HairEngine.kontext, HairEngine.sdxl],
   ),
   HairColourPreset(
@@ -596,7 +596,7 @@ const kHairColours = <HairColourPreset>[
     id: 'pastel-pink',
     label: 'Pastelově růžová',
     phrase: 'pastel pink',
-    swatch: 0xFFCD7988,
+    swatch: 0xFFE67F9C,
     engines: [HairEngine.kontext, HairEngine.sdxl],
   ),
   HairColourPreset(

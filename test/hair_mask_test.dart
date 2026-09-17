@@ -286,6 +286,15 @@ void main() {
     );
   });
 
+  test('composite feather follows the photo size (mirror of feather_px)', () {
+    // Bench portrait keeps about the template's 6/12 px; a phone photo gets
+    // a proportionally soft edge instead of a hard seam.
+    expect(hairFeatherPx(832, 1216), (7, 18));
+    expect(hairFeatherPx(1450, 2576), (15, 39));
+    expect(hairFeatherPx(2576, 1450), (15, 39));
+    expect(hairFeatherPx(10, 10), (1, 1));
+  });
+
   group('colour', () {
     const cases = {
       (20, 18, 16): 'black',

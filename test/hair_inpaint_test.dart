@@ -6,6 +6,7 @@ import 'package:ol1n_llm/models/gen_node.dart';
 import 'package:ol1n_llm/models/hair_mask.dart';
 import 'package:ol1n_llm/models/hairstyle_preset.dart';
 import 'package:ol1n_llm/models/image_model.dart';
+import 'package:ol1n_llm/models/latent_bucket.dart';
 import 'package:ol1n_llm/services/comfyui_service.dart';
 
 Map<String, dynamic> _load(String path) =>
@@ -57,19 +58,32 @@ void main() {
       final spec = imageModelById('flux-fill');
       final svc = ComfyUIService()..setPreset(spec.preset!);
       expect(svc.hairUsesInstruction, isTrue);
-      final wf = svc.prepareHairInpaint(
+      Map<String, dynamic> build({LatentSize? imageSize}) => svc.prepareHairInpaint(
         _load('assets/comfyui/flux_hair_kontext.api.json'),
         prompt: "Change the person's hairstyle to a pixie cut.",
         batch: 1,
         seed: 7,
         imageName: 'photo.png',
         maskName: 'hairmask.png',
+        imageSize: imageSize,
       );
+      final wf = build(imageSize: (w: 1450, h: 2576));
       final nodes = wf.values.cast<Map<String, dynamic>>();
       final loads = nodes.where((n) => n['class_type'] == 'LoadImage').map((n) => n['inputs']['image']).toSet();
       expect(loads, {'photo.png', 'hairmask.png'});
       expect(nodes.any((n) => n['class_type'] == 'ImageCompositeMasked'), isTrue);
       expect(jsonEncode(wf), contains("Change the person's hairstyle"));
+      // The composite edge follows the photo: the template's 6/12 px fit the
+      // bench's 1216 px portraits and were a hard seam on a phone photo.
+      Map<String, dynamic> grow(Map<String, dynamic> g) => g.values
+          .cast<Map<String, dynamic>>()
+          .firstWhere((n) => n['class_type'] == 'GrowMaskWithBlur')['inputs'];
+      expect(grow(wf)['expand'], 15);
+      expect(grow(wf)['blur_radius'], 39.0);
+      expect(hairFeatherPx(832, 1216), (7, 18));
+      final plain = grow(build());
+      expect(plain['expand'], 6);
+      expect(plain['blur_radius'], 12.0);
     });
 
     test('analysis graph has no sampler and passes _prepare untouched', () {
@@ -96,6 +110,23 @@ void main() {
           .toSet();
       const p = ComfyUIService.kHairAnalysePrefixes;
       expect(prefixes, {p.hair, p.face, p.hat, p.features});
+      // The hair mask is the union of both parsers: FaceSegment (CelebAMask-HQ
+      // face crops) stops at the chest on a phone selfie — 1.0 face heights
+      // below the chin where the hair reached 1.4 — and whatever it misses
+      // survives the repaint. ClothesSegment (ATR, full body) reaches the ends.
+      final save = wf.values.cast<Map<String, dynamic>>().firstWhere(
+        (n) => n['class_type'] == 'SaveImage' && n['inputs']['filename_prefix'] == p.hair,
+      );
+      final toImage = wf[save['inputs']['images'][0]] as Map<String, dynamic>;
+      final union = wf[toImage['inputs']['mask'][0]] as Map<String, dynamic>;
+      expect(union['class_type'], 'MaskComposite');
+      expect(union['inputs']['operation'], 'or');
+      final face = wf[union['inputs']['destination'][0]] as Map<String, dynamic>;
+      final body = wf[union['inputs']['source'][0]] as Map<String, dynamic>;
+      expect(face['class_type'], 'FaceSegment');
+      expect(face['inputs']['Hair'], isTrue);
+      expect(body['class_type'], 'ClothesSegment');
+      expect(body['inputs']['Hair'], isTrue);
     });
 
     test('outputs are matched by filename prefix, not order', () {
