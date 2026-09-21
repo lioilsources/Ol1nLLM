@@ -3056,29 +3056,39 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                 ),
               )
             else if (nodePrompt != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.subdirectory_arrow_right,
-                      size: 13,
-                      color: AppTheme.textSecondary,
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        nodePrompt,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 11,
-                          fontStyle: FontStyle.italic,
+              // Long-press copies it in full — the line is clipped to one row,
+              // so the part worth copying is usually the part that is not on
+              // screen. The gesture sits outside the Padding and hit-tests
+              // opaque, because 11 pt of italic text is a thin target on its
+              // own; this way the whole strip above the field takes the press.
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onLongPress: () =>
+                    _copyToClipboard(context, nodePrompt, 'Prompt'),
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.subdirectory_arrow_right,
+                        size: 13,
+                        color: AppTheme.textSecondary,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          nodePrompt,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             Row(
