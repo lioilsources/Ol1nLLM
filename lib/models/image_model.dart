@@ -162,6 +162,19 @@ const _ponyNegative =
     'score_4, score_5, score_6, bad quality, worst quality, low quality, '
     'jpeg artifacts, blurry, ugly, watermark';
 
+/// Shared by the photoreal SDXL checkpoints, whose cards give no negative of
+/// their own (Juggernaut, CyberRealistic, Lustify, SDXL base). RealVis is the
+/// exception — SG161222 publishes one, so it carries its own.
+const _photoNegative =
+    'bad quality, worst quality, low quality, jpeg artifacts, blurry, '
+    'watermark, deformed, disfigured, bad anatomy, bad hands';
+
+/// What [ImageModelSpec.styleNote] says until a model has been through the
+/// style matrix. The field is mandatory (`style_preset_test`), but it must not
+/// be filled with a guess: the picker shows it where every other note is a
+/// measured result, so a guess would read as one.
+const _unmeasured = 'stylovou reakci zatím neměřil lab';
+
 const kImageModels = <ImageModelSpec>[
   ImageModelSpec(
     id: 'flux-schnell',
@@ -275,9 +288,7 @@ const kImageModels = <ImageModelSpec>[
       inpaintAsset: _sdxlInpaint,
       inpaintRefAsset: _sdxlInpaintRef,
       ckptName: 'Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors',
-      negativePrompt:
-          'bad quality, worst quality, low quality, jpeg artifacts, blurry, '
-          'watermark, deformed, disfigured, bad anatomy, bad hands',
+      negativePrompt: _photoNegative,
       cfg: 5.0,
     ),
   ),
@@ -305,12 +316,101 @@ const kImageModels = <ImageModelSpec>[
       inpaintAsset: _sdxlInpaint,
       inpaintRefAsset: _sdxlInpaintRef,
       ckptName: 'Juggernaut-XL-Lightning_4Steps.safetensors',
-      negativePrompt:
-          'bad quality, worst quality, low quality, jpeg artifacts, blurry, '
-          'watermark, deformed, disfigured, bad anatomy, bad hands',
+      negativePrompt: _photoNegative,
       steps: 6,
       cfg: 2.0,
       samplerName: 'dpmpp_sde',
+      scheduler: 'karras',
+    ),
+  ),
+  // Fotoreal SDXL trojka. Hodnoty z karet modelů.
+  ImageModelSpec(
+    id: 'cyberrealistic-xl',
+    label: 'CyberRealistic XL',
+    promptDialect: PromptDialect.natural,
+    icon: Icons.camera_alt_outlined,
+    color: Color(0xFF88C0D0),
+    kind: ImageBackendKind.comfyUi,
+    txt2img: true,
+    img2img: true,
+    inpaint: true,
+    loraFamily: LoraFamily.sdxl,
+    supportsPose: true,
+    styleNote:
+        'fotoreal SDXL, cfg 3–5 — $_unmeasured',
+    preset: ComfyPreset(
+      txt2imgAsset: _sdxlTxt2img,
+      img2imgAsset: _sdxlImg2img,
+      inpaintAsset: _sdxlInpaint,
+      inpaintRefAsset: _sdxlInpaintRef,
+      ckptName: 'CyberRealisticXL_v10.safetensors',
+      negativePrompt: _photoNegative,
+      // Karta: DPM++ 2M SDE Karras, 30+ kroků, cfg 3–5, VAE zapečené.
+      steps: 30,
+      cfg: 4.0,
+      samplerName: 'dpmpp_2m_sde',
+      scheduler: 'karras',
+    ),
+  ),
+  ImageModelSpec(
+    id: 'realvis-xl',
+    label: 'RealVis XL V5',
+    promptDialect: PromptDialect.natural,
+    icon: Icons.portrait_outlined,
+    color: Color(0xFFA3BE8C),
+    kind: ImageBackendKind.comfyUi,
+    txt2img: true,
+    img2img: true,
+    inpaint: true,
+    loraFamily: LoraFamily.sdxl,
+    supportsPose: true,
+    styleNote:
+        'fotoreal SDXL, vlastní negativ autora — $_unmeasured',
+    preset: ComfyPreset(
+      txt2imgAsset: _sdxlTxt2img,
+      img2imgAsset: _sdxlImg2img,
+      inpaintAsset: _sdxlInpaint,
+      inpaintRefAsset: _sdxlInpaintRef,
+      ckptName: 'RealVisXL_V5.0.safetensors',
+      // Vlastní negativ z karty SG161222 (závorkované váhy nechány tak, jak je
+      // autor píše — ComfyUI je čte stejně jako A1111).
+      negativePrompt:
+          'bad hands, bad anatomy, ugly, deformed, (face asymmetry, '
+          'eyes asymmetry, deformed eyes, deformed mouth, open mouth)',
+      // Karta: DPM++ SDE Karras, 30+ kroků. cfg neudává — 5.0 jako
+      // u ostatních fotoreal SDXL v registru.
+      steps: 30,
+      cfg: 5.0,
+      samplerName: 'dpmpp_sde',
+      scheduler: 'karras',
+    ),
+  ),
+  ImageModelSpec(
+    id: 'lustify-zenith',
+    label: 'Lustify ZENITH',
+    promptDialect: PromptDialect.natural,
+    icon: Icons.local_fire_department_outlined,
+    color: Color(0xFFBF616A),
+    kind: ImageBackendKind.comfyUi,
+    txt2img: true,
+    img2img: true,
+    inpaint: true,
+    loraFamily: LoraFamily.sdxl,
+    supportsPose: true,
+    styleNote:
+        'fotoreal SDXL, jede na nízkém cfg — $_unmeasured',
+    preset: ComfyPreset(
+      txt2imgAsset: _sdxlTxt2img,
+      img2imgAsset: _sdxlImg2img,
+      inpaintAsset: _sdxlInpaint,
+      inpaintRefAsset: _sdxlInpaintRef,
+      ckptName: 'Lustify_ZENITH_V9.safetensors',
+      negativePrompt: _photoNegative,
+      // Karta: DPM++ 2M SDE / 3M SDE, Exponential nebo Karras, 30 kroků,
+      // cfg 2.5–4.5 (ZENITH jede níž než starší verze).
+      steps: 30,
+      cfg: 3.5,
+      samplerName: 'dpmpp_2m_sde',
       scheduler: 'karras',
     ),
   ),
@@ -406,6 +506,40 @@ const kImageModels = <ImageModelSpec>[
       scheduler: 'normal',
     ),
   ),
+  ImageModelSpec(
+    id: 'hassaku-illustrious',
+    label: 'Hassaku XL Illustrious',
+    promptDialect: PromptDialect.booru,
+    icon: Icons.color_lens_outlined,
+    color: Color(0xFF5E81AC),
+    kind: ImageBackendKind.comfyUi,
+    txt2img: true,
+    img2img: true,
+    inpaint: true,
+    loraFamily: LoraFamily.illustrious,
+    supportsPose: true,
+    styleNote:
+        'anime, linie Illustrious — $_unmeasured',
+    preset: ComfyPreset(
+      txt2imgAsset: _sdxlTxt2img,
+      img2imgAsset: _sdxlImg2img,
+      inpaintAsset: _sdxlInpaint,
+      inpaintRefAsset: _sdxlInpaintRef,
+      ckptName: 'HassakuXL_Illustrious_v3.4.safetensors',
+      positivePrefix: 'masterpiece, best quality, amazing quality',
+      // Autor jmenovitě doporučuje `signature` do negativu — model jinak sype
+      // podpisy a bubliny.
+      negativePrompt:
+          'bad quality, worst quality, worst detail, sketch, censored, '
+          'lowres, bad anatomy, bad hands, signature, watermark',
+      // Karta: Euler A, 28 kroků, cfg 4–7 (bereme 5.0 jako u ostatních
+      // Illustrious v registru).
+      steps: 28,
+      cfg: 5.0,
+      samplerName: 'euler_ancestral',
+      scheduler: 'normal',
+    ),
+  ),
   // Přímý SDXL finetune (ne Illustrious rodina) — jiná gramatika promptů
   // a čistší "oficiální" anime look; drží se kvůli stylovému kontrastu.
   ImageModelSpec(
@@ -465,6 +599,73 @@ const kImageModels = <ImageModelSpec>[
       cfg: 6.5,
       samplerName: 'euler_ancestral',
       scheduler: 'normal',
+    ),
+  ),
+  ImageModelSpec(
+    id: 'autismmix-pony',
+    label: 'AutismMix Pony',
+    promptDialect: PromptDialect.booru,
+    icon: Icons.auto_awesome_outlined,
+    color: Color(0xFFD8A0DF),
+    kind: ImageBackendKind.comfyUi,
+    txt2img: true,
+    img2img: true,
+    inpaint: true,
+    loraFamily: LoraFamily.pony,
+    supportsPose: true,
+    styleNote:
+        'anime, linie Pony — $_unmeasured',
+    preset: ComfyPreset(
+      txt2imgAsset: _sdxlTxt2img,
+      img2imgAsset: _sdxlImg2img,
+      inpaintAsset: _sdxlInpaint,
+      inpaintRefAsset: _sdxlInpaintRef,
+      ckptName: 'AutismMix_pony.safetensors',
+      // Karta chce celý score řetěz (delší než sdílený _ponyScoreTags)
+      // a `source_anime`.
+      positivePrefix:
+          'score_9, score_8_up, score_7_up, score_6_up, score_5_up, '
+          'score_4_up, source_anime',
+      // Záměrně NE _ponyNegative: autor píše, že score_4/5/6 v negativu
+      // a pony negativní embeddingy výsledek zhoršují. Zůstává jen nutné
+      // minimum.
+      negativePrompt: 'worst quality, low quality, watermark, signature',
+      // Karta: Euler a (nebo DPM++ 2M SDE Karras), 25–28 kroků, cfg 7.
+      steps: 28,
+      cfg: 7.0,
+      samplerName: 'euler_ancestral',
+      scheduler: 'normal',
+    ),
+  ),
+  // Neochucený SDXL 1.0 od Stability — referenční bod, proti kterému je vidět,
+  // co každý finetune výš vlastně přidává.
+  ImageModelSpec(
+    id: 'sdxl-base',
+    label: 'SDXL base 1.0',
+    promptDialect: PromptDialect.natural,
+    icon: Icons.layers_outlined,
+    color: Color(0xFF6E7A8A),
+    kind: ImageBackendKind.comfyUi,
+    txt2img: true,
+    img2img: true,
+    inpaint: true,
+    loraFamily: LoraFamily.sdxl,
+    supportsPose: true,
+    styleNote:
+        'neochucený základ SDXL — $_unmeasured',
+    preset: ComfyPreset(
+      txt2imgAsset: _sdxlTxt2img,
+      img2imgAsset: _sdxlImg2img,
+      inpaintAsset: _sdxlInpaint,
+      inpaintRefAsset: _sdxlInpaintRef,
+      ckptName: 'sd_xl_base_1.0.safetensors',
+      negativePrompt: _photoNegative,
+      // DPM++ 2M Karras, 25–30 kroků, cfg 7–8 (diffusers default guidance 7.5).
+      // Refiner se nepoužívá — generické sdxl_* šablony mají jen base.
+      steps: 30,
+      cfg: 7.5,
+      samplerName: 'dpmpp_2m',
+      scheduler: 'karras',
     ),
   ),
   ImageModelSpec(

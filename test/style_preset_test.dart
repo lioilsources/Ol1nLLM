@@ -137,9 +137,11 @@ void main() {
       expect(booru, {
         'pony',
         'atomix-pony-anime',
+        'autismmix-pony',
         'illustrious-xl',
         'noobai-xl',
         'wai-illustrious',
+        'hassaku-illustrious',
         'animagine-xl',
       });
       expect(imageModelById('animagine-xl').loraFamily, LoraFamily.sdxl);
