@@ -131,6 +131,11 @@ class GenNode {
   final bool isVideo;
   final String? sceneId;
 
+  /// Animation from the user's own motion prompt („Rozhýbat promptem")
+  /// instead of a scene: [sceneId] is null, [prompt] holds the user's text
+  /// and this the clip length in 5 s segments. Persisted only when set.
+  final int? videoBeats;
+
   /// Relative file name of the mp4 result (same directory scheme as
   /// [GenImage.fileName]).
   final String? videoFileName;
@@ -221,6 +226,7 @@ class GenNode {
     this.stlFileName,
     this.isVideo = false,
     this.sceneId,
+    this.videoBeats,
     this.videoFileName,
     this.isFigure = false,
     this.figureId,
@@ -260,6 +266,7 @@ class GenNode {
     bool isRepose = false,
     bool isVideo = false,
     String? sceneId,
+    int? videoBeats,
     bool isFigure = false,
     String? modelId,
     String? loraName,
@@ -292,6 +299,7 @@ class GenNode {
     isRepose: isRepose,
     isVideo: isVideo,
     sceneId: sceneId,
+    videoBeats: videoBeats,
     isFigure: isFigure,
     modelId: modelId,
     loraName: loraName,
@@ -332,6 +340,7 @@ class GenNode {
     if (stlFileName != null) 'stlFileName': stlFileName,
     if (isVideo) 'isVideo': true,
     if (sceneId != null) 'sceneId': sceneId,
+    if (videoBeats != null) 'videoBeats': videoBeats,
     if (videoFileName != null) 'videoFileName': videoFileName,
     if (isFigure) 'isFigure': true,
     if (figureId != null) 'figureId': figureId,
@@ -387,6 +396,7 @@ class GenNode {
       stlFileName: json['stlFileName'] as String?,
       isVideo: json['isVideo'] as bool? ?? false,
       sceneId: json['sceneId'] as String?,
+      videoBeats: (json['videoBeats'] as num?)?.toInt(),
       videoFileName: json['videoFileName'] as String?,
       isFigure: json['isFigure'] as bool? ?? false,
       figureId: json['figureId'] as String?,
@@ -453,6 +463,7 @@ class GenNode {
     stlFileName: stlFileName ?? this.stlFileName,
     isVideo: isVideo,
     sceneId: sceneId,
+    videoBeats: videoBeats,
     videoFileName: videoFileName ?? this.videoFileName,
     isFigure: isFigure,
     figureId: figureId ?? this.figureId,

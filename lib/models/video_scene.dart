@@ -42,3 +42,38 @@ class VideoScene {
         audio: json['audio'] as bool? ?? false,
       );
 }
+
+/// What the video server allows for „Rozhýbat promptem" — animating the image
+/// with the user's own motion description instead of a scene. Absent on
+/// servers that predate it (the option then stays hidden).
+class VideoCustomSpec {
+  /// Longest clip in 5 s segments.
+  final int maxBeats;
+  final int maxPrompt;
+  final double secondsPerBeat;
+  final int minutesPerBeat;
+
+  const VideoCustomSpec({
+    this.maxBeats = 3,
+    this.maxPrompt = 500,
+    this.secondsPerBeat = 5,
+    this.minutesPerBeat = 3,
+  });
+
+  factory VideoCustomSpec.fromJson(Map<String, dynamic> json) =>
+      VideoCustomSpec(
+        maxBeats: (json['max_beats'] as num?)?.toInt() ?? 1,
+        maxPrompt: (json['max_prompt'] as num?)?.toInt() ?? 500,
+        secondsPerBeat: (json['seconds_per_beat'] as num?)?.toDouble() ?? 5,
+        minutesPerBeat: (json['minutes_per_beat'] as num?)?.toInt() ?? 3,
+      );
+}
+
+/// `GET /v1/video/scenes`: the presets and, on newer servers, the custom
+/// prompt limits.
+class VideoCatalog {
+  final List<VideoScene> scenes;
+  final VideoCustomSpec? custom;
+
+  const VideoCatalog({required this.scenes, this.custom});
+}

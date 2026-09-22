@@ -22,6 +22,7 @@ class VideoService {
   static const _cfId = String.fromEnvironment('CF_ACCESS_CLIENT_ID');
   static const _cfSecret = String.fromEnvironment('CF_ACCESS_CLIENT_SECRET');
   static const _timeout = Duration(seconds: 30);
+  static const _promptTimeout = Duration(seconds: 60);
   static const _downloadTimeout = Duration(minutes: 3);
   static const _pollInterval = Duration(seconds: 5);
 
@@ -59,26 +60,44 @@ class VideoService {
   /// Server-side scene catalog. Throws on network/HTTP failure — the caller
   /// decides whether an empty catalog is fatal (the studio just hides the
   /// button).
-  Future<List<VideoScene>> fetchScenes() async {
+  Future<List<VideoScene>> fetchScenes() async => (await fetchCatalog()).scenes;
+
+  /// Scenes plus the custom-prompt limits (`custom`, newer servers only).
+  Future<VideoCatalog> fetchCatalog() async {
     final r = await _client
         .get(Uri.parse('$_baseUrl/scenes'), headers: _headers)
         .timeout(_timeout);
     if (r.statusCode != 200) throw Exception(_snippet(r));
-    final list = (jsonDecode(r.body) as Map<String, dynamic>)['scenes'] as List;
-    return [
-      for (final s in list) VideoScene.fromJson(s as Map<String, dynamic>),
-    ];
+    final j = jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, dynamic>;
+    final custom = j['custom'];
+    return VideoCatalog(
+      scenes: [
+        for (final s in j['scenes'] as List)
+          VideoScene.fromJson(s as Map<String, dynamic>),
+      ],
+      custom: custom is Map<String, dynamic>
+          ? VideoCustomSpec.fromJson(custom)
+          : null,
+    );
   }
 
-  /// Submit [image] (PNG/JPEG bytes) for [sceneId] and stream it to
-  /// completion. [seed] is persisted on the node by the provider so a
+  /// Submit [image] (PNG/JPEG bytes) for [sceneId] — or, with [prompt]
+  /// instead, the user's own motion over [beats] 5 s segments — and stream
+  /// it to completion. [seed] is persisted on the node by the provider so a
   /// re-run is reproducible.
   Stream<GenEvent> animate({
     required Uint8List image,
-    required String sceneId,
+    String? sceneId,
+    String? prompt,
+    int beats = 1,
     required int seed,
   }) async* {
-    debugPrint('[video] POST /jobs scene=$sceneId');
+    assert((sceneId == null) != (prompt == null), 'scene XOR prompt');
+    debugPrint(
+      sceneId != null
+          ? '[video] POST /jobs scene=$sceneId'
+          : '[video] POST /jobs prompt (${prompt!.length} znaků, $beats beaty)',
+    );
     final http.Response r;
     try {
       r = await _client
@@ -86,12 +105,15 @@ class VideoService {
             Uri.parse('$_baseUrl/jobs'),
             headers: _headers,
             body: jsonEncode({
-              'scene': sceneId,
+              'scene': ?sceneId,
+              if (prompt != null) ...{'prompt': prompt, 'beats': beats},
               'image': base64Encode(image),
               'seed': seed,
             }),
           )
-          .timeout(_timeout);
+          // A prompt is rewritten into an English motion prompt by an LLM
+          // on the server before the job is accepted — give it time.
+          .timeout(prompt != null ? _promptTimeout : _timeout);
     } on Exception catch (e) {
       yield GenFailed('Video server nedostupný: $e');
       return;
