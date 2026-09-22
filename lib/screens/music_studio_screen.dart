@@ -331,6 +331,23 @@ class _SampleCard extends ConsumerWidget {
                 ),
               ),
           ],
+          // The LM didn't describe the sample (it failed, or the server was
+          // mid-restart): tempo and key came from librosa alone. The server
+          // doesn't keep such an analysis, so listening again is worth it.
+          if (project.status == SampleStatus.ready &&
+              a != null &&
+              a.source['caption'] != 'lm')
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () {
+                  _dismissKeyboard();
+                  ref.read(musicStudioProvider.notifier).retryAnalysis();
+                },
+                icon: const Icon(Icons.hearing, size: 16),
+                label: const Text('Poslechnout znovu'),
+              ),
+            ),
         ],
       ),
     );

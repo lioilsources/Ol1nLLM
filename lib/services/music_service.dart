@@ -59,6 +59,9 @@ class MusicService {
     try {
       final j = jsonDecode(msg);
       if (j is Map && j['detail'] is String) {
+        // 503 = the music model is down (SPARK outside its day mode) and the
+        // server says so in words — the status code adds nothing for a user.
+        if (r.statusCode == 503) return j['detail'] as String;
         msg = j['detail'] as String;
       } else if (j is Map && j['detail'] is List) {
         final first = (j['detail'] as List).firstOrNull;

@@ -28,7 +28,7 @@ const _analysis = {
   'timesignature': '4',
   'instrumental': true,
   'duration_s': 28.5,
-  'source': {'bpm': 'lm', 'keyscale': 'lm'},
+  'source': {'caption': 'lm', 'bpm': 'lm', 'keyscale': 'lm'},
   'warnings': ['librosa 161.5 je oktávová záměna'],
 };
 
@@ -347,6 +347,30 @@ void main() {
         expect(find.textContaining('Stažení selhalo'), findsOneWidget);
       });
     }
+
+    testWidgets('a full analysis has nothing to listen to again', (
+      tester,
+    ) async {
+      final p = project();
+      await pump(tester, MusicStudioState(projects: [p], activeId: p.id));
+      expect(find.text('Poslechnout znovu'), findsNothing);
+    });
+
+    testWidgets('an analysis without the LM caption offers to listen again', (
+      tester,
+    ) async {
+      final p = project().copyWith(
+        analysis: SampleAnalysis.fromJson({
+          ..._analysis,
+          'caption': '',
+          'source': {'caption': 'none', 'bpm': 'librosa'},
+          'warnings': ['LM analýza selhala: LLM Understanding failed'],
+        }),
+      );
+      await pump(tester, MusicStudioState(projects: [p], activeId: p.id));
+      expect(find.text('Poslechnout znovu'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
 
     testWidgets('groove shows fidelity, vibe shows length and LM plan', (
       tester,

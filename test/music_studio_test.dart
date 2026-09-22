@@ -160,6 +160,25 @@ void main() {
   });
 
   group('MusicService', () {
+    test('a model that is down reads as the server words it', () async {
+      const reason =
+          'Hudební model teď neběží (SPARK je mimo denní režim 07–24, '
+          'nebo je audio-music dole). Zkus to později.';
+      final service = MusicService(
+        client: MockClient((_) async => _fastapi({'detail': reason}, 503)),
+      );
+      expect(
+        () => service.analyze('x'),
+        throwsA(
+          isA<MusicServiceException>().having(
+            (e) => e.message,
+            'message',
+            reason,
+          ),
+        ),
+      );
+    });
+
     test('follow maps queue → running → done', () async {
       final states = [
         {'status': 'queued', 'queue_position': 2},

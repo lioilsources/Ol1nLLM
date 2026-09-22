@@ -746,6 +746,13 @@ v `AiStack/services/audio/NOTES.md`.
 - **Chybová těla čte jako UTF-8** (`MusicService._text`): FastAPI posílá
   `application/json` bez charsetu a `Response.body` by dekódoval Latin-1 —
   české hlášky serveru by se rozsypaly.
+- **Model běží jen přes den.** `audio-music` zvedá a shazuje plánovač režimů
+  SPARKu (`rag-schedule.sh`: nahoře 07:00–00:00). Mimo to server vibe
+  analýzu i skládání odmítne hned `503` s větou pro člověka (upload projde)
+  a appka ji ukáže bez `HTTP 503:` — analýza pak zůstane ve stavu chyby
+  s „Znovu". Analýzu bez popisu od LM (LM odpověděl chybou) si server
+  k předloze **neukládá**, jinak by ji upload téhož souboru vracel pořád;
+  appka u ní nabídne „Poslechnout znovu".
 
 `AUDIO_URL` přepne server (výchozí `https://llm.ol1n.com`; LAN
 `http://192.168.88.66:8093` jen s `make debug`, CF hlavičky jsou pak
