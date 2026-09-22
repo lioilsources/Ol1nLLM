@@ -10,7 +10,8 @@ DART_DEFINES = \
 	$(if $(FINETUNE_URL),--dart-define=FINETUNE_URL=$(FINETUNE_URL),) \
 	$(if $(LIBRARY_CHAT_URL),--dart-define=LIBRARY_CHAT_URL=$(LIBRARY_CHAT_URL),) \
 	$(if $(VLLM_URL),--dart-define=VLLM_URL=$(VLLM_URL),) \
-	$(if $(UGC_FC_URL),--dart-define=UGC_FC_URL=$(UGC_FC_URL),)
+	$(if $(UGC_FC_URL),--dart-define=UGC_FC_URL=$(UGC_FC_URL),) \
+	$(if $(AUDIO_URL),--dart-define=AUDIO_URL=$(AUDIO_URL),)
 
 run:
 	flutter run --release $(DART_DEFINES)

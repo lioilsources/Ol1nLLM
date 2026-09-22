@@ -13,6 +13,7 @@ import '../widgets/conversation_drawer.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/persona_picker.dart';
 import 'image_studio_screen.dart';
+import 'music_studio_screen.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
@@ -99,6 +100,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             tooltip: 'Image Studio',
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ImageStudioScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.music_note_outlined),
+            tooltip: 'Music Studio',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const MusicStudioScreen()),
             ),
           ),
           if (state.conversations.isNotEmpty)
