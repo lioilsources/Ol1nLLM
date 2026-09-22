@@ -28,5 +28,7 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Music Studio records music playing around you (radio, a speaker) as a sample to compose from.</string>
 </dict>
 </plist>
