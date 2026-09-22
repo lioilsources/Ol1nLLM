@@ -196,6 +196,14 @@ void main() {
       ).allMatches(src).length;
       expect(scenes, greaterThan(0));
       expect(carried, scenes);
+
+      // Stejná past pro „Rozhýbat promptem": meze vlastního pohybu jsou
+      // app-scoped jako katalogy, takže musí jet s nimi.
+      final withCustom = RegExp(
+        r'availableDances: state\.availableDances,\s*'
+        r'videoCustom: state\.videoCustom,',
+      ).allMatches(src).length;
+      expect(withCustom, scenes);
     });
   });
 }

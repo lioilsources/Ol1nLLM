@@ -116,7 +116,8 @@ class ImageStudioState {
   ///
   /// This, [availableCheckpoints], [availableScenes] and [availableDances] are
   /// app-scoped, not session-scoped: every site that rebuilds the state from
-  /// scratch (new/select/delete session, restore) has to carry ALL FOUR over by hand,
+  /// scratch (new/select/delete session, restore) has to carry ALL FIVE (with
+  /// [videoCustom]) over by hand,
   /// or the chips/actions silently empty out. Dropping [availableScenes] here
   /// is what hid the „Rozhýbat" button in 1.12.0 — the catalog loaded fine and
   /// _load() then rebuilt the state without it.
@@ -129,6 +130,11 @@ class ImageStudioState {
   /// server is unreachable or has none; the studio then hides the action.
   /// App-scoped like [availableLoras] — carried over on every state rebuild.
   final List<VideoScene> availableScenes;
+
+  /// Limits of „Rozhýbat promptem" (own motion text instead of a scene);
+  /// null = the video server doesn't offer it. App-scoped like
+  /// [availableScenes] — carried over on every state rebuild.
+  final VideoCustomSpec? videoCustom;
 
   /// Dances of the figure library („Tančící figurka", UGCFactory). Empty = the
   /// server is unreachable; the 3D action then only offers the print model.
@@ -191,6 +197,7 @@ class ImageStudioState {
     this.availableLoras = const [],
     this.availableCheckpoints = const [],
     this.availableScenes = const [],
+    this.videoCustom,
     this.availableDances = const [],
     this.selectedLora,
     this.loraStrength = kDefaultLoraStrength,
@@ -265,6 +272,7 @@ class ImageStudioState {
     List<String>? availableLoras,
     List<String>? availableCheckpoints,
     List<VideoScene>? availableScenes,
+    VideoCustomSpec? videoCustom,
     List<FigureClip>? availableDances,
     String? selectedLora,
     bool clearLora = false,
@@ -298,6 +306,7 @@ class ImageStudioState {
     availableLoras: availableLoras ?? this.availableLoras,
     availableCheckpoints: availableCheckpoints ?? this.availableCheckpoints,
     availableScenes: availableScenes ?? this.availableScenes,
+    videoCustom: videoCustom ?? this.videoCustom,
     availableDances: availableDances ?? this.availableDances,
     selectedLora: clearLora ? null : (selectedLora ?? this.selectedLora),
     loraStrength: loraStrength ?? this.loraStrength,
@@ -615,6 +624,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       availableCheckpoints: state.availableCheckpoints,
       availableScenes: state.availableScenes,
       availableDances: state.availableDances,
+      videoCustom: state.videoCustom,
       selectedLora: state.selectedLora,
       loraStrength: state.loraStrength,
       selectedPoseId: state.selectedPoseId,
@@ -650,6 +660,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       availableCheckpoints: state.availableCheckpoints,
       availableScenes: state.availableScenes,
       availableDances: state.availableDances,
+      videoCustom: state.videoCustom,
     );
   }
 
@@ -692,6 +703,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           availableCheckpoints: state.availableCheckpoints,
           availableScenes: state.availableScenes,
           availableDances: state.availableDances,
+          videoCustom: state.videoCustom,
         );
       } else {
         state = ImageStudioState(
@@ -701,6 +713,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           availableCheckpoints: state.availableCheckpoints,
           availableScenes: state.availableScenes,
           availableDances: state.availableDances,
+          videoCustom: state.videoCustom,
         );
       }
     } else {
@@ -745,6 +758,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           availableCheckpoints: state.availableCheckpoints,
           availableScenes: state.availableScenes,
           availableDances: state.availableDances,
+          videoCustom: state.videoCustom,
         );
         _resumeInFlightJob();
       } else {
@@ -896,10 +910,16 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     // Separate server; a failure here must not take the image catalog down
     // with it — the animate action just stays hidden.
     try {
-      final scenes = await _video.fetchScenes();
+      final catalog = await _video.fetchCatalog();
       if (!mounted) return;
-      state = state.copyWith(availableScenes: scenes);
-      debugPrint('Video catalog: ${scenes.length} scenes');
+      state = state.copyWith(
+        availableScenes: catalog.scenes,
+        videoCustom: catalog.custom,
+      );
+      debugPrint(
+        'Video catalog: ${catalog.scenes.length} scenes, '
+        'custom prompt ${catalog.custom != null ? "ano" : "ne"}',
+      );
     } catch (e) {
       debugPrint('Video catalog unavailable: $e');
     }
@@ -1381,6 +1401,42 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     );
   }
 
+  /// Animation from the user's own motion text („Rozhýbat promptem"): same
+  /// round as [animate], but the server builds the clip from [prompt] (it
+  /// rewrites it into an English motion prompt first) over [beats] 5 s
+  /// segments. The node keeps the user's text as its prompt and
+  /// [GenNode.videoBeats], so retry sends the same request.
+  Future<void> animatePrompt(String prompt, {int beats = 1}) async {
+    final base = _imageById(state.selectedImageId);
+    final text = prompt.trim();
+    if (base == null || text.isEmpty) return;
+    _interruptRetries = 0;
+    final seed = _newSeed();
+    final node = GenNode.create(
+      parentId: state.currentNodeId,
+      sourceImageId: base.id,
+      prompt: text,
+      isVideo: true,
+      videoBeats: beats,
+      seed: seed,
+    );
+    state = state.copyWith(
+      nodes: [...state.nodes, node],
+      currentNodeId: node.id,
+      clearSelected: true,
+      clearError: true,
+    );
+    await _runAsync(
+      node.id,
+      () => _video.animate(
+        image: base.bytes,
+        prompt: text,
+        beats: beats,
+        seed: seed,
+      ),
+    );
+  }
+
   /// Dancing-figure round („Tančící figurka"): the selected image becomes a
   /// rigged 3D figure that knows every dance of the catalog (see
   /// [FigureService]). Mirrors [make3D] — a child node flagged
@@ -1525,7 +1581,10 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         return;
       }
       final base = _imageById(node.sourceImageId);
-      if (base == null || node.sceneId == null) {
+      // A scene, or the user's own motion text ([GenNode.videoBeats] set,
+      // the text itself is the node's prompt).
+      final custom = node.sceneId == null && node.videoBeats != null;
+      if (base == null || (node.sceneId == null && !custom)) {
         _patch(
           nodeId,
           (n) =>
@@ -1544,11 +1603,18 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       );
       await _runAsync(
         nodeId,
-        () => _video.animate(
-          image: base.bytes,
-          sceneId: node.sceneId!,
-          seed: seed,
-        ),
+        () => custom
+            ? _video.animate(
+                image: base.bytes,
+                prompt: node.prompt,
+                beats: node.videoBeats!,
+                seed: seed,
+              )
+            : _video.animate(
+                image: base.bytes,
+                sceneId: node.sceneId!,
+                seed: seed,
+              ),
       );
       return;
     }

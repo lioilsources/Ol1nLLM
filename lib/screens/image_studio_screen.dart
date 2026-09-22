@@ -955,7 +955,9 @@ class _NodeGrid extends ConsumerWidget {
         );
     // No scene catalog ⇒ the video server is down; hide rather than dead.
     final canAnimate = ref.watch(
-      imageStudioProvider.select((s) => s.availableScenes.isNotEmpty),
+      imageStudioProvider.select(
+        (s) => s.availableScenes.isNotEmpty || s.videoCustom != null,
+      ),
     );
     return GridView.builder(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -1098,9 +1100,10 @@ class _NodeGrid extends ConsumerWidget {
     await notifier.make3D();
   }
 
-  /// Animate entry („Rozhýbat"): pick a server-defined scene, then hand the
-  /// image to the video job server. The render is minutes long and survives
-  /// app suspension — same contract as 3D.
+  /// Animate entry („Rozhýbat"): pick a server-defined scene — or describe
+  /// the motion in your own words — then hand the image to the video job
+  /// server. The render is minutes long and survives app suspension — same
+  /// contract as 3D.
   Future<void> _startAnimate(
     BuildContext context,
     WidgetRef ref,
@@ -1108,94 +1111,25 @@ class _NodeGrid extends ConsumerWidget {
   ) async {
     _dismissKeyboard();
     final notifier = ref.read(imageStudioProvider.notifier);
-    final scenes = ref.read(imageStudioProvider).availableScenes;
-    final scene = await showModalBottomSheet<VideoScene>(
+    final studio = ref.read(imageStudioProvider);
+    final choice = await showModalBottomSheet<_AnimateChoice>(
       context: context,
       backgroundColor: AppTheme.surface,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text(
-                'Rozhýbat obrázek',
-                style: TextStyle(color: AppTheme.textPrimary, fontSize: 17),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
-              child: Text(
-                'Vyber scénu. Render na serveru trvá minuty — appku můžeš '
-                'zavřít, po návratu se video dotáhne samo.',
-                style: TextStyle(color: AppTheme.textSecondary, height: 1.4),
-              ),
-            ),
-            Flexible(
-              child: ListView(
-                shrinkWrap: true,
-                children: [
-                  for (final s in scenes)
-                    ListTile(
-                      leading: Icon(
-                        s.audio ? Icons.music_note : Icons.movie_outlined,
-                        color: AppTheme.accent,
-                      ),
-                      title: Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              s.label,
-                              style: const TextStyle(
-                                color: AppTheme.textPrimary,
-                              ),
-                            ),
-                          ),
-                          // Scény s vygenerovanou hudbou jsou novinka a jedou na
-                          // jiném modelu — ať je v seznamu poznat na první pohled.
-                          if (s.audio)
-                            Container(
-                              margin: const EdgeInsets.only(left: 8),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.accent.withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Text(
-                                'se zvukem',
-                                style: TextStyle(
-                                  color: AppTheme.accent,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      subtitle: Text(
-                        '${s.desc}\n~${s.seconds.round()} s · ${s.beats} beatů · ~${s.minutesEst} min',
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          height: 1.3,
-                        ),
-                      ),
-                      isThreeLine: true,
-                      onTap: () => Navigator.of(context).pop(s),
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
+      builder: (context) => _AnimateSheet(
+        scenes: studio.availableScenes,
+        custom: studio.videoCustom,
       ),
     );
-    if (scene == null) return;
+    if (choice == null) return;
     notifier.selectImage(img.id);
-    await notifier.animate(scene.id);
+    final scene = choice.scene;
+    if (scene != null) {
+      await notifier.animate(scene.id);
+    } else {
+      await notifier.animatePrompt(choice.prompt!, beats: choice.beats);
+    }
   }
 
   /// Inpaint entry: open the mask editor; the inpaint model (FLUX Fill vs
@@ -3276,3 +3210,221 @@ class _VideoNodeViewState extends State<_VideoNodeView> {
 
 /// What the 3D tile action makes: the printable model or a dancing figure.
 enum _ThreeDChoice { print, figure }
+
+
+/// What the „Rozhýbat" sheet returns: a scene, or the user's own motion text
+/// with a length in 5 s segments.
+class _AnimateChoice {
+  const _AnimateChoice.scene(VideoScene this.scene) : prompt = null, beats = 0;
+  const _AnimateChoice.prompt(String this.prompt, this.beats) : scene = null;
+
+  final VideoScene? scene;
+  final String? prompt;
+  final int beats;
+}
+
+/// „Rozhýbat obrázek": on top your own motion („otočí se k oknu a
+/// zamává") with a length, below the server's scenes. The server rewrites
+/// the text into an English motion prompt, so Czech is fine.
+class _AnimateSheet extends StatefulWidget {
+  const _AnimateSheet({required this.scenes, required this.custom});
+
+  final List<VideoScene> scenes;
+  final VideoCustomSpec? custom;
+
+  @override
+  State<_AnimateSheet> createState() => _AnimateSheetState();
+}
+
+class _AnimateSheetState extends State<_AnimateSheet> {
+  final _prompt = TextEditingController();
+  int _beats = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _prompt.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _prompt.dispose();
+    super.dispose();
+  }
+
+  void _submitPrompt() {
+    final text = _prompt.text.trim();
+    if (text.isEmpty) return;
+    Navigator.of(context).pop(_AnimateChoice.prompt(text, _beats));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final custom = widget.custom;
+    final scenes = widget.scenes;
+    return Padding(
+      // The prompt field must stay above the keyboard.
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(
+                'Rozhýbat obrázek',
+                style: TextStyle(color: AppTheme.textPrimary, fontSize: 17),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Text(
+                'Popiš pohyb, nebo vyber scénu. Render na serveru trvá '
+                'minuty — appku můžeš zavřít, po návratu se video dotáhne samo.',
+                style: TextStyle(color: AppTheme.textSecondary, height: 1.4),
+              ),
+            ),
+            if (custom != null) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                child: TextField(
+                  controller: _prompt,
+                  minLines: 2,
+                  maxLines: 4,
+                  maxLength: custom.maxPrompt,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _submitPrompt(),
+                  style: const TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 14,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Co se má pohnout — např. „otočí se k oknu, '
+                        'usměje se a zamává"',
+                    hintStyle: const TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 13,
+                    ),
+                    filled: true,
+                    fillColor: AppTheme.surfaceAlt,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.all(12),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                child: Row(
+                  children: [
+                    if (custom.maxBeats > 1)
+                      Expanded(
+                        child: Wrap(
+                          spacing: 6,
+                          children: [
+                            for (var b = 1; b <= custom.maxBeats; b++)
+                              ChoiceChip(
+                                label: Text(
+                                  '${(custom.secondsPerBeat * b).round()} s',
+                                ),
+                                selected: _beats == b,
+                                onSelected: (_) => setState(() => _beats = b),
+                              ),
+                          ],
+                        ),
+                      )
+                    else
+                      const Spacer(),
+                    FilledButton.icon(
+                      onPressed: _prompt.text.trim().isEmpty
+                          ? null
+                          : _submitPrompt,
+                      icon: const Icon(Icons.play_arrow),
+                      label: Text(
+                        'Rozhýbat · ~${custom.minutesPerBeat * _beats} min',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (scenes.isNotEmpty)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 12, 20, 4),
+                  child: Text(
+                    'Nebo scéna',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                children: [
+                  for (final s in scenes)
+                    ListTile(
+                      leading: Icon(
+                        s.audio ? Icons.music_note : Icons.movie_outlined,
+                        color: AppTheme.accent,
+                      ),
+                      title: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              s.label,
+                              style: const TextStyle(
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                          ),
+                          // Scény s vygenerovanou hudbou jsou novinka a jedou na
+                          // jiném modelu — ať je v seznamu poznat na první pohled.
+                          if (s.audio)
+                            Container(
+                              margin: const EdgeInsets.only(left: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.accent.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Text(
+                                'se zvukem',
+                                style: TextStyle(
+                                  color: AppTheme.accent,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      subtitle: Text(
+                        '${s.desc}\n~${s.seconds.round()} s · ${s.beats} beatů · ~${s.minutesEst} min',
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          height: 1.3,
+                        ),
+                      ),
+                      isThreeLine: true,
+                      onTap: () =>
+                          Navigator.of(context).pop(_AnimateChoice.scene(s)),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
