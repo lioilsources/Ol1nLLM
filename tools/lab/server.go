@@ -55,6 +55,7 @@ func serve(env *Env, port int, open, forceDry bool) error {
 	mux.HandleFunc("/api/config", s.guard(s.handleConfig))
 	mux.HandleFunc("/api/estimate", s.guard(s.handleEstimate))
 	mux.HandleFunc("/api/upload-ref", s.guard(s.handleUploadRef))
+	mux.HandleFunc("/api/upload-prompts", s.guard(s.handleUploadPrompts))
 	mux.HandleFunc("/api/runs", s.guard(s.handleRuns))
 	mux.HandleFunc("/api/runs/", s.guard(s.handleRun))
 	mux.HandleFunc("/media/", s.guard(s.handleMedia))
@@ -349,6 +350,47 @@ func (s *Server) handleUploadRef(w http.ResponseWriter, r *http.Request) {
 		out["thumb"] = "/media/_refs/" + filepath.Base(local) + ".thumb.jpg"
 	}
 	writeJSON(w, 200, out)
+}
+
+// handleUploadPrompts takes the prompt YAML and answers with what it read.
+//
+// It parses on the way in rather than storing blindly: a typo in a family name
+// is worth seeing while the file is still on screen, not as a blocker attached
+// to a spec the user has stopped thinking about. Text, so the 1 MiB cap is
+// generous — the ref upload's 32 MiB is for photos.
+func (s *Server) handleUploadPrompts(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "PUT", http.StatusMethodNotAllowed)
+		return
+	}
+	data, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		writeJSON(w, 400, map[string]string{"error": err.Error()})
+		return
+	}
+	dir := filepath.Join(s.env.RepoRoot, "build", "lab", "_prompts")
+	_ = os.MkdirAll(dir, 0o755)
+	local := filepath.Join(dir, fmt.Sprintf("prompts-%d.yaml", time.Now().UnixNano()))
+	if err := os.WriteFile(local, data, 0o644); err != nil {
+		writeJSON(w, 500, map[string]string{"error": err.Error()})
+		return
+	}
+	bodies, err := ParsePromptBodies(local)
+	if err != nil {
+		writeJSON(w, 400, map[string]string{"error": err.Error()})
+		return
+	}
+	entries := make([]map[string]any, 0, len(bodies))
+	for _, b := range bodies {
+		fams := make([]string, 0, len(b.Texts))
+		for _, f := range promptFamilies {
+			if b.Texts[f] != "" {
+				fams = append(fams, f)
+			}
+		}
+		entries = append(entries, map[string]any{"id": b.ID, "families": fams})
+	}
+	writeJSON(w, 200, map[string]any{"localPath": local, "prompts": entries})
 }
 
 func (s *Server) handleRuns(w http.ResponseWriter, r *http.Request) {

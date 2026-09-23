@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -1485,5 +1486,189 @@ func TestEstimateCountsTheRegistryWhenNoStylesAreListed(t *testing.T) {
 	}
 	if !slices.Contains(env, "NO_STYLES=1") {
 		t.Fatalf("NoStyles se musí dostat do dumpu jako NO_STYLES=1, env = %v", env)
+	}
+}
+
+// ── gen-queue (NIM) ───────────────────────────────────────────────────────
+
+// A run dumped before the NIM path existed has no backend field anywhere, and
+// every cell in it is a ComfyUI graph. If that read back as "" the runner
+// would have a third, silent backend to guess about.
+func TestManifestReadsOldRunsAsComfyUI(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "manifest.json")
+	if err := os.WriteFile(path, []byte(`{
+		"cells":[{"id":"txt2img__pony____baseline","flow":"txt2img","model":"pony"}],
+		"models":[{"id":"pony","label":"Pony"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	man, err := ReadManifest(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if man.Cells[0].Backend != BackendComfy {
+		t.Errorf("buňka bez backendu = %q, čekáno %q", man.Cells[0].Backend, BackendComfy)
+	}
+	if man.Models[0].Backend != BackendComfy {
+		t.Errorf("model bez backendu = %q, čekáno %q", man.Models[0].Backend, BackendComfy)
+	}
+}
+
+// The estimate is the guard before GPU time, so it must not budget for cells
+// the dump is about to skip: flux-schnell is txt2img only and has no graph for
+// a LoRA to load into.
+func TestEstimateCountsOnlyWhatNimCanRun(t *testing.T) {
+	nim := ManifestModel{ID: "flux-schnell", Label: "FLUX Schnell", Backend: BackendNim}
+	s := Spec{
+		Models: []string{"flux-schnell"}, Prompts: []string{"x"},
+		Flows: []string{"txt2img", "img2img"}, NoStyles: true,
+		RefName: "r.png", Lora: "x.safetensors",
+	}
+	e := s.Estimate(&Manifest{Models: []ManifestModel{nim}}, nil)
+	if e.Cells != 1 {
+		t.Errorf("cells = %d, čekáno 1 — img2img u NIM neexistuje", e.Cells)
+	}
+	joined := strings.Join(e.Warnings, " ")
+	for _, want := range []string{"img2img", "LoRA"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("varování neříká, že se %s přeskočí: %v", want, e.Warnings)
+		}
+	}
+
+	// A ComfyUI model in the same plan is unaffected: both flows count.
+	comfy := ManifestModel{ID: "juggernaut-xl", Preset: map[string]any{"steps": 30.0}}
+	s.Models = []string{"flux-schnell", "juggernaut-xl"}
+	e = s.Estimate(&Manifest{Models: []ManifestModel{nim, comfy}}, nil)
+	if e.Cells != 3 {
+		t.Errorf("cells = %d, čekáno 3 (1 NIM + 2 ComfyUI)", e.Cells)
+	}
+}
+
+// End to end over the app's protocol: 202 with a job id, polled status, PNG
+// from /result — and the image and its thumbnail on disk afterwards.
+func TestNimCellSubmitsPollsAndDownloads(t *testing.T) {
+	png := Placeholder(64, 96, "nim")
+	var submitted map[string]any
+	polls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("CF-Access-Client-Id") != "id" {
+			w.WriteHeader(403)
+			return
+		}
+		switch {
+		case r.URL.Path == "/nim/flux-schnell/v1/infer":
+			_ = json.NewDecoder(r.Body).Decode(&submitted)
+			w.WriteHeader(http.StatusAccepted)
+			_, _ = w.Write([]byte(`{"id":"job-1","queue_position":2}`))
+		case strings.HasSuffix(r.URL.Path, "/result"):
+			_, _ = w.Write(png)
+		case r.URL.Path == "/nim/flux-schnell/jobs/job-1":
+			polls++
+			// Queued first: the runner must keep waiting, not take the first
+			// answer for a finished job.
+			if polls == 1 {
+				_, _ = w.Write([]byte(`{"status":"queued","queue_position":1}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"status":"done"}`))
+		default:
+			w.WriteHeader(404)
+		}
+	}))
+	defer srv.Close()
+
+	run := fakeNimRun(t, srv.URL)
+	cell := run.man.Cells[0]
+	if err := run.generateCell(context.Background(), cell); err != nil {
+		t.Fatal(err)
+	}
+	if submitted["prompt"] != "a woman, ukiyo-e" || submitted["seed"] != 777.0 {
+		t.Errorf("odeslané tělo = %v", submitted)
+	}
+	if polls < 2 {
+		t.Errorf("polls = %d — queued se musí dopollovat do done", polls)
+	}
+	got, err := os.ReadFile(run.imgPath(cell.ID))
+	if err != nil || len(got) != len(png) {
+		t.Fatalf("obrázek se neuložil: %v", err)
+	}
+	if _, err := os.Stat(run.thumbPath(cell.ID)); err != nil {
+		t.Errorf("chybí náhled: %v", err)
+	}
+	if id := run.State().Cells[cell.ID].PromptID; id != "job-1" {
+		t.Errorf("job id se nezapsalo do stavu: %q", id)
+	}
+}
+
+// gen-queue drops the job status together with the result an hour after it
+// finishes, so a 404 means the id is gone — not that the route is wrong.
+func TestNimJobGoneSaysTTLNotHTTP404(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/v1/infer") {
+			w.WriteHeader(http.StatusAccepted)
+			_, _ = w.Write([]byte(`{"id":"job-1"}`))
+			return
+		}
+		w.WriteHeader(404)
+		_, _ = w.Write([]byte(`{"error":"not found"}`))
+	}))
+	defer srv.Close()
+
+	run := fakeNimRun(t, srv.URL)
+	err := run.generateCell(context.Background(), run.man.Cells[0])
+	if err == nil || !strings.Contains(err.Error(), "TTL") {
+		t.Fatalf("404 na job musí mluvit o TTL/restartu fronty, dostal jsem %v", err)
+	}
+}
+
+// Auth failures must stay HTTPError so the run loop's three-strikes abort
+// covers gen-queue too — it is behind the same Access policy as ComfyUI, so a
+// wrong token fails every cell, not an unlucky one.
+func TestNimAuthFailureIsAbortable(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(403)
+	}))
+	defer srv.Close()
+
+	err := fakeNimRun(t, srv.URL).generateCell(context.Background(),
+		ManifestCell{ID: "txt2img__flux-schnell__ukiyoe", Backend: BackendNim})
+	var he *HTTPError
+	if !asHTTPError(err, &he) || !he.IsAuth() {
+		t.Fatalf("403 z gen-queue musí být HTTPError s IsAuth, dostal jsem %v", err)
+	}
+	if !strings.Contains(err.Error(), "gen-queue") {
+		t.Errorf("chyba neříká, kdo odpověděl: %v", err)
+	}
+}
+
+func fakeNimRun(t *testing.T, base string) *Run {
+	t.Helper()
+	// The real cadence would make this suite sleep through a queue it is
+	// faking; the loop under test is the same either way.
+	saved := nimPollInterval
+	nimPollInterval = time.Millisecond
+	t.Cleanup(func() { nimPollInterval = saved })
+	dir := t.TempDir()
+	for _, sub := range []string{"img", "thumb", "wf"} {
+		if err := os.MkdirAll(filepath.Join(dir, sub), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	id := "txt2img__flux-schnell__ukiyoe"
+	if err := os.WriteFile(filepath.Join(dir, "wf", id+".json"), []byte(
+		`{"backend":"flux_nim","model":"flux-schnell","request":
+		{"prompt":"a woman, ukiyo-e","width":1024,"height":1024,"steps":4,"seed":777}}`,
+	), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	man := &Manifest{Cells: []ManifestCell{{
+		ID: id, Backend: BackendNim, Flow: "txt2img", Model: "flux-schnell",
+		Style: "ukiyoe", Prompt: strPtr("a woman, ukiyo-e"),
+	}}}
+	return &Run{
+		Dir: dir, Spec: &Spec{}, man: man,
+		env:   &Env{Nim: NewNim(base, "id", "secret")},
+		state: RunState{ID: "t", Cells: map[string]CellState{id: {ID: id}}},
+		subs:  map[chan RunState]struct{}{},
 	}
 }

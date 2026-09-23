@@ -74,10 +74,17 @@ type HTTPError struct {
 	Status int
 	Body   string
 	Path   string
+	// Service names who answered. Empty means ComfyUI, so the call sites that
+	// predate gen-queue read exactly as they did.
+	Service string
 }
 
 func (e *HTTPError) Error() string {
-	return fmt.Sprintf("ComfyUI %s → HTTP %d: %s", e.Path, e.Status, e.Body)
+	service := e.Service
+	if service == "" {
+		service = "ComfyUI"
+	}
+	return fmt.Sprintf("%s %s → HTTP %d: %s", service, e.Path, e.Status, e.Body)
 }
 
 // IsAuth reports a Cloudflare Access rejection, which is worth aborting a whole

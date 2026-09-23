@@ -338,6 +338,9 @@ func (r *Run) generateCell(ctx context.Context, c ManifestCell) error {
 		}
 		return writeFile(r.thumbPath(c.ID), Placeholder(213, 320, c.ID))
 	}
+	if c.Backend == BackendNim {
+		return r.generateNimCell(ctx, c)
+	}
 	raw, err := os.ReadFile(filepath.Join(r.Dir, "wf", c.ID+".json"))
 	if err != nil {
 		return err
@@ -386,15 +389,79 @@ func (r *Run) generateCell(ctx context.Context, c ManifestCell) error {
 		if err != nil {
 			return err
 		}
-		if err := writeFile(r.imgPath(c.ID), data); err != nil {
-			return err
+		return r.saveImage(c.ID, data)
+	}
+}
+
+// nimPollInterval is the app's own cadence (FluxNimService). A var rather than
+// a const so the tests can drive the loop without sleeping through a queue.
+var nimPollInterval = 3 * time.Second
+
+// generateNimCell runs one gen-queue job. Same shape as the ComfyUI path —
+// submit, poll, download — but there is no graph to send and no per-step
+// progress to read: NIM renders synchronously behind the queue, so a job is
+// only ever queued, running, done or failed.
+func (r *Run) generateNimCell(ctx context.Context, c ManifestCell) error {
+	raw, err := os.ReadFile(filepath.Join(r.Dir, "wf", c.ID+".json"))
+	if err != nil {
+		return err
+	}
+	var payload struct {
+		Model   string         `json:"model"`
+		Request map[string]any `json:"request"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return err
+	}
+	if payload.Model == "" || payload.Request == nil {
+		return fmt.Errorf("%s: gen-queue request bez modelu nebo těla", c.ID)
+	}
+	job, _, err := r.env.Nim.Submit(payload.Model, payload.Request)
+	if err != nil {
+		return err
+	}
+	r.update(func(s *RunState) {
+		cs := s.Cells[c.ID]
+		cs.PromptID = job
+		s.Cells[c.ID] = cs
+	})
+	deadline := time.Now().Add(30 * time.Minute)
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("zrušeno")
+		case <-time.After(nimPollInterval):
 		}
-		thumb, err := Thumbnail(data, thumbMax)
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timeout: %s se nedokončil do 30 min", job)
+		}
+		st, err := r.env.Nim.Status(payload.Model, job)
 		if err != nil {
 			return err
 		}
-		return writeFile(r.thumbPath(c.ID), thumb)
+		switch st.Status {
+		case "done":
+			data, err := r.env.Nim.Result(payload.Model, job)
+			if err != nil {
+				return err
+			}
+			return r.saveImage(c.ID, data)
+		case "error":
+			return fmt.Errorf("gen-queue: %s",
+				defaultStr(st.Error, "běh skončil chybou"))
+		}
 	}
+}
+
+func (r *Run) saveImage(id string, data []byte) error {
+	if err := writeFile(r.imgPath(id), data); err != nil {
+		return err
+	}
+	thumb, err := Thumbnail(data, thumbMax)
+	if err != nil {
+		return err
+	}
+	return writeFile(r.thumbPath(id), thumb)
 }
 
 func (r *Run) computeMetrics() {

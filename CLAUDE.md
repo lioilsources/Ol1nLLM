@@ -462,7 +462,7 @@ Nahrazuje původní Python `nim-kontext-proxy`.
 ```
 POST /nim/{model}/v1/infer          →  202 + {id, queue_position}   (vrátí okamžitě)
 GET  /nim/{model}/jobs/{id}         →  {status, ...}                (poll každé 3s)
-GET  /nim/{model}/jobs/{id}/result  →  PNG bytes                    (po status=done)
+GET  /nim/{model}/jobs/{id}/result  →  obrázek (JPEG)               (po status=done)
 ```
 
 `{model}` = `flux-schnell` (txt2img) nebo `flux-kontext` (img2img).
@@ -470,6 +470,12 @@ GET  /nim/{model}/jobs/{id}/result  →  PNG bytes                    (po status
 Status hodnoty: `queued` (s `queue_position`), `running`, `done`, `error` (s `error`).
 gen-queue volá NIM synchronně ve worker poolu, retry na 5xx (3 pokusy: 0/5/10s),
 4xx je non-retryable. Chybová těla jsou JSON `{"error":"..."}`.
+
+**`/result` vrací JPEG, ne PNG** (ověřeno `file` na staženém výsledku, 2026-09-17)
+— jméno souboru na disku `.png` je jen konvence appky (stejně jako u foto rootů,
+viz `latent_bucket.dart`, který kvůli tomu čte hlavičku PNG i JPEG). Kdo ty bajty
+dekóduje, musí umět obojí: v labu to drží `imageutil.go`, který registruje oba
+dekodéry pro celý balíček, takže i `metrics.go` (importuje jen `image`) projde.
 
 **TTL výsledků: 1 hodina od completion.** Po TTL se evictuje výsledek **i
 job-status** současně → `/jobs/{id}` i `/result` pak vrací `404 {"error":"..."}`
@@ -827,6 +833,26 @@ appka opravdu posílá. Modely, styly i pózy se čtou z registrů (`kImageModel
 prořezané podle nainstalovaných checkpointů, `kStylePresets`, `kPoseTemplates`)
 a přes `manifest.json` tečou do UI — Dart zůstává jediným zdrojem pravdy.
 
+**Modely bez grafu (gen-queue / NIM)**: `flux-schnell` jede přes gen-queue, ne
+ComfyUI, takže do `wf/<id>.json` jde místo grafu **request body** — a staví ho
+zase appka (`FluxNimService.requestBody()`, kvůli tomu je to pojmenovaná
+statická metoda a ne literál uvnitř `_infer`). `ManifestCell.backend`
+(hodnoty z `image_backend.dart`, prázdno = starý běh = `comfyui`) rozhoduje
+v `runner.go`, jestli se buňka pošle do ComfyUI, nebo přes `nim.go` do fronty
+(submit 202 → poll 3 s → `/result`). CF Access token je tentýž, takže 401/403
+zůstává `HTTPError` a strop „3× auth chyba = konec běhu" platí i tady.
+Osy: **prompt, styl, seed** (+ laboratorní `param.stylePosition` /
+`qualityPrefix` / `styleDialect`). Všechno ostatní — LoRA, póza, tvář,
+`KSampler.*`, `LATENT`, img2img — je uzel grafu, který neexistuje, takže se
+buňka **přeskočí s důvodem**; tiše ignorovat páčku by vyrobilo obrázek, co
+vypadá jako její měření. Nepovinný override (`?cíl`) mixovaný plán pustí,
+sweep na uzel ne (identické varianty pod různými štítky). 1024×1024 a 4 kroky
+jsou napevno, protože je appka nenabízí — vystavit je jako osu by znamenalo
+měřit něco, co appka neumí vyrobit. Motivace: `docs/style-matrix.md`
+flux-schnell nikdy neměřil, takže jeho `styleNote` je jediný v registru bez
+verdiktu za sebou. `flux-kontext` v labu není — img2img by chtěl referenci
+dovnitř requestu.
+
 Postup je **plán → dump → prohlédnout → generovat**: dump je zadarmo a vyrobí
 přesný seznam buněk dřív, než se sáhne na GPU. Ke každému modelu se dumpuje
 i `__baseline` (týž prompt bez stylu), bez kterého nejde odlišit „model na
@@ -858,6 +884,27 @@ se místo čísel ukáže poznámka. **Mezi modely čísla nesrovnávat**: ArcFa
 naučený na fotkách a u anime modelů vychází blízko nuly (noobai-xl s InstantID
 0.06, juggernaut-xl 0.68) — nízké číslo tam neodliší jiného člověka od
 nakreslené tváře; čte se hodnota sweepu v rámci modelu.
+
+**Prompty po rodinách (`--prompts-yaml`, v UI pole pod textem promptů)**: YAML
+`jméno: {danbooru, juggernaut, flux}` — týž námět napsaný pro tagový
+checkpoint, fotoreal SDXL a FLUX, aby šly položit vedle sebe pod jedním seedem
+místo tří běhů. **Rodinu vybírá model, ne soubor**: `PromptDialect.booru`
+⇒ `danbooru`, jinak dedikovaný graf / gen-queue ⇒ `flux`, generická SDXL
+šablona ⇒ `juggernaut` (`promptFamilyFor()` v `dump_spec.dart`; nový model se
+zařadí sám). Tři koše proti dvěma hodnotám `PromptDialect` — přirozená půlka
+se dělí znovu, protože věta pro Juggernaut není věta pro FLUX; je to
+**laboratorní** pojem, ne pole na `ImageModelSpec`, appka má jedno pole
+promptu a nikdy by ho nečetla. Textové pole se s tím **násobí** (každý řádek
+je prefix přes všechny prompty ze souboru), prázdné pole = prázdný prefix.
+Chybějící rodina **zastaví běh** — fráze poslaná tagovému modelu vyrobí
+obrázek, co vypadá jako měření toho promptu a není jím; odhad to řekne před
+startem (manifest nese `promptFamily` na modelu), dump je pojistka. YAML parsuje
+**Go** (`promptbodies.go`, první závislost modulu — `gopkg.in/yaml.v3`), protože
+odhad potřebuje počet na každý úhoz; do `dump.dart` jde už normalizovaný JSON
+v adresáři běhu, takže parser je v systému jediný a resume hraje tytéž prompty.
+`manifest.prompts` nese **popisky** sloupců (text se liší model od modelu),
+buňka `promptBody` a v `prompt` text přečtený zpátky z grafu. Ukázka:
+`candidates/prompts-example.yaml`.
 
 **Kandidáti stylů**: `--styles-file` čte `id/label/block` a volitelně
 `booru/artist/period`, ostatní klíče toleruje. Id, které v souboru chybí, se

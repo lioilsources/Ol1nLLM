@@ -20,13 +20,17 @@ const ConfirmCells = 120
 // Spec is one experiment, exactly as the UI submits it and as it is replayed
 // from spec.json.
 type Spec struct {
-	Title      string   `json:"title"`
-	Models     []string `json:"models"`
-	Prompts    []string `json:"prompts"`
-	Styles     []string `json:"styles"`
-	StylesFile string   `json:"stylesFile"`
-	Flows      []string `json:"flows"`
-	NoBaseline bool     `json:"noBaseline"`
+	Title   string   `json:"title"`
+	Models  []string `json:"models"`
+	Prompts []string `json:"prompts"`
+	// PromptsYAML is a file of per-family prompt texts (see promptbodies.go).
+	// With one, Prompts stops being the axis and becomes a list of prefixes —
+	// the axis is every prefix × every entry of the file.
+	PromptsYAML string   `json:"promptsYaml"`
+	Styles      []string `json:"styles"`
+	StylesFile  string   `json:"stylesFile"`
+	Flows       []string `json:"flows"`
+	NoBaseline  bool     `json:"noBaseline"`
 	// NoStyles renders the baseline alone. An empty Styles list means the
 	// whole registry (the dump's long-standing reading), so "no styles" has to
 	// be said out loud — the reference generator needs one image, not 83.
@@ -69,6 +73,22 @@ type Spec struct {
 	SweepLabel string   `json:"sweepLabel"`
 
 	Dry bool `json:"dry"`
+}
+
+// nimSelected lists the chosen gen-queue models. An empty picked set means
+// "all", the same reading the estimate loop uses.
+func nimSelected(models []ManifestModel, picked map[string]bool) []string {
+	var out []string
+	for _, m := range models {
+		if m.Backend != BackendNim {
+			continue
+		}
+		if len(picked) > 0 && !picked[m.ID] {
+			continue
+		}
+		out = append(out, m.ID)
+	}
+	return out
 }
 
 type Estimate struct {
@@ -119,6 +139,19 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 	if prompts == 0 {
 		prompts = 1
 	}
+	// A prompt file turns the box into prefixes, so the axis is the product.
+	// An empty box is one empty prefix, not zero cells — the file carries the
+	// prompts, and that is the whole point of having uploaded it.
+	var bodies []PromptBody
+	if s.PromptsYAML != "" {
+		parsed, err := ParsePromptBodies(s.PromptsYAML)
+		if err != nil {
+			e.Blockers = append(e.Blockers, "prompty: "+err.Error())
+		} else {
+			bodies = parsed
+			prompts *= len(bodies)
+		}
+	}
 	flows := 0
 	hairFlow := false
 	for _, f := range s.Flows {
@@ -148,6 +181,12 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 	for _, id := range s.Models {
 		picked[id] = true
 	}
+	// A body that has no text for a family in the run would crash the dump.
+	// The dump is the backstop; the file is the slow thing to fix, so it is
+	// worth saying here, before anything is started.
+	for _, msg := range missingPromptTexts(bodies, promptFamiliesInRun(models, picked)) {
+		e.Blockers = append(e.Blockers, "prompty: "+msg)
+	}
 	var est float64
 	for _, m := range models {
 		if len(picked) > 0 && !picked[m.ID] {
@@ -159,8 +198,27 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 			if steps, ok := m.Preset["steps"].(float64); ok && steps <= 8 {
 				per = 12
 			}
+			// A NIM model has no preset to read the step count from, and the
+			// default would over-report it threefold: Schnell is four steps
+			// behind a queue that usually has nothing in it.
+			if m.Backend == BackendNim {
+				per = 10
+			}
 		}
-		cells := (prompts*styleCount*flows + hairCount) * e.Variants
+		modelFlows, modelHair := flows, hairCount
+		if m.Backend == BackendNim {
+			// Only txt2img survives the dump, and a gen-queue model never gets
+			// a hair cell. Counting the rest would budget GPU time for pictures
+			// that are about to be skipped — and this estimate exists to be the
+			// guard before that time is spent.
+			modelFlows, modelHair = 0, 0
+			for _, f := range s.Flows {
+				if f == "txt2img" {
+					modelFlows = 1
+				}
+			}
+		}
+		cells := (prompts*styleCount*modelFlows + modelHair) * e.Variants
 		e.Cells += cells
 		est += float64(cells) * per
 	}
@@ -171,8 +229,9 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 	}
 	// The dump loops over prompts, so none means zero cells — while the count
 	// above pretends one. A run that says "0 ok, 0 chyb" after a GPU-less
-	// minute is the wrong way to find out the textarea was empty.
-	if len(s.Prompts) == 0 {
+	// minute is the wrong way to find out the textarea was empty. A prompt file
+	// is prompts too: with one the box is allowed to be empty.
+	if len(s.Prompts) == 0 && s.PromptsYAML == "" {
 		e.Blockers = append(e.Blockers, "napiš aspoň jeden prompt")
 	}
 	if len(s.Flows) == 0 {
@@ -184,6 +243,31 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 	}
 	if s.PoseMode == "template" && s.PoseID == "" {
 		e.Blockers = append(e.Blockers, "vyber šablonu pózy")
+	}
+	// A gen-queue model has no graph, so a knob that lives in one cannot be
+	// applied — the dump skips those cells with the reason. Saying it here is
+	// cheaper than reading it off a run that came back half empty.
+	if nim := nimSelected(models, picked); len(nim) > 0 {
+		var lost []string
+		for _, f := range s.Flows {
+			if f != "txt2img" {
+				lost = append(lost, f)
+			}
+		}
+		if s.Lora != "" {
+			lost = append(lost, "LoRA")
+		}
+		if s.PoseMode != "" && s.PoseMode != "none" {
+			lost = append(lost, "póza")
+		}
+		if s.FaceIdentity != "" && s.FaceIdentity != "none" {
+			lost = append(lost, "tvář")
+		}
+		if len(lost) > 0 {
+			e.Warnings = append(e.Warnings, fmt.Sprintf(
+				"%s jede přes gen-queue bez grafu — %s se u něj přeskočí",
+				strings.Join(nim, ", "), strings.Join(lost, ", ")))
+		}
 	}
 	if e.Cells > MaxCells {
 		e.Blockers = append(e.Blockers,
@@ -478,6 +562,25 @@ func (s *Spec) DumpEnv(dir string) ([]string, error) {
 	if err := os.WriteFile(promptsPath,
 		[]byte(strings.Join(s.Prompts, "\n")+"\n"), 0o644); err != nil {
 		return nil, err
+	}
+	// The YAML is parsed here and handed over as JSON, next to prompts.txt:
+	// one parser in the system, and the run directory keeps exactly the bodies
+	// it ran on — so a resume replays them without re-reading a file that may
+	// have been edited since.
+	if s.PromptsYAML != "" {
+		bodies, err := ParsePromptBodies(s.PromptsYAML)
+		if err != nil {
+			return nil, err
+		}
+		data, err := json.Marshal(bodies)
+		if err != nil {
+			return nil, err
+		}
+		bodiesPath := filepath.Join(dir, "prompt-bodies.json")
+		if err := os.WriteFile(bodiesPath, data, 0o644); err != nil {
+			return nil, err
+		}
+		set("PROMPT_BODIES", bodiesPath)
 	}
 	set("OUT_DIR", filepath.Join(dir, "wf"))
 	set("MANIFEST", "1")

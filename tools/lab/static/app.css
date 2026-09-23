@@ -128,6 +128,9 @@ optgroup option { color: var(--paper); }
 .exportline a { color: inherit; }
 
 .hint { color: var(--dim); font-size: 11px; font-family: var(--sans); margin: 4px 0 0; }
+/* Which families a prompt covers — the reader is scanning for a gap, so the
+   list has to be legible against the hint text carrying it. */
+.fam { color: var(--muted); font-family: var(--mono); font-size: 10px; }
 .danger { color: var(--bad); }
 .warnline { color: var(--warn); }
 

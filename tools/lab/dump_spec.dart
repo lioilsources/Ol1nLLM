@@ -3,7 +3,145 @@
 /// unit-tested without booting a dump (`test/dump_spec_test.dart`).
 library;
 
+import 'package:ol1n_llm/models/image_model.dart';
 import 'package:ol1n_llm/models/style_preset.dart';
+
+/// Which of a prompt file's texts a model reads.
+///
+/// Three buckets where [PromptDialect] has two: its natural half splits again,
+/// because a sentence written for a photoreal SDXL checkpoint and one written
+/// for FLUX are not the same sentence. Lab-only, and deliberately not a field
+/// on [ImageModelSpec] — the app has a single prompt box and would never read
+/// it, and a registry field no app code reads rots.
+enum PromptFamily {
+  /// Danbooru tags — the booru-captioned lineages (Pony, Illustrious, …).
+  danbooru,
+
+  /// Phrases for the photoreal and vanilla SDXL checkpoints.
+  juggernaut,
+
+  /// FLUX, which reads a sentence.
+  flux,
+}
+
+/// The family a model reads, derived from the registry rather than declared.
+///
+/// Dialect decides first: a booru checkpoint wants tags whatever it is built
+/// on. The remaining split is FLUX vs SDXL, and "no checkpoint to patch" is
+/// the FLUX test the rest of the lab already uses (`ckptName == null` —
+/// a dedicated UNETLoader graph), plus the two gen-queue backends, which are
+/// FLUX by construction. Every other entry in `kImageModels` runs a generic
+/// SDXL template, so a new model lands in the right bucket on its own.
+PromptFamily promptFamilyFor(ImageModelSpec m) {
+  if (m.promptDialect == PromptDialect.booru) return PromptFamily.danbooru;
+  final flux = m.kind != ImageBackendKind.comfyUi || m.preset?.ckptName == null;
+  return flux ? PromptFamily.flux : PromptFamily.juggernaut;
+}
+
+/// One entry of the prompt file: the same subject written out per family,
+/// under a shared id.
+class PromptBody {
+  const PromptBody({required this.id, required this.texts});
+
+  final String id;
+  final Map<PromptFamily, String> texts;
+
+  /// The text this family reads.
+  ///
+  /// A missing family is an error, never a fallback onto a neighbour: handing
+  /// a danbooru checkpoint a FLUX sentence returns a picture that looks like a
+  /// measurement of that prompt and is not one. The plan blocks this before
+  /// the dump ever runs; this is the backstop that keeps it true.
+  String textFor(PromptFamily family) {
+    final text = texts[family];
+    if (text == null) {
+      throw FormatException(
+        'prompt "$id" nemá text pro ${family.name} — buď ho doplň, '
+        'nebo z běhu vynech modely, které ho čtou',
+      );
+    }
+    return text;
+  }
+}
+
+/// Prompt bodies as the plan normalises them out of the YAML file:
+/// `[{id, texts: {danbooru, juggernaut, flux}}]`.
+///
+/// Go owns the YAML parse (one parser in the system, and the run directory
+/// keeps the JSON it produced), so anything malformed has been rejected with a
+/// line number by the time this runs. The checks here are the ones that would
+/// otherwise reach the graph: an id or a text that is empty, or a family name
+/// this build does not know.
+List<PromptBody> parsePromptBodies(List<dynamic> json) => [
+      for (final (i, raw) in json.indexed) _promptBody(i, raw),
+    ];
+
+PromptBody _promptBody(int i, Object? raw) {
+  if (raw is! Map) throw FormatException('prompt #$i není objekt');
+  final id = raw['id'];
+  if (id is! String || id.isEmpty) throw FormatException('prompt #$i nemá id');
+  final texts = raw['texts'];
+  if (texts is! Map) throw FormatException('prompt "$id" nemá texty');
+  final byFamily = <PromptFamily, String>{};
+  for (final entry in texts.entries) {
+    final family = PromptFamily.values
+        .where((f) => f.name == entry.key)
+        .firstOrNull;
+    if (family == null) {
+      throw FormatException('prompt "$id": neznámá rodina "${entry.key}", '
+          'čekám ${PromptFamily.values.map((f) => f.name).join('|')}');
+    }
+    final text = entry.value;
+    if (text is! String || text.trim().isEmpty) {
+      throw FormatException('prompt "$id" má prázdný text pro ${family.name}');
+    }
+    byFamily[family] = text;
+  }
+  if (byFamily.isEmpty) throw FormatException('prompt "$id" nemá žádný text');
+  return PromptBody(id: id, texts: byFamily);
+}
+
+/// One column of the prompt axis: a line from the prompt box and, when a
+/// prompt file is in play, the body it prefixes.
+class PromptAxisEntry {
+  const PromptAxisEntry({required this.prefix, this.body});
+
+  final String prefix;
+  final PromptBody? body;
+
+  /// What the manifest lists for this column. With per-family bodies there is
+  /// no single text to show, so the id names the column and the cell keeps the
+  /// text that was really sent (read back out of the graph).
+  String get label => body == null
+      ? prefix
+      : (prefix.isEmpty ? body!.id : '$prefix · ${body!.id}');
+
+  String subjectFor(PromptFamily family) {
+    if (body == null) return prefix;
+    final text = body!.textFor(family);
+    return prefix.isEmpty ? text : '$prefix, $text';
+  }
+}
+
+/// The prompt axis: every line of the prompt box × every body from the file.
+///
+/// Without a file the box is the axis, exactly as before. With one, its lines
+/// become prefixes — a shared instruction tried against each body — so the
+/// axis is the product, and an empty box means one empty prefix rather than no
+/// cells at all, because the file already carries the prompts.
+List<PromptAxisEntry> buildPromptAxis({
+  required List<String> prefixes,
+  required List<PromptBody> bodies,
+}) {
+  if (bodies.isEmpty) {
+    return [for (final p in prefixes) PromptAxisEntry(prefix: p)];
+  }
+  final heads = prefixes.isEmpty ? const [''] : prefixes;
+  return [
+    for (final prefix in heads)
+      for (final body in bodies) PromptAxisEntry(prefix: prefix, body: body),
+  ];
+}
 
 /// Style candidates from `--styles-file`: `[{id, label, block, …}]`.
 ///
