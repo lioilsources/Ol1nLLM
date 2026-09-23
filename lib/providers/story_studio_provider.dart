@@ -465,12 +465,28 @@ class StoryStudioNotifier extends StateNotifier<StoryStudioState>
     }
   }
 
-  /// Failed on the server (or never submitted) → a new job with the same
-  /// cast; failed here (network, download) → re-attach to the existing one.
+  /// Failed here (network, download) → re-attach. Failed on the server → a
+  /// new job with the same cast, but only once the server confirms that job
+  /// is really gone or still broken: a job can be restarted from the server
+  /// side (a fixed pipeline, a repaint), and resubmitting would throw away an
+  /// hour of finished render.
   Future<void> retry(String id) async {
     final p = _byId(id);
     if (p == null) return;
-    if (p.serverFailed || p.jobId == null) {
+    final jobId = p.jobId;
+    if (p.serverFailed && jobId != null && await _aliveOnServer(jobId)) {
+      _update(
+        id,
+        (p) => p.copyWith(
+          status: StoryStatus.queued,
+          clearError: true,
+          serverFailed: false,
+        ),
+      );
+      _follow(id, jobId);
+      return;
+    }
+    if (p.serverFailed || jobId == null) {
       await _submit(id);
     } else {
       _update(
@@ -478,6 +494,17 @@ class StoryStudioNotifier extends StateNotifier<StoryStudioState>
         (p) => p.copyWith(status: StoryStatus.queued, clearError: true),
       );
       _follow(id, p.jobId!);
+    }
+  }
+
+  /// The server still knows this job and it is not in the error state — then
+  /// following it again beats starting over. A network hiccup answers false,
+  /// so the user keeps the old behaviour of submitting anew.
+  Future<bool> _aliveOnServer(String jobId) async {
+    try {
+      return (await _service.job(jobId)).status != 'error';
+    } on Exception {
+      return false;
     }
   }
 
