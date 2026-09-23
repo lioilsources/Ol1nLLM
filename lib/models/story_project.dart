@@ -272,15 +272,27 @@ class StoryCast {
   final String name;
   final String? fileName;
 
-  const StoryCast({required this.name, this.fileName});
+  /// What the picture actually shows, as the user typed it („ježek Bodlinka").
+  /// Empty = the role stays what the screenplay says. The server rewrites the
+  /// prompts, the narration and the subtitles from this.
+  final String who;
+
+  const StoryCast({required this.name, this.fileName, this.who = ''});
 
   bool get usesDefault => fileName == null;
   String? get path => fileName == null ? null : StoryFiles.path(fileName!);
 
-  factory StoryCast.fromJson(Map<String, dynamic> j) =>
-      StoryCast(name: j['name'] as String? ?? '', fileName: j['file'] as String?);
+  factory StoryCast.fromJson(Map<String, dynamic> j) => StoryCast(
+    name: j['name'] as String? ?? '',
+    fileName: j['file'] as String?,
+    who: j['who'] as String? ?? '',
+  );
 
-  Map<String, dynamic> toJson() => {'name': name, 'file': fileName};
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'file': fileName,
+    if (who.isNotEmpty) 'who': who,
+  };
 }
 
 /// One story render: one server job from cast to finished video.

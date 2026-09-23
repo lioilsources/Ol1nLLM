@@ -107,12 +107,18 @@ class StoryService {
     required String lang,
     required bool review,
     required bool hd,
+    Map<String, String> who = const {},
     int? seed,
   }) async {
     final r = await _post('/stories/jobs', {
       'story': storyId,
+      // Plain base64 keeps the role as written; {image, who} recasts it — the
+      // server then swaps the character in the prompts and in the narration.
       'characters': {
-        for (final e in characters.entries) e.key: base64Encode(e.value),
+        for (final e in characters.entries)
+          e.key: (who[e.key] ?? '').isEmpty
+              ? base64Encode(e.value)
+              : {'image': base64Encode(e.value), 'who': who[e.key]},
       },
       'lang': lang,
       'review': review,

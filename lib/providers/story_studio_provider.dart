@@ -267,6 +267,7 @@ class StoryStudioNotifier extends StateNotifier<StoryStudioState>
     required String lang,
     required bool review,
     required bool hd,
+    Map<String, String> castWho = const {},
   }) async {
     try {
       final dir = await _dirFuture;
@@ -286,7 +287,12 @@ class StoryStudioNotifier extends StateNotifier<StoryStudioState>
           fileName = 'cast-${_uuid.v4()}$ext';
           await File(src).copy('${dir.path}/$fileName');
         }
-        cast[role.role] = StoryCast(name: role.name, fileName: fileName);
+        cast[role.role] = StoryCast(
+          name: role.name,
+          fileName: fileName,
+          // jen u vlastního obrázku: výchozí postava je ta ze scénáře
+          who: fileName == null ? '' : (castWho[role.role] ?? '').trim(),
+        );
       }
       final project = StoryProject.create(
         story: story,
@@ -325,9 +331,11 @@ class StoryStudioNotifier extends StateNotifier<StoryStudioState>
     );
     try {
       final characters = <String, Uint8List>{};
+      final who = <String, String>{};
       for (final e in p.cast.entries) {
         final path = e.value.path;
         if (path != null) characters[e.key] = await File(path).readAsBytes();
+        if (e.value.who.isNotEmpty) who[e.key] = e.value.who;
       }
       final acc = await _service.submit(
         storyId: p.storyId,
@@ -335,6 +343,7 @@ class StoryStudioNotifier extends StateNotifier<StoryStudioState>
         lang: p.lang,
         review: p.review,
         hd: p.hd,
+        who: who,
         seed: p.seed,
       );
       _update(
