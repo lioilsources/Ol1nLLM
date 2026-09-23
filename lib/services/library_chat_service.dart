@@ -7,9 +7,15 @@ import '../models/message.dart';
 import 'chat_backend.dart';
 import 'http_error.dart';
 
-/// Library RAG chatbot (`WorldLibraryProject/rag/server.py`, SPARK :8090,
-/// exposed as chat.ol1n.com behind CF Access). Retrieves from a ChromaDB
-/// corpus of ~93 works and answers with citations.
+/// RAG chatbot over a text corpus (`WorldLibraryProject/rag/server.py` on
+/// SPARK, behind CF Access). Retrieves from a ChromaDB collection and answers
+/// with citations. One class, two instances — the server code and wire
+/// format are identical, only corpus, URL and prompt differ:
+///
+///  * [LibraryChatService.library] — chat.ol1n.com (:8090), ~93 works of
+///    world philosophy and scripture.
+///  * [LibraryChatService.law] — pravnik.ol1n.com (:8091), Czech statutes
+///    from e-Sbírka; see `docs/plan-pravnik.md`.
 ///
 /// Two things make it unlike [VllmService]:
 ///
@@ -30,18 +36,19 @@ import 'http_error.dart';
 class LibraryChatService extends ChatBackend {
   /// Host only — no trailing slash, no `/v1`. Point it at the SPARK LAN
   /// address (`http://192.168.88.66:8090`) to develop without the tunnel.
-  static const _baseUrl = String.fromEnvironment(
+  static const _libraryUrl = String.fromEnvironment(
     'LIBRARY_CHAT_URL',
     defaultValue: 'https://chat.ol1n.com',
   );
+
+  /// Law instance of the same server (`law-chat`; LAN
+  /// `http://192.168.88.66:8091`).
+  static const _lawUrl = String.fromEnvironment(
+    'LAW_CHAT_URL',
+    defaultValue: 'https://pravnik.ol1n.com',
+  );
   static const _cfId = String.fromEnvironment('CF_ACCESS_CLIENT_ID');
   static const _cfSecret = String.fromEnvironment('CF_ACCESS_CLIENT_SECRET');
-
-  /// How many chunks the server puts into the prompt. Sent explicitly rather
-  /// than relying on the server default, so a server-side change cannot
-  /// silently alter what the app asks for. Raising it overflows the model's
-  /// context — 5 chunks already build a 9–12k token prompt.
-  static const _topK = 5;
 
   static const _connectTimeout = Duration(seconds: 30);
 
@@ -56,8 +63,59 @@ class LibraryChatService extends ChatBackend {
 
   final http.Client _client = http.Client();
 
+  final String _baseUrl;
+  final String _id;
+
+  /// Czech name of the service as users see it in error messages
+  /// (`[knihovna] …`, „knihovna neběží").
+  final String label;
+
+  /// systemd user unit on SPARK, named in the 502/503/504 hint.
+  final String unit;
+
+  /// How many chunks the server puts into the prompt. Sent explicitly rather
+  /// than relying on the server default, so a server-side change cannot
+  /// silently alter what the app asks for. Raising it overflows the model's
+  /// context — 5 library chunks already build a 9–12k token prompt; statute
+  /// paragraphs are shorter, so the law instance asks for 8.
+  final int _topK;
+
+  LibraryChatService._({
+    required String baseUrl,
+    required String id,
+    required this.label,
+    required this.unit,
+    int topK = 5,
+  }) : _baseUrl = baseUrl,
+       _id = id,
+       _topK = topK;
+
+  /// World-library corpus at `LIBRARY_CHAT_URL`.
+  factory LibraryChatService.library() => LibraryChatService._(
+    baseUrl: _libraryUrl,
+    id: kChatBackendLibrary,
+    label: 'knihovna',
+    unit: 'library-chat',
+  );
+
+  /// Czech statutes at `LAW_CHAT_URL`.
+  factory LibraryChatService.law() => LibraryChatService._(
+    baseUrl: _lawUrl,
+    id: kChatBackendLaw,
+    label: 'právník',
+    unit: 'law-chat',
+    topK: 8,
+  );
+
   @override
-  String get id => 'library';
+  String get id => _id;
+
+  /// What the request is, for `HttpLayerError` steps („timeout při …").
+  /// Accusative, so it cannot be derived from [label].
+  String get _step => switch (_id) {
+    kChatBackendLaw => 'dotaz na právníka',
+    _ => 'dotaz na knihovnu',
+  };
 
   Map<String, String> get _headers => {
     'Content-Type': 'application/json',
@@ -101,7 +159,7 @@ class LibraryChatService extends ChatBackend {
   }) async* {
     final message = thread.isEmpty ? '' : thread.last.content.trim();
     if (message.isEmpty) {
-      throw Exception('[knihovna] prázdný dotaz');
+      throw Exception('[$label] prázdný dotaz');
     }
 
     final request = http.Request('POST', Uri.parse('$_baseUrl/chat/stream'));
@@ -119,8 +177,8 @@ class LibraryChatService extends ChatBackend {
       throw Exception(
         HttpLayerError.fromException(
           e,
-          'dotaz na knihovnu',
-          'knihovna',
+          _step,
+          label,
           timeout: _connectTimeout,
         ).toString(),
       );
@@ -132,13 +190,13 @@ class LibraryChatService extends ChatBackend {
         statusCode: response.statusCode,
         body: body,
         headers: response.headers,
-        step: 'dotaz na knihovnu',
-        service: 'knihovna',
+        step: _step,
+        service: label,
       );
       // A bare "502 bad gateway" is accurate but not actionable — the tunnel
       // stays up while the RAG server itself is down.
       final hint = const {502, 503, 504}.contains(response.statusCode)
-          ? ' — knihovna neběží (na SPARKu: systemctl status library-chat)'
+          ? ' — $label neběží (na SPARKu: systemctl status $unit)'
           : '';
       throw Exception('$err$hint');
     }
@@ -158,8 +216,8 @@ class LibraryChatService extends ChatBackend {
       final error = obj['error'] ?? obj['detail'];
       if (error != null) {
         final msg = error is Map ? '${error['message'] ?? error}' : '$error';
-        debugPrint('[knihovna] SSE error event: $msg');
-        throw Exception('[knihovna] $msg');
+        debugPrint('[$label] SSE error event: $msg');
+        throw Exception('[$label] $msg');
       }
 
       final delta = obj['delta'];
@@ -187,7 +245,7 @@ class LibraryChatService extends ChatBackend {
       // An empty stream that just closes is the only signature it leaves.
       if (deltas == 0) {
         throw Exception(
-          '[knihovna] stream skončil bez odpovědi — model pravděpodobně '
+          '[$label] stream skončil bez odpovědi — model pravděpodobně '
           'selhal. Ověř, že role „translate" na SPARKu běží.',
         );
       }
@@ -209,7 +267,7 @@ class LibraryChatService extends ChatBackend {
           )
           .timeout(const Duration(seconds: 10));
     } catch (e) {
-      debugPrint('[knihovna] reset session failed (ignored): $e');
+      debugPrint('[$label] reset session failed (ignored): $e');
     }
   }
 

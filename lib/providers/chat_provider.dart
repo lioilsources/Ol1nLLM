@@ -57,7 +57,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
   static const _key = 'all';
 
   final VllmService _vllm = VllmService();
-  final LibraryChatService _library = LibraryChatService();
+  final LibraryChatService _library = LibraryChatService.library();
+  final LibraryChatService _law = LibraryChatService.law();
   final MediaService _mediaService = MediaService(); // OCR only
   final PersonaService _personaService;
   StreamSubscription<ChatEvent>? _streamSub;
@@ -67,10 +68,15 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   /// Which transport answers a turn. The persona registry is the single
-  /// source of truth — `Persona.backend` in `assets/personas/index.json`.
+  /// source of truth — `Persona.backend` in `assets/personas/index.json`;
+  /// the rule is [chatBackendIdFor], this only picks the instance.
   Future<ChatBackend> _backendFor(String? personaId) async {
     final persona = await _personaService.byId(personaId);
-    return persona?.backend == kChatBackendLibrary ? _library : _vllm;
+    return switch (chatBackendIdFor(persona)) {
+      kChatBackendLibrary => _library,
+      kChatBackendLaw => _law,
+      _ => _vllm,
+    };
   }
 
   Future<void> _load() async {
@@ -146,8 +152,14 @@ class ChatNotifier extends StateNotifier<ChatState> {
   void deleteConversation(String id) {
     final doomed = state.conversations.where((c) => c.id == id).firstOrNull;
     final sessionId = doomed?.remoteSessionId;
-    if (sessionId != null) {
-      unawaited(_library.resetSession(sessionId));
+    if (doomed != null && sessionId != null) {
+      // The session lives on whichever RAG server this conversation talked
+      // to — resolve it the way a send would, never assume the library.
+      unawaited(
+        _backendFor(
+          doomed.activePersonaId,
+        ).then((b) => b.resetSession(sessionId)),
+      );
     }
     final remaining = state.conversations.where((c) => c.id != id).toList();
     final newActive = state.activeId == id
@@ -479,6 +491,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     _cancelStream();
     _vllm.dispose();
     _library.dispose();
+    _law.dispose();
     _mediaService.dispose();
     super.dispose();
   }

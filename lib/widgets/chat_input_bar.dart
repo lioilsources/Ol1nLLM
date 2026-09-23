@@ -152,11 +152,11 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
         .watch(personaListProvider)
         .maybeWhen(data: (l) => l, orElse: () => const <Persona>[]);
 
-    final isLibrary =
-        personas
-            .firstWhereOrNull((p) => p.id == _effectivePersonaId(conv))
-            ?.backend ==
-        kChatBackendLibrary;
+    // Null for the default vLLM chat; a RAG persona's backend id otherwise,
+    // so the hint can say which server is listening.
+    final ragBackend = personas
+        .firstWhereOrNull((p) => p.id == _effectivePersonaId(conv))
+        ?.backend;
 
     return Container(
       decoration: const BoxDecoration(
@@ -205,8 +205,12 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
                           fontSize: 15,
                         ),
                         decoration: InputDecoration(
-                          hintText: _mode == InputMode.chat && isLibrary
-                              ? 'Zeptej se knihovny…'
+                          hintText: _mode == InputMode.chat
+                              ? switch (ragBackend) {
+                                  kChatBackendLibrary => 'Zeptej se knihovny…',
+                                  kChatBackendLaw => 'Zeptej se na zákon…',
+                                  _ => _mode.hint,
+                                }
                               : _mode.hint,
                           hintStyle: const TextStyle(
                             color: AppTheme.textSecondary,
