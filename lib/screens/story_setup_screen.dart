@@ -27,6 +27,23 @@ class _StorySetupScreenState extends ConsumerState<StorySetupScreen> {
 
   /// role → picked image (temporary path until the provider copies it).
   final Map<String, String> _cast = {};
+
+  /// role → who the picture shows. Prefilled from the screenplay, so leaving
+  /// it alone keeps the story as written; rewriting it recasts the role —
+  /// „kocour Mourek" → „ježek Bodlinka" swaps the animal everywhere, in the
+  /// pictures, in what the narrator says and in the subtitles.
+  final Map<String, TextEditingController> _who = {};
+
+  TextEditingController _whoCtl(StoryRole role) =>
+      _who.putIfAbsent(role.role, () => TextEditingController(text: role.name));
+
+  @override
+  void dispose() {
+    for (final c in _who.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
   late String _lang = widget.story.languages.contains('cs')
       ? 'cs'
       : widget.story.languages.first;
@@ -108,6 +125,11 @@ class _StorySetupScreenState extends ConsumerState<StorySetupScreen> {
         .start(
           story,
           castPaths: {for (final r in story.characters) r.role: _cast[r.role]},
+          castWho: {
+            for (final r in story.characters)
+              if ((_who[r.role]?.text.trim() ?? '') != r.name)
+                r.role: _who[r.role]!.text.trim(),
+          },
           lang: _lang,
           review: _review,
           hd: _hd,
@@ -154,14 +176,20 @@ class _StorySetupScreenState extends ConsumerState<StorySetupScreen> {
             _CastTile(
               role: r,
               path: _cast[r.role],
+              who: _whoCtl(r),
               onPick: () => _pick(r),
-              onClear: () => setState(() => _cast.remove(r.role)),
+              onClear: () => setState(() {
+                _cast.remove(r.role);
+                _whoCtl(r).text = r.name;
+              }),
             ),
           const Padding(
             padding: EdgeInsets.fromLTRB(4, 2, 4, 0),
             child: Text(
               'Nejlíp funguje celá postava zepředu na jednoduchém pozadí. '
-              'Ze vzhledu postavy se nakreslí všech 12 záběrů.',
+              'Ze vzhledu postavy se nakreslí všech 12 záběrů. Když je na '
+              'obrázku někdo jiný, než čeká scénář, přepiš, kdo to je — '
+              'příběh se podle toho přepíše.',
               style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
             ),
           ),
@@ -251,12 +279,14 @@ class _CastTile extends StatelessWidget {
   const _CastTile({
     required this.role,
     required this.path,
+    required this.who,
     required this.onPick,
     required this.onClear,
   });
 
   final StoryRole role;
   final String? path;
+  final TextEditingController who;
   final VoidCallback onPick;
   final VoidCallback onClear;
 
@@ -362,6 +392,26 @@ class _CastTile extends StatelessWidget {
                       ],
                     ],
                   ),
+                  if (picked) ...[
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: who,
+                      textCapitalization: TextCapitalization.sentences,
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 14,
+                      ),
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        labelText: 'Kdo to je',
+                        helperText: 'např. ježek Bodlinka',
+                        helperStyle: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
