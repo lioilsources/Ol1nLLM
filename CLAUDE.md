@@ -17,8 +17,8 @@ make run
 
 Volitelné URL overrides (`.env.local`, Makefile je propouští jen když jsou
 neprázdné): `COMFYUI_URL`, `FINETUNE_URL`, `FLUX_NIM_URL`, `VLLM_URL`,
-`LIBRARY_CHAT_URL`, `UGC_FC_URL`, `AUDIO_URL`. Pro vývoj knihovny proti SPARKu na LAN:
-`LIBRARY_CHAT_URL=http://192.168.88.66:8090` — pak ale **jen `make debug`**
+`LIBRARY_CHAT_URL`, `LAW_CHAT_URL`, `UGC_FC_URL`, `AUDIO_URL`. Pro vývoj knihovny proti SPARKu na LAN:
+`LIBRARY_CHAT_URL=http://192.168.88.66:8090` (Právník: `LAW_CHAT_URL=http://192.168.88.66:8098`) — pak ale **jen `make debug`**
 (release Android manifest nemá `usesCleartextTraffic` a iOS nemá výjimku
 v `Info.plist`, takže čistý HTTP tam neprojde).
 
@@ -989,6 +989,17 @@ lokální prompt — server si ho staví sám a klientský by stejně zahodil.
 si četl RAG odpovědi jako vlastní výstup. `_pickPersona` proto při přechodu
 mezi backendy nevolá per-turn override, ale `selectPersona()`, které zakládá
 novou konverzaci.
+
+**Právník ⚖️ (`"backend": "law"`)**: druhá RAG persona, stejný serverový kód
+i SSE dialekt jako Knihovna — v appce je to **tatáž třída** `LibraryChatService`,
+jen instance `LibraryChatService.law()` s `LAW_CHAT_URL` (výchozí
+`https://pravnik.ol1n.com`, `top_k` 8, chybové texty `[právník] …`, hint na
+unit `law-chat`); `_backendFor()` je switch přes `chatBackendIdFor()`. Přechod
+knihovna ↔ právník je přechod mezi backendy, takže zakládá novou konverzaci
+stejně jako u knihovny; `deleteConversation` proto backend pro `/reset` bere
+z `_backendFor()` podle persony konverzace, ne natvrdo z knihovny. Server:
+WorldLibraryProject, unit `law-chat.service` na SPARKu :8091, postup a korpus
+v `docs/plan-pravnik.md`.
 
 **Session vs. větvení** (`Conversation.canReuseRemoteSession`): server drží
 jednu lineární frontu per `session_id`, appka strom. Session se recykluje jen

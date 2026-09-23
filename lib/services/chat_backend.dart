@@ -1,10 +1,29 @@
 import '../models/library_source.dart';
 import '../models/message.dart';
+import '../models/persona.dart';
 
 /// Backend id carried by a persona (`Persona.backend`). `null` means the
 /// default vLLM chat; ids here must stay stable, they are matched against
 /// `assets/personas/index.json`.
 const kChatBackendLibrary = 'library';
+
+/// Czech-law RAG persona — same server code as the library, its own corpus.
+const kChatBackendLaw = 'law';
+
+/// Id of the default transport (`VllmService.id`). Never written into the
+/// persona registry; only what [chatBackendIdFor] falls back to.
+const kChatBackendVllm = 'vllm';
+
+/// The routing rule: which backend id answers under [persona]. Known RAG ids
+/// route to their server; everything else — no persona, no `backend`, or an
+/// id this build does not know — falls back to vLLM. `ChatNotifier._backendFor`
+/// maps the id to a service instance; the rule itself lives here so it can be
+/// unit-tested without Riverpod or Hive.
+String chatBackendIdFor(Persona? persona) => switch (persona?.backend) {
+  kChatBackendLibrary => kChatBackendLibrary,
+  kChatBackendLaw => kChatBackendLaw,
+  _ => kChatBackendVllm,
+};
 
 sealed class ChatEvent {
   const ChatEvent();

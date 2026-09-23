@@ -76,6 +76,13 @@
       "emoji": "📚",
       "backend": "library",
       "description": "Odpovídá z korpusu světové filosofie a posvátných textů, s citacemi."
+    },
+    {
+      "id": "pravnik",
+      "name": "Právník",
+      "emoji": "⚖️",
+      "backend": "law",
+      "description": "Odpovídá z účinných zákonů ČR (e-Sbírka) s citací paragrafů. Není právní poradenství."
     }
   ]
 }
