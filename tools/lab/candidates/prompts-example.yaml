@@ -1,0 +1,35 @@
+# Ukázka souboru pro --prompts-yaml (nebo pole „prompty po rodinách" v UI).
+#
+# Klíč nahoře je jméno promptu — je z něj popisek řádku v tabulce a `promptBody`
+# na buňce, takže ho volte tak, aby se dal poznat v mřížce.
+#
+# Pod ním je týž námět napsaný zvlášť pro každou rodinu modelů:
+#
+#   danbooru    Pony, Illustrious, NoobAI, WAI, Hassaku, Animagine, AtomixPony,
+#               AutismMix — trénované na danbooru popiscích, čtou tagy.
+#   juggernaut  Juggernaut XL (i Lightning), CyberRealistic, RealVis, Lustify,
+#               SDXL base, SD 1.5 — čtou fráze.
+#   flux        FLUX manga, Schnell, Kontext, Fill — čtou větu.
+#
+# Rodina se bere z registru appky, ne odsud: `promptDialect` rozhodne o tazích,
+# zbytek dělí FLUX od SDXL. Model, jehož rodina v položce chybí, běh zastaví
+# — fráze poslaná tagovému checkpointu vyrobí obrázek, který vypadá jako
+# měření toho promptu a není jím.
+#
+# Prompty z textového pole se s tímhle souborem **násobí**: každý řádek pole je
+# prefix a jede přes všechny položky odsud.
+
+portrait:
+  danbooru: "1girl, solo, looking at viewer, upper body, window light"
+  juggernaut: "a portrait of a young woman, looking at the camera, upper body, soft window light"
+  flux: "A portrait photograph of a young woman looking at the camera, lit by soft window light."
+
+street-night:
+  danbooru: "1boy, city, night, rain, neon lights, from side"
+  juggernaut: "a man on a city street at night in the rain, neon lights, side view"
+  flux: "A photograph of a man on a city street at night in the rain, neon signs reflecting in the puddles."
+
+full-body:
+  danbooru: "1girl, solo, full body, standing, facing viewer, simple background"
+  juggernaut: "a full body photo of a woman standing, facing the camera, plain background"
+  flux: "A full body photograph of a woman standing and facing the camera against a plain background."

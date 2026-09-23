@@ -17,6 +17,8 @@ func runCLI(env *Env, args []string) error {
 	models := fs.String("models", "", "id modelů oddělené čárkou (výchozí: všechny nainstalované)")
 	promptsFile := fs.String("prompts", "", "soubor s prompty, jeden na řádek")
 	subject := fs.String("subject", "", "jeden prompt (alternativa k --prompts)")
+	promptsYAML := fs.String("prompts-yaml", "",
+		"YAML s prompty po rodinách (danbooru/juggernaut/flux); --prompts jsou pak prefixy")
 	styles := fs.String("styles", "", "id stylů oddělená čárkou")
 	stylesFile := fs.String("styles-file", "", "JSON s kandidáty stylů [{id,label,block}]")
 	flows := fs.String("flows", "repose,img2img", "txt2img,img2img,repose,hair")
@@ -37,11 +39,13 @@ func runCLI(env *Env, args []string) error {
 	lora := fs.String("lora", "", "jméno LoRA souboru, jak ho hlásí ComfyUI")
 	loraStrength := fs.Float64("lora-strength", 0, "síla LoRA (výchozí: appková 0.9)")
 	editDenoise := fs.Float64("edit-denoise", 0, "přebít img2img denoise")
+	latent := fs.String("latent", "", "šxv, např. 832x1216 — přebije presetový latent (jen txt2img/repose)")
 	sweep := fs.String("sweep", "", "cíl=v1|v2|v3")
 	overrides := fs.String("override", "", "cíl=hodnota, oddělené čárkou")
 	out := fs.String("out", "", "výstupní adresář (výchozí build/lab/<čas>)")
 	dry := fs.Bool("dry", false, "nanečisto, bez ComfyUI")
 	noBaseline := fs.Bool("no-baseline", false, "vynechat buňku bez stylu")
+	noStyles := fs.Bool("no-styles", false, "jen baseline (bez stylu) — prázdné --styles jinak znamená celý registr")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -54,11 +58,12 @@ func runCLI(env *Env, args []string) error {
 
 	spec := &Spec{
 		Models: splitCSV(*models), Styles: splitCSV(*styles), StylesFile: *stylesFile,
-		Flows: splitCSV(*flows), NoBaseline: *noBaseline,
+		PromptsYAML: *promptsYAML,
+		Flows:       splitCSV(*flows), NoBaseline: *noBaseline, NoStyles: *noStyles,
 		HairFile: *hairFile, HairMasks: *hairMasks, Hairstyles: splitCSV(*hairstyles),
 		PoseMode: *pose, PoseID: *poseID,
 		FaceIdentity: *faceIdentity, FaceDetail: *faceDetail,
-		Seed: *seed, Batch: *batch, Negative: *negative, EditDenoise: *editDenoise,
+		Seed: *seed, Batch: *batch, Negative: *negative, EditDenoise: *editDenoise, Latent: *latent,
 		Lora:  *lora,
 		Sweep: *sweep, Overrides: splitCSV(*overrides), Dry: *dry,
 		LoraStrength: strength,
@@ -76,10 +81,13 @@ func runCLI(env *Env, args []string) error {
 		}
 	case *subject != "":
 		spec.Prompts = []string{*subject}
+	case *promptsYAML != "":
+		// The file carries the prompts; without --prompts there is simply no
+		// prefix to put in front of them.
 	default:
-		return fmt.Errorf("chybí --prompts nebo --subject")
+		return fmt.Errorf("chybí --prompts, --subject nebo --prompts-yaml")
 	}
-	spec.Title = spec.Prompts[0]
+	spec.Title = firstOr(spec.Prompts, filepath.Base(*promptsYAML))
 
 	dir := *out
 	if dir == "" {

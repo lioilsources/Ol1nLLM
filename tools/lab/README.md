@@ -16,10 +16,11 @@ vygenerovat.
 
 Workflow **staví kód appky** (`tools/lab/dump.dart` volá
 `ComfyUIService.prepareForTest` → `_prepare`), takže lab měří to, co appka
-opravdu posílá, ne napodobeninu, která se časem rozejde. Modely bere
-z `kImageModels` prořezaných podle nainstalovaných checkpointů, styly
-z `kStylePresets`, pózy z `kPoseTemplates` — nová položka v registru se
-v labu objeví sama.
+opravdu posílá, ne napodobeninu, která se časem rozejde. Totéž platí pro
+model bez grafu: `flux-schnell` dostane request z `FluxNimService.requestBody()`
+(viz „Modely bez grafu“). Modely bere z `kImageModels` prořezaných podle
+nainstalovaných checkpointů, styly z `kStylePresets`, pózy z `kPoseTemplates`
+— nová položka v registru se v labu objeví sama.
 
 ## Jak to běží
 
@@ -44,6 +45,8 @@ zavření prohlížeče nic nestojí.
 lab check                                   # flutter, CF Access, fronta ComfyUI
 lab run --subject "a ballerina" --models juggernaut-xl,pony \
         --styles ukiyoe,baroque --flows txt2img,repose --ref foto.png
+lab run --prompts-yaml candidates/prompts-example.yaml \
+        --models pony,juggernaut-xl,flux-manga --flows txt2img --no-styles
 lab run --ref-prompt "photo of a dancer" --sweep '__cn_apply__.strength=0.5|0.75|1.0'
 lab resume build/lab/20260826-0023          # dopočítat přerušený běh
 lab score build/lab/20260826-0023
@@ -69,6 +72,55 @@ make lab-score RUN=20260914-200437
 
 Neposílej `resume` na běh, který ještě jede v jiném terminálu nebo v UI — buňky
 by se renderovaly dvakrát.
+
+## Prompty po rodinách (`--prompts-yaml`)
+
+Jeden námět, tři jazyky. Tagový checkpoint, fotoreal SDXL a FLUX chtějí týž
+obrázek popsaný jinak, takže jediné textové pole nutí buď psát tagy i pro FLUX,
+nebo pouštět každou rodinu jako vlastní běh — a pak se výsledky nedají položit
+vedle sebe pod jedním seedem. Soubor to řeší:
+
+```yaml
+portrait:
+  danbooru: "1girl, solo, looking at viewer, upper body"
+  juggernaut: "a portrait of a young woman, looking at the camera"
+  flux: "A portrait photograph of a young woman looking at the camera."
+street-night:
+  danbooru: "1boy, city, night, rain, neon lights"
+  juggernaut: "a man on a city street at night in the rain"
+  flux: "A photograph of a man on a city street at night in the rain."
+```
+
+```bash
+lab run --prompts-yaml candidates/prompts-example.yaml \
+        --models pony,juggernaut-xl,flux-manga --flows txt2img --no-styles
+```
+
+V UI je to políčko pod textovým polem promptů; soubor se čte hned při nahrání,
+takže překlep je vidět, dokud ho máš na obrazovce.
+
+**Rodinu vybírá model, ne soubor.** Bere se z registru appky:
+`promptDialect: booru` ⇒ `danbooru` (Pony, Illustrious, NoobAI, WAI, Hassaku,
+Animagine, AtomixPony, AutismMix), zbytek dělí architektura — dedikovaný graf
+nebo gen-queue ⇒ `flux` (FLUX manga, Schnell, Kontext, Fill), generická SDXL
+šablona ⇒ `juggernaut` (Juggernaut XL i Lightning, CyberRealistic, RealVis,
+Lustify, SDXL base, SD 1.5). Nový model se tím zařadí sám a `promptFamily`
+na modelu v manifestu říká kam.
+
+**Textové pole se pak chová jako prefix** a osa je součin: dva řádky × tři
+prompty ze souboru = šest sloupců na model (`masterpiece · portrait`, …).
+S prázdným polem je prefix prázdný a jedou jen prompty ze souboru.
+
+**Chybějící rodina běh zastaví**, nespadne na náhradní text: fráze poslaná
+tagovému checkpointu vyrobí obrázek, který vypadá jako měření toho promptu
+a není jím. Odhad to řekne dřív, než se něco spustí (*„portrait nemá text pro
+danbooru (Pony V6)"*), dump je pojistka. Totéž platí pro překlep v názvu
+rodiny — ten by jinak text tiše zahodil, takže ho parser odmítne i s číslem
+řádku.
+
+Osa promptů zůstává jednorozměrná: `manifest.prompts` nese **popisky** sloupců
+(text se liší model od modelu, takže jeden být nemůže), buňka nese `promptBody`
+a v `prompt` text přečtený zpátky z grafu — tedy ten, co se opravdu poslal.
 
 ## Kandidáti stylů
 
@@ -169,8 +221,8 @@ každý jiný model.
 
 ### Modely: architektura a jazyk promptu jsou dvě osy
 
-Lab nabízí jen ComfyUI modely (NIM flux-schnell / flux-kontext ne), prořezané
-podle checkpointů na serveru.
+ComfyUI modely, prořezané podle checkpointů na serveru, plus `flux-schnell`
+přes gen-queue (viz „Modely bez grafu“ níž). `flux-kontext` zatím ne.
 
 | skupina | modely | jazyk promptu (`promptDialect`) |
 |---|---|---|
@@ -178,6 +230,38 @@ podle checkpointů na serveru.
 | SDXL, anime | `pony`, `atomix-pony-anime`, `illustrious-xl`, `noobai-xl`, `wai-illustrious`, `animagine-xl` | booru tagy |
 | FLUX | `flux-manga` (txt2img, img2img, repose), `flux-fill` (jen inpaint) | věta |
 | SD 1.5 | `sd15` (bez ControlNetu, bez pózy) | věta |
+| gen-queue (NIM) | `flux-schnell` (jen txt2img, bez grafu) | věta |
+
+### Modely bez grafu (gen-queue / NIM)
+
+`flux-schnell` neběží přes ComfyUI, ale přes gen-queue
+(`llm.ol1n.com/nim/flux-schnell`, `FLUX_NIM_URL`). Místo grafu se do
+`wf/<id>.json` zapíše **request body** — a staví ho appka sama,
+`FluxNimService.requestBody()`, takže lab ani tady neměří kopii.
+
+Co z toho plyne pro plán:
+
+- **jen `txt2img`** — img2img umí `flux-kontext`, a ten by potřeboval dostat
+  referenci dovnitř requestu; zatím není v nabídce,
+- **1024×1024 a 4 kroky napevno** — appka je nenabízí, takže je nenabízí ani
+  lab. `LATENT` buňku odmítne, ne přebije,
+- **žádná LoRA, póza, tvář ani `KSampler.*`** — to všechno jsou uzly grafu.
+  Buňka se **přeskočí s důvodem**, nevznikne obrázek, který by vypadal jako
+  měření té páčky. `?cíl.vstup=…` (nepovinný override) mixovaný plán pustí,
+  sweep na uzel ne: jeho varianty by byly identické buňky pod různými štítky,
+- **žádný negativ** — Schnell nemá negativní podmínění, takže manifest u
+  buňky píše `negative: null`; `NEGATIVE` se do requestu nedostane,
+- **batch se ignoruje** — jeden request je jeden obrázek (appka posílá n
+  requestů za sebou). Manifest zapíše `batch: 1`, i když se žádalo víc.
+
+Zbývají tedy osy **prompt, styl, seed** a laboratorní
+`param.stylePosition` / `param.qualityPrefix` / `param.styleDialect`.
+Schnell nemá `positivePrefix`, takže `qualityPrefix` buňku nezmění a `front`
+je totéž co `first` (jako u Juggernautu a fluxu) — `end` se od nich ale liší
+pořád. To je málo os, ale je to
+přesně ta otázka, kvůli které to vzniklo: `docs/style-matrix.md` flux-schnell
+nikdy neměřil, takže jeho `styleNote` v registru je jediný, pod kterým žádný
+verdikt není.
 
 **Architektura** (SDXL / FLUX / SD 1.5) rozhoduje, co se do grafu dá zapojit:
 LoRA (`loraFamily`, viz níž), ControlNety, metodu tváře. **Jazyk** rozhoduje,
@@ -193,10 +277,10 @@ a přitom čte tagy.
 | síla ControlNetu | `__cn_apply__.strength` | šablona pózy 1.0, auto hloubka 0.7, repose 0.75, repose flux 0.55 (odhad) | SDXL se šablonou pózy, SDXL img2img bez šablony (auto hloubka), repose a `POSE_MODE=depth`; flux-manga jen v repose. `sd15` nikdy |
 | konec ControlNetu | `__cn_apply__.end_percent` | 1.0, repose 0.9 | jako řádek výš |
 | síla úpravy | `param.editDenoise` | preset `img2imgDenoise` (~0.72) | jen **img2img** u generické šablony (SDXL + `sd15`). Šablona pózy ji přebije (0.9), inpaint jede na 1.0, flux-manga má denoise zapečený. V txt2img a repose se builderu vůbec nepředá — buňky vzniknou, ale jsou totožné |
-| cfg ⚠ | `KSampler.cfg` | preset (SDXL 5–6.5, Lightning 2.0, flux 1.0) | **všechny** modely včetně flux-manga (viz výš) |
-| kroky ⚠ | `KSampler.steps` | preset (SDXL 28–30, Lightning 6, flux 20/28) | všechny |
-| seed | `param.seed` | 777 | všechny; na odhad, jestli je rozdíl styl, nebo šum |
-| LoRA | `param.lora` | — (`none` = bez LoRA) | kombinace z jiné architektury (`loraFit` incompatible) se přeskočí už v plánu |
+| cfg ⚠ | `KSampler.cfg` | preset (SDXL 5–6.5, Lightning 2.0, flux 1.0) | **všechny** modely s grafem včetně flux-manga (viz výš); `flux-schnell` se přeskočí |
+| kroky ⚠ | `KSampler.steps` | preset (SDXL 28–30, Lightning 6, flux 20/28) | všechny s grafem; `flux-schnell` má 4 kroky napevno a přeskočí se |
+| seed | `param.seed` | 777 | všechny, `flux-schnell` taky; na odhad, jestli je rozdíl styl, nebo šum |
+| LoRA | `param.lora` | — (`none` = bez LoRA) | kombinace z jiné architektury (`loraFit` incompatible) se přeskočí už v plánu, stejně jako `flux-schnell` (nemá graf) |
 | síla LoRA | `param.loraStrength` | `kDefaultLoraStrength` 0.9, rozsah −1…2 | jen s vybranou LoRA |
 | síla tváře — embedding | `__face_apply__.ip_weight` | 0.6 (odhad, ne měření) | **jen SDXL**, metoda `instantid`/`both`, a jen kde je odkud číst tvář (níž) |
 | síla tváře — klíčové body | `__face_apply__.cn_strength` | 0.8 | jako řádek výš |

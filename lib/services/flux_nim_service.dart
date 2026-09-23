@@ -54,6 +54,25 @@ class FluxNimService implements ImageBackend {
   @override
   int get variantCount => 1;
 
+  /// The gen-queue request body for one image, exactly as this service sends
+  /// it. Named and public because the lab dumps it in place of a ComfyUI
+  /// graph: a second copy of these numbers under tools/lab would drift from
+  /// the app the first time one of them changed, and the lab's whole point is
+  /// that it measures what the app really sends.
+  ///
+  /// Size and steps are fixed — NIM Schnell is a 4-step distilled model and
+  /// the app exposes neither knob.
+  static Map<String, dynamic> requestBody({
+    required String prompt,
+    required int seed,
+  }) => {
+    'prompt': prompt,
+    'width': 1024,
+    'height': 1024,
+    'steps': 4,
+    'seed': seed,
+  };
+
   // FLUX Schnell has no negative conditioning — [negativePrompt] is ignored.
   @override
   Stream<GenEvent> generate({
@@ -91,15 +110,9 @@ class FluxNimService implements ImageBackend {
       String? currentJobId;
       try {
         // ── 1. Submit ──────────────────────────────────────────
-        final bodyMap = {
-          'prompt': prompt,
-          'width': 1024,
-          'height': 1024,
-          'steps': 4,
-          // Provider-owned base seed; request i uses seed+i so each variant
-          // is distinct yet attributable to the node's stored seed.
-          'seed': seed + i,
-        };
+        // Provider-owned base seed; request i uses seed+i so each variant
+        // is distinct yet attributable to the node's stored seed.
+        final bodyMap = requestBody(prompt: prompt, seed: seed + i);
 
         final submitResp = await _client
             .post(

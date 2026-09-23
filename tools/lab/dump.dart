@@ -24,6 +24,8 @@ import 'package:ol1n_llm/models/latent_bucket.dart';
 import 'package:ol1n_llm/models/pose_template.dart';
 import 'package:ol1n_llm/models/style_preset.dart';
 import 'package:ol1n_llm/services/comfyui_service.dart';
+import 'package:ol1n_llm/services/flux_nim_service.dart';
+import 'package:ol1n_llm/services/image_backend.dart';
 
 import 'dump_spec.dart';
 import 'hair_candidates.dart';
@@ -74,13 +76,23 @@ void main() {
 
     // Prompts: a file wins over the single SUBJECT, and its index becomes part
     // of the cell id so two prompts never collide.
-    final prompts = env['PROMPTS_FILE'] != null
+    final promptLines = env['PROMPTS_FILE'] != null
         ? File(env['PROMPTS_FILE']!)
               .readAsLinesSync()
               .map((l) => l.trim())
               .where((l) => l.isNotEmpty)
               .toList()
         : [env['SUBJECT']!];
+    // PROMPT_BODIES: per-family prompt texts the plan normalised out of the
+    // YAML file. With it the lines above become prefixes and the axis is the
+    // product — one column per (prefix, body) pair.
+    final bodies = env['PROMPT_BODIES'] == null
+        ? const <PromptBody>[]
+        : parsePromptBodies(
+            jsonDecode(File(env['PROMPT_BODIES']!).readAsStringSync())
+                as List<dynamic>,
+          );
+    final prompts = buildPromptAxis(prefixes: promptLines, bodies: bodies);
     final indexPrompts = prompts.length > 1;
 
     // Styles: the app registry, unless the caller vets candidates from a file
@@ -107,10 +119,27 @@ void main() {
             env['CKPTS']!,
           ).readAsLinesSync().where((l) => l.trim().isNotEmpty).toList();
     final wantedModels = _csv(env['MODELS']);
-    final models = imageModelsFor(installed)
-        .where((m) => m.kind == ImageBackendKind.comfyUi && m.preset != null)
+    final wanted = imageModelsFor(installed)
         .where((m) => wantedModels.isEmpty || wantedModels.contains(m.id))
         .toList();
+    final models = wanted
+        .where((m) => m.kind == ImageBackendKind.comfyUi && m.preset != null)
+        .toList();
+    // gen-queue models carry no graph — they get a request body instead (see
+    // the NIM section below). Only flux-schnell for now: flux-kontext is
+    // img2img, which means the reference has to travel inside the request.
+    final nimModels = wanted
+        .where((m) => m.kind == ImageBackendKind.fluxNim)
+        .toList();
+
+    // Every body has to cover every family in the run, and it is worth finding
+    // out now rather than from the cell that happens to be dumped first: the
+    // failure belongs to the file, not to whichever model tripped over it.
+    for (final m in [...models, ...nimModels]) {
+      for (final b in bodies) {
+        b.textFor(promptFamilyFor(m));
+      }
+    }
 
     final overrides = _csv(env['OVERRIDE_AT']).map(parseOverride).toList();
     final sweep = parseSweep(env['SWEEP'], env['SWEEP_LABEL']);
@@ -229,7 +258,7 @@ void main() {
               final stylePosition = stylePositionFor(params['stylePosition']);
               final qualityPrefix = qualityPrefixFor(params['qualityPrefix']);
               final composed = composeCellPrompt(
-                subject: prompts[pi],
+                subject: prompts[pi].subjectFor(promptFamilyFor(m)),
                 styleText: style?.blockFor(dialect),
                 prefix: preset.positivePrefix,
                 position: stylePosition,
@@ -379,6 +408,7 @@ void main() {
               File('${out.path}/$id.json').writeAsStringSync(jsonEncode(wf));
               cells.add({
                 'id': id,
+                'backend': kBackendComfyUI,
                 'flow': flow,
                 'model': m.id,
                 'modelLabel': m.label,
@@ -386,6 +416,9 @@ void main() {
                 'styleLabel': style?.label,
                 'styleText': style?.blockFor(dialect),
                 'promptIndex': pi,
+                // Which entry of the prompt file this column came from; null
+                // when the prompt box was the whole axis.
+                'promptBody': prompts[pi].body?.id,
                 // Read back out of the graph, so the table can never show a
                 // prompt that differs from the one that was sent.
                 'prompt': _encodedText(wf, positive: true),
@@ -428,6 +461,190 @@ void main() {
             } else {
               for (final v in sweep.values) {
                 emit(v);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // ── gen-queue (NIM): a request body, not a graph ──────────────────────
+    // The app builds this body in FluxNimService.requestBody, so the dump calls
+    // it rather than restating the numbers. Everything a graph makes possible —
+    // LoRA, ControlNet, identity, sampler settings — is absent by construction,
+    // so a run that asks for one of those skips the cell with the reason rather
+    // than returning a picture that looks like an answer about that knob.
+    for (final m in nimModels) {
+      for (var pi = 0; pi < prompts.length; pi++) {
+        for (final style in [null, ...styles]) {
+          if (style == null && _flag(env['NO_BASELINE']) && styles.isNotEmpty) {
+            continue;
+          }
+          final styleId = style?.id ?? '__baseline';
+
+          for (final flow in flows) {
+            if (flow == 'hair') continue;
+            void emitNim(String? variantValue) {
+              if (limit != null && n >= limit) return;
+              final id = cellId(
+                flow: flow,
+                model: m.id,
+                style: styleId,
+                variantLabel: variantValue == null ? null : sweep.label,
+                variantValue: variantValue,
+                promptIndex: indexPrompts ? pi : null,
+              );
+              void skip(String reason) =>
+                  skipped.add({'cell': id, 'reason': reason});
+
+              if (flow != 'txt2img') {
+                skip('${m.id} umí jen txt2img (gen-queue)');
+                return;
+              }
+
+              final params = <String, Object>{};
+              for (final o in overrides) {
+                if (o.target.kind == OverrideKind.param) {
+                  params[o.target.scope] = o.value;
+                }
+              }
+              // A `?`-prefixed override tolerates a missing target by design,
+              // so a mixed plan still runs here. A sweep cannot: its variants
+              // would be identical cells under different labels, which reads as
+              // "the knob did nothing" about a knob that was never connected.
+              if (variantValue != null) {
+                if (sweep.target.kind == OverrideKind.param) {
+                  params[sweep.target.scope] = coerce(variantValue);
+                } else {
+                  skip('sweep "${sweep.target.raw}" míří na uzel grafu, '
+                      'a ${m.id} jede přes gen-queue — žádný graf nemá');
+                  return;
+                }
+              }
+              final hardOverride = overrides
+                  .where((o) =>
+                      o.target.kind != OverrideKind.param && !o.target.optional)
+                  .firstOrNull;
+              if (hardOverride != null) {
+                skip('override "${hardOverride.target.raw}" míří na uzel grafu, '
+                    'a ${m.id} jede přes gen-queue — žádný graf nemá; '
+                    'úmyslně smíšený plán označ "?${hardOverride.target.raw}"');
+                return;
+              }
+
+              // Knobs that exist only inside a graph. Refusing the cell is the
+              // point: ignoring one silently hands back a picture that looks
+              // like a measurement of it.
+              const graphOnly = {
+                'lora',
+                'loraStrength',
+                'faceIdentity',
+                'faceDetail',
+                'editDenoise',
+              };
+              final refused = params.keys.where(graphOnly.contains).toList();
+              if (refused.isNotEmpty) {
+                skip('${refused.join(', ')} patří do grafu — ${m.id} jede '
+                    'přes gen-queue, kde takový uzel není');
+                return;
+              }
+              if (lora != null) {
+                skip('LoRA se do gen-queue requestu vložit nedá (${m.id})');
+                return;
+              }
+              if (faceIdentity != 'none') {
+                skip('zachovat tvář potřebuje InstantID/PuLID uzel (${m.id})');
+                return;
+              }
+              if (poseMode != 'none') {
+                skip('póza potřebuje ControlNet, ten žije jen v grafu (${m.id})');
+                return;
+              }
+              if (latentEnv != null) {
+                skip('rozměr je u ${m.id} pevných 1024×1024 — appka ho nenabízí');
+                return;
+              }
+
+              var cellSeed = seed;
+              if (params['seed'] is int) cellSeed = params['seed'] as int;
+              final dialect = styleDialectFor(
+                params['styleDialect'],
+                m.promptDialect,
+              );
+              final stylePosition = stylePositionFor(params['stylePosition']);
+              final qualityPrefix = qualityPrefixFor(params['qualityPrefix']);
+              // No preset, so no quality prefix to place: the score tags belong
+              // to the booru checkpoints, and FLUX reads a sentence.
+              final composed = composeCellPrompt(
+                subject: prompts[pi].subjectFor(promptFamilyFor(m)),
+                styleText: style?.blockFor(dialect),
+                prefix: '',
+                position: stylePosition,
+                qualityPrefix: qualityPrefix,
+              );
+
+              final body = FluxNimService.requestBody(
+                prompt: composed.prompt,
+                seed: cellSeed,
+              );
+              File('${out.path}/$id.json').writeAsStringSync(
+                jsonEncode({
+                  'backend': kBackendFluxNim,
+                  'model': m.id,
+                  'request': body,
+                }),
+              );
+              cells.add({
+                'id': id,
+                'backend': kBackendFluxNim,
+                'flow': flow,
+                'model': m.id,
+                'modelLabel': m.label,
+                'style': styleId,
+                'styleLabel': style?.label,
+                'styleText': style?.blockFor(dialect),
+                'promptIndex': pi,
+                'promptBody': prompts[pi].body?.id,
+                // Read back out of the request, for the reason the ComfyUI path
+                // reads it back out of the graph: the table must show the text
+                // that was sent, never the one we meant to send.
+                'prompt': body['prompt'],
+                // FLUX Schnell has no negative conditioning — the service drops
+                // the argument, so the table must not claim one was applied.
+                'negative': null,
+                'variant': variantValue == null
+                    ? null
+                    : {'label': sweep.label, 'value': variantValue},
+                'params': {
+                  'seed': body['seed'],
+                  'styleDialect': style == null ? null : dialect.name,
+                  'stylePosition': style == null ? null : stylePosition.name,
+                  'qualityPrefix': qualityPrefix,
+                  // One request is one image; the app sends n sequential calls
+                  // instead of a batch. The manifest records what was sent, so
+                  // it says 1 even when BATCH asked for more.
+                  'batch': 1,
+                  'editDenoise': null,
+                  'latent': '${body['width']}x${body['height']}',
+                  'poseMode': 'none',
+                  'refName': null,
+                  'lora': null,
+                  'loraStrength': null,
+                  'sourceDepth': false,
+                  'faceIdentity': 'none',
+                  'faceDetail': false,
+                },
+                'applied': <String, List<String>>{},
+                'presetOverridden': false,
+              });
+              n++;
+            }
+
+            if (sweep.isEmpty) {
+              emitNim(null);
+            } else {
+              for (final v in sweep.values) {
+                emitNim(v);
               }
             }
           }
@@ -514,6 +731,7 @@ void main() {
             File('${out.path}/$id.json').writeAsStringSync(jsonEncode(wf));
             cells.add({
               'id': id,
+              'backend': kBackendComfyUI,
               'flow': 'hair',
               'model': m.id,
               'modelLabel': m.label,
@@ -558,25 +776,37 @@ void main() {
           'cells': cells,
           'skipped': skipped,
           'models': [
-            for (final m in models)
+            // ComfyUI first, then gen-queue — the picker keeps this order, and
+            // a NIM model has no preset to report: its numbers live in the NIM
+            // service, not in a checkpoint the lab can read.
+            for (final m in [...models, ...nimModels])
               {
                 'id': m.id,
                 'label': m.label,
+                'backend': m.kind == ImageBackendKind.comfyUi
+                    ? kBackendComfyUI
+                    : kBackendFluxNim,
                 'supportsPose': m.supportsPose,
                 'promptDialect': m.promptDialect.name,
+                // Which text of a prompt file this model reads. Derived here so
+                // the plan can check a file against the picked models without
+                // keeping a second opinion about the registry.
+                'promptFamily': promptFamilyFor(m).name,
                 'styleNote': m.styleNote,
-                'ckptName': m.preset!.ckptName,
-                'preset': {
-                  'steps': m.preset!.steps,
-                  'cfg': m.preset!.cfg,
-                  'sampler': m.preset!.samplerName,
-                  'scheduler': m.preset!.scheduler,
-                  'width': m.preset!.width,
-                  'height': m.preset!.height,
-                  'img2imgDenoise': m.preset!.img2imgDenoise,
-                  'positivePrefix': m.preset!.positivePrefix,
-                  'negativePrompt': m.preset!.negativePrompt,
-                },
+                'ckptName': m.preset?.ckptName,
+                'preset': m.preset == null
+                    ? null
+                    : {
+                        'steps': m.preset!.steps,
+                        'cfg': m.preset!.cfg,
+                        'sampler': m.preset!.samplerName,
+                        'scheduler': m.preset!.scheduler,
+                        'width': m.preset!.width,
+                        'height': m.preset!.height,
+                        'img2imgDenoise': m.preset!.img2imgDenoise,
+                        'positivePrefix': m.preset!.positivePrefix,
+                        'negativePrompt': m.preset!.negativePrompt,
+                      },
               },
           ],
           'styles': [
@@ -609,12 +839,14 @@ void main() {
           ],
           'defaultLoraStrength': kDefaultLoraStrength,
           'buckets': [for (final b in kSdxlBuckets) '${b.w}x${b.h}'],
-          'prompts': prompts,
+          // Column labels, not the texts: with a prompt file each column is a
+          // different sentence per model, and the one that ran is on the cell.
+          'prompts': [for (final e in prompts) e.label],
         }),
       );
     }
     stdout.writeln(
-      'DUMP $n workflows · ${models.length} modelů × '
+      'DUMP $n workflows · ${models.length + nimModels.length} modelů × '
       '${prompts.length} promptů × ${styles.length + 1} stylů × '
       '${flows.length} flow'
       '${sweep.isEmpty ? '' : ' × ${sweep.values.length} variant'}'

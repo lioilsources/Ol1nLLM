@@ -315,6 +315,143 @@ void main() {
     });
   });
 
+  group('prompt bodies', () {
+    List<PromptBody> two() => parsePromptBodies([
+          {
+            'id': 'portrait',
+            'texts': {
+              'danbooru': '1girl, solo',
+              'juggernaut': 'a portrait of a young woman',
+              'flux': 'A portrait photograph of a young woman.',
+            },
+          },
+          {
+            'id': 'street',
+            'texts': {
+              'danbooru': '1boy, city, night',
+              'juggernaut': 'a man on a city street at night',
+              'flux': 'A photograph of a man on a city street at night.',
+            },
+          },
+        ]);
+
+    test('the registry splits into exactly the three families', () {
+      // Independent cross-check of the derivation: it reads the preset and the
+      // backend, this reads the name. A new model that lands in the wrong
+      // bucket — a FLUX one with a checkpoint, or an SDXL one without — shows
+      // up here rather than as a run measuring the wrong sentence.
+      for (final m in kImageModels) {
+        final family = promptFamilyFor(m);
+        expect(family == PromptFamily.flux, m.id.startsWith('flux-'),
+            reason: '${m.id} → ${family.name}');
+        if (m.promptDialect == PromptDialect.booru) {
+          expect(family, PromptFamily.danbooru, reason: m.id);
+        }
+      }
+      // The three the user picks between, spelled out.
+      expect(promptFamilyFor(imageModelById('pony')), PromptFamily.danbooru);
+      expect(promptFamilyFor(imageModelById('illustrious-xl')),
+          PromptFamily.danbooru);
+      expect(promptFamilyFor(imageModelById('animagine-xl')),
+          PromptFamily.danbooru);
+      expect(promptFamilyFor(imageModelById('juggernaut-xl')),
+          PromptFamily.juggernaut);
+      expect(promptFamilyFor(imageModelById('cyberrealistic-xl')),
+          PromptFamily.juggernaut);
+      expect(promptFamilyFor(imageModelById('sd15')), PromptFamily.juggernaut);
+      expect(promptFamilyFor(imageModelById('flux-manga')), PromptFamily.flux);
+      expect(promptFamilyFor(imageModelById('flux-schnell')), PromptFamily.flux);
+    });
+
+    test('a model reads its own text, and a missing one is never borrowed', () {
+      final body = two().first;
+      expect(body.textFor(PromptFamily.danbooru), '1girl, solo');
+      expect(body.textFor(PromptFamily.flux),
+          'A portrait photograph of a young woman.');
+
+      final fluxOnly = parsePromptBodies([
+        {
+          'id': 'p1',
+          'texts': {'flux': 'A photograph.'},
+        },
+      ]).single;
+      // Falling back on a neighbour would hand a tag-reading checkpoint a
+      // sentence and return a picture that looks like a measurement of it.
+      expect(() => fluxOnly.textFor(PromptFamily.danbooru),
+          throwsFormatException);
+    });
+
+    test('the axis is prefixes × bodies, in that order', () {
+      final axis = buildPromptAxis(
+        prefixes: const ['masterpiece', 'low angle'],
+        bodies: two(),
+      );
+      expect(axis.map((e) => e.label), [
+        'masterpiece · portrait',
+        'masterpiece · street',
+        'low angle · portrait',
+        'low angle · street',
+      ]);
+      expect(axis.first.subjectFor(PromptFamily.danbooru),
+          'masterpiece, 1girl, solo');
+      expect(axis.last.subjectFor(PromptFamily.juggernaut),
+          'low angle, a man on a city street at night');
+    });
+
+    test('an empty box is one empty prefix; no file leaves the box alone', () {
+      final fromFile = buildPromptAxis(prefixes: const [], bodies: two());
+      expect(fromFile.length, 2);
+      expect(fromFile.first.label, 'portrait');
+      expect(fromFile.first.subjectFor(PromptFamily.flux),
+          'A portrait photograph of a young woman.');
+
+      final plain = buildPromptAxis(
+          prefixes: const ['a dancer'], bodies: const []);
+      expect(plain.single.label, 'a dancer');
+      // Without a body the family cannot change what is sent.
+      for (final f in PromptFamily.values) {
+        expect(plain.single.subjectFor(f), 'a dancer');
+      }
+    });
+
+    test('a body that would render as something else is rejected', () {
+      expect(() => parsePromptBodies(['x']), throwsFormatException);
+      expect(
+        () => parsePromptBodies([
+          {
+            'texts': {'flux': 'a'},
+          },
+        ]),
+        throwsFormatException,
+      );
+      // A typo in a family name would silently drop the text.
+      expect(
+        () => parsePromptBodies([
+          {
+            'id': 'x',
+            'texts': {'pony': 'a'},
+          },
+        ]),
+        throwsFormatException,
+      );
+      expect(
+        () => parsePromptBodies([
+          {
+            'id': 'x',
+            'texts': {'flux': '  '},
+          },
+        ]),
+        throwsFormatException,
+      );
+      expect(
+        () => parsePromptBodies([
+          {'id': 'x', 'texts': <String, String>{}},
+        ]),
+        throwsFormatException,
+      );
+    });
+  });
+
   test('the real ControlNet apply node is reachable by its synthetic id', () {
     // Guards the naming contract between _prepare and the lab: if the app ever
     // renames __cn_apply__, every strength sweep silently stops matching.

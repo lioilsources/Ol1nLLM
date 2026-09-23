@@ -17,17 +17,22 @@ import (
 
 const (
 	defaultComfyURL = "https://comfyui.ol1n.com"
-	defaultPort     = 8765
+	// gen-queue is routed at llm.ol1n.com/nim/* — same host and dart-define
+	// name the app uses, so .env.local configures both with one line.
+	defaultNimURL = "https://llm.ol1n.com"
+	defaultPort   = 8765
 )
 
 type Env struct {
 	RepoRoot    string
 	ComfyURL    string
+	NimURL      string
 	FinetuneURL string
 	Finetune    *Finetune
 	ClientID    string
 	Secret      string
 	Comfy       *Comfy
+	Nim         *Nim
 	FlutterOK   bool
 	FlutterMsg  string
 }
@@ -50,11 +55,13 @@ func loadEnv() (*Env, error) {
 	e := &Env{
 		RepoRoot:    root,
 		ComfyURL:    get("COMFYUI_URL", defaultComfyURL),
+		NimURL:      get("FLUX_NIM_URL", defaultNimURL),
 		FinetuneURL: get("FINETUNE_URL", defaultFinetuneURL),
 		ClientID:    get("CF_ACCESS_CLIENT_ID", ""),
 		Secret:      get("CF_ACCESS_CLIENT_SECRET", ""),
 	}
 	e.Comfy = NewComfy(e.ComfyURL, e.ClientID, e.Secret)
+	e.Nim = NewNim(e.NimURL, e.ClientID, e.Secret)
 	// Same CF Access token as ComfyUI — both sit behind the same tunnel.
 	e.Finetune = NewFinetune(e.FinetuneURL, e.ClientID, e.Secret)
 	e.FlutterOK, e.FlutterMsg = flutterVersion(root)

@@ -14,6 +14,8 @@ const state = {
   faceDetail: false,
   lora: '',
   ref: null,
+  promptsYaml: null,
+  promptsYamlName: '',
   rowOrder: localStorage.getItem('labRowOrder') || 'style',
   runId: null,
   run: null,
@@ -340,6 +342,32 @@ $('ref').onchange = async () => {
   estimate();
 };
 
+// The prompt YAML is parsed on upload, so a typo shows while the file is still
+// on screen. What comes back is a list of ids and the families each one covers
+// — enough to see at a glance that a model in the run has nothing to read.
+$('promptsYaml').onchange = async () => {
+  const file = $('promptsYaml').files[0];
+  const info = $('promptsyamlinfo');
+  if (!file) { state.promptsYaml = null; info.innerHTML = ''; estimate(); return; }
+  info.innerHTML = '<p class="hint">čtu…</p>';
+  try {
+    const res = await fetch('/api/upload-prompts', {
+      method: 'PUT', headers: { 'X-Lab-Token': TOKEN }, body: file,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    state.promptsYaml = data.localPath;
+    state.promptsYamlName = file.name;
+    info.innerHTML = `<p class="hint">${data.prompts.length} promptů: ${
+      data.prompts.map((p) => `${esc(p.id)} <span class="fam">${
+        p.families.map(esc).join('/')}</span>`).join(', ')}</p>`;
+  } catch (err) {
+    state.promptsYaml = null;
+    info.innerHTML = `<p class="hint danger">${esc(err.message)}</p>`;
+  }
+  estimate();
+};
+
 function updateModeHint(h) {
   const dry = $('mode').value === 'dry';
   const el = $('modehint');
@@ -356,9 +384,10 @@ function spec() {
   const values = $('sweepValues').value.trim();
   const target = $('sweepTarget').value;
   return {
-    title: ($('prompts').value.split('\n')[0] || 'běh').slice(0, 60),
+    title: ($('prompts').value.split('\n')[0] || state.promptsYamlName || 'běh').slice(0, 60),
     models: [...state.models],
     prompts: $('prompts').value.split('\n').map((s) => s.trim()).filter(Boolean),
+    promptsYaml: state.promptsYaml || '',
     styles: [...state.styles],
     flows: [...state.flows],
     refName: state.ref?.refName || '',
