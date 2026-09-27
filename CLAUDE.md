@@ -1027,6 +1027,12 @@ jako JSON string.
 | CF Access | povinný (bez tokenů hodí výjimku) | volitelný (kvůli LAN vývoji) |
 | Idle timeout | 120 s | 5 min (prefill 9–12k tokenů trvá minuty) |
 
+**Kopírování odpovědi**: dlouhý stisk na bublině role (jakákoli persona,
+knihovna, právník) zkopíruje celý text odpovědi do schránky (`MessageBubble`,
+snackbar + haptika); během streamu ne. Markdown odpovědi proto **není
+`selectable`** — `SelectableText` si long press bere pro výběr slova a gesto
+by nikdy nedošlo. Odkazy se dál klepnutím otevírají.
+
 **Routing přes personu**: `Persona.backend` v `assets/personas/index.json`
 (`"backend": "library"` u Knihovníka 📚) určuje transport; `_backendFor()`
 v provideru je jediné místo, kde se to rozhoduje. Persona bez `file` nemá

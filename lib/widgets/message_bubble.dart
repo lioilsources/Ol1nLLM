@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/constants/theme.dart';
@@ -76,30 +77,53 @@ class _MessageBubbleState extends State<MessageBubble>
   Widget build(BuildContext context) {
     final isUser = widget.message.role == MessageRole.user;
 
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.85,
-        ),
-        margin: EdgeInsets.only(
-          left: isUser ? 48 : 12,
-          right: isUser ? 12 : 48,
-          top: 4,
-          bottom: 4,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: isUser ? AppTheme.userBubble : AppTheme.aiBubble,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(isUser ? 16 : 4),
-            bottomRight: Radius.circular(isUser ? 4 : 16),
+    return GestureDetector(
+      onLongPress: _canCopy ? _copyToClipboard : null,
+      child: Align(
+        alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.85,
           ),
-          border: isUser ? null : Border.all(color: Colors.white10, width: 0.5),
+          margin: EdgeInsets.only(
+            left: isUser ? 48 : 12,
+            right: isUser ? 12 : 48,
+            top: 4,
+            bottom: 4,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: isUser ? AppTheme.userBubble : AppTheme.aiBubble,
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(16),
+              topRight: const Radius.circular(16),
+              bottomLeft: Radius.circular(isUser ? 16 : 4),
+              bottomRight: Radius.circular(isUser ? 4 : 16),
+            ),
+            border: isUser
+                ? null
+                : Border.all(color: Colors.white10, width: 0.5),
+          ),
+          child: _buildContent(context, isUser),
         ),
-        child: _buildContent(context, isUser),
+      ),
+    );
+  }
+
+  /// A role's answer (library, lawyer, any persona) is copied whole on long
+  /// press. Not while streaming — half an answer in the clipboard is a trap.
+  bool get _canCopy =>
+      widget.message.role != MessageRole.user &&
+      !widget.isStreaming &&
+      widget.message.content.trim().isNotEmpty;
+
+  void _copyToClipboard() {
+    Clipboard.setData(ClipboardData(text: widget.message.content));
+    HapticFeedback.lightImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Odpověď zkopírována do schránky'),
+        duration: Duration(seconds: 2),
       ),
     );
   }
@@ -206,7 +230,9 @@ class _MessageBubbleState extends State<MessageBubble>
           children: [
             MarkdownBody(
               data: widget.message.content,
-              selectable: true,
+              // Not selectable: SelectableText claims long press for word
+              // selection, which would swallow the copy-whole-answer gesture.
+              selectable: false,
               styleSheet: AppTheme.markdownStyle(context),
               onTapLink: (text, href, title) async {
                 if (href == null) return;
