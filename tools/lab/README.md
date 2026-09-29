@@ -118,6 +118,11 @@ danbooru (Pony V6)"*), dump je pojistka. Totéž platí pro překlep v názvu
 rodiny — ten by jinak text tiše zahodil, takže ho parser odmítne i s číslem
 řádku.
 
+`--prompt-ids key1,key2` vezme ze souboru jen jmenované položky (v pořadí
+souboru). Hodí se u běhů s referencí, které jdou po jednom námětu — bez něj by
+každý takový běh násobil celý soubor. Id, které v souboru není, běh zastaví
+(překlep by jinak postavu tiše vypustil). Jen terminál, UI to nenabízí.
+
 Osa promptů zůstává jednorozměrná: `manifest.prompts` nese **popisky** sloupců
 (text se liší model od modelu, takže jeden být nemůže), buňka nese `promptBody`
 a v `prompt` text přečtený zpátky z grafu — tedy ten, co se opravdu poslal.

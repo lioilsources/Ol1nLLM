@@ -19,6 +19,8 @@ func runCLI(env *Env, args []string) error {
 	subject := fs.String("subject", "", "jeden prompt (alternativa k --prompts)")
 	promptsYAML := fs.String("prompts-yaml", "",
 		"YAML s prompty po rodinách (danbooru/juggernaut/flux); --prompts jsou pak prefixy")
+	promptIDs := fs.String("prompt-ids", "",
+		"jen tyhle položky z --prompts-yaml, oddělené čárkou (výchozí: všechny)")
 	styles := fs.String("styles", "", "id stylů oddělená čárkou")
 	stylesFile := fs.String("styles-file", "", "JSON s kandidáty stylů [{id,label,block}]")
 	flows := fs.String("flows", "repose,img2img", "txt2img,img2img,repose,hair")
@@ -58,8 +60,8 @@ func runCLI(env *Env, args []string) error {
 
 	spec := &Spec{
 		Models: splitCSV(*models), Styles: splitCSV(*styles), StylesFile: *stylesFile,
-		PromptsYAML: *promptsYAML,
-		Flows:       splitCSV(*flows), NoBaseline: *noBaseline, NoStyles: *noStyles,
+		PromptsYAML: *promptsYAML, PromptIDs: splitCSV(*promptIDs),
+		Flows: splitCSV(*flows), NoBaseline: *noBaseline, NoStyles: *noStyles,
 		HairFile: *hairFile, HairMasks: *hairMasks, Hairstyles: splitCSV(*hairstyles),
 		PoseMode: *pose, PoseID: *poseID,
 		FaceIdentity: *faceIdentity, FaceDetail: *faceDetail,
@@ -86,6 +88,9 @@ func runCLI(env *Env, args []string) error {
 		// prefix to put in front of them.
 	default:
 		return fmt.Errorf("chybí --prompts, --subject nebo --prompts-yaml")
+	}
+	if len(spec.PromptIDs) > 0 && *promptsYAML == "" {
+		return fmt.Errorf("--prompt-ids vybírá z --prompts-yaml, a ten chybí")
 	}
 	spec.Title = firstOr(spec.Prompts, filepath.Base(*promptsYAML))
 

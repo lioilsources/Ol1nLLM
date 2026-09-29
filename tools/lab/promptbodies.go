@@ -126,6 +126,47 @@ func parsePromptBodies(data []byte, name string) ([]PromptBody, error) {
 	return out, nil
 }
 
+// promptBodies is the file as the run sees it: parsed, then narrowed to
+// PromptIDs. The estimate and the dump both read it through here, so the count
+// on screen and the columns in the manifest cannot disagree.
+func (s *Spec) promptBodies() ([]PromptBody, error) {
+	bodies, err := ParsePromptBodies(s.PromptsYAML)
+	if err != nil {
+		return nil, err
+	}
+	return selectPromptBodies(bodies, s.PromptIDs, filepath.Base(s.PromptsYAML))
+}
+
+// selectPromptBodies keeps the entries named in ids, in file order. An id the
+// file does not have is an error, not an empty column: a typo in a character
+// key would otherwise quietly drop that character from the run.
+func selectPromptBodies(bodies []PromptBody, ids []string, name string) ([]PromptBody, error) {
+	if len(ids) == 0 {
+		return bodies, nil
+	}
+	want := map[string]bool{}
+	for _, id := range ids {
+		want[strings.TrimSpace(id)] = true
+	}
+	var out []PromptBody
+	for _, b := range bodies {
+		if want[b.ID] {
+			out = append(out, b)
+			delete(want, b.ID)
+		}
+	}
+	if len(want) > 0 {
+		var missing []string
+		for id := range want {
+			missing = append(missing, id)
+		}
+		sort.Strings(missing)
+		return nil, fmt.Errorf("%s: --prompt-ids %s v souboru nejsou",
+			name, strings.Join(missing, ", "))
+	}
+	return out, nil
+}
+
 func knownPromptFamily(name string) bool {
 	for _, f := range promptFamilies {
 		if f == name {
