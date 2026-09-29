@@ -31,6 +31,16 @@ OUT = ROOT / "docs" / "sheets"
 # actually refers to.
 WAVES = [
     {
+        "id": "20260929-102218", "file": "storyteller-cast-wave-a.html",
+        "wave": "StoryTeller A", "title": "Postavy StoryTelleru: modely × styly (txt2img)",
+        "note": "Osm postav ze světového korpusu (dítě, princezna, liška, medvěd, drak, vodník, "
+                "skřítek, strom) × čtyři modely (flux-dev = <code>flux-manga</code>, Juggernaut XL, "
+                "Illustrious XL, NoobAI XL) × osm stylů registru StoryTelleru + návrh "
+                "<code>pixar-3d</code>, seed 777, 1024². Bez flux-schnell (tier 0 se dotočí večer). "
+                "Otázka: <code>preferred_model</code> pro každý styl, jde Pixar look bez LoRA, a první "
+                "review šesti shadow stylů. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3.",
+    },
+    {
         "id": "20260910-104000", "file": "wave3-ablace-clip-t5.html",
         "wave": "Vlna 3", "title": "Ablace: jméno, nebo popis?",
         "note": "Šest autorů napříč známostí, text stylu v šesti variantách "
