@@ -1,0 +1,47 @@
+# Vygenerováno: tools/lab/candidates/storyteller_cast.py yaml — neupravovat ručně.
+# Přesný prompt render-motifs -kind character (tier 0 StoryTelleru), jen flux.
+# Kontrola reprodukce, po postavě s jejím seedem ze storyteller-cast.json:
+#   lab run --prompts-yaml candidates/storyteller-cast-tier0.yaml --prompt-ids fox \
+#           --models flux-schnell --flows txt2img --no-styles --seed 1499655865
+# Karty přegenerované přes render-motifs -reroll mají jiný seed a nesednou.
+
+child:
+  flux: "Watercolor character portrait: a clever child who leaves a trail to find the way home. One figure, full body, standing on a plain soft cream background, soft warm colors, gentle storybook painting."
+youngest-son:
+  flux: "Watercolor character portrait: a simpleton youngest son who proves brave and clever despite being mocked. One figure, full body, standing on a plain soft cream background, soft warm colors, gentle storybook painting."
+princess:
+  flux: "Watercolor character portrait: a golden-haired princess whose radiant hair lights the sky and sea. One figure, full body, standing on a plain soft cream background, soft warm colors, gentle storybook painting."
+old-woman:
+  flux: "Watercolor character portrait: a mysterious old woman who offers magical help. One figure, full body, standing on a plain soft cream background, soft warm colors, gentle storybook painting."
+blacksmith:
+  flux: "Watercolor character portrait: a hardworking tinsmith who supports his family despite community complaints. One figure, full body, standing on a plain soft cream background, soft warm colors, gentle storybook painting."
+servant:
+  flux: "Watercolor character portrait: a clever servant who gains the ability to understand animal speech by tasting a magical snake. One figure, full body, standing on a plain soft cream background, soft warm colors, gentle storybook painting."
+fox:
+  flux: "Watercolor character portrait: a clever fox who gives wise counsel and aids the hero. One figure, full body, standing on a plain soft cream background, soft warm colors, gentle storybook painting."
+golden-bird:
+  flux: "Watercolor character portrait: a golden bird whose song heals the heart. One figure, full body, standing on a plain soft cream background, soft warm colors, gentle storybook painting."
+bear:
+  flux: "Watercolor character portrait: a strong but gullible bear who is easily tricked. One figure, full body, standing on a plain soft cream background, soft warm colors, gentle storybook painting."
+fish:
+  flux: "Watercolor character portrait: an enchanted fish who grants wishes but has limits. One figure, full body, standing on a plain soft cream background, soft warm colors, gentle storybook painting."
+horse:
+  flux: "Watercolor character portrait: a loyal horse that can speak and witnesses injustice. One figure, full body, standing on a plain soft cream background, soft warm colors, gentle storybook painting."
+snake:
+  flux: "Watercolor character portrait: an enormous white serpent that terrorizes livestock and defies ordinary means. One figure, full body, standing on a plain soft cream background, soft warm colors, gentle storybook painting."
+dragon:
+  flux: "Watercolor character portrait: a kind-hearted dragon who avoids harming humans despite its nature. One figure, full body, standing on a plain soft cream background, soft warm colors, gentle storybook painting."
+water-sprite:
+  flux: "Watercolor character portrait: a water spirit who lives in a river and takes a human spouse. One figure, full body, standing on a plain soft cream background, soft warm colors, gentle storybook painting."
+witch:
+  flux: "Watercolor character portrait: a cruel stepmother who is a witch and seeks to harm her stepchildren. One figure, full body, standing on a plain soft cream background, soft warm colors, gentle storybook painting."
+giant:
+  flux: "Watercolor character portrait: a giant who shapes mountains and can be overcome by strength. One figure, full body, standing on a plain soft cream background, soft warm colors, gentle storybook painting."
+elf:
+  flux: "Watercolor character portrait: a clever old elf who loves mischief and helps others with clever tricks. One figure, full body, standing on a plain soft cream background, soft warm colors, gentle storybook painting."
+wise-stone:
+  flux: "Watercolor character portrait: a wise stone that speaks and protects those who honor it. One figure, full body, standing on a plain soft cream background, soft warm colors, gentle storybook painting."
+magic-flower:
+  flux: "Watercolor character portrait: a magical flower that breaks enchantments when touched. One figure, full body, standing on a plain soft cream background, soft warm colors, gentle storybook painting."
+tree:
+  flux: "Watercolor character portrait: a young tree eager to grow tall and be admired. One figure, full body, standing on a plain soft cream background, soft warm colors, gentle storybook painting."

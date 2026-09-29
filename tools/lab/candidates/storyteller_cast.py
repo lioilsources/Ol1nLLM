@@ -4,7 +4,7 @@
 Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §2.1–2.2.
 
     python3 tools/lab/candidates/storyteller_cast.py select   # → storyteller-cast.json + reference
-    python3 tools/lab/candidates/storyteller_cast.py yaml     # → storyteller-cast.yaml (z JSON)
+    python3 tools/lab/candidates/storyteller_cast.py yaml     # → storyteller-cast{,-tier0}.yaml (z JSON)
     python3 tools/lab/candidates/storyteller_cast.py          # obojí
 
 `select` čte repo storyteller (jen čtení): text postavy z
@@ -35,6 +35,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 CAST_JSON = os.path.join(HERE, "storyteller-cast.json")
 CAST_YAML = os.path.join(HERE, "storyteller-cast.yaml")
+CAST_TIER0_YAML = os.path.join(HERE, "storyteller-cast-tier0.yaml")
 REFS = os.path.join(REPO, "build", "lab", "refs", "storyteller")
 
 # Výběr (§2.1): 6 lidí, 6 zvířat, 5 nadpřirozených, 3 věci. Přednost mají
@@ -77,11 +78,22 @@ PICKS = [
 # Tělo promptu po rodinách (§2.2). `flux` je prompt `render-motifs` bez slova
 # „Watercolor“ a bez stylové věty, aby šel styl měnit beze změny námětu.
 BODIES = {
-    "flux": "A character portrait of {t}. One figure, full body, standing on a plain soft cream background.",
+    # Bez tečky na konci: lab připojí styl za námět přes „, “, a tečka by dala
+    # „background., soft watercolor…“. Dnešní prompt má za „background“ taky čárku.
+    "flux": "A character portrait of {t}. One figure, full body, standing on a plain soft cream background",
     "juggernaut": "a full body character portrait of {t}, one figure standing on a plain soft cream background",
     # Fráze uvnitř tagů: Pony/Illustrious tu měří i překlad fráze, ne jen model.
     "danbooru": "solo, full body, standing, simple background, {t}",
 }
+
+
+# Přesný prompt `render-motifs -kind character` (storyteller
+# internal/nimqueue/cmd/render-motifs: characterPrefix + text + characterStyle).
+# Jde do zvláštního souboru storyteller-cast-tier0.yaml, jen pro flux-schnell
+# s --no-styles a seedem postavy: kontrola, že lab reprodukuje dnešní obrázek.
+# V hlavním YAML by se s během bez --prompt-ids násobil.
+TIER0 = ("Watercolor character portrait: {t}. One figure, full body, standing on a plain "
+         "soft cream background, soft warm colors, gentle storybook painting.")
 
 
 def seed_of(motif_id):
@@ -182,6 +194,22 @@ def write_yaml():
     with open(CAST_YAML, "w", encoding="utf-8") as f:
         f.write("\n".join(out))
     print("%s: %d promptů" % (os.path.relpath(CAST_YAML, REPO), len(cast)))
+
+    t0 = [
+        "# Vygenerováno: tools/lab/candidates/storyteller_cast.py yaml — neupravovat ručně.",
+        "# Přesný prompt render-motifs -kind character (tier 0 StoryTelleru), jen flux.",
+        "# Kontrola reprodukce, po postavě s jejím seedem ze storyteller-cast.json:",
+        "#   lab run --prompts-yaml candidates/storyteller-cast-tier0.yaml --prompt-ids fox \\",
+        "#           --models flux-schnell --flows txt2img --no-styles --seed 1499655865",
+        "# Karty přegenerované přes render-motifs -reroll mají jiný seed a nesednou.",
+        "",
+    ]
+    for c in cast:
+        t0.append("%s:" % c["key"])
+        t0.append("  flux: %s" % q(TIER0.format(t=c["text_en"])))
+    with open(CAST_TIER0_YAML, "w", encoding="utf-8") as f:
+        f.write("\n".join(t0) + "\n")
+    print("%s: %d promptů" % (os.path.relpath(CAST_TIER0_YAML, REPO), len(cast)))
 
 
 def main():
