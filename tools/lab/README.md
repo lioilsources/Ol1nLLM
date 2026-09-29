@@ -249,7 +249,9 @@ Co z toho plyne pro plán:
 - **jen `txt2img`** — img2img umí `flux-kontext`, a ten by potřeboval dostat
   referenci dovnitř requestu; zatím není v nabídce,
 - **1024×1024 a 4 kroky napevno** — appka je nenabízí, takže je nenabízí ani
-  lab. `LATENT` buňku odmítne, ne přebije,
+  lab. `LATENT` s jiným rozměrem buňku odmítne, ne přebije; `--latent 1024x1024`
+  projde (nic nemění), takže smíšený běh s ComfyUI modely na 1024² sloupec
+  Schnellu neztratí,
 - **žádná LoRA, póza, tvář ani `KSampler.*`** — to všechno jsou uzly grafu.
   Buňka se **přeskočí s důvodem**, nevznikne obrázek, který by vypadal jako
   měření té páčky. `?cíl.vstup=…` (nepovinný override) mixovaný plán pustí,

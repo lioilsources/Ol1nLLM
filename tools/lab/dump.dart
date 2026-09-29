@@ -560,11 +560,6 @@ void main() {
                 skip('póza potřebuje ControlNet, ten žije jen v grafu (${m.id})');
                 return;
               }
-              if (latentEnv != null) {
-                skip('rozměr je u ${m.id} pevných 1024×1024 — appka ho nenabízí');
-                return;
-              }
-
               var cellSeed = seed;
               if (params['seed'] is int) cellSeed = params['seed'] as int;
               final dialect = styleDialectFor(
@@ -587,6 +582,16 @@ void main() {
                 prompt: composed.prompt,
                 seed: cellSeed,
               );
+              // The size is fixed in the request. A LATENT that asks for
+              // exactly that size changes nothing and passes — a mixed run
+              // with --latent 1024x1024 keeps its gen-queue column; any other
+              // size would be a label on a picture that does not have it.
+              final fixed = '${body['width']}x${body['height']}';
+              if (latentEnv != null &&
+                  latentEnv.trim().toLowerCase() != fixed) {
+                skip('rozměr je u ${m.id} pevných $fixed — appka ho nenabízí');
+                return;
+              }
               File('${out.path}/$id.json').writeAsStringSync(
                 jsonEncode({
                   'backend': kBackendFluxNim,
