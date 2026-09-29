@@ -457,6 +457,23 @@ výsledky se ukládají do `identity.json` v adresáři běhu podle velikosti a 
 obrázku, takže `lab score` nad hotovým během nic nepřepočítává a navázaný běh
 spočítá jen nové buňky. Starší běh dostane čísla přes `lab score <adresář>`.
 
+- **DINO** — kosinová podobnost DINOv2 (ViT-S/14, CLS token) celého obrázku
+  k referenci (`tools/lab/dino.py`). Je to metrika, kterou StoryTeller
+  (MODELS_PLAN §2) rozhoduje o `degraded` (gate ≥ 0.80), a na rozdíl od ArcFace
+  nepotřebuje lidskou tvář — liška, strom nebo mluvící kámen ji nemají.
+  Obrázek se zmenší na 224×224 **bez ořezu** (karta je celá postava). Měří celý
+  obraz, takže změna stylu ho srazí i u téže postavy: čti ho proti baseline
+  téhož modelu a flow. `lab score` vypíše průměr, minimum a počet buněk ≥ 0.80
+  po flow × model × styl; v UI je v detailu buňky.
+
+  Nastavení jednou: `make lab-dino` (CPU torch do téhož `tools/lab/.venv`),
+  váhy (~90 MB) stáhne torch hub při prvním skóre do `build/lab/torch`. Jiný
+  interpret přes `LAB_DINO_PYTHON`. Výsledky jsou v `identity.json` vedle
+  ArcFace (klíč `dino`), se stejnou cache; ~0.1–0.3 s na buňku. Referenční
+  hodnoty z tier 0 StoryTelleru: táž liška z dřívějšího renderu 0.67, jiná
+  „chytrá liška“ 0.78, strom proti lišce 0.21 — tedy 0.80 je přísný práh
+  a sama změna seedu ho u téže postavy nemusí dát.
+
 ## Poznámky k prostředí
 
 - CF Access creds se berou z `.env.local` (`CF_ACCESS_CLIENT_ID`,

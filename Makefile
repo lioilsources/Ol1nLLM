@@ -1,4 +1,4 @@
-.PHONY: run debug build-ios build-android lab lab-dry lab-check lab-arcface lab-resume lab-score
+.PHONY: run debug build-ios build-android lab lab-dry lab-check lab-arcface lab-dino lab-resume lab-score
 
 -include .env.local
 
@@ -60,3 +60,11 @@ lab-arcface:
 	tools/lab/.venv/bin/pip install -q insightface onnxruntime opencv-python-headless numpy
 	mkdir -p $(HOME)/.insightface/models
 	rsync -a spark:Code/ComfyUI/models/insightface/models/antelopev2 $(HOME)/.insightface/models/
+
+# DINOv2 metric for the lab (tools/lab/dino.py): CPU torch in the same venv as
+# ArcFace. Weights (~90 MB) come from torch hub on the first scored run and
+# land in build/lab/torch, not on the boot disk; --no-cache-dir keeps the big
+# torch wheels out of the pip cache there too.
+lab-dino:
+	test -x tools/lab/.venv/bin/python || python3 -m venv tools/lab/.venv
+	tools/lab/.venv/bin/pip install -q --no-cache-dir torch torchvision pillow

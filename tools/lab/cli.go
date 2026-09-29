@@ -313,7 +313,56 @@ func scoreCLI(env *Env, args []string) error {
 	}
 	fmt.Println("\n" + m.Note)
 	printIdentity(man, m)
+	printDino(man, m)
 	return nil
+}
+
+// printDino sums the DINOv2 numbers per flow, model and style (and sweep
+// value): the rows StoryTeller's decision table reads — does this path keep
+// the character, and how many cells would fall under the 0.80 gate.
+func printDino(man *Manifest, m Metrics) {
+	type row struct {
+		sum, min float64
+		n, pass  int
+	}
+	rows := map[string]*row{}
+	var order []string
+	for _, c := range man.Cells {
+		cm, ok := m.Cells[c.ID]
+		if !ok || cm.Dino == nil {
+			continue
+		}
+		k := c.Flow + "|" + c.Model + "|" + c.Style
+		if c.Variant != nil {
+			k += "|" + c.Variant.Label + "=" + c.Variant.Value
+		}
+		r := rows[k]
+		if r == nil {
+			r = &row{min: 2}
+			rows[k] = r
+			order = append(order, k)
+		}
+		r.sum += *cm.Dino
+		r.n++
+		if *cm.Dino < r.min {
+			r.min = *cm.Dino
+		}
+		if *cm.Dino >= dinoGate {
+			r.pass++
+		}
+	}
+	if len(rows) == 0 {
+		if m.DinoNote != "" {
+			fmt.Println("\n" + m.DinoNote)
+		}
+		return
+	}
+	fmt.Printf("\n%-52s %6s %6s %4s %7s\n", "DINO (flow|model|styl|sweep)", "průměr", "min", "n", "≥ 0.80")
+	for _, k := range order {
+		r := rows[k]
+		fmt.Printf("%-52s %6.3f %6.3f %4d %7d\n", k, r.sum/float64(r.n), r.min, r.n, r.pass)
+	}
+	fmt.Println("\n" + m.DinoNote)
 }
 
 // printIdentity sums the face numbers per model and sweep value — the shape

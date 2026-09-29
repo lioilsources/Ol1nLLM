@@ -60,6 +60,9 @@ type CellMetric struct {
 	Identity *float64 `json:"identity,omitempty"`
 	Faces    *int     `json:"faces,omitempty"`
 	FacePx   int      `json:"facePx,omitempty"`
+	// Dino is the DINOv2 cosine of the whole image to the run's reference
+	// (tools/lab/dino.py) — StoryTeller's consistency gate.
+	Dino *float64 `json:"dino,omitempty"`
 }
 
 type GroupMetric struct {
@@ -76,6 +79,8 @@ type Metrics struct {
 	Note string `json:"note"`
 	// IdentityNote explains the face numbers — or why there are none.
 	IdentityNote string `json:"identityNote,omitempty"`
+	// DinoNote explains the DINOv2 numbers — or why there are none.
+	DinoNote string `json:"dinoNote,omitempty"`
 }
 
 // ComputeMetrics needs the histogram of every finished cell plus the manifest
