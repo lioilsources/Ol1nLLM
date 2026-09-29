@@ -40,6 +40,56 @@ void main() {
       test('$name → ${want.name}', () => expect(familyOfLora(name), want));
     });
 
+    test('StoryTeller 3D/Pixar and comparison LoRAs (headers from SPARK)', () {
+      // Without the registry the names would guess unknown (3D_Portrait,
+      // Cute-3d-Kawaii, Disney) or pony (MeMaXL lists Pony in its name).
+      const pixar = [
+        'Canopus-Pixar-3D-FluxDev-LoRA',
+        '3D_Portrait',
+        'Cute-3d-Kawaii',
+        'Toy_Box_Flux_v1_renderartist',
+        'Toy_Box_Flux_v2_renderartist',
+      ];
+      for (final n in pixar) {
+        expect(
+          familyOfLora('3D_Pixar_Flux/$n.safetensors'),
+          LoraFamily.flux,
+          reason: n,
+        );
+      }
+      expect(
+        familyOfLora(
+          'Juggernaut_XL_Lightning/All_Disney_Princess_XL_LoRA_Model_'
+          'from_Ralph_Breaks_the_Internet.safetensors',
+        ),
+        LoraFamily.sdxl,
+      );
+      expect(
+        familyOfLora(
+          'NoobAI/MeMaXL_Flat_Anime_Style_-_NoobIllustriousPonyXL.safetensors',
+        ),
+        LoraFamily.illustrious,
+      );
+    });
+
+    test('folder-qualified entry beats the bare name (Velvets collision)', () {
+      const velvets =
+          'Velvets_Mythic_Fantasy_Styles__Flux__Pony__illustrious__ZiT__Anima__Krea2.safetensors';
+      expect(familyOfLora('Flux_Dev/$velvets'), LoraFamily.flux);
+      expect(familyOfLora('Illustrious_WAI/$velvets'), LoraFamily.illustrious);
+      // Only the parent folder counts, and a folder without an entry falls
+      // back to the bare name as before.
+      expect(
+        familyOfLora('a/Illustrious_WAI/$velvets'),
+        LoraFamily.illustrious,
+      );
+      expect(familyOfLora('other/sexy_attire.safetensors'), LoraFamily.sd15);
+      expect(
+        fitOfLora('Illustrious_WAI/$velvets', LoraFamily.flux),
+        LoraFit.incompatible,
+      );
+    });
+
     test('subfolder and case do not matter', () {
       expect(familyOfLora('sub/SEXY_ATTIRE.safetensors'), LoraFamily.sd15);
     });

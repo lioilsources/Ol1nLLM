@@ -81,6 +81,16 @@ const _knownLoras = <String, LoraFamily>{
   // metadata claims sd_1.5 (kohya default left untouched), but it is the
   // published FLUX NSFW slider — the name wins here.
   'sldr_flux_nsfw_v2-studio': LoraFamily.flux,
+  // 3D_Pixar_Flux/ (SPARK, read 2026-09-29): all five carry
+  // modelspec.architecture flux-1-dev/lora. The names alone would guess
+  // `unknown` for all but Toy_Box — hence listed.
+  //   Canopus, 3D_Portrait, Cute-3d-Kawaii: ss_sd_model_name "models", dim 64
+  //   Toy_Box v1/v2: ss_sd_model_name flux1-dev.safetensors, dim 32
+  'canopus-pixar-3d-fluxdev-lora': LoraFamily.flux,
+  '3d_portrait': LoraFamily.flux,
+  'cute-3d-kawaii': LoraFamily.flux,
+  'toy_box_flux_v1_renderartist': LoraFamily.flux,
+  'toy_box_flux_v2_renderartist': LoraFamily.flux,
 
   // ── Illustrious / NoobAI lineage (ss_sd_model_name) ──
   'style-anime-screencap': LoraFamily.illustrious, // Laxhar/noobai-XL-0.5
@@ -90,6 +100,10 @@ const _knownLoras = <String, LoraFamily>{
   'pussy-sandwich-il': LoraFamily.illustrious,
   'spread-pussy-il': LoraFamily.illustrious,
   'util-stabilizer-il': LoraFamily.illustrious,
+  // ss_base_model_version 'sdxl_', no ss_sd_model_name, v-prediction; the
+  // OneTrainer config (ot_config.base_model_name) names
+  // noobaiXLNAIXL_vPred10Version — NoobAI, not the Pony the filename also lists.
+  'memaxl_flat_anime_style_-_noobillustriousponyxl': LoraFamily.illustrious,
 
   // ── Pony (all three trained on 290640.safetensors) ──
   'starship_hulls_-_pony_r1': LoraFamily.pony,
@@ -100,6 +114,9 @@ const _knownLoras = <String, LoraFamily>{
   'real-pussy-lily-xl': LoraFamily.sdxl, // bigLust_v10 (SDXL)
   'dmd2_sdxl_4step_lora_fp16': LoraFamily.sdxl,
   'sdxl_lightning_8step_lora': LoraFamily.sdxl,
+  // Juggernaut_XL_Lightning/: sdxl_base_v1-0, sd_xl_base_1.0.safetensors, dim 32
+  'all_disney_princess_xl_lora_model_from_ralph_breaks_the_internet':
+      LoraFamily.sdxl,
 
   // ── SD 1.5 / NAI (SD 1.x) — these must never reach an SDXL model ──
   'sexy_attire': LoraFamily.sd15, // runwayml/stable-diffusion-v1-5
@@ -113,6 +130,17 @@ const _knownLoras = <String, LoraFamily>{
 
   // ── Other architectures we host no model for ──
   'heelsup_v2_22': LoraFamily.zimage, // ss_base_model_version: zimage
+
+  // ── Folder-qualified: one filename, two different files ──
+  // `folder/bare`, the parent folder as the server lists it. Checked before
+  // the bare name, because the bare name cannot tell these apart.
+  // Velvets_Mythic_Fantasy_Styles… (SPARK, 2026-09-29):
+  //   Flux_Dev/        flux1, 691639.safetensors, flux-1-dev/lora, dim 8
+  //   Illustrious_WAI/ sdxl_base_v1-0, 889818.safetensors, dim 32
+  'flux_dev/velvets_mythic_fantasy_styles__flux__pony__illustrious__zit__anima__krea2':
+      LoraFamily.flux,
+  'illustrious_wai/velvets_mythic_fantasy_styles__flux__pony__illustrious__zit__anima__krea2':
+      LoraFamily.illustrious,
 };
 
 /// Filename fallback for anything outside [_knownLoras]. Deliberately
@@ -142,13 +170,22 @@ LoraFamily _guessFamily(String bare) {
 
 /// Family of the LoRA named [name] (as the server lists it — may include a
 /// subfolder, e.g. `avatar/testface.safetensors`).
+///
+/// The folder usually says nothing and is dropped, but the same filename can
+/// sit in two folders as two different files (Velvets: FLUX in `Flux_Dev/`,
+/// SDXL in `Illustrious_WAI/`), so a `folder/bare` entry wins over `bare`.
 LoraFamily familyOfLora(String name) {
-  final bare = name
-      .split('/')
-      .last
+  final parts = name
+      .replaceAll('\\', '/')
       .toLowerCase()
       .replaceAll('.safetensors', '')
-      .replaceAll('.ckpt', '');
+      .replaceAll('.ckpt', '')
+      .split('/');
+  final bare = parts.last;
+  if (parts.length > 1) {
+    final qualified = _knownLoras['${parts[parts.length - 2]}/$bare'];
+    if (qualified != null) return qualified;
+  }
   return _knownLoras[bare] ?? _guessFamily(bare);
 }
 
