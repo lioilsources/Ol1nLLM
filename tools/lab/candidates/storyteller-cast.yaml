@@ -1,0 +1,124 @@
+# Vygenerováno: tools/lab/candidates/storyteller_cast.py yaml — neupravovat ručně.
+# Postavy StoryTelleru (storyteller-cast.json), tělo promptu bez stylu:
+# styl je v labu vlastní osa (--styles-file candidates/storyteller-styles.json).
+# Klíč = key postavy, výběr přes --prompt-ids; seed postavy je v JSON.
+
+# Chytrá Anička / person / DE / 8c4863a20f1c752b
+child:
+  danbooru: "solo, full body, standing, simple background, a clever child who leaves a trail to find the way home"
+  juggernaut: "a full body character portrait of a clever child who leaves a trail to find the way home, one figure standing on a plain soft cream background"
+  flux: "A character portrait of a clever child who leaves a trail to find the way home. One figure, full body, standing on a plain soft cream background."
+
+# Ivan Durák / person / RU / 3a3365f00caa094e
+youngest-son:
+  danbooru: "solo, full body, standing, simple background, a simpleton youngest son who proves brave and clever despite being mocked"
+  juggernaut: "a full body character portrait of a simpleton youngest son who proves brave and clever despite being mocked, one figure standing on a plain soft cream background"
+  flux: "A character portrait of a simpleton youngest son who proves brave and clever despite being mocked. One figure, full body, standing on a plain soft cream background."
+
+# Zlatovláska / person / CZ / 6b5324095e421756
+princess:
+  danbooru: "solo, full body, standing, simple background, a golden-haired princess whose radiant hair lights the sky and sea"
+  juggernaut: "a full body character portrait of a golden-haired princess whose radiant hair lights the sky and sea, one figure standing on a plain soft cream background"
+  flux: "A character portrait of a golden-haired princess whose radiant hair lights the sky and sea. One figure, full body, standing on a plain soft cream background."
+
+# Babička z lesa / person / SE / 53a25fc6ee60fbbe
+old-woman:
+  danbooru: "solo, full body, standing, simple background, a mysterious old woman who offers magical help"
+  juggernaut: "a full body character portrait of a mysterious old woman who offers magical help, one figure standing on a plain soft cream background"
+  flux: "A character portrait of a mysterious old woman who offers magical help. One figure, full body, standing on a plain soft cream background."
+
+# Kovář Mustafa / person / TR / 6f3ea8e2cf43bcf9
+blacksmith:
+  danbooru: "solo, full body, standing, simple background, a hardworking tinsmith who supports his family despite community complaints"
+  juggernaut: "a full body character portrait of a hardworking tinsmith who supports his family despite community complaints, one figure standing on a plain soft cream background"
+  flux: "A character portrait of a hardworking tinsmith who supports his family despite community complaints. One figure, full body, standing on a plain soft cream background."
+
+# Chytrý sluha / person / CZ / 98a283cd49943f48
+servant:
+  danbooru: "solo, full body, standing, simple background, a clever servant who gains the ability to understand animal speech by tasting a magical snake"
+  juggernaut: "a full body character portrait of a clever servant who gains the ability to understand animal speech by tasting a magical snake, one figure standing on a plain soft cream background"
+  flux: "A character portrait of a clever servant who gains the ability to understand animal speech by tasting a magical snake. One figure, full body, standing on a plain soft cream background."
+
+# Chytrá liška / animal / DE / fc5ee8dd1600bb0e
+fox:
+  danbooru: "solo, full body, standing, simple background, a clever fox who gives wise counsel and aids the hero"
+  juggernaut: "a full body character portrait of a clever fox who gives wise counsel and aids the hero, one figure standing on a plain soft cream background"
+  flux: "A character portrait of a clever fox who gives wise counsel and aids the hero. One figure, full body, standing on a plain soft cream background."
+
+# Zlatý ptáček / animal / CZ / 5f28650a078076c0
+golden-bird:
+  danbooru: "solo, full body, standing, simple background, a golden bird whose song heals the heart"
+  juggernaut: "a full body character portrait of a golden bird whose song heals the heart, one figure standing on a plain soft cream background"
+  flux: "A character portrait of a golden bird whose song heals the heart. One figure, full body, standing on a plain soft cream background."
+
+# Medvěd Brumla / animal / SE / 79ee7ea7f0452d59
+bear:
+  danbooru: "solo, full body, standing, simple background, a strong but gullible bear who is easily tricked"
+  juggernaut: "a full body character portrait of a strong but gullible bear who is easily tricked, one figure standing on a plain soft cream background"
+  flux: "A character portrait of a strong but gullible bear who is easily tricked. One figure, full body, standing on a plain soft cream background."
+
+# animal / DE / 54fcbd66b67e27d9
+fish:
+  danbooru: "solo, full body, standing, simple background, an enchanted fish who grants wishes but has limits"
+  juggernaut: "a full body character portrait of an enchanted fish who grants wishes but has limits, one figure standing on a plain soft cream background"
+  flux: "A character portrait of an enchanted fish who grants wishes but has limits. One figure, full body, standing on a plain soft cream background."
+
+# animal / DE / 59290a892dec702f
+horse:
+  danbooru: "solo, full body, standing, simple background, a loyal horse that can speak and witnesses injustice"
+  juggernaut: "a full body character portrait of a loyal horse that can speak and witnesses injustice, one figure standing on a plain soft cream background"
+  flux: "A character portrait of a loyal horse that can speak and witnesses injustice. One figure, full body, standing on a plain soft cream background."
+
+# Bílý had z jezera / animal / CZ / 8991eac495aaf687
+snake:
+  danbooru: "solo, full body, standing, simple background, an enormous white serpent that terrorizes livestock and defies ordinary means"
+  juggernaut: "a full body character portrait of an enormous white serpent that terrorizes livestock and defies ordinary means, one figure standing on a plain soft cream background"
+  flux: "A character portrait of an enormous white serpent that terrorizes livestock and defies ordinary means. One figure, full body, standing on a plain soft cream background."
+
+# Drak z Alp / supernatural / CH / 8bb037ec49fe9315
+dragon:
+  danbooru: "solo, full body, standing, simple background, a kind-hearted dragon who avoids harming humans despite its nature"
+  juggernaut: "a full body character portrait of a kind-hearted dragon who avoids harming humans despite its nature, one figure standing on a plain soft cream background"
+  flux: "A character portrait of a kind-hearted dragon who avoids harming humans despite its nature. One figure, full body, standing on a plain soft cream background."
+
+# Vodník z řeky / supernatural / HR / 9d5dc320c3f422ef
+water-sprite:
+  danbooru: "solo, full body, standing, simple background, a water spirit who lives in a river and takes a human spouse"
+  juggernaut: "a full body character portrait of a water spirit who lives in a river and takes a human spouse, one figure standing on a plain soft cream background"
+  flux: "A character portrait of a water spirit who lives in a river and takes a human spouse. One figure, full body, standing on a plain soft cream background."
+
+# Zlá čarodějnice / supernatural / CA / 007b5c578424e208
+witch:
+  danbooru: "solo, full body, standing, simple background, a cruel stepmother who is a witch and seeks to harm her stepchildren"
+  juggernaut: "a full body character portrait of a cruel stepmother who is a witch and seeks to harm her stepchildren, one figure standing on a plain soft cream background"
+  flux: "A character portrait of a cruel stepmother who is a witch and seeks to harm her stepchildren. One figure, full body, standing on a plain soft cream background."
+
+# Veliký obr Hora / supernatural / ZM / 88578bcaaf50fdab
+giant:
+  danbooru: "solo, full body, standing, simple background, a giant who shapes mountains and can be overcome by strength"
+  juggernaut: "a full body character portrait of a giant who shapes mountains and can be overcome by strength, one figure standing on a plain soft cream background"
+  flux: "A character portrait of a giant who shapes mountains and can be overcome by strength. One figure, full body, standing on a plain soft cream background."
+
+# Chytrý skřítek / supernatural / NL / 6f355e279baa2ba8
+elf:
+  danbooru: "solo, full body, standing, simple background, a clever old elf who loves mischief and helps others with clever tricks"
+  juggernaut: "a full body character portrait of a clever old elf who loves mischief and helps others with clever tricks, one figure standing on a plain soft cream background"
+  flux: "A character portrait of a clever old elf who loves mischief and helps others with clever tricks. One figure, full body, standing on a plain soft cream background."
+
+# Moudrý kámen / object / GD / 83942e103a435d2d
+wise-stone:
+  danbooru: "solo, full body, standing, simple background, a wise stone that speaks and protects those who honor it"
+  juggernaut: "a full body character portrait of a wise stone that speaks and protects those who honor it, one figure standing on a plain soft cream background"
+  flux: "A character portrait of a wise stone that speaks and protects those who honor it. One figure, full body, standing on a plain soft cream background."
+
+# object / DE / 6584f0b9d590f779
+magic-flower:
+  danbooru: "solo, full body, standing, simple background, a magical flower that breaks enchantments when touched"
+  juggernaut: "a full body character portrait of a magical flower that breaks enchantments when touched, one figure standing on a plain soft cream background"
+  flux: "A character portrait of a magical flower that breaks enchantments when touched. One figure, full body, standing on a plain soft cream background."
+
+# Malý smrček / object / DK / e1b5411142bf5e6f
+tree:
+  danbooru: "solo, full body, standing, simple background, a young tree eager to grow tall and be admired"
+  juggernaut: "a full body character portrait of a young tree eager to grow tall and be admired, one figure standing on a plain soft cream background"
+  flux: "A character portrait of a young tree eager to grow tall and be admired. One figure, full body, standing on a plain soft cream background."
