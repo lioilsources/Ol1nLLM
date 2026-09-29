@@ -1,0 +1,79 @@
+[
+ {
+  "id": "watercolor",
+  "label": "Akvarel / Watercolor",
+  "block": "soft watercolor children's book illustration, gentle wet-on-wet washes, visible paper texture, warm light, simple shapes",
+  "negative": "scary, violence, blood, weapon, horror, dark, realistic photo, text, watermark, signature, deformed, extra limbs",
+  "preferred_model": "sdxl-lora",
+  "status": "active",
+  "sort_order": 10,
+  "note": "z infra/seed/models_styles.sql; appka dává prefix před námět, lab celý blok za něj"
+ },
+ {
+  "id": "papercut",
+  "label": "Papírová koláž / Paper collage",
+  "block": "layered paper cut-out collage illustration for children, flat torn-paper shapes, subtle drop shadows between layers, bright matte colors",
+  "negative": "scary, violence, blood, weapon, horror, dark, realistic photo, text, watermark, signature, deformed, extra limbs",
+  "preferred_model": "flux-dev",
+  "status": "shadow",
+  "sort_order": 20,
+  "note": "z infra/seed/models_styles.sql; appka dává prefix před námět, lab celý blok za něj"
+ },
+ {
+  "id": "crayon",
+  "label": "Pastelka / Crayon",
+  "block": "wax crayon drawing by a child's illustrator, waxy strokes, slightly uneven outlines, cheerful primary colors, white paper background",
+  "negative": "scary, violence, blood, weapon, horror, dark, realistic photo, text, watermark, signature, deformed, extra limbs",
+  "preferred_model": "flux-dev",
+  "status": "shadow",
+  "sort_order": 30,
+  "note": "z infra/seed/models_styles.sql; appka dává prefix před námět, lab celý blok za něj"
+ },
+ {
+  "id": "anime-lite",
+  "label": "Anime (jemné) / Anime (soft)",
+  "block": "soft anime-style illustration for young children, big friendly eyes, clean lineart, pastel cel shading, calm composition",
+  "negative": "scary, violence, blood, weapon, horror, dark, realistic photo, text, watermark, signature, deformed, extra limbs, mature",
+  "preferred_model": "flux-dev",
+  "status": "shadow",
+  "sort_order": 40,
+  "note": "z infra/seed/models_styles.sql; appka dává prefix před námět, lab celý blok za něj"
+ },
+ {
+  "id": "woodcut",
+  "label": "Dřevořez / Woodcut",
+  "block": "friendly woodcut print illustration, bold carved outlines, limited two- or three-color palette, visible grain, folk-book feel",
+  "negative": "scary, violence, blood, weapon, horror, dark, realistic photo, text, watermark, signature, deformed, extra limbs",
+  "preferred_model": "flux-dev",
+  "status": "shadow",
+  "sort_order": 50,
+  "note": "z infra/seed/models_styles.sql; appka dává prefix před námět, lab celý blok za něj"
+ },
+ {
+  "id": "clay",
+  "label": "Plastelína / Clay",
+  "block": "stop-motion plasticine clay figures, soft studio lighting, fingerprint texture on the clay, shallow depth of field, miniature set",
+  "negative": "scary, violence, blood, weapon, horror, dark, text, watermark, signature, deformed, extra limbs",
+  "preferred_model": "flux-dev",
+  "status": "shadow",
+  "sort_order": 60,
+  "note": "z infra/seed/models_styles.sql; appka dává prefix před námět, lab celý blok za něj"
+ },
+ {
+  "id": "folk",
+  "label": "Česká klasika / Folk classic",
+  "block": "central european folk-art storybook illustration, decorative floral borders, embroidered-pattern motifs, earthy reds and blues, flat perspective",
+  "negative": "scary, violence, blood, weapon, horror, dark, realistic photo, text, watermark, signature, deformed, extra limbs",
+  "preferred_model": "flux-dev",
+  "status": "shadow",
+  "sort_order": 70,
+  "note": "z infra/seed/models_styles.sql; appka dává prefix před námět, lab celý blok za něj"
+ },
+ {
+  "id": "pixar-3d",
+  "label": "3D / Pixar (návrh)",
+  "block": "3D animated film still, Pixar-style character render, smooth subsurface skin, big expressive eyes, soft global illumination, rounded stylized proportions",
+  "booru": "3d, pixar style, cgi, smooth shading, big eyes",
+  "note": "není v models_styles.sql — kandidát na nový řádek (plán §2.3), text je návrh k měření"
+ }
+]
