@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ol1n_llm/models/image_model.dart';
+import 'package:ol1n_llm/models/style_preset.dart' show PromptDialect;
 
 void main() {
   group('imageModelsFor', () {
@@ -27,27 +28,111 @@ void main() {
 
     test('checkpoint-less models survive an empty server catalog', () {
       // One unrelated checkpoint: the list is "known" but matches nothing.
-      final ids = imageModelsFor(const ['nothing.safetensors'])
-          .map((m) => m.id)
-          .toList();
+      final ids = imageModelsFor(const [
+        'nothing.safetensors',
+      ]).map((m) => m.id).toList();
       // NIM backends (no preset) and flux-manga (UNETLoader, ckptName == null).
       expect(ids, containsAll(['flux-schnell', 'flux-kontext', 'flux-manga']));
       expect(ids, isNot(contains('pony')));
     });
 
     test('keepId survives even when its checkpoint is gone', () {
-      final ids = imageModelsFor(
-        const ['nothing.safetensors'],
-        keepId: 'pony',
-      ).map((m) => m.id);
+      final ids = imageModelsFor(const [
+        'nothing.safetensors',
+      ], keepId: 'pony').map((m) => m.id);
       expect(ids, contains('pony'));
       expect(ids, isNot(contains('juggernaut-xl')));
+    });
+
+    test('UNETLoader models are pruned by the diffusion-model list', () {
+      const unets = ['flux1-dev.safetensors'];
+      // Server lists diffusion models, schnell not among them ⇒ hidden.
+      var ids = imageModelsFor(
+        const [],
+        installedUnets: unets,
+      ).map((m) => m.id).toList();
+      expect(ids, isNot(contains('flux-schnell-comfy')));
+      // Models without a unetName (flux-manga) and checkpoint models (the
+      // checkpoint list is unknown here) are untouched.
+      expect(ids, containsAll(['flux-manga', 'flux-fill', 'pony']));
+
+      ids = imageModelsFor(
+        const [],
+        installedUnets: [...unets, 'flux1-schnell.safetensors'],
+      ).map((m) => m.id).toList();
+      expect(ids, contains('flux-schnell-comfy'));
+    });
+
+    test('an unknown UNET list keeps flux-schnell-comfy offered', () {
+      final ids = imageModelsFor(const [
+        'nothing.safetensors',
+      ]).map((m) => m.id);
+      expect(ids, contains('flux-schnell-comfy'));
+      expect(ids, isNot(contains('pony')));
+    });
+
+    test('keepId survives a missing UNET too', () {
+      final ids = imageModelsFor(
+        const [],
+        installedUnets: const ['flux1-dev.safetensors'],
+        keepId: 'flux-schnell-comfy',
+      ).map((m) => m.id);
+      expect(ids, contains('flux-schnell-comfy'));
     });
 
     test('registry order is preserved', () {
       final filtered = imageModelsFor(allCkpts).map((m) => m.id).toList();
       expect(filtered, kImageModels.map((m) => m.id).toList());
     });
+  });
+
+  group('flux-schnell-comfy', () {
+    final m = imageModelById('flux-schnell-comfy');
+
+    test('is a ComfyUI img2img model distinct from the gen-queue schnell', () {
+      expect(m.id, 'flux-schnell-comfy');
+      expect(m.kind, ImageBackendKind.comfyUi);
+      expect(m.txt2img && m.img2img, isTrue);
+      expect(m.inpaint, isFalse);
+      expect(m.supportsPose, isFalse);
+      // The NIM entry keeps its id and backend.
+      final nim = imageModelById('flux-schnell');
+      expect(nim.id, 'flux-schnell');
+      expect(nim.kind, ImageBackendKind.fluxNim);
+      expect(nim.img2img, isFalse);
+    });
+
+    test('flux lineage, natural dialect, honest note', () {
+      expect(m.loraFamily, LoraFamily.flux);
+      expect(m.promptDialect, PromptDialect.natural);
+      expect(m.styleNote, contains('neměřil'));
+    });
+
+    test('dedicated graphs, schnell sampler, patchable denoise', () {
+      final p = m.preset!;
+      expect(p.ckptName, isNull);
+      expect(p.unetName, 'flux1-schnell.safetensors');
+      expect(p.patchEditDenoise, isTrue);
+      expect(p.editDenoiseApplies, isTrue);
+      expect(p.txt2imgAsset, contains('flux_schnell_txt2img'));
+      expect(p.img2imgAsset, contains('flux_schnell_img2img'));
+      expect(
+        (p.steps, p.cfg, p.samplerName, p.scheduler),
+        (4, 1.0, 'euler', 'simple'),
+      );
+      expect(p.img2imgDenoise, lessThan(1.0));
+    });
+
+    test(
+      'flux-manga (Kontext img2img) does not opt into the denoise patch',
+      () {
+        expect(
+          imageModelById('flux-manga').preset!.editDenoiseApplies,
+          isFalse,
+        );
+        expect(imageModelById('pony').preset!.editDenoiseApplies, isTrue);
+      },
+    );
   });
 
   test('model ids are unique', () {
@@ -61,22 +146,61 @@ void main() {
     // a sampler *and* a scheduler here, so a transcribed name fails silently
     // at enqueue. This is the oracle that catches it in CI instead.
     const samplers = {
-      'euler', 'euler_cfg_pp', 'euler_ancestral', 'euler_ancestral_cfg_pp',
-      'heun', 'heunpp2', 'exp_heun_2_x0', 'exp_heun_2_x0_sde', 'dpm_2',
-      'dpm_2_ancestral', 'lms', 'dpm_fast', 'dpm_adaptive',
-      'dpmpp_2s_ancestral', 'dpmpp_2s_ancestral_cfg_pp', 'dpmpp_sde',
-      'dpmpp_sde_gpu', 'dpmpp_2m', 'dpmpp_2m_cfg_pp', 'dpmpp_2m_sde',
-      'dpmpp_2m_sde_gpu', 'dpmpp_2m_sde_heun', 'dpmpp_2m_sde_heun_gpu',
-      'dpmpp_3m_sde', 'dpmpp_3m_sde_gpu', 'ddpm', 'lcm', 'ipndm', 'ipndm_v',
-      'deis', 'res_multistep', 'res_multistep_cfg_pp',
-      'res_multistep_ancestral', 'res_multistep_ancestral_cfg_pp',
-      'gradient_estimation', 'gradient_estimation_cfg_pp', 'er_sde',
-      'seeds_2', 'seeds_3', 'sa_solver', 'sa_solver_pece', 'ddim', 'uni_pc',
+      'euler',
+      'euler_cfg_pp',
+      'euler_ancestral',
+      'euler_ancestral_cfg_pp',
+      'heun',
+      'heunpp2',
+      'exp_heun_2_x0',
+      'exp_heun_2_x0_sde',
+      'dpm_2',
+      'dpm_2_ancestral',
+      'lms',
+      'dpm_fast',
+      'dpm_adaptive',
+      'dpmpp_2s_ancestral',
+      'dpmpp_2s_ancestral_cfg_pp',
+      'dpmpp_sde',
+      'dpmpp_sde_gpu',
+      'dpmpp_2m',
+      'dpmpp_2m_cfg_pp',
+      'dpmpp_2m_sde',
+      'dpmpp_2m_sde_gpu',
+      'dpmpp_2m_sde_heun',
+      'dpmpp_2m_sde_heun_gpu',
+      'dpmpp_3m_sde',
+      'dpmpp_3m_sde_gpu',
+      'ddpm',
+      'lcm',
+      'ipndm',
+      'ipndm_v',
+      'deis',
+      'res_multistep',
+      'res_multistep_cfg_pp',
+      'res_multistep_ancestral',
+      'res_multistep_ancestral_cfg_pp',
+      'gradient_estimation',
+      'gradient_estimation_cfg_pp',
+      'er_sde',
+      'seeds_2',
+      'seeds_3',
+      'sa_solver',
+      'sa_solver_pece',
+      'ddim',
+      'uni_pc',
       'uni_pc_bh2',
     };
     const schedulers = {
-      'simple', 'sgm_uniform', 'karras', 'exponential', 'ddim_uniform',
-      'beta', 'normal', 'linear_quadratic', 'kl_optimal',
+      'simple',
+      'sgm_uniform',
+      'karras',
+      'exponential',
+      'ddim_uniform',
+      'beta',
+      'normal',
+      'linear_quadratic',
+      'kl_optimal',
     };
 
     test('every preset names a sampler and scheduler ComfyUI knows', () {

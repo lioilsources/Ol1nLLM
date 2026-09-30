@@ -116,8 +116,8 @@ class ImageStudioState {
   ///
   /// This, [availableCheckpoints], [availableScenes] and [availableDances] are
   /// app-scoped, not session-scoped: every site that rebuilds the state from
-  /// scratch (new/select/delete session, restore) has to carry ALL FIVE (with
-  /// [videoCustom]) over by hand,
+  /// scratch (new/select/delete session, restore) has to carry ALL of them (with
+  /// [availableUnets] and [videoCustom]) over by hand,
   /// or the chips/actions silently empty out. Dropping [availableScenes] here
   /// is what hid the „Rozhýbat" button in 1.12.0 — the catalog loaded fine and
   /// _load() then rebuilt the state without it.
@@ -125,6 +125,11 @@ class ImageStudioState {
 
   /// Checkpoints installed on the ComfyUI server. Empty = not (yet) known.
   final List<String> availableCheckpoints;
+
+  /// Diffusion models (`UNETLoader.unet_name`) on the server — prunes the
+  /// dedicated graphs that name one (see [imageModelsFor]). Empty = unknown.
+  /// App-scoped like [availableCheckpoints], carried over the same way.
+  final List<String> availableUnets;
 
   /// Animation presets served by the video server („Rozhýbat"). Empty = the
   /// server is unreachable or has none; the studio then hides the action.
@@ -196,6 +201,7 @@ class ImageStudioState {
     this.modelId = kDefaultImageModelId,
     this.availableLoras = const [],
     this.availableCheckpoints = const [],
+    this.availableUnets = const [],
     this.availableScenes = const [],
     this.videoCustom,
     this.availableDances = const [],
@@ -219,7 +225,11 @@ class ImageStudioState {
   /// Models offerable in the picker — curated registry minus entries whose
   /// checkpoint is missing on the server (the active one always stays).
   List<ImageModelSpec> get availableModels =>
-      imageModelsFor(availableCheckpoints, keepId: modelId);
+      imageModelsFor(
+        availableCheckpoints,
+        installedUnets: availableUnets,
+        keepId: modelId,
+      );
 
   /// LoRAs compatible with the active model's family.
   List<String> get filteredLoras =>
@@ -271,6 +281,7 @@ class ImageStudioState {
     String? modelId,
     List<String>? availableLoras,
     List<String>? availableCheckpoints,
+    List<String>? availableUnets,
     List<VideoScene>? availableScenes,
     VideoCustomSpec? videoCustom,
     List<FigureClip>? availableDances,
@@ -305,6 +316,7 @@ class ImageStudioState {
     modelId: modelId ?? this.modelId,
     availableLoras: availableLoras ?? this.availableLoras,
     availableCheckpoints: availableCheckpoints ?? this.availableCheckpoints,
+    availableUnets: availableUnets ?? this.availableUnets,
     availableScenes: availableScenes ?? this.availableScenes,
     videoCustom: videoCustom ?? this.videoCustom,
     availableDances: availableDances ?? this.availableDances,
@@ -622,6 +634,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       modelId: state.modelId,
       availableLoras: state.availableLoras,
       availableCheckpoints: state.availableCheckpoints,
+      availableUnets: state.availableUnets,
       availableScenes: state.availableScenes,
       availableDances: state.availableDances,
       videoCustom: state.videoCustom,
@@ -658,6 +671,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       modelId: session.modelId,
       availableLoras: state.availableLoras,
       availableCheckpoints: state.availableCheckpoints,
+      availableUnets: state.availableUnets,
       availableScenes: state.availableScenes,
       availableDances: state.availableDances,
       videoCustom: state.videoCustom,
@@ -701,6 +715,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           modelId: next.modelId,
           availableLoras: state.availableLoras,
           availableCheckpoints: state.availableCheckpoints,
+          availableUnets: state.availableUnets,
           availableScenes: state.availableScenes,
           availableDances: state.availableDances,
           videoCustom: state.videoCustom,
@@ -711,6 +726,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           modelId: state.modelId,
           availableLoras: state.availableLoras,
           availableCheckpoints: state.availableCheckpoints,
+          availableUnets: state.availableUnets,
           availableScenes: state.availableScenes,
           availableDances: state.availableDances,
           videoCustom: state.videoCustom,
@@ -756,6 +772,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           modelId: latest.modelId,
           availableLoras: state.availableLoras,
           availableCheckpoints: state.availableCheckpoints,
+          availableUnets: state.availableUnets,
           availableScenes: state.availableScenes,
           availableDances: state.availableDances,
           videoCustom: state.videoCustom,
@@ -907,6 +924,10 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     state = state.copyWith(availableCheckpoints: checkpoints);
     debugPrint('ComfyUI catalog: ${checkpoints.length} checkpoints');
 
+    final unets = await _comfyui.fetchUnets();
+    state = state.copyWith(availableUnets: unets);
+    debugPrint('ComfyUI catalog: ${unets.length} diffusion models');
+
     // Separate server; a failure here must not take the image catalog down
     // with it — the animate action just stays hidden.
     try {
@@ -962,6 +983,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     final spec = state.model;
     final preset = spec.preset;
     final patched = preset?.ckptName != null;
+    // Dedicated graphs that patch their img2img denoise (flux-schnell-comfy)
+    // record it too — the one sampler value that isn't baked in there.
+    final denoisePatched = preset?.editDenoiseApplies ?? false;
     final isInpaint = maskFileName != null;
     // Pose/depth ControlNet never applies to inpaint rounds (see
     // ComfyUIService._inpaint) — don't record a pose that won't run. Repose
@@ -1030,7 +1054,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       steps: patched ? preset!.steps : null,
       cfg: patched ? preset!.cfg : null,
       // Inpaint always samples at full denoise — the mask limits the change.
-      denoise: patched
+      denoise: patched || (denoisePatched && isImg2img && !isInpaint)
           ? (isImg2img && !isInpaint
                 ? (poseActive
                       ? kPoseEditDenoise

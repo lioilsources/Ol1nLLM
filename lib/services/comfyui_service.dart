@@ -277,6 +277,12 @@ class ComfyUIService implements ImageBackend {
   Future<List<String>> fetchCheckpoints() =>
       _fetchComboOptions('CheckpointLoaderSimple', 'ckpt_name');
 
+  /// Diffusion models under `models/diffusion_models` — what dedicated
+  /// UNETLoader graphs load ([ComfyPreset.unetName]). Same "empty = unknown"
+  /// contract as [fetchCheckpoints].
+  Future<List<String>> fetchUnets() =>
+      _fetchComboOptions('UNETLoader', 'unet_name');
+
   /// Reads one combo-widget's option list out of `/object_info/{node}`. ComfyUI
   /// nests it as `{node: {input: {required: {field: [[…options], {…meta}]}}}}` —
   /// the per-node endpoint keeps this cheap (the full /object_info is megabytes).
@@ -1400,7 +1406,9 @@ class ComfyUIService implements ImageBackend {
   ///
   /// Sampler/latent parameters are patched from the active [ComfyPreset] only
   /// for generic-template models (ckptName != null) — dedicated workflows like
-  /// flux-manga keep their baked-in values.
+  /// flux-manga keep their baked-in values. A dedicated graph with
+  /// [ComfyPreset.patchEditDenoise] gets its img2img denoise patched and
+  /// nothing else.
   /// Test seam: exposes the private [_prepare] graph transform so tests can
   /// assert LoRA/pose injection against the real workflow assets. Set the
   /// preset/lora/pose via the public setters first.
@@ -1610,6 +1618,13 @@ class ComfyUIService implements ImageBackend {
                 : (poseImageName != null
                     ? kPoseEditDenoise
                     : (editDenoise ?? preset.img2imgDenoise));
+          } else if (preset.patchEditDenoise &&
+              imageName != null &&
+              maskName == null) {
+            // Dedicated img2img graph that opted in (flux-schnell-comfy):
+            // sampler stays baked in, only the edit strength follows the
+            // preset / chip, so the lab can sweep `param.editDenoise` on it.
+            inputs['denoise'] = editDenoise ?? preset.img2imgDenoise;
           }
       }
       if (inputs.containsKey('seed')) inputs['seed'] = seed;

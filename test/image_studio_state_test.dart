@@ -24,17 +24,37 @@ void main() {
     expect(next.availableCheckpoints, ckpts);
   });
 
+  test('UNET catalog survives copyWith and prunes the picker', () {
+    const base = ImageStudioState(availableUnets: ['flux1-dev.safetensors']);
+    final next = base.copyWith(currentNodeId: 'n1');
+    expect(next.availableUnets, ['flux1-dev.safetensors']);
+    final ids = next.availableModels.map((m) => m.id);
+    expect(ids, isNot(contains('flux-schnell-comfy')));
+    expect(ids, contains('flux-manga'));
+    // The active model is never pruned.
+    expect(
+      next
+          .copyWith(modelId: 'flux-schnell-comfy')
+          .availableModels
+          .map((m) => m.id),
+      contains('flux-schnell-comfy'),
+    );
+  });
+
   test('filteredLoras follows the active model lineage', () {
     const base = ImageStudioState(availableLoras: loras);
-    expect(base.copyWith(modelId: 'flux-manga').filteredLoras,
-        ['flux-lora-uncensored.safetensors']);
+    expect(base.copyWith(modelId: 'flux-manga').filteredLoras, [
+      'flux-lora-uncensored.safetensors',
+    ]);
     // Illustrious file is offered to Pony (same architecture, weaker fit);
     // the SD 1.5 one is dropped — on SDXL it half-loads through the shared
     // text encoder and corrupts the prompt instead of applying its concept.
-    expect(base.copyWith(modelId: 'pony').filteredLoras,
-        ['style-anime-screencap.safetensors']);
-    expect(base.copyWith(modelId: 'illustrious-xl').filteredLoras,
-        ['style-anime-screencap.safetensors']);
+    expect(base.copyWith(modelId: 'pony').filteredLoras, [
+      'style-anime-screencap.safetensors',
+    ]);
+    expect(base.copyWith(modelId: 'illustrious-xl').filteredLoras, [
+      'style-anime-screencap.safetensors',
+    ]);
     // sd15 declares no LoRA family — the chip is meant to disappear there.
     expect(base.copyWith(modelId: 'sd15').filteredLoras, isEmpty);
   });
@@ -68,16 +88,18 @@ void main() {
       expect(base.copyWith(clearRepose: true).reposeSourceImageId, isNull);
     });
 
-    test('clearSelected leaves it alone (exclusivity lives in the notifier)',
-        () {
-      const base = ImageStudioState(
-        reposeSourceImageId: 'img',
-        selectedImageId: 'sel',
-      );
-      final next = base.copyWith(clearSelected: true);
-      expect(next.selectedImageId, isNull);
-      expect(next.reposeSourceImageId, 'img');
-    });
+    test(
+      'clearSelected leaves it alone (exclusivity lives in the notifier)',
+      () {
+        const base = ImageStudioState(
+          reposeSourceImageId: 'img',
+          selectedImageId: 'sel',
+        );
+        final next = base.copyWith(clearSelected: true);
+        expect(next.selectedImageId, isNull);
+        expect(next.reposeSourceImageId, 'img');
+      },
+    );
   });
 
   group('adoptableSettings — chips follow the node you navigate to', () {
@@ -119,8 +141,11 @@ void main() {
     test('a node without a snapshot leaves the chips alone', () {
       // Photo roots and pre-metadata sessions carry no modelId.
       expect(
-        adoptableSettings(node(modelId: null),
-            availableModels: models, installedLoras: catalog),
+        adoptableSettings(
+          node(modelId: null),
+          availableModels: models,
+          installedLoras: catalog,
+        ),
         isNull,
       );
     });
@@ -128,8 +153,11 @@ void main() {
     test('a model the server no longer has is not adopted', () {
       final onlyPony = models.where((m) => m.id == 'pony').toList();
       expect(
-        adoptableSettings(node(),
-            availableModels: onlyPony, installedLoras: catalog),
+        adoptableSettings(
+          node(),
+          availableModels: onlyPony,
+          installedLoras: catalog,
+        ),
         isNull,
       );
     });
@@ -208,8 +236,9 @@ void main() {
         selectedStyleId: 'baroque',
         editDenoise: kStyleEditDenoise,
       );
-      final back = ImageSession.fromJson(jsonDecode(jsonEncode(s.toJson()))
-          as Map<String, dynamic>);
+      final back = ImageSession.fromJson(
+        jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>,
+      );
       expect(back.selectedStyleId, 'baroque');
       expect(back.editDenoise, kStyleEditDenoise);
     });
@@ -219,16 +248,23 @@ void main() {
       expect(effectiveEditDenoise(null, styled: false), isNull);
       // A style at the preset's ~0.72 would not land — auto goes strong.
       expect(effectiveEditDenoise(null, styled: true), kStyleEditDenoise);
-      expect(effectiveEditDenoise(kGentleEditDenoise, styled: true),
-          kGentleEditDenoise);
-      expect(effectiveEditDenoise(kStyleEditDenoise, styled: false),
-          kStyleEditDenoise);
+      expect(
+        effectiveEditDenoise(kGentleEditDenoise, styled: true),
+        kGentleEditDenoise,
+      );
+      expect(
+        effectiveEditDenoise(kStyleEditDenoise, styled: false),
+        kStyleEditDenoise,
+      );
     });
 
     test('a session saved before this version reads as defaults', () {
       final back = ImageSession.fromJson({
-        'id': 'a', 'title': 't', 'nodes': <Map<String, dynamic>>[],
-        'modelId': 'pony', 'updatedAt': DateTime.now().toIso8601String(),
+        'id': 'a',
+        'title': 't',
+        'nodes': <Map<String, dynamic>>[],
+        'modelId': 'pony',
+        'updatedAt': DateTime.now().toIso8601String(),
       });
       expect(back.selectedStyleId, isNull);
       expect(back.editDenoise, isNull);
@@ -240,10 +276,14 @@ void main() {
       const st = ImageStudioState();
       expect(st.faceIdentity, FaceIdentity.none);
       final on = st.copyWith(faceIdentity: FaceIdentity.instantid);
-      expect(on.copyWith(currentNodeId: 'n1').faceIdentity,
-          FaceIdentity.instantid);
-      expect(on.copyWith(faceIdentity: FaceIdentity.none).faceIdentity,
-          FaceIdentity.none);
+      expect(
+        on.copyWith(currentNodeId: 'n1').faceIdentity,
+        FaceIdentity.instantid,
+      );
+      expect(
+        on.copyWith(faceIdentity: FaceIdentity.none).faceIdentity,
+        FaceIdentity.none,
+      );
     });
 
     test('round-trips through the persisted session by name', () {
@@ -254,14 +294,19 @@ void main() {
       );
       final json = jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>;
       expect(json['faceIdentity'], 'faceid');
-      expect(FaceIdentity.parse(ImageSession.fromJson(json).faceIdentity),
-          FaceIdentity.faceid);
+      expect(
+        FaceIdentity.parse(ImageSession.fromJson(json).faceIdentity),
+        FaceIdentity.faceid,
+      );
     });
 
     test('a session saved before this version, or off, reads as none', () {
       final legacy = ImageSession.fromJson({
-        'id': 'a', 'title': 't', 'nodes': <Map<String, dynamic>>[],
-        'modelId': 'pony', 'updatedAt': DateTime.now().toIso8601String(),
+        'id': 'a',
+        'title': 't',
+        'nodes': <Map<String, dynamic>>[],
+        'modelId': 'pony',
+        'updatedAt': DateTime.now().toIso8601String(),
       });
       expect(legacy.faceIdentity, isNull);
       expect(FaceIdentity.parse(legacy.faceIdentity), FaceIdentity.none);

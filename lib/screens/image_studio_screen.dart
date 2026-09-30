@@ -2919,10 +2919,11 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                     ),
                     // Only meaningful for a ComfyUI img2img round: the NIM
                     // backends have no denoise and inpaint always runs at 1.0.
+                    // Dedicated graphs only when they patch it (not Kontext).
                     if (_isRefineMode &&
                         !_isReposeMode &&
                         spec.kind == ImageBackendKind.comfyUi &&
-                        spec.preset?.ckptName != null) ...[
+                        (spec.preset?.editDenoiseApplies ?? false)) ...[
                       const SizedBox(width: 8),
                       _EditStrengthChip(
                         denoise: widget.state.editDenoise,

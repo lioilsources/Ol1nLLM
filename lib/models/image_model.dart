@@ -22,6 +22,8 @@ class ComfyPreset {
     this.inpaintRefAsset,
     this.inpaintFaceAsset,
     this.ckptName,
+    this.unetName,
+    this.patchEditDenoise = false,
     this.positivePrefix = '',
     this.negativePrompt = '',
     this.width = 1024,
@@ -50,6 +52,22 @@ class ComfyPreset {
   /// looks. Null = the face toggle is hidden for this model.
   final String? inpaintFaceAsset;
   final String? ckptName;
+
+  /// The diffusion model a dedicated (UNETLoader) graph loads, as the server
+  /// lists it under `UNETLoader.unet_name`. Presence check only — the name is
+  /// baked into the template, nothing patches it. Null = not checked (the
+  /// flux-manga/flux-fill graphs predate the check and stay always offered).
+  final String? unetName;
+
+  /// Dedicated template whose img2img KSampler denoise the service patches
+  /// like a generic one ([img2imgDenoise], or the edit-strength override).
+  /// Off for flux-manga: its img2img is Kontext, which samples a fresh latent
+  /// at full denoise and takes the source as a reference instead.
+  final bool patchEditDenoise;
+
+  /// Whether an img2img round honours [img2imgDenoise] / the edit-strength
+  /// chip: every generic template, plus dedicated ones that opt in.
+  bool get editDenoiseApplies => ckptName != null || patchEditDenoise;
   final String positivePrefix;
   final String negativePrompt;
   final int width;
@@ -153,6 +171,8 @@ const _sdxlInpaintRef = 'assets/comfyui/sdxl_inpaint_ref.api.json';
 /// into, which is what makes repose possible outside the SDXL family.
 const kFluxMangaTxt2img = 'assets/comfyui/flux_manga_txt2img.api.json';
 const _fluxMangaImg2img = 'assets/comfyui/flux_manga_img2img.api.json';
+const _fluxSchnellTxt2img = 'assets/comfyui/flux_schnell_txt2img.api.json';
+const _fluxSchnellImg2img = 'assets/comfyui/flux_schnell_img2img.api.json';
 const _fluxFillInpaint = 'assets/comfyui/flux_fill_inpaint.api.json';
 const _fluxFillInpaintRef = 'assets/comfyui/flux_fill_inpaint_ref.api.json';
 const _fluxFillInpaintFace = 'assets/comfyui/flux_fill_inpaint_face.api.json';
@@ -215,6 +235,35 @@ const kImageModels = <ImageModelSpec>[
     preset: ComfyPreset(
       txt2imgAsset: kFluxMangaTxt2img,
       img2imgAsset: _fluxMangaImg2img,
+    ),
+  ),
+  // The same FLUX.1-schnell weights as the gen-queue entry above, but on
+  // ComfyUI — the point is img2img, which the NIM can't do (the StoryTeller
+  // tier-2 Pixar look from a reference). Values are the official schnell
+  // ones: 4 steps, cfg 1, euler/simple, no FluxGuidance (distilled without
+  // guidance input) and no ModelSamplingFlux (schnell's native shift 1.0,
+  // resolution-independent — the dev-style max/base shift doesn't apply).
+  ImageModelSpec(
+    id: 'flux-schnell-comfy',
+    label: 'FLUX schnell (ComfyUI)',
+    promptDialect: PromptDialect.natural,
+    icon: Icons.bolt_outlined,
+    color: Color(0xFF3FB68B),
+    kind: ImageBackendKind.comfyUi,
+    txt2img: true,
+    img2img: true,
+    loraFamily: LoraFamily.flux,
+    styleNote: 'rychlé img2img, 4 kroky; $_unmeasured',
+    preset: ComfyPreset(
+      txt2imgAsset: _fluxSchnellTxt2img,
+      img2imgAsset: _fluxSchnellImg2img,
+      unetName: 'flux1-schnell.safetensors',
+      patchEditDenoise: true,
+      steps: 4,
+      cfg: 1.0,
+      samplerName: 'euler',
+      scheduler: 'simple',
+      img2imgDenoise: 0.75,
     ),
   ),
   ImageModelSpec(
@@ -711,20 +760,34 @@ ImageModelSpec imageModelById(String id) => kImageModels.firstWhere(
 /// fetch failed) — then everything stays visible, i.e. the pre-fetch behaviour.
 /// [keepId] is never filtered out, so a session restored with a since-removed
 /// model still shows its own entry as the selected one.
+///
+/// [installedUnets] does the same for dedicated UNETLoader graphs that name
+/// their [ComfyPreset.unetName] (`UNETLoader.unet_name` on the server), with
+/// the same "empty = unknown" rule, independently of the checkpoint list.
 List<ImageModelSpec> imageModelsFor(
   List<String> installedCheckpoints, {
+  List<String> installedUnets = const [],
   String? keepId,
 }) {
-  if (installedCheckpoints.isEmpty) return kImageModels;
-  final installed = installedCheckpoints.toSet();
+  if (installedCheckpoints.isEmpty && installedUnets.isEmpty) {
+    return kImageModels;
+  }
+  final ckpts = installedCheckpoints.toSet();
+  final unets = installedUnets.toSet();
+  bool present(ComfyPreset? p) {
+    // preset == null (NIM) loads nothing from ComfyUI.
+    if (p == null) return true;
+    final ckpt = p.ckptName;
+    if (ckpt != null) return ckpts.isEmpty || ckpts.contains(ckpt);
+    final unet = p.unetName;
+    // No unetName (flux-manga, flux-fill): nothing to check.
+    if (unet != null) return unets.isEmpty || unets.contains(unet);
+    return true;
+  }
+
   return [
     for (final m in kImageModels)
-      // preset == null (NIM) and ckptName == null (flux-manga's UNETLoader
-      // graph) load no checkpoint, so nothing to check.
-      if (m.id == keepId ||
-          m.preset?.ckptName == null ||
-          installed.contains(m.preset!.ckptName))
-        m,
+      if (m.id == keepId || present(m.preset)) m,
   ];
 }
 
