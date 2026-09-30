@@ -136,7 +136,19 @@ atomix-pony-anime, sd15) jede na generických template
 `sdxl_txt2img/sdxl_img2img.api.json` se sentinely
 `__CKPT__` / `__NEGATIVE__`; sampler/steps/cfg/rozměry patchuje `_prepare()`
 z `ComfyPreset`. Flux-manga má dedikované JSONy (UNETLoader graf, hodnoty
-baked-in, `ckptName == null` ⇒ sampler se nepatchuje). Positive prefix (score
+baked-in, `ckptName == null` ⇒ sampler se nepatchuje). Stejně je postavený
+**`flux-schnell-comfy`** („FLUX schnell (ComfyUI)“, `flux_schnell_*.api.json`,
+`flux1-schnell.safetensors` bf16 → `fp8_e4m3fn` jako flux-manga): 4 kroky,
+cfg 1, euler/simple, **bez** `FluxGuidance` (schnell je distilovaný bez
+guidance vstupu) a **bez** `ModelSamplingFlux` (schnell má nativní shift 1.0
+nezávislý na rozlišení, max/base shift je dev-věc). Smysl je img2img, které
+NIM `flux-schnell` (gen-queue, jen txt2img, zůstává beze změny) neumí —
+Pixar look pro StoryTeller tier 2 z reference. Img2img je skutečný
+`LoadImage → ImageScaleToTotalPixels (1 MP, strany po 16) → VAEEncode →
+KSampler`, ne Kontext (ten je jen na dev). `ComfyPreset.patchEditDenoise`
+nechá u dedikovaného grafu patchovat **jen** denoise (preset 0.75, chip síly
+úpravy, lab `param.editDenoise`); flux-manga ho nemá, jeho img2img je Kontext
+s plným denoise. `styleNote` je zatím „neměřil lab“. Positive prefix (score
 tagy) se skládá v Dartu. `_LoraChip` v input baru ukazuje sílu i mimo picker
 (hodnota + divergentní proužek `_LoraStrengthBar` od nuly, oranžově pro
 záporné); řada chipů je horizontálně scrollovatelná, protože model + LoRA se
@@ -249,6 +261,10 @@ model, jehož `ckptName` na serveru není, takže picker nenabídne něco, co sp
 až při enqueue. Prázdný seznam = „neznámo" (offline / chyba fetche) ⇒ ukáže se
 vše jako dřív; aktivní model (`keepId`) se nefiltruje nikdy, aby session
 s odinstalovaným checkpointem měla koherentní výběr.
+Dedikované grafy s `ComfyPreset.unetName` (zatím jen flux-schnell-comfy)
+prořezává stejně `fetchUnets()` (`UNETLoader.unet_name`, stav
+`availableUnets`, v labu env `UNETS`); flux-manga/flux-fill `unetName`
+nemají a nabízí se vždy.
 
 **Nový model na serveru se v appce neobjeví sám** — musí dostat
 `ImageModelSpec` v `kImageModels`, protože ze jména `.safetensors` nejde

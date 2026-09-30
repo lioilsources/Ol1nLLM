@@ -228,7 +228,7 @@ přes gen-queue (viz „Modely bez grafu“ níž). `flux-kontext` zatím ne.
 |---|---|---|
 | SDXL, fotoreal | `juggernaut-xl`, `juggernaut-xl-lightning` | věta (`natural`) |
 | SDXL, anime | `pony`, `atomix-pony-anime`, `illustrious-xl`, `noobai-xl`, `wai-illustrious`, `animagine-xl` | booru tagy |
-| FLUX | `flux-manga` (txt2img, img2img, repose), `flux-fill` (jen inpaint) | věta |
+| FLUX | `flux-manga` (txt2img, img2img, repose), `flux-schnell-comfy` (txt2img, img2img), `flux-fill` (jen inpaint) | věta |
 | SD 1.5 | `sd15` (bez ControlNetu, bez pózy) | věta |
 | gen-queue (NIM) | `flux-schnell` (jen txt2img, bez grafu) | věta |
 
@@ -276,7 +276,7 @@ a přitom čte tagy.
 |---|---|---|---|
 | síla ControlNetu | `__cn_apply__.strength` | šablona pózy 1.0, auto hloubka 0.7, repose 0.75, repose flux 0.55 (odhad) | SDXL se šablonou pózy, SDXL img2img bez šablony (auto hloubka), repose a `POSE_MODE=depth`; flux-manga jen v repose. `sd15` nikdy |
 | konec ControlNetu | `__cn_apply__.end_percent` | 1.0, repose 0.9 | jako řádek výš |
-| síla úpravy | `param.editDenoise` | preset `img2imgDenoise` (~0.72) | jen **img2img** u generické šablony (SDXL + `sd15`). Šablona pózy ji přebije (0.9), inpaint jede na 1.0, flux-manga má denoise zapečený. V txt2img a repose se builderu vůbec nepředá — buňky vzniknou, ale jsou totožné |
+| síla úpravy | `param.editDenoise` | preset `img2imgDenoise` (~0.72) | jen **img2img** u generické šablony (SDXL + `sd15`). Šablona pózy ji přebije (0.9), inpaint jede na 1.0, flux-manga má denoise zapečený (Kontext). `flux-schnell-comfy` ji dostane (dedikovaný graf s `patchEditDenoise`, sampler zůstává zapečený). V txt2img a repose se builderu vůbec nepředá — buňky vzniknou, ale jsou totožné |
 | cfg ⚠ | `KSampler.cfg` | preset (SDXL 5–6.5, Lightning 2.0, flux 1.0) | **všechny** modely s grafem včetně flux-manga (viz výš); `flux-schnell` se přeskočí |
 | kroky ⚠ | `KSampler.steps` | preset (SDXL 28–30, Lightning 6, flux 20/28) | všechny s grafem; `flux-schnell` má 4 kroky napevno a přeskočí se |
 | seed | `param.seed` | 777 | všechny, `flux-schnell` taky; na odhad, jestli je rozdíl styl, nebo šum |
