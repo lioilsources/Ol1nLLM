@@ -118,8 +118,15 @@ void main() {
         : File(
             env['CKPTS']!,
           ).readAsLinesSync().where((l) => l.trim().isNotEmpty).toList();
+    // Diffusion models (UNETLoader) — prunes dedicated graphs that name one,
+    // e.g. flux-schnell-comfy, exactly like the app's catalog does.
+    final installedUnets = env['UNETS'] == null
+        ? const <String>[]
+        : File(
+            env['UNETS']!,
+          ).readAsLinesSync().where((l) => l.trim().isNotEmpty).toList();
     final wantedModels = _csv(env['MODELS']);
-    final wanted = imageModelsFor(installed)
+    final wanted = imageModelsFor(installed, installedUnets: installedUnets)
         .where((m) => wantedModels.isEmpty || wantedModels.contains(m.id))
         .toList();
     final models = wanted

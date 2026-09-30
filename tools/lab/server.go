@@ -31,6 +31,7 @@ type Server struct {
 	active   string
 	cache    struct {
 		checkpoints []string
+		unets       []string
 		loras       []string
 		samplers    []string
 		schedulers  []string
@@ -232,6 +233,13 @@ func (s *Server) registries() (*Manifest, error) {
 			env = append(env, "CKPTS="+ckPath)
 		}
 	}
+	if len(s.cache.unets) > 0 {
+		unPath := filepath.Join(dir, "unets.txt")
+		if err := os.WriteFile(unPath,
+			[]byte(strings.Join(s.cache.unets, "\n")), 0o644); err == nil {
+			env = append(env, "UNETS="+unPath)
+		}
+	}
 	if len(s.cache.loras) > 0 {
 		loPath := filepath.Join(dir, "loras.txt")
 		if err := os.WriteFile(loPath,
@@ -284,6 +292,9 @@ func (s *Server) refreshOptions() {
 	}
 	if ck, err := s.env.Comfy.Checkpoints(); err == nil {
 		s.cache.checkpoints = ck
+	}
+	if un, err := s.env.Comfy.Unets(); err == nil {
+		s.cache.unets = un
 	}
 	if lo, err := s.env.Comfy.Loras(); err == nil {
 		s.cache.loras = lo

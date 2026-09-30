@@ -1672,3 +1672,26 @@ func fakeNimRun(t *testing.T, base string) *Run {
 		subs:  map[chan RunState]struct{}{},
 	}
 }
+
+// Dedicated FLUX graphs are pruned by the UNETLoader list (the app's
+// ComfyPreset.unetName), so the lab has to read the same combo the app does.
+func TestUnetsReadsUNETLoaderCombo(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/object_info/UNETLoader" {
+			http.NotFound(w, r)
+			return
+		}
+		fmt.Fprint(w, `{"UNETLoader":{"input":{"required":{
+			"unet_name":[["flux1-dev.safetensors","flux1-schnell.safetensors"]],
+			"weight_dtype":[["default","fp8_e4m3fn"],{"advanced":true}]}}}}`)
+	}))
+	defer srv.Close()
+
+	got, err := NewComfy(srv.URL, "id", "secret").Unets()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[1] != "flux1-schnell.safetensors" {
+		t.Fatalf("Unets() = %v", got)
+	}
+}

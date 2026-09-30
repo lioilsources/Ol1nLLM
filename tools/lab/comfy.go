@@ -137,6 +137,17 @@ func (c *Comfy) Checkpoints() ([]string, error) {
 	return comboOptions(info, "CheckpointLoaderSimple", "ckpt_name"), nil
 }
 
+// Unets lists the diffusion models (UNETLoader.unet_name) — what the dedicated
+// FLUX graphs load. The app prunes a model that names one the server lacks
+// (ComfyPreset.unetName), so the lab must hand the same list to the dump.
+func (c *Comfy) Unets() ([]string, error) {
+	info, err := c.ObjectInfo("UNETLoader")
+	if err != nil {
+		return nil, err
+	}
+	return comboOptions(info, "UNETLoader", "unet_name"), nil
+}
+
 func (c *Comfy) Loras() ([]string, error) {
 	info, err := c.ObjectInfo("LoraLoader")
 	if err != nil {
