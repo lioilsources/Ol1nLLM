@@ -268,3 +268,50 @@ func TestDumpEnvNormalisesThePromptFile(t *testing.T) {
 		}
 	}
 }
+
+func TestPromptIDsNarrowTheFile(t *testing.T) {
+	// Runs with a reference go one subject at a time; --prompt-ids is what
+	// keeps such a run from multiplying the whole file.
+	models := []ManifestModel{{ID: "a", PromptFamily: FamilyFlux, Preset: map[string]any{}}}
+	path := writePromptYAML(t, promptYAML)
+	s := Spec{
+		Models: []string{"a"}, PromptsYAML: path, PromptIDs: []string{"street"},
+		Flows: []string{"txt2img"}, NoStyles: true,
+	}
+	e := s.Estimate(&Manifest{Models: models}, nil)
+	if len(e.Blockers) != 0 || e.Cells != 1 {
+		t.Fatalf("cells = %d (blockers %v), want 1", e.Cells, e.Blockers)
+	}
+
+	// The dump gets only the picked entries, in file order whatever the flag order.
+	s.PromptIDs = []string{"street", "portrait"}
+	env, err := s.DumpEnv(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var bodies []PromptBody
+	for _, kv := range env {
+		if rest, ok := strings.CutPrefix(kv, "PROMPT_BODIES="); ok {
+			data, err := os.ReadFile(rest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal(data, &bodies); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if len(bodies) != 2 || bodies[0].ID != "portrait" || bodies[1].ID != "street" {
+		t.Fatalf("výběr nebo pořadí nesedí: %+v", bodies)
+	}
+
+	// A typo in a key must stop the run, not drop the subject silently.
+	s.PromptIDs = []string{"portrait", "stret"}
+	e = s.Estimate(&Manifest{Models: models}, nil)
+	if joined := strings.Join(e.Blockers, " · "); !strings.Contains(joined, "stret") {
+		t.Fatalf("neznámé id musí blokovat a být jmenované: %q", joined)
+	}
+	if _, err := s.DumpEnv(t.TempDir()); err == nil {
+		t.Fatal("dump s neznámým id musí selhat")
+	}
+}

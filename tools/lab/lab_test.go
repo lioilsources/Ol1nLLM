@@ -1695,3 +1695,77 @@ func TestUnetsReadsUNETLoaderCombo(t *testing.T) {
 		t.Fatalf("Unets() = %v", got)
 	}
 }
+
+func TestDinoScoresNextToArcFaceInOneCache(t *testing.T) {
+	// DINOv2 is StoryTeller's gate: it has to land in identity.json next to
+	// ArcFace without either scorer dropping the other's numbers, and be
+	// cached the same way.
+	dir := t.TempDir()
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(os.MkdirAll(filepath.Join(dir, "wf"), 0o755))
+	must(os.MkdirAll(filepath.Join(dir, "img"), 0o755))
+	man := &Manifest{Cells: []ManifestCell{
+		{ID: "txt2img__m__fox____baseline", Flow: "txt2img", Model: "m", Style: "__baseline"},
+		{ID: "txt2img__m__fox__pixar-3d", Flow: "txt2img", Model: "m", Style: "pixar-3d"},
+	}}
+	for _, c := range man.Cells {
+		must(os.WriteFile(filepath.Join(dir, "img", c.ID+".png"), Placeholder(64, 64, c.ID), 0o644))
+	}
+	ref := filepath.Join(dir, "fox.jpg")
+	must(os.WriteFile(ref, Placeholder(64, 64, "ref"), 0o644))
+	fakePy := func(name, calls, body string) string {
+		p := filepath.Join(dir, name)
+		must(os.WriteFile(p, []byte("#!/bin/sh\ncat > /dev/null\necho x >> "+calls+"\necho '"+body+"'\n"), 0o755))
+		return p
+	}
+	dinoCalls := filepath.Join(dir, "dino-calls")
+	t.Setenv("LAB_ARCFACE_PYTHON", fakePy("arc", filepath.Join(dir, "arc-calls"),
+		`{"cells":{"txt2img__m__fox____baseline":{"identity":null,"faces":0},"txt2img__m__fox__pixar-3d":{"identity":null,"faces":0}}}`))
+	t.Setenv("LAB_DINO_PYTHON", fakePy("dino", dinoCalls,
+		`{"model":"dinov2_vits14","cells":{"txt2img__m__fox____baseline":{"dino":0.91},"txt2img__m__fox__pixar-3d":{"dino":0.62}}}`))
+
+	run := &Run{Dir: dir, env: &Env{RepoRoot: dir}, man: man, Spec: &Spec{RefFile: ref}}
+	run.computeMetrics()
+	run.computeMetrics()
+
+	data, err := os.ReadFile(filepath.Join(dir, "metrics.json"))
+	must(err)
+	var m Metrics
+	must(json.Unmarshal(data, &m))
+	if d := m.Cells["txt2img__m__fox____baseline"].Dino; d == nil || *d != 0.91 {
+		t.Fatalf("baseline dino = %v, want 0.91", d)
+	}
+	if d := m.Cells["txt2img__m__fox__pixar-3d"].Dino; d == nil || *d != 0.62 {
+		t.Fatalf("pixar dino = %v, want 0.62", d)
+	}
+	if !strings.Contains(m.DinoNote, "0.80") {
+		t.Fatalf("poznámka má nést gate: %q", m.DinoNote)
+	}
+	if n, _ := os.ReadFile(dinoCalls); strings.Count(string(n), "x") != 1 {
+		t.Fatalf("dino volán %d×, nezměněné buňky se mají brát z identity.json", strings.Count(string(n), "x"))
+	}
+	var cache identityCache
+	data, err = os.ReadFile(filepath.Join(dir, "identity.json"))
+	must(err)
+	must(json.Unmarshal(data, &cache))
+	if len(cache.Cells) != 2 || len(cache.Dino) != 2 {
+		t.Fatalf("identity.json má nést obojí: arcface %d, dino %d", len(cache.Cells), len(cache.Dino))
+	}
+
+	// Without the setup the run keeps its metrics and says what is missing.
+	must(os.Remove(filepath.Join(dir, "identity.json")))
+	t.Setenv("LAB_DINO_PYTHON", filepath.Join(dir, "chybi"))
+	run.computeMetrics()
+	data, err = os.ReadFile(filepath.Join(dir, "metrics.json"))
+	must(err)
+	m = Metrics{}
+	must(json.Unmarshal(data, &m))
+	if m.Cells["txt2img__m__fox____baseline"].Dino != nil || !strings.Contains(m.DinoNote, "make lab-dino") {
+		t.Fatalf("bez DINO: cell=%+v note=%q", m.Cells["txt2img__m__fox____baseline"], m.DinoNote)
+	}
+}

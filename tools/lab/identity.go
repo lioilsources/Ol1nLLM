@@ -30,9 +30,20 @@ type FaceScore struct {
 	Stamp    string   `json:"stamp,omitempty"`
 }
 
+// identityCache is identity.json: ArcFace (Cells) and DINOv2 (Dino) side by
+// side, under one reference key. Both scorers load and save the whole file,
+// so neither drops the other's numbers.
 type identityCache struct {
 	Ref   string               `json:"ref"`
 	Cells map[string]FaceScore `json:"cells"`
+	Dino  map[string]DinoScore `json:"dino,omitempty"`
+}
+
+// DinoScore is one cell's DINOv2 cosine to the reference (tools/lab/dino.py).
+// Dino is nil when the image could not be read.
+type DinoScore struct {
+	Dino  *float64 `json:"dino"`
+	Stamp string   `json:"stamp,omitempty"`
 }
 
 const identityScale = "Tvář = ArcFace (antelopev2) největší tváře k referenci: 1.0 táž tvář, " +
@@ -79,14 +90,7 @@ func (r *Run) scoreIdentity(images map[string]string) (map[string]FaceScore, str
 	}
 
 	cachePath := filepath.Join(r.Dir, "identity.json")
-	refKey := r.Spec.RefFile + "@" + refStamp
-	cache := identityCache{}
-	if data, err := os.ReadFile(cachePath); err == nil {
-		_ = json.Unmarshal(data, &cache)
-	}
-	if cache.Ref != refKey || cache.Cells == nil {
-		cache = identityCache{Ref: refKey, Cells: map[string]FaceScore{}}
-	}
+	cache := loadIdentityCache(cachePath, r.Spec.RefFile+"@"+refStamp)
 
 	stamps := map[string]string{}
 	todo := map[string]string{}
@@ -123,6 +127,132 @@ func (r *Run) scoreIdentity(images map[string]string) (map[string]FaceScore, str
 		}
 	}
 	return out, note
+}
+
+// loadIdentityCache reads identity.json, or starts it over when it was scored
+// against another reference (or another version of the same file).
+func loadIdentityCache(path, refKey string) identityCache {
+	cache := identityCache{}
+	if data, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(data, &cache)
+	}
+	if cache.Ref != refKey {
+		cache = identityCache{Ref: refKey}
+	}
+	if cache.Cells == nil {
+		cache.Cells = map[string]FaceScore{}
+	}
+	if cache.Dino == nil {
+		cache.Dino = map[string]DinoScore{}
+	}
+	return cache
+}
+
+// ── DINOv2 ────────────────────────────────────────────────
+//
+// Whole-image similarity to the reference, the metric StoryTeller's
+// MODELS_PLAN §2 gates `degraded` on (cos ≥ 0.80). ArcFace needs a human face;
+// a fox, a tree or a talking stone has none, and those are exactly the cards
+// the StoryTeller lab measures. Same out-of-process shape and the same cache
+// file as ArcFace.
+
+const dinoScale = "DINO = kosinová podobnost DINOv2 (ViT-S/14, CLS, celý obrázek 224², bez ořezu) " +
+	"k referenci. StoryTeller gate pro `degraded` je ≥ 0.80. Měří celý obraz — kompozici, " +
+	"barvy i postavu —, takže změna stylu ho srazí i u téže postavy; čti ho proti " +
+	"baseline téhož modelu a flow."
+
+// dinoGate is StoryTeller's consistency threshold (MODELS_PLAN §2): a variant
+// under it is regenerated, then marked `degraded`.
+const dinoGate = 0.80
+
+func dinoPython(env *Env) string {
+	if p := os.Getenv("LAB_DINO_PYTHON"); p != "" {
+		return p
+	}
+	return filepath.Join(env.RepoRoot, "tools", "lab", ".venv", "bin", "python")
+}
+
+// scoreDino is scoreIdentity's twin for DINOv2. Like it, it never fails the
+// run: a missing setup or a crash comes back as the note.
+func (r *Run) scoreDino(images map[string]string) (map[string]DinoScore, string) {
+	if r.Spec == nil || r.Spec.RefFile == "" || len(images) == 0 {
+		return nil, ""
+	}
+	if r.Spec.Dry {
+		return nil, "DINO se nanečisto nepočítá — obrázky jsou placeholdery."
+	}
+	refStamp, ok := fileStamp(r.Spec.RefFile)
+	if !ok {
+		return nil, "DINO nespočítáno: reference " + r.Spec.RefFile + " už na disku není."
+	}
+	python := dinoPython(r.env)
+	if _, err := os.Stat(python); err != nil {
+		return nil, "DINO nespočítáno: chybí " + python + " — nastavení: make lab-dino."
+	}
+	cachePath := filepath.Join(r.Dir, "identity.json")
+	refKey := r.Spec.RefFile + "@" + refStamp
+
+	stamps := map[string]string{}
+	todo := map[string]string{}
+	cache := loadIdentityCache(cachePath, refKey)
+	for id, path := range images {
+		st, ok := fileStamp(path)
+		if !ok {
+			continue
+		}
+		stamps[id] = st
+		if cached, ok := cache.Dino[id]; !ok || cached.Stamp != st {
+			todo[id] = path
+		}
+	}
+	note := dinoScale
+	if len(todo) > 0 {
+		scores, err := runDino(r.env, r.Spec.RefFile, todo)
+		if err != nil {
+			note = "DINO nespočítáno: " + err.Error()
+		} else {
+			// Re-read: ArcFace may have written the file since, and its
+			// numbers must survive this save.
+			cache = loadIdentityCache(cachePath, refKey)
+			for id, s := range scores {
+				s.Stamp = stamps[id]
+				cache.Dino[id] = s
+			}
+			data, _ := json.MarshalIndent(cache, "", " ")
+			_ = os.WriteFile(cachePath, data, 0o644)
+		}
+	}
+	out := map[string]DinoScore{}
+	for id, st := range stamps {
+		if s, ok := cache.Dino[id]; ok && s.Stamp == st {
+			out[id] = s
+		}
+	}
+	return out, note
+}
+
+func runDino(env *Env, ref string, images map[string]string) (map[string]DinoScore, error) {
+	req, err := json.Marshal(map[string]any{"ref": ref, "images": images})
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), arcfaceTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, dinoPython(env),
+		filepath.Join(env.RepoRoot, "tools", "lab", "dino.py"))
+	cmd.Stdin = bytes.NewReader(req)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("dino.py: %s", lastLine(stderr.String(), err.Error()))
+	}
+	var resp struct {
+		Cells map[string]DinoScore `json:"cells"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &resp); err != nil {
+		return nil, fmt.Errorf("dino.py vrátil nečitelný výstup: %w", err)
+	}
+	return resp.Cells, nil
 }
 
 func runArcface(env *Env, ref string, images map[string]string) (map[string]FaceScore, error) {

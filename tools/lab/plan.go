@@ -26,11 +26,15 @@ type Spec struct {
 	// PromptsYAML is a file of per-family prompt texts (see promptbodies.go).
 	// With one, Prompts stops being the axis and becomes a list of prefixes —
 	// the axis is every prefix × every entry of the file.
-	PromptsYAML string   `json:"promptsYaml"`
-	Styles      []string `json:"styles"`
-	StylesFile  string   `json:"stylesFile"`
-	Flows       []string `json:"flows"`
-	NoBaseline  bool     `json:"noBaseline"`
+	PromptsYAML string `json:"promptsYaml"`
+	// PromptIDs narrows the file to these entries (file order kept). A run
+	// with a reference is per subject — the StoryTeller cast has 20 of them —
+	// and without it every such run would multiply the whole file.
+	PromptIDs  []string `json:"promptIds,omitempty"`
+	Styles     []string `json:"styles"`
+	StylesFile string   `json:"stylesFile"`
+	Flows      []string `json:"flows"`
+	NoBaseline bool     `json:"noBaseline"`
 	// NoStyles renders the baseline alone. An empty Styles list means the
 	// whole registry (the dump's long-standing reading), so "no styles" has to
 	// be said out loud — the reference generator needs one image, not 83.
@@ -144,7 +148,7 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 	// prompts, and that is the whole point of having uploaded it.
 	var bodies []PromptBody
 	if s.PromptsYAML != "" {
-		parsed, err := ParsePromptBodies(s.PromptsYAML)
+		parsed, err := s.promptBodies()
 		if err != nil {
 			e.Blockers = append(e.Blockers, "prompty: "+err.Error())
 		} else {
@@ -568,7 +572,7 @@ func (s *Spec) DumpEnv(dir string) ([]string, error) {
 	// it ran on — so a resume replays them without re-reading a file that may
 	// have been edited since.
 	if s.PromptsYAML != "" {
-		bodies, err := ParsePromptBodies(s.PromptsYAML)
+		bodies, err := s.promptBodies()
 		if err != nil {
 			return nil, err
 		}

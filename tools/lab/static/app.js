@@ -738,6 +738,7 @@ async function openCell(id) {
     m.neighbourDelta != null ? metric(m.neighbourDelta.toFixed(3), 'změna proti předchozí hodnotě') : '',
     m.faces != null ? metric(m.identity != null ? m.identity.toFixed(3) : '—',
       m.identity != null ? `tvář k referenci (${m.faces} ${m.faces === 1 ? 'tvář' : 'tváře'}, ${m.facePx} px)` : 'tvář nenalezena') : '',
+    m.dino != null ? metric(m.dino.toFixed(3), `DINO k referenci (gate ≥ 0.80)`) : '',
     g ? metric(g.spread.toFixed(3), `rozptyl stylů (${g.n})`) : '',
   ].filter(Boolean).join('');
 
@@ -749,6 +750,7 @@ async function openCell(id) {
     ${metrics ? `<div class="metricrow">${metrics}</div>
       <p class="hint">${esc(state.config.copy.metrics.text)}</p>` : ''}
     ${m.faces != null && state.metrics?.identityNote ? `<p class="hint">${esc(state.metrics.identityNote)}</p>` : ''}
+    ${m.dino != null && state.metrics?.dinoNote ? `<p class="hint">${esc(state.metrics.dinoNote)}</p>` : ''}
     ${c.presetOverridden ? `<p class="hint warnline">${esc(state.config.copy.preset_overridden.text)}</p>` : ''}
     <dl class="kv">
       <dt>prompt</dt><dd>${esc(c.prompt || '—')}</dd>

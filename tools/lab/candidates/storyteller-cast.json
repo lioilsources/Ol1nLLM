@@ -1,0 +1,199 @@
+[
+ {
+  "key": "child",
+  "id": "8c4863a20f1c752b",
+  "text_en": "a clever child who leaves a trail to find the way home",
+  "cs_name": "Chytrá Anička",
+  "category": "person",
+  "country": "DE",
+  "seed": 1728718893,
+  "ref": "build/lab/refs/storyteller/child.jpg"
+ },
+ {
+  "key": "youngest-son",
+  "id": "3a3365f00caa094e",
+  "text_en": "a simpleton youngest son who proves brave and clever despite being mocked",
+  "cs_name": "Ivan Durák",
+  "category": "person",
+  "country": "RU",
+  "seed": 2976240419,
+  "ref": "build/lab/refs/storyteller/youngest-son.jpg"
+ },
+ {
+  "key": "princess",
+  "id": "6b5324095e421756",
+  "text_en": "a golden-haired princess whose radiant hair lights the sky and sea",
+  "cs_name": "Zlatovláska",
+  "category": "person",
+  "country": "CZ",
+  "seed": 1100752278,
+  "ref": "build/lab/refs/storyteller/princess.jpg"
+ },
+ {
+  "key": "old-woman",
+  "id": "53a25fc6ee60fbbe",
+  "text_en": "a mysterious old woman who offers magical help",
+  "cs_name": "Babička z lesa",
+  "category": "person",
+  "country": "SE",
+  "seed": 276165478,
+  "ref": "build/lab/refs/storyteller/old-woman.jpg"
+ },
+ {
+  "key": "blacksmith",
+  "id": "6f3ea8e2cf43bcf9",
+  "text_en": "a hardworking tinsmith who supports his family despite community complaints",
+  "cs_name": "Kovář Mustafa",
+  "category": "person",
+  "country": "TR",
+  "seed": 3555239026,
+  "ref": "build/lab/refs/storyteller/blacksmith.jpg"
+ },
+ {
+  "key": "servant",
+  "id": "98a283cd49943f48",
+  "text_en": "a clever servant who gains the ability to understand animal speech by tasting a magical snake",
+  "cs_name": "Chytrý sluha",
+  "category": "person",
+  "country": "CZ",
+  "seed": 3474895960,
+  "ref": "build/lab/refs/storyteller/servant.jpg"
+ },
+ {
+  "key": "fox",
+  "id": "fc5ee8dd1600bb0e",
+  "text_en": "a clever fox who gives wise counsel and aids the hero",
+  "cs_name": "Chytrá liška",
+  "category": "animal",
+  "country": "DE",
+  "seed": 1499655865,
+  "ref": "build/lab/refs/storyteller/fox.jpg"
+ },
+ {
+  "key": "golden-bird",
+  "id": "5f28650a078076c0",
+  "text_en": "a golden bird whose song heals the heart",
+  "cs_name": "Zlatý ptáček",
+  "category": "animal",
+  "country": "CZ",
+  "seed": 3647077135,
+  "ref": "build/lab/refs/storyteller/golden-bird.jpg"
+ },
+ {
+  "key": "bear",
+  "id": "79ee7ea7f0452d59",
+  "text_en": "a strong but gullible bear who is easily tricked",
+  "cs_name": "Medvěd Brumla",
+  "category": "animal",
+  "country": "SE",
+  "seed": 3698690349,
+  "ref": "build/lab/refs/storyteller/bear.jpg"
+ },
+ {
+  "key": "fish",
+  "id": "54fcbd66b67e27d9",
+  "text_en": "an enchanted fish who grants wishes but has limits",
+  "category": "animal",
+  "country": "DE",
+  "seed": 1856320523,
+  "ref": "build/lab/refs/storyteller/fish.jpg"
+ },
+ {
+  "key": "horse",
+  "id": "59290a892dec702f",
+  "text_en": "a loyal horse that can speak and witnesses injustice",
+  "category": "animal",
+  "country": "DE",
+  "seed": 3981350748,
+  "ref": "build/lab/refs/storyteller/horse.jpg"
+ },
+ {
+  "key": "snake",
+  "id": "8991eac495aaf687",
+  "text_en": "an enormous white serpent that terrorizes livestock and defies ordinary means",
+  "cs_name": "Bílý had z jezera",
+  "category": "animal",
+  "country": "CZ",
+  "seed": 4027754420,
+  "ref": "build/lab/refs/storyteller/snake.jpg"
+ },
+ {
+  "key": "dragon",
+  "id": "8bb037ec49fe9315",
+  "text_en": "a kind-hearted dragon who avoids harming humans despite its nature",
+  "cs_name": "Drak z Alp",
+  "category": "supernatural",
+  "country": "CH",
+  "seed": 4194428440,
+  "ref": "build/lab/refs/storyteller/dragon.jpg"
+ },
+ {
+  "key": "water-sprite",
+  "id": "9d5dc320c3f422ef",
+  "text_en": "a water spirit who lives in a river and takes a human spouse",
+  "cs_name": "Vodník z řeky",
+  "category": "supernatural",
+  "country": "HR",
+  "seed": 1156653252,
+  "ref": "build/lab/refs/storyteller/water-sprite.jpg"
+ },
+ {
+  "key": "witch",
+  "id": "007b5c578424e208",
+  "text_en": "a cruel stepmother who is a witch and seeks to harm her stepchildren",
+  "cs_name": "Zlá čarodějnice",
+  "category": "supernatural",
+  "country": "CA",
+  "seed": 3817149023,
+  "ref": "build/lab/refs/storyteller/witch.jpg"
+ },
+ {
+  "key": "giant",
+  "id": "88578bcaaf50fdab",
+  "text_en": "a giant who shapes mountains and can be overcome by strength",
+  "cs_name": "Veliký obr Hora",
+  "category": "supernatural",
+  "country": "ZM",
+  "seed": 2228927099,
+  "ref": "build/lab/refs/storyteller/giant.jpg"
+ },
+ {
+  "key": "elf",
+  "id": "6f355e279baa2ba8",
+  "text_en": "a clever old elf who loves mischief and helps others with clever tricks",
+  "cs_name": "Chytrý skřítek",
+  "category": "supernatural",
+  "country": "NL",
+  "seed": 1026260555,
+  "ref": "build/lab/refs/storyteller/elf.jpg"
+ },
+ {
+  "key": "wise-stone",
+  "id": "83942e103a435d2d",
+  "text_en": "a wise stone that speaks and protects those who honor it",
+  "cs_name": "Moudrý kámen",
+  "category": "object",
+  "country": "GD",
+  "seed": 1115926937,
+  "ref": "build/lab/refs/storyteller/wise-stone.jpg"
+ },
+ {
+  "key": "magic-flower",
+  "id": "6584f0b9d590f779",
+  "text_en": "a magical flower that breaks enchantments when touched",
+  "category": "object",
+  "country": "DE",
+  "seed": 542174797,
+  "ref": "build/lab/refs/storyteller/magic-flower.jpg"
+ },
+ {
+  "key": "tree",
+  "id": "e1b5411142bf5e6f",
+  "text_en": "a young tree eager to grow tall and be admired",
+  "cs_name": "Malý smrček",
+  "category": "object",
+  "country": "DK",
+  "seed": 355152641,
+  "ref": "build/lab/refs/storyteller/tree.jpg"
+ }
+]

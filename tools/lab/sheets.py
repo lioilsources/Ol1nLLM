@@ -31,6 +31,156 @@ OUT = ROOT / "docs" / "sheets"
 # actually refers to.
 WAVES = [
     {
+        "id": "20260929-174948", "file": "storyteller-cast-wave-b-child.html",
+        "wave": "StoryTeller B", "title": "Reference vs. prompt: child",
+        "note": "Postava <code>child</code> (person), seed 1728718893. Řádky flow × styl, sloupce modely; "
+                "txt2img = stejný prompt a seed bez reference, img2img = z reference (flux = Kontext), repose = ControlNet hloubka. "
+                "DINO k referenci v <code>lab score</code>. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3 vlna B.",
+    },
+    {
+        "id": "20260929-181827", "file": "storyteller-cast-wave-b-youngest-son.html",
+        "wave": "StoryTeller B", "title": "Reference vs. prompt: youngest-son",
+        "note": "Postava <code>youngest-son</code> (person), seed 2976240419. Řádky flow × styl, sloupce modely; "
+                "txt2img = stejný prompt a seed bez reference, img2img = z reference (flux = Kontext), repose = ControlNet hloubka. "
+                "DINO k referenci v <code>lab score</code>. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3 vlna B.",
+    },
+    {
+        "id": "20260929-183405", "file": "storyteller-cast-wave-b-princess.html",
+        "wave": "StoryTeller B", "title": "Reference vs. prompt: princess",
+        "note": "Postava <code>princess</code> (person), seed 1100752278. Řádky flow × styl, sloupce modely; "
+                "txt2img = stejný prompt a seed bez reference, img2img = z reference (flux = Kontext), repose = ControlNet hloubka. "
+                "DINO k referenci v <code>lab score</code>. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3 vlna B.",
+    },
+    {
+        "id": "20260929-184856", "file": "storyteller-cast-wave-b-old-woman.html",
+        "wave": "StoryTeller B", "title": "Reference vs. prompt: old-woman",
+        "note": "Postava <code>old-woman</code> (person), seed 276165478. Řádky flow × styl, sloupce modely; "
+                "txt2img = stejný prompt a seed bez reference, img2img = z reference (flux = Kontext), repose = ControlNet hloubka. "
+                "DINO k referenci v <code>lab score</code>. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3 vlna B.",
+    },
+    {
+        "id": "20260929-190413", "file": "storyteller-cast-wave-b-blacksmith.html",
+        "wave": "StoryTeller B", "title": "Reference vs. prompt: blacksmith",
+        "note": "Postava <code>blacksmith</code> (person), seed 3555239026. Řádky flow × styl, sloupce modely; "
+                "txt2img = stejný prompt a seed bez reference, img2img = z reference (flux = Kontext), repose = ControlNet hloubka. "
+                "DINO k referenci v <code>lab score</code>. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3 vlna B.",
+    },
+    {
+        "id": "20260929-191919", "file": "storyteller-cast-wave-b-servant.html",
+        "wave": "StoryTeller B", "title": "Reference vs. prompt: servant",
+        "note": "Postava <code>servant</code> (person), seed 3474895960. Řádky flow × styl, sloupce modely; "
+                "txt2img = stejný prompt a seed bez reference, img2img = z reference (flux = Kontext), repose = ControlNet hloubka. "
+                "DINO k referenci v <code>lab score</code>. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3 vlna B.",
+    },
+    {
+        "id": "20260929-193428", "file": "storyteller-cast-wave-b-fox.html",
+        "wave": "StoryTeller B", "title": "Reference vs. prompt: fox",
+        "note": "Postava <code>fox</code> (animal), seed 1499655865. Řádky flow × styl, sloupce modely; "
+                "txt2img = stejný prompt a seed bez reference, img2img = z reference (flux = Kontext), repose = ControlNet hloubka. "
+                "DINO k referenci v <code>lab score</code>. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3 vlna B.",
+    },
+    {
+        "id": "20260929-194915", "file": "storyteller-cast-wave-b-golden-bird.html",
+        "wave": "StoryTeller B", "title": "Reference vs. prompt: golden-bird",
+        "note": "Postava <code>golden-bird</code> (animal), seed 3647077135. Řádky flow × styl, sloupce modely; "
+                "txt2img = stejný prompt a seed bez reference, img2img = z reference (flux = Kontext), repose = ControlNet hloubka. "
+                "DINO k referenci v <code>lab score</code>. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3 vlna B.",
+    },
+    {
+        "id": "20260929-200435", "file": "storyteller-cast-wave-b-bear.html",
+        "wave": "StoryTeller B", "title": "Reference vs. prompt: bear",
+        "note": "Postava <code>bear</code> (animal), seed 3698690349. Řádky flow × styl, sloupce modely; "
+                "txt2img = stejný prompt a seed bez reference, img2img = z reference (flux = Kontext), repose = ControlNet hloubka. "
+                "DINO k referenci v <code>lab score</code>. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3 vlna B.",
+    },
+    {
+        "id": "20260929-201934", "file": "storyteller-cast-wave-b-fish.html",
+        "wave": "StoryTeller B", "title": "Reference vs. prompt: fish",
+        "note": "Postava <code>fish</code> (animal), seed 1856320523. Řádky flow × styl, sloupce modely; "
+                "txt2img = stejný prompt a seed bez reference, img2img = z reference (flux = Kontext), repose = ControlNet hloubka. "
+                "DINO k referenci v <code>lab score</code>. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3 vlna B.",
+    },
+    {
+        "id": "20260929-203509", "file": "storyteller-cast-wave-b-horse.html",
+        "wave": "StoryTeller B", "title": "Reference vs. prompt: horse",
+        "note": "Postava <code>horse</code> (animal), seed 3981350748. Řádky flow × styl, sloupce modely; "
+                "txt2img = stejný prompt a seed bez reference, img2img = z reference (flux = Kontext), repose = ControlNet hloubka. "
+                "DINO k referenci v <code>lab score</code>. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3 vlna B.",
+    },
+    {
+        "id": "20260929-205117", "file": "storyteller-cast-wave-b-snake.html",
+        "wave": "StoryTeller B", "title": "Reference vs. prompt: snake",
+        "note": "Postava <code>snake</code> (animal), seed 4027754420. Řádky flow × styl, sloupce modely; "
+                "txt2img = stejný prompt a seed bez reference, img2img = z reference (flux = Kontext), repose = ControlNet hloubka. "
+                "DINO k referenci v <code>lab score</code>. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3 vlna B.",
+    },
+    {
+        "id": "20260929-212037", "file": "storyteller-cast-wave-b-dragon.html",
+        "wave": "StoryTeller B", "title": "Reference vs. prompt: dragon",
+        "note": "Postava <code>dragon</code> (supernatural), seed 4194428440. Řádky flow × styl, sloupce modely; "
+                "txt2img = stejný prompt a seed bez reference, img2img = z reference (flux = Kontext), repose = ControlNet hloubka. "
+                "DINO k referenci v <code>lab score</code>. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3 vlna B.",
+    },
+    {
+        "id": "20260929-213841", "file": "storyteller-cast-wave-b-water-sprite.html",
+        "wave": "StoryTeller B", "title": "Reference vs. prompt: water-sprite",
+        "note": "Postava <code>water-sprite</code> (supernatural), seed 1156653252. Řádky flow × styl, sloupce modely; "
+                "txt2img = stejný prompt a seed bez reference, img2img = z reference (flux = Kontext), repose = ControlNet hloubka. "
+                "DINO k referenci v <code>lab score</code>. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3 vlna B.",
+    },
+    {
+        "id": "20260929-215356", "file": "storyteller-cast-wave-b-witch.html",
+        "wave": "StoryTeller B", "title": "Reference vs. prompt: witch",
+        "note": "Postava <code>witch</code> (supernatural), seed 3817149023. Řádky flow × styl, sloupce modely; "
+                "txt2img = stejný prompt a seed bez reference, img2img = z reference (flux = Kontext), repose = ControlNet hloubka. "
+                "DINO k referenci v <code>lab score</code>. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3 vlna B.",
+    },
+    {
+        "id": "20260929-220909", "file": "storyteller-cast-wave-b-giant.html",
+        "wave": "StoryTeller B", "title": "Reference vs. prompt: giant",
+        "note": "Postava <code>giant</code> (supernatural), seed 2228927099. Řádky flow × styl, sloupce modely; "
+                "txt2img = stejný prompt a seed bez reference, img2img = z reference (flux = Kontext), repose = ControlNet hloubka. "
+                "DINO k referenci v <code>lab score</code>. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3 vlna B.",
+    },
+    {
+        "id": "20260929-222430", "file": "storyteller-cast-wave-b-elf.html",
+        "wave": "StoryTeller B", "title": "Reference vs. prompt: elf",
+        "note": "Postava <code>elf</code> (supernatural), seed 1026260555. Řádky flow × styl, sloupce modely; "
+                "txt2img = stejný prompt a seed bez reference, img2img = z reference (flux = Kontext), repose = ControlNet hloubka. "
+                "DINO k referenci v <code>lab score</code>. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3 vlna B.",
+    },
+    {
+        "id": "20260929-223921", "file": "storyteller-cast-wave-b-wise-stone.html",
+        "wave": "StoryTeller B", "title": "Reference vs. prompt: wise-stone",
+        "note": "Postava <code>wise-stone</code> (object), seed 1115926937. Řádky flow × styl, sloupce modely; "
+                "txt2img = stejný prompt a seed bez reference, img2img = z reference (flux = Kontext), repose = ControlNet hloubka. "
+                "DINO k referenci v <code>lab score</code>. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3 vlna B.",
+    },
+    {
+        "id": "20260929-225421", "file": "storyteller-cast-wave-b-magic-flower.html",
+        "wave": "StoryTeller B", "title": "Reference vs. prompt: magic-flower",
+        "note": "Postava <code>magic-flower</code> (object), seed 542174797. Řádky flow × styl, sloupce modely; "
+                "txt2img = stejný prompt a seed bez reference, img2img = z reference (flux = Kontext), repose = ControlNet hloubka. "
+                "DINO k referenci v <code>lab score</code>. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3 vlna B.",
+    },
+    {
+        "id": "20260929-230929", "file": "storyteller-cast-wave-b-tree.html",
+        "wave": "StoryTeller B", "title": "Reference vs. prompt: tree",
+        "note": "Postava <code>tree</code> (object), seed 355152641. Řádky flow × styl, sloupce modely; "
+                "txt2img = stejný prompt a seed bez reference, img2img = z reference (flux = Kontext), repose = ControlNet hloubka. "
+                "DINO k referenci v <code>lab score</code>. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3 vlna B.",
+    },
+    {
+        "id": "20260929-102218", "file": "storyteller-cast-wave-a.html",
+        "wave": "StoryTeller A", "title": "Postavy StoryTelleru: modely × styly (txt2img)",
+        "note": "Osm postav ze světového korpusu (dítě, princezna, liška, medvěd, drak, vodník, "
+                "skřítek, strom) × čtyři modely (flux-dev = <code>flux-manga</code>, Juggernaut XL, "
+                "Illustrious XL, NoobAI XL) × osm stylů registru StoryTelleru + návrh "
+                "<code>pixar-3d</code>, seed 777, 1024². Bez flux-schnell (tier 0 se dotočí večer). "
+                "Otázka: <code>preferred_model</code> pro každý styl, jde Pixar look bez LoRA, a první "
+                "review šesti shadow stylů. Plán: storyteller/STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md §3.",
+    },
+    {
         "id": "20260910-104000", "file": "wave3-ablace-clip-t5.html",
         "wave": "Vlna 3", "title": "Ablace: jméno, nebo popis?",
         "note": "Šest autorů napříč známostí, text stylu v šesti variantách "

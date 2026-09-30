@@ -492,6 +492,13 @@ func (r *Run) computeMetrics() {
 		cm.Identity, cm.Faces, cm.FacePx = f.Identity, &n, f.Face
 		m.Cells[id] = cm
 	}
+	dino, dnote := r.scoreDino(images)
+	m.DinoNote = dnote
+	for id, d := range dino {
+		cm := m.Cells[id]
+		cm.Dino = d.Dino
+		m.Cells[id] = cm
+	}
 	data, _ := json.MarshalIndent(m, "", " ")
 	_ = os.WriteFile(filepath.Join(r.Dir, "metrics.json"), data, 0o644)
 }

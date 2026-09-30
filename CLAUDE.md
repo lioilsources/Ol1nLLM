@@ -859,8 +859,8 @@ v `runner.go`, jestli se buňka pošle do ComfyUI, nebo přes `nim.go` do fronty
 zůstává `HTTPError` a strop „3× auth chyba = konec běhu" platí i tady.
 Osy: **prompt, styl, seed** (+ laboratorní `param.stylePosition` /
 `qualityPrefix` / `styleDialect`). Všechno ostatní — LoRA, póza, tvář,
-`KSampler.*`, `LATENT`, img2img — je uzel grafu, který neexistuje, takže se
-buňka **přeskočí s důvodem**; tiše ignorovat páčku by vyrobilo obrázek, co
+`KSampler.*`, `LATENT` (kromě `1024x1024`, který request už má), img2img —
+je uzel grafu, který neexistuje, takže se buňka **přeskočí s důvodem**; tiše ignorovat páčku by vyrobilo obrázek, co
 vypadá jako její měření. Nepovinný override (`?cíl`) mixovaný plán pustí,
 sweep na uzel ne (identické varianty pod různými štítky). 1024×1024 a 4 kroky
 jsou napevno, protože je appka nenabízí — vystavit je jako osu by znamenalo
@@ -921,6 +921,19 @@ v adresáři běhu, takže parser je v systému jediný a resume hraje tytéž p
 `manifest.prompts` nese **popisky** sloupců (text se liší model od modelu),
 buňka `promptBody` a v `prompt` text přečtený zpátky z grafu. Ukázka:
 `candidates/prompts-example.yaml`.
+
+`--prompt-ids a,b` vybere ze souboru jen jmenované položky (běhy s referencí
+jdou po jednom námětu); neznámé id běh zastaví. Postavy StoryTelleru:
+`candidates/storyteller_cast.py` (20 postav, seed tier 0, reference do
+`build/lab/refs/storyteller/`) a `candidates/storyteller_styles.py` (styly
+z `infra/seed/models_styles.sql` repa storyteller + `pixar-3d`); plán měření je
+v repu storyteller, `STORYTELLER_CHARACTER_MODELS_LAB_PLAN.md`.
+
+**DINO**: vedle ArcFace `tools/lab/dino.py` (DINOv2 ViT-S/14 na CPU, celý
+obrázek 224² bez ořezu, `make lab-dino`) — kosinová podobnost k referenci,
+metrika gate StoryTelleru (≥ 0.80), funguje i na postavách bez lidské tváře.
+Cache v `identity.json` pod klíčem `dino`, `lab score` vypíše průměr/min/počet
+nad gatem po flow × model × styl.
 
 **Kandidáti stylů**: `--styles-file` čte `id/label/block` a volitelně
 `booru/artist/period`, ostatní klíče toleruje. Id, které v souboru chybí, se

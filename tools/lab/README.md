@@ -118,6 +118,11 @@ danbooru (Pony V6)"*), dump je pojistka. Totéž platí pro překlep v názvu
 rodiny — ten by jinak text tiše zahodil, takže ho parser odmítne i s číslem
 řádku.
 
+`--prompt-ids key1,key2` vezme ze souboru jen jmenované položky (v pořadí
+souboru). Hodí se u běhů s referencí, které jdou po jednom námětu — bez něj by
+každý takový běh násobil celý soubor. Id, které v souboru není, běh zastaví
+(překlep by jinak postavu tiše vypustil). Jen terminál, UI to nenabízí.
+
 Osa promptů zůstává jednorozměrná: `manifest.prompts` nese **popisky** sloupců
 (text se liší model od modelu, takže jeden být nemůže), buňka nese `promptBody`
 a v `prompt` text přečtený zpátky z grafu — tedy ten, co se opravdu poslal.
@@ -244,7 +249,9 @@ Co z toho plyne pro plán:
 - **jen `txt2img`** — img2img umí `flux-kontext`, a ten by potřeboval dostat
   referenci dovnitř requestu; zatím není v nabídce,
 - **1024×1024 a 4 kroky napevno** — appka je nenabízí, takže je nenabízí ani
-  lab. `LATENT` buňku odmítne, ne přebije,
+  lab. `LATENT` s jiným rozměrem buňku odmítne, ne přebije; `--latent 1024x1024`
+  projde (nic nemění), takže smíšený běh s ComfyUI modely na 1024² sloupec
+  Schnellu neztratí,
 - **žádná LoRA, póza, tvář ani `KSampler.*`** — to všechno jsou uzly grafu.
   Buňka se **přeskočí s důvodem**, nevznikne obrázek, který by vypadal jako
   měření té páčky. `?cíl.vstup=…` (nepovinný override) mixovaný plán pustí,
@@ -451,6 +458,23 @@ doběhne normálně a místo čísel ukáže, co chybí. Jede na CPU, ~0.4 s na 
 výsledky se ukládají do `identity.json` v adresáři běhu podle velikosti a času
 obrázku, takže `lab score` nad hotovým během nic nepřepočítává a navázaný běh
 spočítá jen nové buňky. Starší běh dostane čísla přes `lab score <adresář>`.
+
+- **DINO** — kosinová podobnost DINOv2 (ViT-S/14, CLS token) celého obrázku
+  k referenci (`tools/lab/dino.py`). Je to metrika, kterou StoryTeller
+  (MODELS_PLAN §2) rozhoduje o `degraded` (gate ≥ 0.80), a na rozdíl od ArcFace
+  nepotřebuje lidskou tvář — liška, strom nebo mluvící kámen ji nemají.
+  Obrázek se zmenší na 224×224 **bez ořezu** (karta je celá postava). Měří celý
+  obraz, takže změna stylu ho srazí i u téže postavy: čti ho proti baseline
+  téhož modelu a flow. `lab score` vypíše průměr, minimum a počet buněk ≥ 0.80
+  po flow × model × styl; v UI je v detailu buňky.
+
+  Nastavení jednou: `make lab-dino` (CPU torch do téhož `tools/lab/.venv`),
+  váhy (~90 MB) stáhne torch hub při prvním skóre do `build/lab/torch`. Jiný
+  interpret přes `LAB_DINO_PYTHON`. Výsledky jsou v `identity.json` vedle
+  ArcFace (klíč `dino`), se stejnou cache; ~0.1–0.3 s na buňku. Referenční
+  hodnoty z tier 0 StoryTelleru: táž liška z dřívějšího renderu 0.67, jiná
+  „chytrá liška“ 0.78, strom proti lišce 0.21 — tedy 0.80 je přísný práh
+  a sama změna seedu ho u téže postavy nemusí dát.
 
 ## Poznámky k prostředí
 
