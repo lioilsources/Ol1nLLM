@@ -40,6 +40,15 @@ class AppTheme {
       blockquote: base.copyWith(color: textSecondary),
       a: base.copyWith(color: accent, decoration: TextDecoration.underline),
       listBullet: base,
+      // Library catalog answers arrive as GFM tables (| Dílo | Autor | … |).
+      // fromTheme() ships a light Material border that glows in the dark
+      // bubble; keep the grid but make it whisper.
+      tableHead: base.copyWith(fontSize: 13, fontWeight: FontWeight.w700),
+      tableBody: base.copyWith(fontSize: 13, height: 1.35),
+      tableHeadAlign: TextAlign.left,
+      tableBorder: TableBorder.all(color: Colors.white12, width: 1),
+      tableCellsPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      tableColumnWidth: const IntrinsicColumnWidth(),
     );
   }
 
