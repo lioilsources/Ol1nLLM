@@ -756,7 +756,8 @@ v `AiStack/services/audio/NOTES.md`.
   `application/json` bez charsetu a `Response.body` by dekódoval Latin-1 —
   české hlášky serveru by se rozsypaly.
 - **Model běží jen přes den.** `audio-music` zvedá a shazuje plánovač režimů
-  SPARKu (`rag-schedule.sh`: nahoře 07:00–00:00). Mimo to server vibe
+  SPARKu (`rag-schedule.sh`: nahoře jen v profilu comfy, okna v AiStack
+  `PLAN-spark-scheduler.md` §3). Mimo to server vibe
   analýzu i skládání odmítne hned `503` s větou pro člověka (upload projde)
   a appka ji ukáže bez `HTTP 503:` — analýza pak zůstane ve stavu chyby
   s „Znovu". Analýzu bez popisu od LM (LM odpověděl chybou) si server
