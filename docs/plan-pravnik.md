@@ -653,7 +653,8 @@ to je rozhodnutí pro uživatele, ne pro Opuse.
   `works.edition`; změněné akty re-ingest z cache (`--acts …`), `load_pg
   --replace-work`, `embed` (idempotentní). S klíčem API později `zmeny-zneni`.
 - **Noční režim SPARKu** (`rag-schedule.timer`): `law-chat` nechat běžet (1,3 GiB),
-  ale nespouštět embed vrstvy 2 mezi 00:00–08:00 (director si bere 93 GiB).
+  ale nespouštět embed vrstvy 2 v okně director (91 GiB; okna v AiStack
+  `PLAN-spark-scheduler.md` §3).
 - **Monitoring**: `journalctl --user -u law-chat`; appka hlásí 502/503 s hintem
   na unit — v `LibraryChatService.law()` hint `systemctl status law-chat`.
 - **Verze korpusu** je vidět: `works.edition` v katalogu, datum v každé odpovědi.
