@@ -209,6 +209,8 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
                               ? switch (ragBackend) {
                                   kChatBackendLibrary => 'Zeptej se knihovny…',
                                   kChatBackendLaw => 'Zeptej se na zákon…',
+                                  kChatBackendLeads =>
+                                    'Zeptej se na firmy ze smluv…',
                                   _ => _mode.hint,
                                 }
                               : _mode.hint,

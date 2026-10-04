@@ -83,6 +83,13 @@
       "emoji": "⚖️",
       "backend": "law",
       "description": "Odpovídá z účinných zákonů ČR (e-Sbírka) s citací paragrafů. Není právní poradenství."
+    },
+    {
+      "id": "leads",
+      "name": "Leads",
+      "emoji": "📈",
+      "backend": "leads",
+      "description": "Hledá firmy a instituce v Registru smluv: kdo dělá kampaně, kdo kupuje tablety, kdo řeší spisovou službu. Odpovídá s odkazy na smlouvy."
     }
   ]
 }

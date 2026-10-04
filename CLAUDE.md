@@ -17,8 +17,9 @@ make run
 
 Volitelné URL overrides (`.env.local`, Makefile je propouští jen když jsou
 neprázdné): `COMFYUI_URL`, `FINETUNE_URL`, `FLUX_NIM_URL`, `VLLM_URL`,
-`LIBRARY_CHAT_URL`, `LAW_CHAT_URL`, `UGC_FC_URL`, `AUDIO_URL`. Pro vývoj knihovny proti SPARKu na LAN:
-`LIBRARY_CHAT_URL=http://192.168.88.66:8090` (Právník: `LAW_CHAT_URL=http://192.168.88.66:8098`) — pak ale **jen `make debug`**
+`LIBRARY_CHAT_URL`, `LAW_CHAT_URL`, `LEADS_CHAT_URL`, `UGC_FC_URL`, `AUDIO_URL`. Pro vývoj knihovny proti SPARKu na LAN:
+`LIBRARY_CHAT_URL=http://192.168.88.66:8090` (Právník: `LAW_CHAT_URL=http://192.168.88.66:8098`; Leads: `LEADS_CHAT_URL=http://192.168.88.66:8099`,
+to je zároveň výchozí hodnota, tunel zatím není) — pak ale **jen `make debug`**
 (release Android manifest nemá `usesCleartextTraffic` a iOS nemá výjimku
 v `Info.plist`, takže čistý HTTP tam neprojde).
 
@@ -1054,6 +1055,18 @@ stejně jako u knihovny; `deleteConversation` proto backend pro `/reset` bere
 z `_backendFor()` podle persony konverzace, ne natvrdo z knihovny. Server:
 WorldLibraryProject, unit `law-chat.service` na SPARKu :8091, postup a korpus
 v `docs/plan-pravnik.md`.
+
+**Leads 📈 (`"backend": "leads"`)**: třetí RAG persona — firmy a instituce
+z Registru smluv. Jiný serverový kód (LeadsRAG, unit `leadsd` na SPARKu :8099),
+ale stejný SSE dialekt (navíc `: planning` / `: keepalive` komentáře, které
+`parseSseLine` zahodí), takže v appce zase jen instance
+`LibraryChatService.leads()` s `LEADS_CHAT_URL` (výchozí LAN
+`http://192.168.88.66:8099` — tunel zatím není, tedy jen `make debug`;
+`top_k` 8, server vrací max 15 firem; chybové texty `[leads] …`). Zdroje jsou
+`LibrarySource`-kompatibilní: `work` = IČO, `name_cs` = firma, `title` =
+`IČO … · segment`, `group` = segment, `path` = číslo smlouvy, `excerpt` =
+předmět smlouvy; navíc posílané `url` (odkaz na smlouvu) a `channels` model
+ignoruje. Fixture `test/fixtures/leads_stream.sse`.
 
 **Session vs. větvení** (`Conversation.canReuseRemoteSession`): server drží
 jednu lineární frontu per `session_id`, appka strom. Session se recykluje jen

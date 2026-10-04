@@ -1,0 +1,16 @@
+: planning
+
+: keepalive
+
+: keepalive
+
+: keepalive
+
+: keepalive
+
+: keepalive
+
+data: {"delta":"- Hotelová škola, Obchodní akademie a Střední průmyslová škola, Teplice, příspěvková organizace (IČO 00555878) — kupuje tablety pro výuku od KSP Computer \u0026 Services Moravia, s.r.o. a LOSAN s.r.o. — [36758734], [33989057]  \n- Základní škola profesora Švejcara v Praze 12 (IČO 61387363) — nakupuje tablety a notebooky pro školní účely od Kinet s.r.o. — [29455864], [29333440]  \n- Základní umělecká škola Brandýs n. L. - Stará Boleslav, okres Praha-východ (IČO 43755097) — nakupuje tablety pro výukové účely — [33802893]  \n- Základní škola a Mateřská škola Uherské Hradiště, Šafaříkova (IČO 60370432) — nakupuje tablety pro výuku od WESTech CZ s.r.o. — [32792349]  \n- Vyšší odborná škola, Obchodní akademie a Střední zdravotnická škola, Domažlice, Erbenova 184 (IČO 48342939) — nakupuje tablety pro výuku od Alza.cz a.s. — [32655297]"}
+
+data: {"channels":["fts"],"done":true,"invalid_citations":null,"model":"translate","session_id":"1b321038-fde2-407d-9ee2-9e61cea7491d","sources":[{"channels":["fts"],"excerpt":"Kupní smlouva - Tablety pro výuku HŠ — Střední škola (Hotelová škola) nakupuje tablety pro výukové účely od dodavatele IT techniky.","group":"skoly","lang":"cs","name_cs":"Hotelová škola, Obchodní akademie a Střední průmyslová škola, Teplice, příspěvková organizace","path":"36758734","title":"IČO 00555878 · skoly","url":"https://smlouvy.gov.cz/smlouva/39107334","work":"00555878"},{"channels":["fts"],"excerpt":"PC vybavení školy – tablety — Základní škola nakupuje tablety pro své účely od dodavatele Kinet s.r.o.","group":"skoly","lang":"cs","name_cs":"Základní škola profesora Švejcara v Praze 12","path":"29455864","title":"IČO 61387363 · skoly","url":"https://smlouvy.gov.cz/smlouva/31472420","work":"61387363"},{"channels":["fts"],"excerpt":"Tablety pro výuku — Základní umělecká škola nakupuje tablety pro výukové účely.","group":"skoly","lang":"cs","name_cs":"Základní umělecká škola Brandýs n. L. - Stará Boleslav, okres Praha-východ","path":"33802893","title":"IČO 43755097 · skoly","url":"https://smlouvy.gov.cz/smlouva/36025361","work":"43755097"},{"channels":["fts"],"excerpt":"Tablety pro výuku — Základní škola a Mateřská škola Uherské Hradiště nakupuje tablety pro výukové účely od dodavatele WESTech CZ s.r.o.","group":"skoly","lang":"cs","name_cs":"Základní škola a Mateřská škola Uherské Hradiště, Šafaříkova","path":"32792349","title":"IČO 60370432 · skoly","url":"https://smlouvy.gov.cz/smlouva/34968169","work":"60370432"},{"channels":["fts"],"excerpt":"Nákup tabletů pro výuku — Střední zdravotnická škola a obchodní akademie v Domažlicích nakupuje tablety pro výukové účely od e-shopu Alza.cz.","group":"skoly","lang":"cs","name_cs":"Vyšší odborná škola, Obchodní akademie a Střední zdravotnická škola, Domažlice, Erbenova 184","path":"32655297","title":"IČO 48342939 · skoly","url":"https://smlouvy.gov.cz/smlouva/34825529","work":"48342939"}]}
+

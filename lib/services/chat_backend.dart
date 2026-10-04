@@ -10,6 +10,10 @@ const kChatBackendLibrary = 'library';
 /// Czech-law RAG persona — same server code as the library, its own corpus.
 const kChatBackendLaw = 'law';
 
+/// Leads RAG persona — firms and institutions from the Czech contract
+/// registry (LeadsRAG, `leadsd`); same SSE dialect as the library.
+const kChatBackendLeads = 'leads';
+
 /// Id of the default transport (`VllmService.id`). Never written into the
 /// persona registry; only what [chatBackendIdFor] falls back to.
 const kChatBackendVllm = 'vllm';
@@ -22,6 +26,7 @@ const kChatBackendVllm = 'vllm';
 String chatBackendIdFor(Persona? persona) => switch (persona?.backend) {
   kChatBackendLibrary => kChatBackendLibrary,
   kChatBackendLaw => kChatBackendLaw,
+  kChatBackendLeads => kChatBackendLeads,
   _ => kChatBackendVllm,
 };
 
