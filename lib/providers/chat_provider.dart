@@ -59,6 +59,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   final VllmService _vllm = VllmService();
   final LibraryChatService _library = LibraryChatService.library();
   final LibraryChatService _law = LibraryChatService.law();
+  final LibraryChatService _leads = LibraryChatService.leads();
   final MediaService _mediaService = MediaService(); // OCR only
   final PersonaService _personaService;
   StreamSubscription<ChatEvent>? _streamSub;
@@ -75,6 +76,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     return switch (chatBackendIdFor(persona)) {
       kChatBackendLibrary => _library,
       kChatBackendLaw => _law,
+      kChatBackendLeads => _leads,
       _ => _vllm,
     };
   }
@@ -492,6 +494,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     _vllm.dispose();
     _library.dispose();
     _law.dispose();
+    _leads.dispose();
     _mediaService.dispose();
     super.dispose();
   }

@@ -16,6 +16,9 @@ import 'http_error.dart';
 ///    world philosophy and scripture.
 ///  * [LibraryChatService.law] — pravnik.ol1n.com (:8091), Czech statutes
 ///    from e-Sbírka; see `docs/plan-pravnik.md`.
+///  * [LibraryChatService.leads] — LeadsRAG (`leadsd`, :8099), firms and
+///    institutions from Registr smluv. Separate server code that speaks the
+///    same SSE dialect (plus `: planning` / `: keepalive` comments).
 ///
 /// Two things make it unlike [VllmService]:
 ///
@@ -46,6 +49,13 @@ class LibraryChatService extends ChatBackend {
   static const _lawUrl = String.fromEnvironment(
     'LAW_CHAT_URL',
     defaultValue: 'https://pravnik.ol1n.com',
+  );
+
+  /// Leads server (LeadsRAG, unit `leadsd`). No tunnel yet, so the default
+  /// is the SPARK LAN address — cleartext, i.e. `make debug` only.
+  static const _leadsUrl = String.fromEnvironment(
+    'LEADS_CHAT_URL',
+    defaultValue: 'http://192.168.88.66:8099',
   );
   static const _cfId = String.fromEnvironment('CF_ACCESS_CLIENT_ID');
   static const _cfSecret = String.fromEnvironment('CF_ACCESS_CLIENT_SECRET');
@@ -107,6 +117,16 @@ class LibraryChatService extends ChatBackend {
     topK: 8,
   );
 
+  /// Firms from Registr smluv at `LEADS_CHAT_URL`. The server returns at most
+  /// 15 firms; 8 keeps the prompt comparable to the law instance.
+  factory LibraryChatService.leads() => LibraryChatService._(
+    baseUrl: _leadsUrl,
+    id: kChatBackendLeads,
+    label: 'leads',
+    unit: 'leadsd',
+    topK: 8,
+  );
+
   @override
   String get id => _id;
 
@@ -114,6 +134,7 @@ class LibraryChatService extends ChatBackend {
   /// Accusative, so it cannot be derived from [label].
   String get _step => switch (_id) {
     kChatBackendLaw => 'dotaz na právníka',
+    kChatBackendLeads => 'dotaz na leads',
     _ => 'dotaz na knihovnu',
   };
 

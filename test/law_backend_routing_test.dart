@@ -39,18 +39,38 @@ void main() {
       expect(library.label, 'knihovna');
       expect(library.unit, 'library-chat');
     });
+
+    test('leads() is a third instance with its own id, label and unit', () {
+      final leads = LibraryChatService.leads();
+      addTearDown(leads.dispose);
+
+      expect(leads.id, 'leads');
+      expect(leads.id, kChatBackendLeads);
+      expect(leads.label, 'leads');
+      expect(leads.unit, 'leadsd');
+    });
   });
 
   group('persona registry', () {
     late Persona pravnik;
+    late Persona leads;
 
     setUpAll(() {
       final raw = File('assets/personas/index.json').readAsStringSync();
       final personas = (jsonDecode(raw) as Map<String, dynamic>)['personas'];
-      pravnik = (personas as List)
+      final all = (personas as List)
           .cast<Map<String, dynamic>>()
           .map(Persona.fromJson)
-          .firstWhere((p) => p.id == 'pravnik');
+          .toList();
+      pravnik = all.firstWhere((p) => p.id == 'pravnik');
+      leads = all.firstWhere((p) => p.id == 'leads');
+    });
+
+    test('leads routes to the leads backend and carries no local prompt', () {
+      expect(leads.backend, kChatBackendLeads);
+      expect(leads.name, 'Leads');
+      expect(leads.emoji, '📈');
+      expect(leads.file, isNull);
     });
 
     test('pravnik routes to the law backend', () {
@@ -77,6 +97,10 @@ void main() {
 
     test('law persona → law', () {
       expect(chatBackendIdFor(persona(backend: 'law')), kChatBackendLaw);
+    });
+
+    test('leads persona → leads', () {
+      expect(chatBackendIdFor(persona(backend: 'leads')), kChatBackendLeads);
     });
 
     test('library persona → library', () {
