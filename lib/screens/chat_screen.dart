@@ -150,6 +150,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         key: ValueKey(message.id),
                         message: message,
                         isStreaming: isStreamingThisMsg,
+                        isActiveLeaf: isLast && !state.isStreaming,
+                        onAgentSend: (text, answers) => ref
+                            .read(chatProvider.notifier)
+                            .sendMessage(text, agentAnswers: answers),
                       );
                     },
                   ),

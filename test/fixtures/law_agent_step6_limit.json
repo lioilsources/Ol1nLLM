@@ -1,0 +1,55 @@
+{
+ "odpoved": "Děkuji za doplnění. Chybí nám již jen poslední chybějící údaj pro nájem na dobu určitou.\n\nProsím, odpovězte na následující otázku:\n\n1. **Do jakého data má nájem trvat (datum ukončení nájmu)?**",
+ "mode": "draft",
+ "session_id": "fixture-ol1nllm-49b1e1",
+ "otazky": [
+  {
+   "id": "doba_do",
+   "otazka": "Do kdy nájem trvá (jen u doby určité)?",
+   "typ": "date",
+   "hodnoty": null,
+   "napoveda": "U nájmu na dobu určitou chybí datum, do kterého nájem trvá.",
+   "hodnota": null
+  }
+ ],
+ "dokument": null,
+ "checklist": [],
+ "upozorneni": [],
+ "stav": {
+  "typ": "najemni_smlouva_byt",
+  "nazev": "Nájemní smlouva (byt)",
+  "stav": "intake",
+  "vyplneno": 15,
+  "povinnych": 15,
+  "povinnych_vyplneno": 15,
+  "chybi_celkem": 0,
+  "dalsi_otazky": [
+   {
+    "id": "doba_do",
+    "otazka": "Do kdy nájem trvá (jen u doby určité)?",
+    "typ": "date",
+    "hodnoty": null,
+    "napoveda": "U nájmu na dobu určitou chybí datum, do kterého nájem trvá.",
+    "hodnota": null
+   }
+  ],
+  "porusene_limity": [
+   {
+    "zprava": "U nájmu na dobu určitou chybí datum, do kterého nájem trvá.",
+    "zaklad": ""
+   }
+  ],
+  "pripraveno_k_renderu": false
+ },
+ "ulozene_odpovedi": {
+  "ulozeno": [
+   "bankovni_ucet",
+   "sluzby_vecet",
+   "zaloha_sluzby"
+  ],
+  "odmitnuto": []
+ },
+ "volani": [],
+ "ms_modelu": 2905,
+ "model": "pravnik-agent"
+}

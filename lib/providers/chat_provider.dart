@@ -4,9 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
+import '../models/agent_step.dart';
 import '../models/conversation.dart';
 import '../models/message.dart';
 import '../services/chat_backend.dart';
+import '../services/law_agent_service.dart';
 import '../services/library_chat_service.dart';
 import '../services/media_service.dart';
 import '../services/vllm_service.dart';
@@ -59,6 +61,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   final VllmService _vllm = VllmService();
   final LibraryChatService _library = LibraryChatService.library();
   final LibraryChatService _law = LibraryChatService.law();
+  final LawAgentService _lawAgent = LawAgentService();
   final LibraryChatService _leads = LibraryChatService.leads();
   final MediaService _mediaService = MediaService(); // OCR only
   final PersonaService _personaService;
@@ -76,6 +79,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     return switch (chatBackendIdFor(persona)) {
       kChatBackendLibrary => _library,
       kChatBackendLaw => _law,
+      kChatBackendLawAgent => _lawAgent,
       kChatBackendLeads => _leads,
       _ => _vllm,
     };
@@ -177,7 +181,14 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   // ── Chat ─────────────────────────────────────────────────────────────────
 
-  Future<void> sendMessage(String text, {String? personaId}) async {
+  /// Sends a user turn. [agentAnswers] is set only by the contract agent's
+  /// question card (`AgentStepView`): [text] is then the readable summary
+  /// shown in the bubble, the answers ride on the message to the server.
+  Future<void> sendMessage(
+    String text, {
+    String? personaId,
+    List<AgentAnswer> agentAnswers = const [],
+  }) async {
     if (text.trim().isEmpty || state.isStreaming) return;
 
     var conv = state.active;
@@ -210,6 +221,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       content: text.trim(),
       createdAt: DateTime.now(),
       personaId: turnPersonaId,
+      agentAnswers: agentAnswers,
     );
     // API sees only the active branch (root→leaf) plus the new user turn.
     final messagesForApi = [...conv.thread, userMsg];
@@ -281,6 +293,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
                   :final truncatedByLength,
                   :final sources,
                   :final remoteSessionId,
+                  :final agentStep,
                 ):
                   if (truncatedByLength) {
                     state = state.copyWith(pendingContinuation: true);
@@ -289,22 +302,27 @@ class ChatNotifier extends StateNotifier<ChatState> {
                       .where((c) => c.id == convId)
                       .firstOrNull;
                   if (current == null) return;
-                  // Snapshot the citations onto the answer they belong to, and
-                  // record where the server's history now ends.
+                  // Snapshot the citations (or the agent's cards and
+                  // document) onto the answer they belong to, and record
+                  // where the server's history now ends.
                   _replaceConversation(
                     current.copyWith(
-                      messages: sources.isEmpty
+                      messages: sources.isEmpty && agentStep == null
                           ? current.messages
                           : current.messages
                                 .map(
                                   (m) => m.id == assistantMsg.id
-                                      ? m.copyWith(sources: sources)
+                                      ? m.copyWith(
+                                          sources: sources,
+                                          agentStep: agentStep,
+                                        )
                                       : m,
                                 )
                                 .toList(),
                       remoteSessionId: remoteSessionId,
-                      remoteLeafId:
-                          remoteSessionId != null ? assistantMsg.id : null,
+                      remoteLeafId: remoteSessionId != null
+                          ? assistantMsg.id
+                          : null,
                     ),
                   );
               }
@@ -425,7 +443,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
             messages: current.messages
                 .map(
                   (m) => m.id == placeholderId
-                      ? m.copyWith(content: result.content, images: result.images)
+                      ? m.copyWith(
+                          content: result.content,
+                          images: result.images,
+                        )
                       : m,
                 )
                 .toList(),
@@ -494,6 +515,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     _vllm.dispose();
     _library.dispose();
     _law.dispose();
+    _lawAgent.dispose();
     _leads.dispose();
     _mediaService.dispose();
     super.dispose();
