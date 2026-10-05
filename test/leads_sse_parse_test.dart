@@ -9,8 +9,8 @@ import 'package:ol1n_llm/services/library_chat_service.dart';
 /// unchanged. Two differences matter: the server sends `: planning` and
 /// `: keepalive` comment lines while it works, and the sources describe firms
 /// from Registr smluv — `work` is the IČO, `name_cs` the firm, `title`
-/// `IČO … · segment`, `path` the contract id; the extra `url` and `channels`
-/// keys are ignored by `LibrarySource`. `test/fixtures/leads_stream.sse` is a
+/// `IČO … · segment`, `path` the contract id, `url` the contract in Registr
+/// smluv; the extra `channels` key is ignored by `LibrarySource`. `test/fixtures/leads_stream.sse` is a
 /// verbatim capture from `leadsd` (`curl -N` on `/chat/stream`, question
 /// „Které školy kupují tablety pro výuku?").
 void main() {

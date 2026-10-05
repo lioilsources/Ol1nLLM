@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/constants/theme.dart';
 import '../models/library_source.dart';
 
@@ -107,6 +108,12 @@ class _SourceListState extends State<SourceList> {
                   ),
                 ),
               ],
+              // Only Leads sends a link today (the contract in Registr
+              // smluv); without one the sheet looks exactly as before.
+              if (source.openableUrl case final uri?) ...[
+                const SizedBox(height: 8),
+                OriginalLink(uri: uri),
+              ],
             ],
           ),
         ),
@@ -212,6 +219,68 @@ class _SourceListState extends State<SourceList> {
                 ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "Otevřít originál" link at the bottom of the source detail sheet.
+///
+/// Worded generically on purpose: the field lives on [LibrarySource], shared
+/// by every RAG persona, and the host shown next to it (`smlouvy.gov.cz`)
+/// already says where the original lives.
+class OriginalLink extends StatelessWidget {
+  final Uri uri;
+
+  const OriginalLink({super.key, required this.uri});
+
+  Future<void> _open(BuildContext context) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    var ok = false;
+    try {
+      ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      ok = false;
+    }
+    if (!ok) {
+      messenger?.showSnackBar(
+        SnackBar(content: Text('Odkaz nejde otevřít: $uri')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => _open(context),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.open_in_new, size: 16, color: AppTheme.accent),
+            const SizedBox(width: 6),
+            const Text(
+              'Otevřít originál',
+              style: TextStyle(
+                color: AppTheme.accent,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                uri.host,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 11,
+                ),
+              ),
+            ),
           ],
         ),
       ),
