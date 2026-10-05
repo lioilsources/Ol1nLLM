@@ -39,6 +39,14 @@ class LibrarySource {
   /// predates it — the original then stands alone.
   final String? excerptCs;
 
+  /// Link to the original document the chunk was cut from. Sent only by
+  /// LeadsRAG (`leadsd`, persona Leads 📈), where it points at the contract
+  /// in Registr smluv (`https://smlouvy.gov.cz/smlouva/<id>`); the library
+  /// and law servers have no public original, so for them — and for answers
+  /// stored in Hive before the field existed — it stays null. Server data,
+  /// not trusted: the UI opens it only when [openableUrl] says so.
+  final String? url;
+
   const LibrarySource({
     required this.work,
     this.nameCs,
@@ -49,6 +57,7 @@ class LibrarySource {
     this.distance,
     required this.excerpt,
     this.excerptCs,
+    this.url,
   });
 
   /// Label for the sources list: the Czech name when the catalog has one,
@@ -91,6 +100,18 @@ class LibrarySource {
     return cs != null && cs.isNotEmpty && cs != excerpt;
   }
 
+  /// [url] parsed, but only for `http`/`https` with a host — anything else
+  /// (`javascript:`, `file:`, `intent:`, garbage) yields null so the UI never
+  /// hands an arbitrary scheme to the OS.
+  Uri? get openableUrl {
+    final raw = url;
+    if (raw == null) return null;
+    final uri = Uri.tryParse(raw);
+    if (uri == null || !uri.hasAuthority || uri.host.isEmpty) return null;
+    final scheme = uri.scheme.toLowerCase();
+    return (scheme == 'http' || scheme == 'https') ? uri : null;
+  }
+
   static String? _str(dynamic v) {
     if (v == null) return null;
     final s = v.toString().trim();
@@ -107,6 +128,7 @@ class LibrarySource {
     distance: (json['distance'] as num?)?.toDouble(),
     excerpt: _str(json['excerpt']) ?? '',
     excerptCs: _str(json['excerpt_cs']),
+    url: _str(json['url']),
   );
 
   Map<String, dynamic> toJson() => {
@@ -119,6 +141,7 @@ class LibrarySource {
     if (distance != null) 'distance': distance,
     if (excerpt.isNotEmpty) 'excerpt': excerpt,
     if (excerptCs != null) 'excerpt_cs': excerptCs,
+    if (url != null) 'url': url,
   };
 
   /// Tolerant list parser — used for both the wire payload and Hive JSON.
