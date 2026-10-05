@@ -1,3 +1,4 @@
+import '../models/agent_step.dart';
 import '../models/library_source.dart';
 import '../models/message.dart';
 import '../models/persona.dart';
@@ -9,6 +10,13 @@ const kChatBackendLibrary = 'library';
 
 /// Czech-law RAG persona — same server code as the library, its own corpus.
 const kChatBackendLaw = 'law';
+
+/// Právník's contract agent — same `law-chat` server as [kChatBackendLaw],
+/// but `/agent/chat` (one JSON step with tool calling) instead of the RAG
+/// stream. Its own id because it keeps its own server-side history: mixing
+/// it with law RAG turns in one thread would feed each side the other's
+/// answers.
+const kChatBackendLawAgent = 'law-agent';
 
 /// Leads RAG persona — firms and institutions from the Czech contract
 /// registry (LeadsRAG, `leadsd`); same SSE dialect as the library.
@@ -26,6 +34,7 @@ const kChatBackendVllm = 'vllm';
 String chatBackendIdFor(Persona? persona) => switch (persona?.backend) {
   kChatBackendLibrary => kChatBackendLibrary,
   kChatBackendLaw => kChatBackendLaw,
+  kChatBackendLawAgent => kChatBackendLawAgent,
   kChatBackendLeads => kChatBackendLeads,
   _ => kChatBackendVllm,
 };
@@ -59,11 +68,15 @@ class ChatDone extends ChatEvent {
   /// Model that actually answered, as reported by the server.
   final String? model;
 
+  /// Structured result of a contract-agent step; null for every other backend.
+  final AgentStep? agentStep;
+
   const ChatDone(
     this.finishReason, {
     this.sources = const [],
     this.remoteSessionId,
     this.model,
+    this.agentStep,
   });
 
   bool get truncatedByLength => finishReason == 'length';

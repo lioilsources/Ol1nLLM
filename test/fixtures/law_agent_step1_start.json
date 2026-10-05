@@ -1,0 +1,91 @@
+{
+ "odpoved": "Seznam dostupných šablon jsem prohledal a našel jsem přesně to, co potřebujete: **Nájemní smlouva (byt)**. Tato šablona je určena pro zajištění bytových potřeb nájemce a vychází z občanského zákoníku (§ 2235 a násl.).\n\nAbychom mohli smlouvu sepsat, potřebuji seznámit se základními údaji o vás (jako pronajímateli) a o bytě. Začneme první sadou otázek:\n\n1. **Jméno nebo firma pronajímatele?**\n2. **Datum narození, nebo IČO pronajímatele?**\n3. **Adresa pronajímatele?**\n\nProsím, napište odpovědi.",
+ "mode": "draft",
+ "session_id": "fixture-ol1nllm-49b1e1",
+ "otazky": [
+  {
+   "id": "pronajimatel_jmeno",
+   "otazka": "Jméno nebo firma pronajímatele?",
+   "napoveda": "",
+   "typ": "string",
+   "hodnoty": null
+  },
+  {
+   "id": "pronajimatel_identifikace",
+   "otazka": "Datum narození, nebo IČO pronajímatele?",
+   "napoveda": "",
+   "typ": "string",
+   "hodnoty": null
+  },
+  {
+   "id": "pronajimatel_adresa",
+   "otazka": "Adresa pronajímatele?",
+   "napoveda": "",
+   "typ": "string",
+   "hodnoty": null
+  }
+ ],
+ "dokument": null,
+ "checklist": [],
+ "upozorneni": [],
+ "stav": {
+  "typ": "najemni_smlouva_byt",
+  "nazev": "Nájemní smlouva (byt)",
+  "stav": "intake",
+  "vyplneno": 0,
+  "povinnych": 15,
+  "povinnych_vyplneno": 0,
+  "chybi_celkem": 15,
+  "dalsi_otazky": [
+   {
+    "id": "pronajimatel_jmeno",
+    "otazka": "Jméno nebo firma pronajímatele?",
+    "napoveda": "",
+    "typ": "string",
+    "hodnoty": null
+   },
+   {
+    "id": "pronajimatel_identifikace",
+    "otazka": "Datum narození, nebo IČO pronajímatele?",
+    "napoveda": "",
+    "typ": "string",
+    "hodnoty": null
+   },
+   {
+    "id": "pronajimatel_adresa",
+    "otazka": "Adresa pronajímatele?",
+    "napoveda": "",
+    "typ": "string",
+    "hodnoty": null
+   }
+  ],
+  "porusene_limity": [],
+  "pripraveno_k_renderu": false
+ },
+ "ulozene_odpovedi": null,
+ "volani": [
+  {
+   "nastroj": "list_templates",
+   "argumenty": {
+    "dotaz": "nájemní smlouva byt"
+   },
+   "chyba": null
+  },
+  {
+   "nastroj": "list_templates",
+   "argumenty": {
+    "dotaz": "nájem"
+   },
+   "chyba": null
+  },
+  {
+   "nastroj": "get_template",
+   "argumenty": {
+    "typ": "najemni_smlouva_byt"
+   },
+   "chyba": null
+  }
+ ],
+ "ms_modelu": 12855,
+ "model": "pravnik-agent"
+}

@@ -85,6 +85,13 @@
       "description": "Odpovídá z účinných zákonů ČR (e-Sbírka) s citací paragrafů. Není právní poradenství."
     },
     {
+      "id": "pravnik_smlouvy",
+      "name": "Právník – smlouvy",
+      "emoji": "📝",
+      "backend": "law-agent",
+      "description": "Sepíše smlouvu nebo dokument ze šablony (nájem, kupní, NDA, DPP…): ptá se po kartách, hlídá zákonné limity. Běží 19–01. Návrh k odborné kontrole."
+    },
+    {
       "id": "leads",
       "name": "Leads",
       "emoji": "📈",

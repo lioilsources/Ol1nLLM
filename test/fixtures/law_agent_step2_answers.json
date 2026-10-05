@@ -1,0 +1,76 @@
+{
+ "odpoved": "Děkuji, údaje o pronajímateli mám. Nyní potřebuji znát údaje o nájemci a o bytě, který se bude pronajímat.\n\nProsím, odpovězte na následující otázky:\n\n1. **Jméno nájemce?**\n2. **Datum narození nebo IČO nájemce?**\n3. **Adresa nájemce?**",
+ "mode": "draft",
+ "session_id": "fixture-ol1nllm-49b1e1",
+ "otazky": [
+  {
+   "id": "najemce_jmeno",
+   "otazka": "Jméno nájemce?",
+   "napoveda": "",
+   "typ": "string",
+   "hodnoty": null
+  },
+  {
+   "id": "najemce_identifikace",
+   "otazka": "Datum narození nájemce?",
+   "napoveda": "",
+   "typ": "string",
+   "hodnoty": null
+  },
+  {
+   "id": "najemce_adresa",
+   "otazka": "Adresa nájemce (doručovací)?",
+   "napoveda": "",
+   "typ": "string",
+   "hodnoty": null
+  }
+ ],
+ "dokument": null,
+ "checklist": [],
+ "upozorneni": [],
+ "stav": {
+  "typ": "najemni_smlouva_byt",
+  "nazev": "Nájemní smlouva (byt)",
+  "stav": "intake",
+  "vyplneno": 3,
+  "povinnych": 15,
+  "povinnych_vyplneno": 3,
+  "chybi_celkem": 12,
+  "dalsi_otazky": [
+   {
+    "id": "najemce_jmeno",
+    "otazka": "Jméno nájemce?",
+    "napoveda": "",
+    "typ": "string",
+    "hodnoty": null
+   },
+   {
+    "id": "najemce_identifikace",
+    "otazka": "Datum narození nájemce?",
+    "napoveda": "",
+    "typ": "string",
+    "hodnoty": null
+   },
+   {
+    "id": "najemce_adresa",
+    "otazka": "Adresa nájemce (doručovací)?",
+    "napoveda": "",
+    "typ": "string",
+    "hodnoty": null
+   }
+  ],
+  "porusene_limity": [],
+  "pripraveno_k_renderu": false
+ },
+ "ulozene_odpovedi": {
+  "ulozeno": [
+   "pronajimatel_adresa",
+   "pronajimatel_identifikace",
+   "pronajimatel_jmeno"
+  ],
+  "odmitnuto": []
+ },
+ "volani": [],
+ "ms_modelu": 3035,
+ "model": "pravnik-agent"
+}

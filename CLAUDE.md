@@ -50,6 +50,7 @@ lib/
     chat_backend.dart          # ChatBackend interface + ChatEvent sealed class
     vllm_service.dart          # llm.ol1n.com — OpenAI SSE, stateless
     library_chat_service.dart  # chat.ol1n.com — RAG knihovna, session na serveru
+    law_agent_service.dart     # pravnik.ol1n.com/agent/chat — Právník sepisuje smlouvy (JSON krok)
     music_service.dart         # llm.ol1n.com/v1/audio/vibe — MusicStudio (ACE-Step)
     video_service.dart         # llm.ol1n.com/v1/video — Rozhýbat (scéna nebo vlastní pohyb)
     story_service.dart         # llm.ol1n.com/v1/video/stories — StoryStudio
@@ -1053,7 +1054,7 @@ unit `law-chat`); `_backendFor()` je switch přes `chatBackendIdFor()`. Přechod
 knihovna ↔ právník je přechod mezi backendy, takže zakládá novou konverzaci
 stejně jako u knihovny; `deleteConversation` proto backend pro `/reset` bere
 z `_backendFor()` podle persony konverzace, ne natvrdo z knihovny. Server:
-WorldLibraryProject, unit `law-chat.service` na SPARKu :8091, postup a korpus
+WorldLibraryProject, unit `law-chat.service` na SPARKu :8098, postup a korpus
 v `docs/plan-pravnik.md`.
 
 **Leads 📈 (`"backend": "leads"`)**: třetí RAG persona — firmy a instituce
@@ -1067,6 +1068,51 @@ ale stejný SSE dialekt (navíc `: planning` / `: keepalive` komentáře, které
 `IČO … · segment`, `group` = segment, `path` = číslo smlouvy, `excerpt` =
 předmět smlouvy; navíc posílané `url` (odkaz na smlouvu) a `channels` model
 ignoruje. Fixture `test/fixtures/leads_stream.sse`.
+
+**Právník – smlouvy 📝 (`"backend": "law-agent"`)**: agent, který sepíše
+smlouvu nebo dokument ze šablony (14 šablon — nájem bytu, kupní, dílo, NDA,
+DPP/DPČ, plná moc, reklamace…). Tentýž server `law-chat` jako Právník ⚖️, ale
+`POST /agent/chat` místo `/chat/stream`, služba `LawAgentService`
+(`LAW_CHAT_URL`). **Samostatná persona, ne přepínač v chatu Právníka**: agent
+má na serveru vlastní historii (jinou než RAG chat) a vlastní dokument
+v Postgresu pod týmž `session_id`, takže přepínač uvnitř jedné konverzace by
+byl právě to míchané vlákno, které je zakázané. Persona s jiným `backend` to
+dostane zadarmo — výběr z chatu Právníka založí novou konverzaci, session je
+per konverzace, fork/větev pošle `session_id: null` a stará jde na `/reset`
+(smaže rozhovor agenta; rozepsaný dokument v PG zůstává do retence, 30 dní).
+
+- **Kontrakt je jeden JSON na krok, ne stream.** Krok je smyčka modelu
+  s nástroji na serveru (3–20 s s qwen36, Gemma pomaleji, timeout 6 min);
+  výsledkem jsou data, ne text na postupné vykreslení. Služba ho vydá jako
+  jeden `ChatDelta` (text agenta) + `ChatDone.agentStep` (`AgentStep`:
+  `otazky`, `stav`, `dokument`, `checklist`, `upozorneni`, odmítnuté
+  odpovědi). Snapshot jde na asistentskou zprávu (`Message.agentStep`, Hive),
+  stejně jako `sources`.
+- **Karty** (`AgentStepView`, `lib/widgets/agent_step_view.dart`): až tři
+  otázky s inputem podle typu proměnné šablony (`money`/`int` číselná
+  klávesnice, `date` text + kalendář, `enum` a `bool` čipy, `text` víc
+  řádků). Interaktivní jen na špičce aktivní větve, starší kroky ukazují
+  otázky jen pro čtení. Odeslání pošle uživatelskou zprávu s čitelným
+  shrnutím a `Message.agentAnswers` → `odpovedi: [{id, otazka, hodnota}]`;
+  **server je uloží sám** a převede typy („16 500 Kč" → 16500,
+  „1. 10. 2026" → ISO), appka hodnoty nenormalizuje. Nad kartou je progress
+  (`povinnych_vyplneno/povinnych`), porušené zákonné limity a důvody
+  odmítnutých odpovědí. Kompletní vstup bez dokumentu nabídne „Sestavit
+  dokument".
+- **Výsledek**: karta dokumentu s náhledem, „Otevřít" (celá obrazovka,
+  markdown, selectable), „Kopírovat" a „Sdílet" (`share_plus`) — obojí bere
+  `AgentStep.shareText`, tj. dokument **i s kontrolním seznamem
+  a upozorněními**, aby návrh necestoval bez nich. Pod kartou checklist ☐
+  a upozornění ⚠️.
+- **Okno 19–01**: alias LiteLLM `pravnik-agent` (Gemma na vyžádání, jinak
+  qwen36) běží jen večer. Mimo okno server vrací 503 s větou pro člověka
+  („Právník teď smlouvy nesepisuje… od 19:00 do 01:00…") a appka ji ukáže
+  doslova, bez `HTTP 503` a bez hintu na systemctl.
+- Testy `test/law_agent_test.dart` nad `test/fixtures/law_agent_step*.json`
+  — **skutečné odpovědi** agenta s qwen36 (2026-10-05, sedm kroků nájemní
+  smlouvy, kód serveru z větve `pravnik-agent-app`); `law_agent_503.json`
+  zachycený není, je postavený z kódu serveru. Serverová strana:
+  WorldLibraryProject `rag/agent/klient.py`, `docs/lawyer/AGENT.md`.
 
 **Session vs. větvení** (`Conversation.canReuseRemoteSession`): server drží
 jednu lineární frontu per `session_id`, appka strom. Session se recykluje jen

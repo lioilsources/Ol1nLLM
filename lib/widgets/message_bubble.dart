@@ -6,16 +6,26 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/constants/theme.dart';
 import '../models/message.dart';
+import 'agent_step_view.dart';
 import 'source_list.dart';
 
 class MessageBubble extends StatefulWidget {
   final Message message;
   final bool isStreaming;
 
+  /// True for the tip of the active branch when nothing is streaming — the
+  /// only place where a contract-agent question card accepts answers.
+  final bool isActiveLeaf;
+
+  /// Sends a turn from a contract-agent card (answers, "Sestavit dokument").
+  final AgentSend? onAgentSend;
+
   const MessageBubble({
     super.key,
     required this.message,
     this.isStreaming = false,
+    this.isActiveLeaf = false,
+    this.onAgentSend,
   });
 
   @override
@@ -169,6 +179,21 @@ class _MessageBubbleState extends State<MessageBubble>
   /// event, so rendering mid-stream would make the section pop in at the end.
   Widget _buildAssistantBody(BuildContext context) {
     final sources = widget.message.sources;
+    final agentStep = widget.message.agentStep;
+    if (agentStep != null && !widget.isStreaming) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildMarkdown(context),
+          AgentStepView(
+            step: agentStep,
+            active: widget.isActiveLeaf,
+            onSend: widget.onAgentSend,
+          ),
+        ],
+      );
+    }
     if (sources.isEmpty || widget.isStreaming) return _buildMarkdown(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
