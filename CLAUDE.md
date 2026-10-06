@@ -52,12 +52,14 @@ lib/
     library_chat_service.dart  # chat.ol1n.com — RAG knihovna, session na serveru
     law_agent_service.dart     # pravnik.ol1n.com/agent/chat — Právník sepisuje smlouvy (JSON krok)
     music_service.dart         # llm.ol1n.com/v1/audio/vibe — MusicStudio (ACE-Step)
+    voice_service.dart         # llm.ol1n.com/v1/audio/tts + /voices — Voice Studio (řeč, klony hlasů)
     video_service.dart         # llm.ol1n.com/v1/video — Rozhýbat (scéna nebo vlastní pohyb)
     story_service.dart         # llm.ol1n.com/v1/video/stories — StoryStudio
   screens/
     image_studio_screen.dart
     chat_screen.dart
     music_studio_screen.dart
+    voice_studio_screen.dart
     story_studio_screen.dart   # + story_setup_screen.dart (obsazení rolí)
 ```
 
@@ -772,6 +774,64 @@ volitelné). Veřejně jde `llm.ol1n.com/v1/audio/*` přes AiStack Go gateway
 (`AUDIO_API_URL=http://audio:8093`), takže orchestrátor musí běžet z compose
 (`make up-audio`) — ručně spuštěný kontejner nemá DNS alias `audio`
 a gateway spadne na LiteLLM s `{"detail":"Not Found"}`.
+
+## Voice Studio (hlasy person, klonování)
+
+Ikona mluvící hlavy v Chatu. Tři věci na jedné obrazovce: **vyzkoušet** hlas
+na větě, **naklonovat** hlas z krátké nahrávky (mikrofon nebo soubor) a určit,
+**kterým hlasem mluví která persona**. Pod každou hotovou odpovědí v chatu je
+pak reproduktor (`SpeakButton`), který ji přečte hlasem persony, jež ji dala
+(`message.personaId ?? personaId` konverzace). Server je tentýž orchestrátor
+jako u MusicStudia (AiStack `services/audio`, sekce TTS v jeho README),
+`AUDIO_URL` ho přepíná stejně.
+
+- **Hlasy žijí na serveru**, ne v telefonu — sdílí je všechno, co s audio
+  službou mluví (MemeShorts). Appka drží jen mapu persona → hlas (Hive box
+  `voice_studio`, klíč `persona_voices`) a cache už řečeného. Smazání hlasu
+  ho proto smaže všem; dialog to říká. Persona bez přiřazení mluví
+  `kDefaultVoiceId` (Piper Kasandra): jediný český hlas, který jede na CPU
+  (běží, kdykoli běží služba) a má čistou licenci.
+- **Klon je v seznamu jednou za každý klonující model** (stejné id
+  `custom:…`, jiný engine) — `Voice.fromRows` řádky slučuje podle id a modely
+  drží vedle sebe. Jméno, práva a délku seznam nenese; na ty je
+  `GET /voices/{id}` zvlášť pro každý klon (`VoiceStudioState.stored`).
+- **`commercial_only: false` je záměr** (`speechRequest()`): česky klonují jen
+  XTTS-v2 (nekomerční) a chatterbox-cs (licence neověřená), takže s výchozím
+  `true` by každý klon v jazyce person skončil 403. Appka je soukromý nástroj;
+  licenci místo zákazu ukazuje u každého hlasu (`VoiceModel.licenseLabel`,
+  u klonu všechny modely, které umí česky — který z nich server vybere, se
+  rozhoduje per request).
+- **Jazyk** (`speechLanguage()`): čeština, pokud ji hlas umí, jinak jazyk
+  hlasu — anglický Kokoro přečte českou odpověď anglickými fonémy, což je
+  pořád lepší než 422. Proto `speak()` bez načteného katalogu nejdřív načte
+  katalog. Picker hlasu pro personu nabízí jen klony a hlasy, co česky umí.
+- **Čte se text, ne markdown** (`speakableText()`): kód, odkazy, URL, oddělovač
+  tabulky a značky pryč, konec řádku bez interpunkce je tečka, strop 5000
+  znaků (limit serveru) se řeže na konci věty.
+- **Syntéza je jedno volání, žádný resume**: `VoiceService.speak()` odešle job,
+  dopolluje ho přes `MusicService.follow()` a stáhne mp3. Řeč trvá vteřiny
+  (Kasandra 0,7 s, klon přes chatterbox-cs 3,2 s na větu, měřeno 2026-10-06),
+  takže výpadek sítě je chyba a uživatel klepne znovu — persistovat jobId jako
+  u hudby by byl kód bez užitku.
+- **Cache**: soubor `applicationSupport/voice_studio/<sha1(hlas, jazyk, text)>.mp3`,
+  zapisuje se přes `.part` + rename. Stejná věta stejným hlasem se syntetizuje
+  jednou; souběžná klepnutí sdílí jeden request (`_inFlight`).
+- **Nahrávka hlasu**: `SampleRecorderSheet` s vlastními mezemi 5–30 s
+  (server chce 3 s řeči *po* ořezu ticha a bere nejvýš 30 s) a textem;
+  hlasové zpracování zůstává vypnuté i tady — potlačení šumu a AGC mění
+  barvu hlasu, kterou má klon převzít. `rights` + `source` jsou povinné
+  (server je zapíše k hlasu a do manifestu každého jobu). Id hlasu na serveru
+  je `voiceIdFor(jméno)`; obsazené jméno vrátí 409 a formulář chybu ukáže
+  sám (snackbar by byl schovaný za sheetem, proto `createVoice()` hází).
+- **GPU enginy běží jen někdy.** Kokoro a Piper jsou CPU a jedou pořád; XTTS
+  a Chatterbox nejsou v rozvrhu SPARKu (AiStack `CLAUDE.md`, sekce TTS). Když
+  neběží, server odmítne `/tts` hned `503` s větou pro člověka a appka ji
+  ukáže doslova (stejná cesta jako u MusicStudia, `MusicService.errorSnippet`).
+- Přehrává sdílený `MusicPlayback`, takže řeč zastaví hudbu a naopak.
+- Testy `test/voice_test.dart` nad `test/fixtures/audio_voices.json`,
+  `audio_voice_stored.json`, `audio_tts_job.json` — odpovědi zachycené ze
+  SPARKu 2026-10-06; text 403 je taky doslova ze serveru, 503 je vymyšlený
+  (engine v tu chvíli běžel).
 
 ## Video (`video-stack/serve.py`, `llm.ol1n.com/v1/video/*`)
 
