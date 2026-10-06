@@ -5,16 +5,20 @@ import '../core/constants/theme.dart';
 import '../core/utils/keyword.dart';
 import '../models/message.dart';
 import '../models/persona.dart';
+import '../models/voice.dart';
 import '../providers/chat_provider.dart';
+import '../providers/voice_studio_provider.dart';
 import '../services/persona_service.dart';
 import '../widgets/chat_branch_tree.dart';
 import '../widgets/chat_input_bar.dart';
 import '../widgets/conversation_drawer.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/persona_picker.dart';
+import '../widgets/speak_button.dart';
 import 'image_studio_screen.dart';
 import 'music_studio_screen.dart';
 import 'story_studio_screen.dart';
+import 'voice_studio_screen.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
@@ -79,6 +83,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final title = _appBarTitle(state.active?.title, activePersona);
     final showPicker =
         state.active == null || (messages.isEmpty && personaId == null);
+    final personaVoices = ref.watch(
+      voiceStudioProvider.select((s) => s.personaVoices),
+    );
 
     return Scaffold(
       drawer: const ConversationDrawer(),
@@ -108,6 +115,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             tooltip: 'Music Studio',
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const MusicStudioScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.record_voice_over_outlined),
+            tooltip: 'Voice Studio',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const VoiceStudioScreen()),
             ),
           ),
           IconButton(
@@ -154,6 +168,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         onAgentSend: (text, answers) => ref
                             .read(chatProvider.notifier)
                             .sendMessage(text, agentAnswers: answers),
+                        // Each answer in the voice of the persona that gave
+                        // it (a turn can override the conversation's).
+                        footer: message.role == MessageRole.assistant
+                            ? SpeakButton(
+                                text: message.content,
+                                voiceId:
+                                    personaVoices[message.personaId ??
+                                        personaId] ??
+                                    kDefaultVoiceId,
+                              )
+                            : null,
                       );
                     },
                   ),
