@@ -300,8 +300,12 @@ class VoiceStudioNotifier extends StateNotifier<VoiceStudioState> {
   /// Path of [text] spoken by [voiceId] — from disk when it was said before,
   /// otherwise synthesised now. Throws [VoiceServiceException] with a message
   /// for the user (the engine is down, the text is empty, the network went).
-  Future<String> speak(String text, String voiceId) async {
-    final spoken = speakableText(text);
+  Future<String> speak(String text, String voiceId) =>
+      speakPrepared(speakableText(text), voiceId);
+
+  /// [speak] for text that already went through [speakableText] — a piece of
+  /// a longer answer (see [speechChunks]).
+  Future<String> speakPrepared(String spoken, String voiceId) async {
     if (spoken.isEmpty) {
       throw const VoiceServiceException('V odpovědi není co číst.');
     }

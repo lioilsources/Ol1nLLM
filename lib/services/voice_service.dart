@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/voice.dart';
@@ -21,12 +21,21 @@ class VoiceService {
   static const _timeout = Duration(seconds: 30);
   static const _uploadTimeout = Duration(minutes: 2);
 
-  VoiceService({http.Client? client, Duration? pollInterval})
-    : _client = client ?? http.Client() {
+  /// Pause before the one retry of a failed synthesis: a restarted engine
+  /// container answers again after about 15 s.
+  static const _retryDelay = Duration(seconds: 15);
+
+  VoiceService({
+    http.Client? client,
+    Duration? pollInterval,
+    Duration? retryDelay,
+  }) : _client = client ?? http.Client(),
+       _retry = retryDelay ?? _retryDelay {
     _jobs = MusicService(client: _client, pollInterval: pollInterval);
   }
 
   final http.Client _client;
+  final Duration _retry;
   late final MusicService _jobs;
 
   Map<String, String> get _auth => MusicService.auth;
@@ -100,10 +109,26 @@ class VoiceService {
       _guard(() => _jobs.download('/v1/audio/voices/$voiceId/sample'));
 
   /// Synthesise [body] (see [speechRequest]) and return the audio bytes.
-  /// One call, start to finish: speech takes seconds on CPU and well under a
-  /// minute on GPU, so unlike a composition there is no job to resume later —
-  /// a lost connection is an error and the caller asks again.
+  /// One call, start to finish: a piece of speech takes seconds, so unlike a
+  /// composition there is no job to resume later.
+  ///
+  /// A job that was accepted and then died is tried once more after a pause:
+  /// that is what an engine container restarting mid-sentence looks like
+  /// (seen 2026-10-06, "chatterbox nedostupný: Server disconnected"). A
+  /// request the server *refuses* is not retried — a 503 says in words that
+  /// the voice is not running now, and waiting would only delay that answer.
   Future<Uint8List> speak(Map<String, dynamic> body) async {
+    try {
+      return await _speakOnce(body);
+    } on VoiceServiceException catch (e) {
+      if (!e.transient) rethrow;
+      debugPrint('[voice] syntéza selhala (${e.detail}), zkouším znovu');
+      await Future<void>.delayed(_retry);
+      return _speakOnce(body);
+    }
+  }
+
+  Future<Uint8List> _speakOnce(Map<String, dynamic> body) async {
     final r = await _client
         .post(
           Uri.parse('$_base/tts'),
@@ -118,9 +143,19 @@ class VoiceService {
         case MusicQueued() || MusicRunning():
           break;
         case MusicFailed(:final message):
-          throw VoiceServiceException(message);
+          // The job's own error is the orchestrator talking to itself
+          // ("varianta 0: chatterbox → HTTP 502 …"), not a sentence for a
+          // reader; it stays in the log.
+          throw VoiceServiceException(
+            'Hlas se nepodařilo přečíst, zkus to znovu.',
+            transient: true,
+            detail: message,
+          );
         case MusicInterrupted():
-          throw const VoiceServiceException('Spojení se serverem vypadlo');
+          throw const VoiceServiceException(
+            'Spojení se serverem vypadlo, zkus to znovu.',
+            transient: true,
+          );
         case MusicDone(:final job):
           final output = (job['outputs'] as List?)?.firstOrNull;
           if (output is! Map || output['url'] is! String) {
@@ -150,7 +185,18 @@ class VoiceService {
 
 class VoiceServiceException implements Exception {
   final String message;
-  const VoiceServiceException(this.message);
+
+  /// The job was accepted and then failed — worth one more try.
+  final bool transient;
+
+  /// The server's own wording when [message] replaces it.
+  final String? detail;
+
+  const VoiceServiceException(
+    this.message, {
+    this.transient = false,
+    this.detail,
+  });
   @override
   String toString() => message;
 }

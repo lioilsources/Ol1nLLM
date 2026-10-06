@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/constants/theme.dart';
-import '../providers/voice_studio_provider.dart';
-import 'music_playback.dart';
+import '../providers/speech_player.dart';
 
-/// Reads [text] aloud in voice [voiceId]: the first tap synthesises (or finds
-/// the audio on disk) and plays, later taps pause and resume. Shares the one
-/// player with MusicStudio, so starting speech stops whatever played before.
-class SpeakButton extends ConsumerStatefulWidget {
+/// Reads [text] aloud in voice [voiceId] through the app's one
+/// [SpeechPlayer]: a tap starts reading (sound comes after the first short
+/// piece, the rest follows while it plays), later taps pause and resume, and
+/// a tap while it is still waiting for audio cancels.
+class SpeakButton extends ConsumerWidget {
   const SpeakButton({
     super.key,
     required this.text,
@@ -24,85 +24,73 @@ class SpeakButton extends ConsumerStatefulWidget {
   final bool filled;
 
   @override
-  ConsumerState<SpeakButton> createState() => _SpeakButtonState();
-}
-
-class _SpeakButtonState extends ConsumerState<SpeakButton> {
-  String? _path;
-  bool _busy = false;
-
-  @override
-  void didUpdateWidget(SpeakButton old) {
-    super.didUpdateWidget(old);
-    if (old.text != widget.text || old.voiceId != widget.voiceId) _path = null;
-  }
-
-  Future<void> _tap() async {
-    // Listening is not typing.
-    FocusManager.instance.primaryFocus?.unfocus();
-    final playback = ref.read(musicPlaybackProvider);
-    final path = _path;
-    if (path != null && playback.isCurrent(path)) {
-      await playback.toggle(path);
-      return;
-    }
-    setState(() => _busy = true);
-    try {
-      final spoken = await ref
-          .read(voiceStudioProvider.notifier)
-          .speak(widget.text, widget.voiceId);
-      if (!mounted) return;
-      _path = spoken;
-      await playback.toggle(spoken);
-    } on Exception catch (e) {
-      if (!mounted) return;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final key = SpeechPlayer.keyOf(text, voiceId);
+    ref.listen(speechPlayerProvider, (_, player) {
+      final error = player.takeError(key);
+      if (error == null) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$e'),
+          content: Text(error),
           backgroundColor: Colors.red[700],
           duration: const Duration(seconds: 8),
         ),
       );
-    } finally {
-      if (mounted) setState(() => _busy = false);
+    });
+    final status = ref.watch(speechPlayerProvider.select((p) => p.status(key)));
+    final color = filled ? AppTheme.accent : AppTheme.textSecondary;
+    final size = filled ? 24.0 : 18.0;
+    final icon = switch (status) {
+      SpeechStatus.loading => SizedBox(
+        width: size - 4,
+        height: size - 4,
+        child: CircularProgressIndicator(strokeWidth: 2, color: color),
+      ),
+      SpeechStatus.playing => Icon(
+        Icons.pause,
+        size: size,
+        color: AppTheme.accent,
+      ),
+      SpeechStatus.paused => Icon(
+        Icons.play_arrow,
+        size: size,
+        color: AppTheme.accent,
+      ),
+      SpeechStatus.idle => Icon(
+        Icons.volume_up_outlined,
+        size: size,
+        color: color,
+      ),
+    };
+    final tooltip = switch (status) {
+      SpeechStatus.loading => 'Zrušit čtení',
+      SpeechStatus.playing => 'Pozastavit',
+      SpeechStatus.paused => 'Pokračovat',
+      SpeechStatus.idle => 'Přečíst nahlas',
+    };
+    void tap() {
+      // Listening is not typing.
+      FocusManager.instance.primaryFocus?.unfocus();
+      ref.read(speechPlayerProvider).toggle(text, voiceId);
     }
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    final path = _path;
-    final playing =
-        path != null && ref.watch(musicPlaybackProvider).isPlaying(path);
-    final color = widget.filled ? AppTheme.accent : AppTheme.textSecondary;
-    final size = widget.filled ? 24.0 : 18.0;
-    final icon = _busy
-        ? SizedBox(
-            width: size - 4,
-            height: size - 4,
-            child: CircularProgressIndicator(strokeWidth: 2, color: color),
-          )
-        : Icon(
-            playing ? Icons.pause : Icons.volume_up_outlined,
-            size: size,
-            color: playing ? AppTheme.accent : color,
-          );
-    if (widget.filled) {
+    if (filled) {
       return IconButton.filledTonal(
         style: IconButton.styleFrom(
           backgroundColor: AppTheme.accent.withValues(alpha: 0.15),
         ),
-        tooltip: 'Přečíst',
+        tooltip: tooltip,
         icon: icon,
-        onPressed: _busy ? null : _tap,
+        onPressed: tap,
       );
     }
     return IconButton(
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(minWidth: 32, minHeight: 28),
-      tooltip: 'Přečíst nahlas',
+      tooltip: tooltip,
       icon: icon,
-      onPressed: _busy ? null : _tap,
+      onPressed: tap,
     );
   }
 }
