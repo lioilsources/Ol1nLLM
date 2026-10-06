@@ -1,0 +1,18 @@
+[
+ "AutismMix_pony.safetensors",
+ "CyberRealisticXL_v10.safetensors",
+ "HassakuXL_Illustrious_v3.4.safetensors",
+ "Illustrious-XL-v2.0.safetensors",
+ "Juggernaut-XL-Lightning_4Steps.safetensors",
+ "Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors",
+ "Lustify_ZENITH_V9.safetensors",
+ "RealVisXL_V5.0.safetensors",
+ "animagine-xl-40-opt.safetensors",
+ "atomixPonyAnimeXL_v30.safetensors",
+ "ltx-2.3-22b-dev-fp8.safetensors",
+ "noobai-xl-eps11.safetensors",
+ "ponyDiffusionV6XL_v6StartWithThisOne.safetensors",
+ "sd_xl_base_1.0.safetensors",
+ "v1-5-pruned-emaonly-fp16.safetensors",
+ "wai-nsfw-illustrious.safetensors"
+]

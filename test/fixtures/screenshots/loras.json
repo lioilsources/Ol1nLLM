@@ -1,0 +1,13 @@
+[
+ "Juggernaut_XL_Lightning/Detail_Tweaker_XL.safetensors",
+ "Juggernaut_XL_Lightning/xl_more_art-full__xl_real__Enhancer.safetensors",
+ "Juggernaut_XL_Lightning/All_Disney_Princess_XL_LoRA_Model_from_Ralph_Breaks_the_Internet.safetensors",
+ "Pixar_SDXL/PixarXL.safetensors",
+ "Pixar_Pony/Pixar_Pony.safetensors",
+ "Pixar_Illustrious/Pixar_Illustrious.safetensors",
+ "NoobAI/NoobAI-XL_Detailer.safetensors",
+ "NoobAI/MeMaXL_Flat_Anime_Style_-_NoobIllustriousPonyXL.safetensors",
+ "Spacecraft.safetensors",
+ "Starship_warm_anime_old_anime.safetensors",
+ "dmd2_sdxl_4step_lora_fp16.safetensors"
+]

@@ -1,0 +1,3 @@
+tags:
+  # Goldens for the store page; see test/screenshots_test.dart.
+  screenshots:
