@@ -233,6 +233,49 @@ String speakableText(String markdown) {
   return end > kMaxSpeechChars ~/ 2 ? s.substring(0, end + 1) : s;
 }
 
+/// First piece of a spoken answer: short, so sound starts within seconds.
+const kFirstSpeechChunkChars = 120;
+
+/// Later pieces: long enough that the gaps between them are rare, short
+/// enough that one lost request costs little.
+const kSpeechChunkChars = 400;
+
+/// [spoken] (already through [speakableText]) cut into pieces that are
+/// synthesised one after another while the earlier ones play. A cloning
+/// engine generates slightly slower than real time — a three-minute answer
+/// takes over three minutes — so waiting for the whole file is not an option.
+/// Cuts fall on sentence ends; a sentence longer than a piece is cut at a
+/// comma or a space.
+List<String> speechChunks(String spoken) {
+  final chunks = <String>[];
+  var current = '';
+  int limit() => chunks.isEmpty ? kFirstSpeechChunkChars : kSpeechChunkChars;
+  void flush() {
+    if (current.isNotEmpty) chunks.add(current);
+    current = '';
+  }
+
+  for (var sentence in spoken.trim().split(RegExp(r'(?<=[.!?…])\s+'))) {
+    if (sentence.isEmpty) continue;
+    if (current.isNotEmpty && current.length + 1 + sentence.length > limit()) {
+      flush();
+    }
+    // A sentence that does not fit even alone.
+    while (sentence.length > limit()) {
+      final head = sentence.substring(0, limit());
+      var cut = head.lastIndexOf(RegExp(r'[,;:]\s'));
+      if (cut < limit() ~/ 2) cut = head.lastIndexOf(' ');
+      if (cut <= 0) cut = limit() - 1;
+      chunks.add(sentence.substring(0, cut + 1).trim());
+      sentence = sentence.substring(cut + 1).trim();
+    }
+    if (sentence.isEmpty) continue;
+    current = current.isEmpty ? sentence : '$current $sentence';
+  }
+  flush();
+  return chunks;
+}
+
 /// Body of `POST /v1/audio/tts`.
 ///
 /// `commercial_only` is false on purpose: the app is a private tool and the

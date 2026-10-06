@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -9,10 +10,12 @@ import 'package:http/testing.dart';
 import 'package:ol1n_llm/core/constants/theme.dart';
 import 'package:ol1n_llm/models/persona.dart';
 import 'package:ol1n_llm/models/voice.dart';
+import 'package:ol1n_llm/providers/speech_player.dart';
 import 'package:ol1n_llm/providers/voice_studio_provider.dart';
 import 'package:ol1n_llm/screens/voice_studio_screen.dart';
 import 'package:ol1n_llm/services/persona_service.dart';
 import 'package:ol1n_llm/services/voice_service.dart';
+import 'package:ol1n_llm/widgets/music_playback.dart';
 
 /// FastAPI's JSON: UTF-8 bytes, no charset in the content type.
 http.Response _fastapi(Object body, [int status = 200]) => http.Response.bytes(
@@ -32,6 +35,9 @@ class _FakeAudioServer {
   final requests = <http.BaseRequest>[];
   final bodies = <Map<String, dynamic>>[];
   http.Response? ttsRefusal;
+
+  /// How many of the next jobs end in `error` after being accepted.
+  var failingJobs = 0;
   final audio = utf8.encode('ID3-not-really-mp3');
 
   int count(String method, String path) =>
@@ -57,6 +63,20 @@ class _FakeAudioServer {
             'status': 'queued',
             'queue_position': 1,
           }, 202);
+    }
+    if (path == '/v1/audio/jobs/j1' && failingJobs > 0) {
+      failingJobs--;
+      // Job error as SPARK reported it on 2026-10-06 18:26, when the engine
+      // container was restarted mid-sentence.
+      return _fastapi({
+        'job_id': 'j1',
+        'kind': 'tts',
+        'status': 'error',
+        'error':
+            'varianta 0: chatterbox nedostupný: Server disconnected without '
+            'sending a response.',
+        'outputs': <Object>[],
+      });
     }
     if (path == '/v1/audio/jobs/j1') {
       // The finished Kasandra job from SPARK, pointed at our fake output.
@@ -245,6 +265,204 @@ print('nečíst');
     });
   });
 
+  group('speak retries', () {
+    VoiceService service(_FakeAudioServer server) => VoiceService(
+      client: MockClient(server.handle),
+      pollInterval: Duration.zero,
+      retryDelay: Duration.zero,
+    );
+
+    test('a job that died after being accepted is tried once more', () async {
+      final server = _FakeAudioServer()..failingJobs = 1;
+      final bytes = await service(server).speak({'text': 'Ahoj.'});
+      expect(bytes, server.audio);
+      expect(server.count('POST', '/v1/audio/tts'), 2);
+    });
+
+    test(
+      'twice dead: a sentence for the reader, the detail kept aside',
+      () async {
+        final server = _FakeAudioServer()..failingJobs = 2;
+        await expectLater(
+          service(server).speak({'text': 'Ahoj.'}),
+          throwsA(
+            isA<VoiceServiceException>()
+                .having(
+                  (e) => '$e',
+                  'message',
+                  'Hlas se nepodařilo přečíst, zkus to znovu.',
+                )
+                .having(
+                  (e) => e.detail,
+                  'detail',
+                  contains('chatterbox nedostupný'),
+                ),
+          ),
+        );
+        expect(server.count('POST', '/v1/audio/tts'), 2);
+      },
+    );
+
+    test('a refusal is not retried', () async {
+      final server = _FakeAudioServer()
+        ..ttsRefusal = _fastapi({'detail': 'Hlas teď neběží.'}, 503);
+      await expectLater(
+        service(server).speak({'text': 'Ahoj.'}),
+        throwsA(isA<VoiceServiceException>()),
+      );
+      expect(server.count('POST', '/v1/audio/tts'), 1);
+    });
+  });
+
+  group('speechChunks', () {
+    test('a short answer is one piece', () {
+      expect(speechChunks('Ahoj. Jak se máš?'), ['Ahoj. Jak se máš?']);
+      expect(speechChunks(''), isEmpty);
+    });
+
+    test('first piece short, later ones longer, nothing lost', () {
+      final text = List.generate(
+        40,
+        (i) => 'Tohle je věta číslo $i a má nějakou délku.',
+      ).join(' ');
+      final chunks = speechChunks(text);
+      expect(chunks.length, greaterThan(3));
+      expect(chunks.first.length, lessThanOrEqualTo(kFirstSpeechChunkChars));
+      for (final c in chunks) {
+        expect(c.length, lessThanOrEqualTo(kSpeechChunkChars));
+        expect(c, matches(RegExp(r'[.!?]$')));
+      }
+      expect(chunks.skip(1).first.length, greaterThan(kFirstSpeechChunkChars));
+      expect(chunks.join(' '), text);
+    });
+
+    test('a sentence longer than a piece is cut at a comma or a space', () {
+      final text =
+          '${List.filled(60, 'slovo za slovem, pořád dál').join(' ')}.';
+      final chunks = speechChunks(text);
+      expect(chunks.length, greaterThan(1));
+      for (final c in chunks) {
+        expect(c.length, lessThanOrEqualTo(kSpeechChunkChars));
+      }
+      expect(chunks.join(' '), text);
+    });
+  });
+
+  group('SpeechPlayer', () {
+    const voice = kDefaultVoiceId;
+    // Three pieces: a short opener and two sentences that do not fit together.
+    final text = 'Krátký úvod. ${'A' * 300}. ${'B' * 300}.';
+    final key = SpeechPlayer.keyOf(text, voice);
+
+    test('pieces play in order, each as soon as it is ready', () async {
+      final output = _FakeOutput();
+      final gates = <String, Completer<String>>{};
+      final asked = <String>[];
+      final player = SpeechPlayer(
+        output: output,
+        synthesise: (spoken, _) {
+          asked.add(spoken);
+          return (gates[spoken] = Completer<String>()).future;
+        },
+      );
+      addTearDown(player.dispose);
+
+      await player.toggle(text, voice);
+      await pumpEventQueue();
+      expect(player.status(key), SpeechStatus.loading);
+      // One piece at a time: the second is not asked for before the first.
+      expect(asked, ['Krátký úvod.']);
+
+      gates[asked[0]]!.complete('/a.mp3');
+      await pumpEventQueue();
+      expect(output.started, ['/a.mp3']);
+      expect(player.status(key), SpeechStatus.playing);
+      expect(asked, hasLength(2));
+
+      // First piece ends before the second is ready: back to waiting.
+      output.finish();
+      await pumpEventQueue();
+      expect(player.status(key), SpeechStatus.loading);
+
+      gates[asked[1]]!.complete('/b.mp3');
+      await pumpEventQueue();
+      expect(output.started, ['/a.mp3', '/b.mp3']);
+      gates[asked[2]]!.complete('/c.mp3');
+      output.finish();
+      await pumpEventQueue();
+      expect(output.started, ['/a.mp3', '/b.mp3', '/c.mp3']);
+
+      output.finish();
+      await pumpEventQueue();
+      expect(player.status(key), SpeechStatus.idle);
+      expect(player.takeError(key), isNull);
+    });
+
+    test('pause and resume; a tap while waiting cancels', () async {
+      final output = _FakeOutput();
+      final first = Completer<String>();
+      var calls = 0;
+      final player = SpeechPlayer(
+        output: output,
+        synthesise: (_, _) =>
+            calls++ == 0 ? first.future : Completer<String>().future,
+      );
+      addTearDown(player.dispose);
+
+      await player.toggle(text, voice);
+      first.complete('/a.mp3');
+      await pumpEventQueue();
+      await player.toggle(text, voice);
+      expect(player.status(key), SpeechStatus.paused);
+      await player.toggle(text, voice);
+      expect(player.status(key), SpeechStatus.playing);
+
+      output.finish();
+      await pumpEventQueue();
+      expect(player.status(key), SpeechStatus.loading);
+      await player.toggle(text, voice);
+      expect(player.status(key), SpeechStatus.idle);
+    });
+
+    test('a failed piece stops the reading and says why once', () async {
+      final output = _FakeOutput();
+      var calls = 0;
+      final player = SpeechPlayer(
+        output: output,
+        synthesise: (_, _) async => calls++ == 0
+            ? '/a.mp3'
+            : throw const VoiceServiceException('Hlas teď neběží.'),
+      );
+      addTearDown(player.dispose);
+
+      await player.toggle(text, voice);
+      await pumpEventQueue();
+      output.finish();
+      await pumpEventQueue();
+      expect(player.status(key), SpeechStatus.idle);
+      expect(player.takeError(key), 'Hlas teď neběží.');
+      expect(player.takeError(key), isNull);
+    });
+
+    test('music taking the player ends the reading', () async {
+      final output = _FakeOutput();
+      final player = SpeechPlayer(
+        output: output,
+        synthesise: (spoken, _) async => '/${spoken.length}.mp3',
+      );
+      addTearDown(player.dispose);
+
+      await player.toggle(text, voice);
+      await pumpEventQueue();
+      expect(player.status(key), SpeechStatus.playing);
+      await output.toggle('/song.mp3');
+      await pumpEventQueue();
+      expect(player.status(key), SpeechStatus.idle);
+      // And the song is left alone.
+      expect(output.path, '/song.mp3');
+    });
+  });
+
   group('VoiceStudioNotifier', () {
     late Directory dir;
     late _FakeAudioServer server;
@@ -426,4 +644,52 @@ print('nečíst');
     expect(find.text('Kasandra (medium)'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
+}
+
+/// A player that plays until told the file ended.
+class _FakeOutput extends ChangeNotifier implements AudioOutput {
+  final started = <String>[];
+  String? _path;
+  var _playing = false;
+  var _completed = false;
+
+  @override
+  String? get path => _path;
+
+  @override
+  bool isPlaying(String path) => _path == path && _playing;
+
+  @override
+  bool isCompleted(String path) => _path == path && _completed;
+
+  @override
+  Future<void> toggle(String path) async {
+    if (_path == path && !_completed) {
+      _playing = !_playing;
+    } else {
+      // Like the real one: the old file goes first, then the new one loads.
+      _path = null;
+      notifyListeners();
+      await Future<void>.delayed(Duration.zero);
+      _path = path;
+      _playing = true;
+      _completed = false;
+      started.add(path);
+    }
+    notifyListeners();
+  }
+
+  void finish() {
+    _playing = false;
+    _completed = true;
+    notifyListeners();
+  }
+
+  @override
+  Future<void> stop() async {
+    _path = null;
+    _playing = false;
+    _completed = false;
+    notifyListeners();
+  }
 }

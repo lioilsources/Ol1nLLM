@@ -808,11 +808,31 @@ jako u MusicStudia (AiStack `services/audio`, sekce TTS v jeho README),
 - **Čte se text, ne markdown** (`speakableText()`): kód, odkazy, URL, oddělovač
   tabulky a značky pryč, konec řádku bez interpunkce je tečka, strop 5000
   znaků (limit serveru) se řeže na konci věty.
-- **Syntéza je jedno volání, žádný resume**: `VoiceService.speak()` odešle job,
-  dopolluje ho přes `MusicService.follow()` a stáhne mp3. Řeč trvá vteřiny
-  (Kasandra 0,7 s, klon přes chatterbox-cs 3,2 s na větu, měřeno 2026-10-06),
-  takže výpadek sítě je chyba a uživatel klepne znovu — persistovat jobId jako
-  u hudby by byl kód bez užitku.
+- **Čte se po částech** (`speechChunks()` → `SpeechPlayer`,
+  `lib/providers/speech_player.dart`). Klonující engine generuje o něco
+  pomaleji než reálný čas: odpověď Knihovníka o 2 736 znacích dala 192 s
+  zvuku za 214 s (chatterbox-cs, 2026-10-06; Kasandra tutéž za 8 s), takže
+  čekat na celý soubor znamenalo tři a půl minuty ticha. Text se proto řeže
+  na koncích vět — první kus do 120 znaků, aby zvuk začal za pár vteřin,
+  další do 400 — kusy se syntetizují **po jednom a v pořadí** (engine frontu
+  stejně bere popořadě a zrušení pak zahodí nejvýš jeden kus) a každý hraje,
+  jakmile je hotový a předchozí dohrál. Model dál nestíhá reálný čas, takže
+  u dlouhé odpovědi jsou mezi kusy krátké pauzy (tlačítko ukazuje kolečko);
+  padají na konec věty. Klepnutí při hraní pozastaví, při čekání zruší.
+  Sekvenci řídí `SpeechPlayer` nad rozhraním `AudioOutput` (to z
+  `MusicPlayback` potřebuje: `path`, `isPlaying`, `isCompleted`, `toggle`,
+  `stop`), aby šla testovat bez nativního přehrávače; když přehrávač
+  převezme hudba, čtení skončí a hudbu nechá být.
+- **Jeden kus = jedno volání, žádný resume**: `VoiceService.speak()` odešle
+  job, dopolluje ho přes `MusicService.follow()` a stáhne mp3 — persistovat
+  jobId jako u hudby by byl kód bez užitku. Job, který server **přijal a pak
+  spadl**, se po 15 s zkusí jednou znovu: tak vypadá restart kontejneru
+  enginu uprostřed věty (2026-10-06, „varianta 0: chatterbox nedostupný:
+  Server disconnected…"). Ta hláška je orchestrátor mluvící sám se sebou,
+  proto ji appka nahrazuje větou „Hlas se nepodařilo přečíst, zkus to znovu."
+  a originál nechává v logu (`VoiceServiceException.detail`). **Odmítnutí**
+  (503, 403) se neopakuje — server v něm říká větou, proč hlas neběží, a
+  čekání by tu odpověď jen zdrželo.
 - **Cache**: soubor `applicationSupport/voice_studio/<sha1(hlas, jazyk, text)>.mp3`,
   zapisuje se přes `.part` + rename. Stejná věta stejným hlasem se syntetizuje
   jednou; souběžná klepnutí sdílí jeden request (`_inFlight`).
@@ -827,11 +847,12 @@ jako u MusicStudia (AiStack `services/audio`, sekce TTS v jeho README),
   a Chatterbox nejsou v rozvrhu SPARKu (AiStack `CLAUDE.md`, sekce TTS). Když
   neběží, server odmítne `/tts` hned `503` s větou pro člověka a appka ji
   ukáže doslova (stejná cesta jako u MusicStudia, `MusicService.errorSnippet`).
-- Přehrává sdílený `MusicPlayback`, takže řeč zastaví hudbu a naopak.
+- Přehrává sdílený `MusicPlayback`, takže řeč zastaví hudbu a naopak; čte
+  vždy nejvýš jedna odpověď (`speechPlayerProvider`).
 - Testy `test/voice_test.dart` nad `test/fixtures/audio_voices.json`,
   `audio_voice_stored.json`, `audio_tts_job.json` — odpovědi zachycené ze
-  SPARKu 2026-10-06; text 403 je taky doslova ze serveru, 503 je vymyšlený
-  (engine v tu chvíli běžel).
+  SPARKu 2026-10-06; text 403 i chyba spadlého jobu jsou doslova ze serveru,
+  503 je vymyšlený (engine v tu chvíli běžel).
 
 ## Video (`video-stack/serve.py`, `llm.ol1n.com/v1/video/*`)
 
