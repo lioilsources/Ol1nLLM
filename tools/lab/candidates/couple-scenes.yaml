@@ -1,0 +1,69 @@
+# Matice F — scény páru. Řádky = scéna, sloupce = modely, bez stylu.
+#
+# Otázka: jsou na obrázku dva lidé, je akce poznat, drží ruce a tváře?
+# Oblečení je všude stejné (současné, běžné), aby se měnila jen scéna.
+# Obě postavy jsou výslovně dospělé; „do školy“ je univerzitní kampus.
+#
+#   lab run --prompts-yaml tools/lab/candidates/couple-scenes.yaml \
+#           --models juggernaut-xl,flux-manga,illustrious-xl \
+#           --flows txt2img --no-styles --sweep 'param.seed=777|778|779'
+
+holding-hands:
+  danbooru: "1girl, 1boy, hetero, couple, adult, holding hands, walking, full body, casual clothes, jeans, city street, day"
+  juggernaut: "an adult couple, a man and a woman in their late twenties, walking and holding hands, full body, casual clothes, city street, daylight"
+  flux: "A photograph of an adult couple in their late twenties, a man and a woman in casual clothes, walking down a city street holding hands, full body, daylight."
+
+kiss:
+  danbooru: "1girl, 1boy, hetero, couple, adult, kiss, closed eyes, upper body, from side, casual clothes, park, evening"
+  juggernaut: "an adult couple, a man and a woman in their late twenties, kissing, eyes closed, side view, upper body, casual clothes, park at dusk"
+  flux: "A photograph of an adult couple in their late twenties kissing in a park at dusk, seen from the side, eyes closed, upper body, casual clothes."
+
+hug:
+  danbooru: "1girl, 1boy, hetero, couple, adult, hug, arms around waist, smile, upper body, casual clothes, living room"
+  juggernaut: "an adult couple, a man and a woman in their late twenties, hugging, his arms around her waist, both smiling, upper body, casual clothes, living room"
+  flux: "A photograph of an adult couple in their late twenties hugging in a living room, his arms around her waist, both smiling, upper body, casual clothes."
+
+date:
+  danbooru: "1girl, 1boy, hetero, couple, adult, date, sitting, across table, cafe, coffee cup, smile, casual clothes"
+  juggernaut: "an adult couple, a man and a woman in their late twenties, on a date, sitting across a small cafe table with coffee cups, smiling, casual clothes"
+  flux: "A photograph of an adult couple in their late twenties on a date, sitting across a small cafe table with two coffee cups, smiling at each other, casual clothes."
+
+in-love:
+  danbooru: "1girl, 1boy, hetero, couple, adult, forehead-to-forehead, eye contact, blush, smile, upper body, casual clothes, sunset"
+  juggernaut: "an adult couple, a man and a woman in their late twenties, in love, foreheads touching, looking into each other's eyes, soft smiles, upper body, casual clothes, sunset light"
+  flux: "A photograph of an adult couple in their late twenties, clearly in love, foreheads touching and looking into each other's eyes with soft smiles, upper body, casual clothes, sunset light."
+
+smiling:
+  danbooru: "1girl, 1boy, hetero, couple, adult, side-by-side, looking at viewer, smile, grin, upper body, casual clothes, outdoors"
+  juggernaut: "an adult couple, a man and a woman in their late twenties, standing side by side, smiling at the camera, upper body, casual clothes, outdoors"
+  flux: "A photograph of an adult couple in their late twenties standing side by side outdoors and smiling at the camera, upper body, casual clothes."
+
+watching-tv:
+  danbooru: "1girl, 1boy, hetero, couple, adult, sitting, couch, watching television, leaning on person, blanket, living room, night, casual clothes"
+  juggernaut: "an adult couple, a man and a woman in their late twenties, sitting on a couch watching television, she leans on his shoulder, blanket, living room at night, casual clothes"
+  flux: "A photograph of an adult couple in their late twenties sitting on a couch under a blanket and watching television at night, her head on his shoulder, casual clothes, the screen lighting their faces."
+
+dinner:
+  danbooru: "1girl, 1boy, hetero, couple, adult, sitting, table, dinner, food, plate, wine glass, candle, restaurant, smile, casual clothes"
+  juggernaut: "an adult couple, a man and a woman in their late twenties, having dinner at a restaurant table, plates of food, wine glasses, candlelight, smiling, casual clothes"
+  flux: "A photograph of an adult couple in their late twenties having dinner at a restaurant table with plates of food, wine glasses and a candle, smiling at each other, casual clothes."
+
+campus:
+  danbooru: "1girl, 1boy, hetero, couple, adult, college students, walking, side-by-side, backpack, holding book, university, campus, day, casual clothes, full body"
+  juggernaut: "an adult couple, two university students in their mid twenties, a man and a woman, walking to class across a university campus, backpacks, books, full body, casual clothes, morning"
+  flux: "A photograph of two adult university students in their mid twenties, a man and a woman who are a couple, walking to class across a university campus with backpacks and books, full body, casual clothes, morning light."
+
+bus-stop:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, bus stop, bus, waiting, side-by-side, street, morning, casual clothes, full body"
+  juggernaut: "an adult couple, a man and a woman in their late twenties, waiting at a bus stop as a city bus arrives, standing side by side, full body, casual clothes, morning"
+  flux: "A photograph of an adult couple in their late twenties waiting together at a bus stop as a city bus arrives, standing side by side, full body, casual clothes, morning."
+
+in-bed:
+  danbooru: "1girl, 1boy, hetero, couple, adult, lying, on bed, on side, facing another, under covers, pillow, pajamas, smile, bedroom, morning, from above"
+  juggernaut: "an adult couple, a man and a woman in their late twenties, lying in bed facing each other under the covers, pajamas, smiling, bedroom, morning light, view from above"
+  flux: "A photograph of an adult couple in their late twenties lying in bed facing each other under the covers, wearing pajamas and smiling, seen from above in soft morning light."
+
+walk-embrace:
+  danbooru: "1girl, 1boy, hetero, couple, adult, walking, arm around shoulder, from behind, autumn, park, path, casual clothes, coat, full body"
+  juggernaut: "an adult couple, a man and a woman in their late twenties, walking away along a park path in autumn, his arm around her shoulders, seen from behind, full body, coats"
+  flux: "A photograph of an adult couple in their late twenties walking away along a park path in autumn, his arm around her shoulders, seen from behind, full body, wearing coats."

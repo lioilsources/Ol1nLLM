@@ -1,0 +1,145 @@
+# Matice D — móda podle doby. Řádky = doba, sloupce = modely, bez stylu.
+#
+# Otázka: pozná model dobu, nebo jen přebarví obrázek? Scéna je všude táž
+# (dospělý pár stojí vedle sebe na ulici, celé postavy), mění se jen oblečení.
+#
+# Každá doba je dvakrát — ablace „štítek, nebo popis“ (jako jméno × popis
+# u umělců ve vlně 3):
+#   <doba>-label  jen název doby
+#   <doba>-desc   konkrétní kusy oblečení a účesy, bez názvu doby
+# `baseline` je táž scéna bez jakéhokoli údaje o oblečení.
+#
+#   lab run --prompts-yaml tools/lab/candidates/clothing-eras.yaml \
+#           --models juggernaut-xl,flux-manga,illustrious-xl \
+#           --flows txt2img --no-styles
+
+baseline:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day"
+  juggernaut: "a full body photo of an adult couple in their late twenties, a man and a woman, standing side by side on a street, facing the camera, daylight"
+  flux: "A full body photograph of an adult couple in their late twenties, a man and a woman, standing side by side on a street and facing the camera in daylight."
+
+now-label:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, contemporary fashion, 2020s fashion, trendy clothes"
+  juggernaut: "a full body photo of an adult couple in their late twenties, a man and a woman, standing side by side on a street, facing the camera, daylight, dressed in trendy mid-2020s fashion"
+  flux: "A full body photograph of an adult couple in their late twenties, a man and a woman, standing side by side on a street and facing the camera in daylight, dressed in trendy mid-2020s fashion."
+now-desc:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, baggy pants, wide-leg jeans, crop top, oversized jacket, sneakers, tote bag, oversized shirt, cargo pants"
+  juggernaut: "a full body photo of an adult couple in their late twenties standing side by side on a street, facing the camera, daylight, she wears baggy wide-leg jeans, a cropped top, an oversized blazer and chunky sneakers, he wears loose cargo trousers, a boxy overshirt and retro running shoes"
+  flux: "A full body photograph of an adult couple in their late twenties standing side by side on a street and facing the camera in daylight. She wears baggy wide-leg jeans, a cropped top, an oversized blazer and chunky sneakers; he wears loose cargo trousers, a boxy overshirt and retro running shoes."
+
+y2020-label:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, 2020 fashion, loungewear"
+  juggernaut: "a full body photo of an adult couple in their late twenties, a man and a woman, standing side by side on a street, facing the camera, daylight, dressed in typical 2020 fashion"
+  flux: "A full body photograph of an adult couple in their late twenties, a man and a woman, standing side by side on a street and facing the camera in daylight, dressed in typical 2020 fashion."
+y2020-desc:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, hoodie, sweatpants, leggings, tie-dye, puffer jacket, white sneakers, bike shorts"
+  juggernaut: "a full body photo of an adult couple in their late twenties standing side by side on a street, facing the camera, daylight, she wears a tie-dye sweatshirt, high-waisted leggings and white chunky sneakers, he wears a matching grey hoodie and sweatpants set with a cropped puffer jacket"
+  flux: "A full body photograph of an adult couple in their late twenties standing side by side on a street and facing the camera in daylight. She wears a tie-dye sweatshirt, high-waisted leggings and white chunky sneakers; he wears a matching grey hoodie and sweatpants set with a cropped puffer jacket."
+
+y2015-label:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, 2010s fashion, hipster"
+  juggernaut: "a full body photo of an adult couple in their late twenties, a man and a woman, standing side by side on a street, facing the camera, daylight, dressed in typical mid-2010s fashion"
+  flux: "A full body photograph of an adult couple in their late twenties, a man and a woman, standing side by side on a street and facing the camera in daylight, dressed in typical mid-2010s fashion."
+y2015-desc:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, skinny jeans, torn jeans, ankle boots, plaid shirt, beanie, beard, undercut, scarf, long cardigan"
+  juggernaut: "a full body photo of an adult couple in their late twenties standing side by side on a street, facing the camera, daylight, she wears ripped skinny jeans, ankle boots, a long cardigan and a big scarf, he wears skinny jeans, a plaid flannel shirt, a beanie and a full beard"
+  flux: "A full body photograph of an adult couple in their late twenties standing side by side on a street and facing the camera in daylight. She wears ripped skinny jeans, ankle boots, a long cardigan and a big scarf; he wears skinny jeans, a plaid flannel shirt, a beanie and a full beard."
+
+y2k-label:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, y2k fashion, 2000s (style)"
+  juggernaut: "a full body photo of an adult couple in their late twenties, a man and a woman, standing side by side on a street, facing the camera, daylight, dressed in Y2K early-2000s fashion"
+  flux: "A full body photograph of an adult couple in their late twenties, a man and a woman, standing side by side on a street and facing the camera in daylight, dressed in Y2K early-2000s fashion."
+y2k-desc:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, lowleg pants, flared jeans, tube top, midriff, tinted eyewear, baseball cap, baggy pants, polo shirt, popped collar, spiked hair"
+  juggernaut: "a full body photo of an adult couple in their late twenties standing side by side on a street, facing the camera, daylight, she wears low-rise flared jeans, a tube top, a studded belt and tinted sunglasses, he wears baggy bootcut jeans, a polo shirt with a popped collar, a trucker cap and gelled spiky hair"
+  flux: "A full body photograph of an adult couple in their late twenties standing side by side on a street and facing the camera in daylight. She wears low-rise flared jeans, a tube top, a studded belt and tinted sunglasses; he wears baggy bootcut jeans, a polo shirt with a popped collar, a trucker cap and gelled spiky hair."
+
+y1990s-label:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, 1990s (style), 90s fashion, retro artstyle"
+  juggernaut: "a full body photo of an adult couple in their late twenties, a man and a woman, standing side by side on a street, facing the camera, daylight, dressed in 1990s fashion"
+  flux: "A full body photograph of an adult couple in their late twenties, a man and a woman, standing side by side on a street and facing the camera in daylight, dressed in 1990s fashion."
+y1990s-desc:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, plaid shirt, shirt around waist, torn jeans, combat boots, choker, slip dress, denim jacket, overalls, curtained hair"
+  juggernaut: "a full body photo of an adult couple in their late twenties standing side by side on a street, facing the camera, daylight, she wears a slip dress over a white t-shirt, a choker and combat boots, he wears ripped light-wash jeans, a band t-shirt, a flannel shirt tied around his waist and curtained hair"
+  flux: "A full body photograph of an adult couple in their late twenties standing side by side on a street and facing the camera in daylight. She wears a slip dress over a white t-shirt, a choker and combat boots; he wears ripped light-wash jeans, a band t-shirt, a flannel shirt tied around his waist and curtained hair."
+
+y1980s-label:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, 1980s (style), 80s fashion, retro artstyle"
+  juggernaut: "a full body photo of an adult couple in their late twenties, a man and a woman, standing side by side on a street, facing the camera, daylight, dressed in 1980s fashion"
+  flux: "A full body photograph of an adult couple in their late twenties, a man and a woman, standing side by side on a street and facing the camera in daylight, dressed in 1980s fashion."
+y1980s-desc:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, shoulder pads, big hair, leg warmers, neon clothes, high-waist jeans, acid wash, sleeves rolled up, blazer, mullet, headband"
+  juggernaut: "a full body photo of an adult couple in their late twenties standing side by side on a street, facing the camera, daylight, she has big permed hair and wears a neon blazer with huge shoulder pads, high-waisted acid-wash jeans and leg warmers, he has a mullet and wears a pastel blazer with rolled-up sleeves over a t-shirt and white trousers"
+  flux: "A full body photograph of an adult couple in their late twenties standing side by side on a street and facing the camera in daylight. She has big permed hair and wears a neon blazer with huge shoulder pads, high-waisted acid-wash jeans and leg warmers; he has a mullet and wears a pastel blazer with rolled-up sleeves over a t-shirt and white trousers."
+
+y1970s-label:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, 1970s (style), 70s fashion, retro artstyle"
+  juggernaut: "a full body photo of an adult couple in their late twenties, a man and a woman, standing side by side on a street, facing the camera, daylight, dressed in 1970s fashion"
+  flux: "A full body photograph of an adult couple in their late twenties, a man and a woman, standing side by side on a street and facing the camera in daylight, dressed in 1970s fashion."
+y1970s-desc:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, bell-bottoms, platform footwear, floral print, wide collar, open collar, long hair, sideburns, headband, fringe trim, maxi dress"
+  juggernaut: "a full body photo of an adult couple in their late twenties standing side by side on a street, facing the camera, daylight, she has long straight hair and wears a floral maxi dress with a fringed suede vest and platform sandals, he has long hair and sideburns and wears bell-bottom trousers and a patterned shirt with a wide open collar"
+  flux: "A full body photograph of an adult couple in their late twenties standing side by side on a street and facing the camera in daylight. She has long straight hair and wears a floral maxi dress with a fringed suede vest and platform sandals; he has long hair and sideburns and wears bell-bottom trousers and a patterned shirt with a wide open collar."
+
+y1960s-label:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, 1960s (style), 60s fashion, mod fashion, retro artstyle"
+  juggernaut: "a full body photo of an adult couple in their late twenties, a man and a woman, standing side by side on a street, facing the camera, daylight, dressed in 1960s mod fashion"
+  flux: "A full body photograph of an adult couple in their late twenties, a man and a woman, standing side by side on a street and facing the camera in daylight, dressed in 1960s mod fashion."
+y1960s-desc:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, minidress, a-line dress, geometric pattern, go-go boots, white boots, beehive hairdo, bob cut, slim suit, narrow necktie, turtleneck"
+  juggernaut: "a full body photo of an adult couple in their late twenties standing side by side on a street, facing the camera, daylight, she has a bouffant bob and wears a short A-line shift dress with a bold geometric print and white go-go boots, he wears a slim-cut suit with narrow lapels, a skinny tie and Chelsea boots"
+  flux: "A full body photograph of an adult couple in their late twenties standing side by side on a street and facing the camera in daylight. She has a bouffant bob and wears a short A-line shift dress with a bold geometric print and white go-go boots; he wears a slim-cut suit with narrow lapels, a skinny tie and Chelsea boots."
+
+y1950s-label:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, 1950s (style), 50s fashion, retro artstyle"
+  juggernaut: "a full body photo of an adult couple in their late twenties, a man and a woman, standing side by side on a street, facing the camera, daylight, dressed in 1950s fashion"
+  flux: "A full body photograph of an adult couple in their late twenties, a man and a woman, standing side by side on a street and facing the camera in daylight, dressed in 1950s fashion."
+y1950s-desc:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, polka dot dress, circle skirt, petticoat, cinched waist, pumps, curled hair, red lips, leather jacket, white t-shirt, cuffed jeans, pompadour"
+  juggernaut: "a full body photo of an adult couple in their late twenties standing side by side on a street, facing the camera, daylight, she has curled hair and red lipstick and wears a polka-dot dress with a cinched waist, a full circle skirt and pumps, he has a pompadour and wears a leather jacket over a white t-shirt and cuffed blue jeans"
+  flux: "A full body photograph of an adult couple in their late twenties standing side by side on a street and facing the camera in daylight. She has curled hair and red lipstick and wears a polka-dot dress with a cinched waist, a full circle skirt and pumps; he has a pompadour and wears a leather jacket over a white t-shirt and cuffed blue jeans."
+
+y1920s-label:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, 1920s (style), flapper, roaring twenties"
+  juggernaut: "a full body photo of an adult couple in their late twenties, a man and a woman, standing side by side on a street, facing the camera, daylight, dressed in 1920s fashion"
+  flux: "A full body photograph of an adult couple in their late twenties, a man and a woman, standing side by side on a street and facing the camera in daylight, dressed in 1920s fashion."
+y1920s-desc:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, drop-waist dress, beaded dress, fringe trim, cloche hat, pearl necklace, bob cut, three-piece suit, vest, fedora, two-tone footwear"
+  juggernaut: "a full body photo of an adult couple in their late twenties standing side by side on a street, facing the camera, daylight, she has a short bob under a cloche hat and wears a beaded drop-waist dress with fringe and a long pearl necklace, he wears a three-piece pinstripe suit, a fedora and two-tone shoes"
+  flux: "A full body photograph of an adult couple in their late twenties standing side by side on a street and facing the camera in daylight. She has a short bob under a cloche hat and wears a beaded drop-waist dress with fringe and a long pearl necklace; he wears a three-piece pinstripe suit, a fedora and two-tone shoes."
+
+belle-epoque-label:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, victorian, edwardian, 1900s fashion"
+  juggernaut: "a full body photo of an adult couple in their late twenties, a man and a woman, standing side by side on a street, facing the camera, daylight, dressed in Belle Epoque fashion of around 1900"
+  flux: "A full body photograph of an adult couple in their late twenties, a man and a woman, standing side by side on a street and facing the camera in daylight, dressed in Belle Epoque fashion of around 1900."
+belle-epoque-desc:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, long dress, high collar, puffy sleeves, corset, large hat, hat feather, parasol, hair bun, frock coat, top hat, waistcoat, cane, mustache"
+  juggernaut: "a full body photo of an adult couple in their late twenties standing side by side on a street, facing the camera, daylight, she wears a floor-length high-collared gown with puffed sleeves and a corseted waist, a wide feathered hat and carries a parasol, he wears a frock coat, a waistcoat, a top hat and a moustache and holds a cane"
+  flux: "A full body photograph of an adult couple in their late twenties standing side by side on a street and facing the camera in daylight. She wears a floor-length high-collared gown with puffed sleeves and a corseted waist and a wide feathered hat, and carries a parasol; he wears a frock coat, a waistcoat and a top hat, has a moustache and holds a cane."
+
+rococo-label:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, rococo, 18th century fashion"
+  juggernaut: "a full body photo of an adult couple in their late twenties, a man and a woman, standing side by side on a street, facing the camera, daylight, dressed in 18th century Rococo fashion"
+  flux: "A full body photograph of an adult couple in their late twenties, a man and a woman, standing side by side on a street and facing the camera in daylight, dressed in 18th century Rococo fashion."
+rococo-desc:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, pannier, wide skirt, pastel dress, lace trim, ribbon, powdered wig, embroidered coat, justaucorps, breeches, white stockings, cravat, buckle shoes"
+  juggernaut: "a full body photo of an adult couple in their late twenties standing side by side on a street, facing the camera, daylight, she wears a pastel silk gown with wide panniers, lace and ribbons and a tall powdered wig, he wears an embroidered coat, knee breeches, white stockings, a lace cravat and buckled shoes"
+  flux: "A full body photograph of an adult couple in their late twenties standing side by side on a street and facing the camera in daylight. She wears a pastel silk gown with wide panniers, lace and ribbons and a tall powdered wig; he wears an embroidered coat, knee breeches, white stockings, a lace cravat and buckled shoes."
+
+medieval-label:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, medieval, medieval clothes"
+  juggernaut: "a full body photo of an adult couple in their late twenties, a man and a woman, standing side by side on a street, facing the camera, daylight, dressed in medieval clothing"
+  flux: "A full body photograph of an adult couple in their late twenties, a man and a woman, standing side by side on a street and facing the camera in daylight, dressed in medieval clothing."
+medieval-desc:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, long dress, long sleeves, wide sleeves, wool, veil, circlet, braid, tunic, hose, leather belt, cloak, hood, leather boots"
+  juggernaut: "a full body photo of an adult couple in their late twenties standing side by side on a street, facing the camera, daylight, she wears a long woollen kirtle with wide trailing sleeves, a linen veil and a circlet, he wears a knee-length belted tunic, hose, a hooded cloak and leather boots"
+  flux: "A full body photograph of an adult couple in their late twenties standing side by side on a street and facing the camera in daylight. She wears a long woollen kirtle with wide trailing sleeves, a linen veil and a circlet; he wears a knee-length belted tunic, hose, a hooded cloak and leather boots."
+
+roman-label:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, ancient rome, roman clothes"
+  juggernaut: "a full body photo of an adult couple in their late twenties, a man and a woman, standing side by side on a street, facing the camera, daylight, dressed in ancient Roman clothing"
+  flux: "A full body photograph of an adult couple in their late twenties, a man and a woman, standing side by side on a street and facing the camera in daylight, dressed in ancient Roman clothing."
+roman-desc:
+  danbooru: "1girl, 1boy, hetero, couple, adult, standing, side-by-side, full body, facing viewer, street, day, stola, draped dress, white dress, shawl, gold bracelet, hair updo, toga, white tunic, sandals, laurel crown"
+  juggernaut: "a full body photo of an adult couple in their late twenties standing side by side on a street, facing the camera, daylight, she wears a long draped white stola pinned at the shoulders with a coloured shawl, gold bracelets and pinned-up hair, he wears a white tunic under a draped toga and leather sandals"
+  flux: "A full body photograph of an adult couple in their late twenties standing side by side on a street and facing the camera in daylight. She wears a long draped white stola pinned at the shoulders with a coloured shawl, gold bracelets and pinned-up hair; he wears a white tunic under a draped toga and leather sandals."
