@@ -73,8 +73,8 @@ def main() -> None:
     packs = []
     for p in sorted(args.set.parent.glob("*/map.json")):
         m = json.loads(p.read_text())
-        if "atlas" not in m:
-            continue  # built but not rendered yet
+        if "atlas" not in m or p.parent.name.startswith("_"):
+            continue  # built but not rendered yet, or a scratch set
         packs.append({
             "id": m["id"], "title": m["title"], "n": m["n"],
             "aspect": m["aspect"], "atlas": f"{m['id']}/{m['atlas']}",

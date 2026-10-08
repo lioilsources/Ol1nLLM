@@ -1,4 +1,4 @@
-.PHONY: run debug build-ios build-android lab lab-dry lab-check lab-arcface lab-resume lab-score stylemap-env stylemap stylemap-serve stylemap-publish
+.PHONY: run debug build-ios build-android lab lab-dry lab-check lab-arcface lab-resume lab-score stylemap-env stylemap stylemap-tags stylemap-serve stylemap-publish
 
 -include .env.local
 
@@ -86,8 +86,20 @@ stylemap:
 		$(if $(RUN),--run build/lab/$(RUN),) \
 		$(foreach s,$(SESSIONS),--session $(s)) $(foreach w,$(WHERE),--where $(w)) \
 		$(if $(FULL),--full,) $(if $(TAG_REGEX),--tag-regex '$(TAG_REGEX)',)
+	$(STYLEMAP_PY) tools/stylemap/perceptual.py --set build/stylemap/$(SET)
 	$(STYLEMAP_PY) tools/stylemap/build_map.py --set build/stylemap/$(SET) \
 		$(if $(TITLE),--title "$(TITLE)",)
+	$(STYLEMAP_PY) tools/stylemap/make_thumbs.py --set build/stylemap/$(SET)
+
+# VLM tags for a set (facets and search in the widget), then the manifest
+# again — the layout does not change, only what the pictures carry. The model
+# is shared and runs in a window (SPARK, 19:15–00:50); the script stops by
+# itself and keeps what it has, so the same command another evening finishes
+# the set. TAG_ARGS passes options through (--jobs, --until, --url).
+stylemap-tags:
+	$(STYLEMAP_PY) tools/stylemap/tag_images.py --set build/stylemap/$(SET) $(TAG_ARGS)
+	$(STYLEMAP_PY) tools/stylemap/build_map.py --set build/stylemap/$(SET) \
+		--title "$$(python3 -c "import json;print(json.load(open('build/stylemap/$(SET)/map.json'))['title'])")"
 	$(STYLEMAP_PY) tools/stylemap/make_thumbs.py --set build/stylemap/$(SET)
 
 # Serves the packs to a phone on the LAN (STYLEMAP_URL=http://<mac-ip>:8770,

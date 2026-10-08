@@ -48,6 +48,37 @@ MEDIA = [
     "low poly", "paper cutout", "pastel drawing", "digital painting",
 ]
 
+# What the VLM is asked about every picture (tag_images.py) and what the
+# widget filters by: key → (Czech name, {value: Czech label}). The values are
+# the model's whole vocabulary — a closed list, so a facet has a handful of
+# chips and not one per spelling. `medium` is the CLIP list above on purpose:
+# a set without VLM tags gets the same facet from the zero-shot guess.
+FACETS: dict[str, tuple[str, dict[str, str]]] = {
+    "medium": ("Médium", dict(zip(MEDIA, [
+        "fotka", "olejomalba", "akvarel", "kresba tužkou", "kresba tuší",
+        "pixel art", "3D render", "anime", "komiks", "koláž", "low poly",
+        "papírová vystřihovánka", "pastel", "digitální malba",
+    ]))),
+    "palette": ("Paleta", {
+        "warm": "teplá", "cool": "studená", "pastel": "pastelová", "muted": "tlumená",
+        "vivid": "sytá", "monochrome": "jednobarevná", "dark": "tmavá",
+        "earthy": "zemitá", "neon": "neonová",
+    }),
+    "mood": ("Nálada", {
+        "calm": "klidná", "joyful": "radostná", "dramatic": "dramatická",
+        "melancholic": "melancholická", "dark": "temná", "dreamy": "snová",
+        "playful": "hravá", "sensual": "smyslná", "tense": "napjatá",
+    }),
+    "line": ("Linka", {
+        "none": "bez linek", "soft": "měkká", "clean": "čistá", "bold": "silná",
+        "sketchy": "skicovitá",
+    }),
+    "background": ("Pozadí", {
+        "plain": "jednolité", "gradient": "přechod", "abstract": "abstraktní",
+        "interior": "interiér", "landscape": "krajina", "urban": "město",
+        "pattern": "vzor",
+    }),
+}
 
 @dataclass
 class Item:
@@ -104,9 +135,11 @@ def _unescape(s: str) -> str:
 
 DEFAULT_GALLERY = "https://finetune.ol1n.com"
 REPO_ROOT = Path(__file__).resolve().parents[2]
+# One answer per picture file, shared by every set the picture is in.
+TAG_CACHE = REPO_ROOT / "build" / "stylemap" / "_tags"
 
 
-def _credentials() -> dict[str, str]:
+def credentials() -> dict[str, str]:
     """CF Access headers from the environment, else from the repo's .env.local
     (the same two places the lab looks). None at all is fine on the LAN."""
     vals: dict[str, str] = {}
@@ -140,7 +173,7 @@ def _get(url: str, headers: dict[str, str], timeout: float = 60) -> bytes:
 def gallery_rows(base: str, session: str, where: dict[str, str]) -> list[dict]:
     """Every image of one session that passes `where` (the gallery's own
     /api/images filters: score=1, model=…, style=…), oldest first."""
-    headers = _credentials()
+    headers = credentials()
     rows: list[dict] = []
     cursor = None
     while True:
@@ -171,7 +204,7 @@ def load_gallery(
     hangs its cells under is not a result and is left out.
     """
     base = base.rstrip("/")
-    headers = _credentials()
+    headers = credentials()
     rx = re.compile(tag_regex) if tag_regex else None
     kind, ext = ("img", "png") if full else ("thumb", "jpg")
     cache.mkdir(parents=True, exist_ok=True)
