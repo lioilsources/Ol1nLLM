@@ -1,0 +1,9 @@
+torch
+torchvision
+open_clip_torch
+umap-learn
+scikit-learn
+scipy
+numpy
+pillow
+opencv-python-headless

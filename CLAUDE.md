@@ -17,7 +17,8 @@ make run
 
 Volitelné URL overrides (`.env.local`, Makefile je propouští jen když jsou
 neprázdné): `COMFYUI_URL`, `FINETUNE_URL`, `FLUX_NIM_URL`, `VLLM_URL`,
-`LIBRARY_CHAT_URL`, `LAW_CHAT_URL`, `LEADS_CHAT_URL`, `UGC_FC_URL`, `AUDIO_URL`. Pro vývoj knihovny proti SPARKu na LAN:
+`LIBRARY_CHAT_URL`, `LAW_CHAT_URL`, `LEADS_CHAT_URL`, `UGC_FC_URL`, `AUDIO_URL`,
+`STYLEMAP_URL`. Pro vývoj knihovny proti SPARKu na LAN:
 `LIBRARY_CHAT_URL=http://192.168.88.66:8090` (Právník: `LAW_CHAT_URL=http://192.168.88.66:8098`; Leads: `LEADS_CHAT_URL=http://192.168.88.66:8099`,
 to je zároveň výchozí hodnota, tunel zatím není) — pak ale **jen `make debug`**
 (release Android manifest nemá `usesCleartextTraffic` a iOS nemá výjimku
@@ -61,6 +62,8 @@ lib/
     music_studio_screen.dart
     voice_studio_screen.dart
     story_studio_screen.dart   # + story_setup_screen.dart (obsazení rolí)
+    style_map_screen.dart      # mapy stylů: výběr sady + widget StyleMap
+  stylemap/                    # widget StyleMap, model packu, StyleMapService
 ```
 
 ## Image Studio — Job Queue implementace
@@ -903,6 +906,47 @@ popisem vzhledu, odhad minut), uživatel obsadí role vlastními obrázky
   `StoryFiles.baseDir`). Resume při startu, návratu do popředí a 5 s po
   výpadku sítě, i pro projekty v review (jeden poll ověří, že pořád čekají).
 - Smazání projektu v telefonu job na serveru nezastaví — server cancel nemá.
+
+## Style map (`lib/stylemap/`, `tools/stylemap/`)
+
+Picker, ve kterém prst jezdí po mozaice tisíců obrázků téhož námětu v různých
+stylech a nad ní se ukazuje obrázek pod prstem. Sousední buňky si jsou
+stylově blízké, takže přejíždění působí jako plynulá animace. Plán je
+`docs/STYLEMAP_PLAN.md`; hotové jsou milníky M1 (pipeline) a M2 (režim Map),
+zbytek — LPIPS a trasa pro scrub, režimy Pad/Wheel, VLM tagy, dogenerování děr,
+StyleSpec — je vypsaný v `tools/stylemap/README.md`.
+
+- **Pack je statický**: `map.json` (mřížka, osy, clustery, obrázky),
+  `atlas.webp` (celá mapa jako jeden obrázek, buňka 32 px) a `t/<i>.webp`
+  (náhled 384 px). Staví ho Python pipeline (`tools/stylemap`): levné
+  vlastnosti + CLIP → UMAP → přiřazení na mřížku. Žádný backend za běhu, appka jen čte.
+- **Z čeho se staví**: z jedné nebo víc sessions FINETUNE gallery
+  (`make stylemap SET=… SESSIONS="<id> <id>"`, volitelně `WHERE="score=1"` —
+  filtry `/api/images`), nebo z běhu labu na disku (`RUN=…`). Z galerie se
+  stahují její 384px náhledy, ne originály (`FULL=1` je vynutí). Python
+  `urllib` musí poslat vlastní `User-Agent` — na výchozí odpoví Cloudflare 403
+  dřív, než se Access podívá na token.
+- **Odkud se čte**: `STYLEMAP_URL` (výchozí
+  `https://finetune.ol1n.com/stylemaps`). Galerie packy servíruje staticky
+  z `<data>/stylemaps` (repo FineTuneGallery, `server/stylemaps.go`); na NAS je
+  kopíruje `make stylemap-publish`. Pro vývoj `make stylemap-serve` na Macu
+  a `STYLEMAP_URL=http://<ip>:8770` s `make debug`.
+- **Okamžitá odezva**: pod prstem se hned kreslí výřez z atlasu (je v paměti),
+  ostrý náhled se stáhne až po 90 ms klidu na buňce a přednačtou se čtyři
+  sousedi. Rychlý tah přes desítky buněk tak nepustí desítky requestů.
+- **Gesta**: dotyk vybírá hned (`Listener.onPointerDown` — scale gesto by
+  začalo až po slopu a tap by nevybral nic), dva prsty zoomují a posouvají.
+  Po pinchi se 250 ms nevybírá, jinak by poslední zvednutý prst skočil jinam.
+  Geometrie zoomu je čistá třída `StyleMapView` (testy bez gest).
+- **Co pick znamená, určuje volající**: widget hlásí jen výběr. V Image Studiu
+  chip „Mapa“ otevře `StyleMapScreen(pick: true)` a dostane `StyleMapPick`:
+  obrázek vzniklý se stylem z registru (`style` v `map.json`) nastaví chip
+  stylu, fragment promptu (`tag`, např. `artist:…`) se připojí **za** text
+  v poli. Model se nepřepíná, jen se ukazuje v popisku, když jich sada míchá
+  víc. Pack nese id z registrů, jména jim dává až appka
+  (`StyleMapScreen._label`); id, které registr už nemá, zůstane, jak je.
+- `test/fixtures/stylemap_map.json` je manifest, který pipeline opravdu
+  zapsala (16 obrázků, jedna buňka vyjmutá kvůli díře).
 
 ## Lab (`tools/lab/`)
 
