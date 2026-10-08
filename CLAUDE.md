@@ -912,14 +912,17 @@ popisem vzhledu, odhad minut), uživatel obsadí role vlastními obrázky
 Picker, ve kterém prst jezdí po mozaice tisíců obrázků téhož námětu v různých
 stylech a nad ní se ukazuje obrázek pod prstem. Sousední buňky si jsou
 stylově blízké, takže přejíždění působí jako plynulá animace. Plán je
-`docs/STYLEMAP_PLAN.md`; hotové jsou milníky M1 (pipeline) a M2 (režim Map),
-zbytek — LPIPS a trasa pro scrub, režimy Pad/Wheel, VLM tagy, dogenerování děr,
-StyleSpec — je vypsaný v `tools/stylemap/README.md`.
+`docs/STYLEMAP_PLAN.md`; hotové jsou milníky M1 (pipeline), M2 (režim Map),
+M3 (plynulost: LPIPS, trasa, přehrávání), M4 (režimy Osy a Kolo) a M5 (VLM
+tagy, fasety, hledání), zbytek — dogenerování děr, StyleSpec — je vypsaný
+v `tools/stylemap/README.md`, i s tím, které kroky pipeline se po jaké změně
+pouštějí znovu.
 
 - **Pack je statický**: `map.json` (mřížka, osy, clustery, obrázky),
   `atlas.webp` (celá mapa jako jeden obrázek, buňka 32 px) a `t/<i>.webp`
   (náhled 384 px). Staví ho Python pipeline (`tools/stylemap`): levné
-  vlastnosti + CLIP → UMAP → přiřazení na mřížku. Žádný backend za běhu, appka jen čte.
+  vlastnosti + CLIP → UMAP → přiřazení na mřížku → vyhlazení podle LPIPS.
+  Žádný backend za běhu, appka jen čte.
 - **Z čeho se staví**: z jedné nebo víc sessions FINETUNE gallery
   (`make stylemap SET=… SESSIONS="<id> <id>"`, volitelně `WHERE="score=1"` —
   filtry `/api/images`), nebo z běhu labu na disku (`RUN=…`). Z galerie se
@@ -938,6 +941,28 @@ StyleSpec — je vypsaný v `tools/stylemap/README.md`.
   začalo až po slopu a tap by nevybral nic), dva prsty zoomují a posouvají.
   Po pinchi se 250 ms nevybírá, jinak by poslední zvednutý prst skočil jinam.
   Geometrie zoomu je čistá třída `StyleMapView` (testy bez gest).
+- **Přehrávání**: lišta mezi náhledem a mozaikou (play/pause, posuvník,
+  rychlost 3/6/12 obrázků za vteřinu) jede po `StyleMapPack.route` — pořadí
+  `tour` z packu (nejmenší kroky v LPIPS), u packu bez něj po Hilbertově
+  křivce. Přehrávání **čeká na náhled** dalšího snímku (nejdéle 800 ms)
+  a přednačítá osm snímků dopředu: na pomalé síti film zpomalí, místo aby
+  ukazoval rozmazané výřezy z atlasu. Dotyk na mozaiku i posuvník přehrávání
+  zastaví. Trasa po LPIPS skáče po mozaice, značka skáče s ní.
+- **Režimy** (`StyleMapMode`, ikony v rohu náhledu): tytéž obrázky jinak
+  rozložené. *Mapa* je mozaika. *Osy* (`pad.dart`) je bodový graf dvou
+  měřených vlastností (osy se vybírají z `axes[]` packu) a prst dostane
+  nejbližší obrázek — hrubou silou, pro tisíce bodů to stačí. *Barvy*
+  a *Skupiny* (`wheel.dart`) jsou prstenec sektorů (převládající odstín, resp.
+  cluster; šířka podle počtu, nejmíň 4 % kruhu, aby šel trefit) a uvnitř mřížka
+  obrázků sektoru, ve kterém je výběr — dva kroky místo hledání šestibodové
+  buňky mezi tisíci. Režim se nabídne, jen když pack má, co kreslí.
+- **Filtr** (`filter.dart`, ikona pod režimy): hledání bez diakritiky a fasety
+  z packu (`facets[]` — model, médium, po otagování paleta, nálada, linka,
+  pozadí). Uvnitř fasety platí kterákoli hodnota, mezi fasetami všechny.
+  Filtr widgetu nepřidává žádnou logiku navíc: `StyleMapPack.where()` vrátí
+  tutéž mapu jen s vyhovujícími obrázky (ostatní buňky jsou díry), takže
+  mozaika, trasa, přehrávání, osy i kolo se zúží samy. Vyřazené buňky se
+  v mozaice ztmaví. Id modelu dostane jméno až v appce (`valueLabel`).
 - **Co pick znamená, určuje volající**: widget hlásí jen výběr. V Image Studiu
   chip „Mapa“ otevře `StyleMapScreen(pick: true)` a dostane `StyleMapPick`:
   obrázek vzniklý se stylem z registru (`style` v `map.json`) nastaví chip

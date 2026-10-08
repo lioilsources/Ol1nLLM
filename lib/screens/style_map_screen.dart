@@ -167,6 +167,13 @@ class _StyleMapScreenState extends State<StyleMapScreen> {
                   headers: _service.headers,
                   thumbUrl: (im) => _service.thumbUrl(pack, im),
                   labelOf: _label,
+                  valueLabel: (key, v) => key == 'model'
+                      ? kImageModels
+                                .where((m) => m.id == v.id)
+                                .firstOrNull
+                                ?.label ??
+                            v.label
+                      : v.label,
                   onChanged: (im) => setState(() => _selected = im),
                 )
               : _list(),
