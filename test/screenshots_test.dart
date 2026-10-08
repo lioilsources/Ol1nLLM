@@ -3,6 +3,7 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -33,6 +34,10 @@ import 'package:ol1n_llm/screens/story_studio_screen.dart';
 import 'package:ol1n_llm/services/music_service.dart';
 import 'package:ol1n_llm/services/persona_service.dart';
 import 'package:ol1n_llm/services/story_service.dart';
+import 'package:ol1n_llm/screens/style_map_screen.dart';
+import 'package:ol1n_llm/stylemap/model.dart';
+import 'package:ol1n_llm/stylemap/service.dart';
+import 'package:ol1n_llm/stylemap/stylemap.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 /// Renders the app's screens to `test/screenshots/*.png` so the store page
@@ -53,6 +58,9 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 ///   a subset of the live LoRA list;
 /// * `fixtures/screenshots/img/` are outputs of the app's own workflows from
 ///   a lab run (`painters-dancer-img2img-repose`, seed 777), downscaled.
+///   The style map (`fixtures/screenshots/stylemap/`) is a pack
+///   `tools/stylemap` built from the whole of that run — manifest and atlas
+///   as written, and only the previews the shots show.
 ///   One liberty: the root round's four tiles are that prompt's baseline on
 ///   two models × two flows, not four batch variants of one request.
 ///
@@ -95,9 +103,9 @@ Future<void> _loadRealFonts() async {
     roboto.addFont(read('${dir.path}/Roboto-$f.ttf'));
   }
   await roboto.load();
-  await (FontLoader('MaterialIcons')
-        ..addFont(read('${dir.path}/MaterialIcons-Regular.otf')))
-      .load();
+  await (FontLoader(
+    'MaterialIcons',
+  )..addFont(read('${dir.path}/MaterialIcons-Regular.otf'))).load();
   // `fontFamily: 'monospace'` (source paths, code spans) and the persona
   // emoji come from the host. Only macOS ships these files; elsewhere they
   // render as boxes, one more reason this suite is not CI's.
@@ -308,6 +316,50 @@ Future<ProviderContainer> _chat(
   await tester.pumpWidget(_app(container, const ChatScreen()));
   await _settle(tester);
   return container;
+}
+
+// ── Style map ───────────────────────────────────────────────────────────
+
+/// A pack read from disk the way the app reads it from the gallery.
+class _FileStyleMaps extends StyleMapService {
+  _FileStyleMaps(this.pack, this.atlas);
+
+  static const dir = '$_shots/stylemap';
+
+  final StyleMapPack pack;
+  final ui.Image atlas;
+
+  /// Previews a shot asked for and the fixtures do not have.
+  final missing = <int>{};
+
+  @override
+  Future<List<StyleMapEntry>> fetchIndex() async => [
+    StyleMapEntry(
+      id: pack.id,
+      title: pack.title,
+      count: pack.images.length,
+      atlasPath: pack.atlasPath,
+    ),
+  ];
+
+  @override
+  Future<StyleMapPack> fetchPack(String id) async => pack;
+
+  // The screen disposes what it is given.
+  @override
+  Future<ui.Image> fetchAtlas(StyleMapPack pack) async => atlas.clone();
+
+  @override
+  ImageProvider thumb(StyleMapPack pack, StyleMapImage im) {
+    final file = File('$dir/${pack.id}/${pack.thumbPath(im)}');
+    if (!file.existsSync()) missing.add(im.index);
+    return FileImage(file);
+  }
+
+  /// Printed so a refresh knows which previews to copy from the built pack.
+  void report() {
+    if (missing.isNotEmpty) debugPrint('STYLEMAP-MISSING ${missing.join(' ')}');
+  }
 }
 
 // ── Image Studio ────────────────────────────────────────────────────────
@@ -732,6 +784,96 @@ void main() {
       await _studio(tester);
       await _tap(tester, find.byTooltip('Session history'));
       await _shoot(tester, '21-studio-historie');
+    });
+  });
+
+  group('style map', () {
+    const set = 'dancer-painters';
+
+    Future<(StyleMapPack, _FileStyleMaps)> open(WidgetTester tester) async {
+      _phoneView(tester);
+      final pack = StyleMapPack.fromJson(
+        (_json('${_FileStyleMaps.dir}/$set/map.json') as Map).cast(),
+      );
+      final atlas = await tester.runAsync(() async {
+        final codec = await ui.instantiateImageCodec(
+          File(
+            '${_FileStyleMaps.dir}/$set/${pack.atlasPath}',
+          ).readAsBytesSync(),
+        );
+        return (await codec.getNextFrame()).image;
+      });
+      addTearDown(atlas!.dispose);
+      final service = _FileStyleMaps(pack, atlas);
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        _app(container, StyleMapScreen(pick: true, service: service)),
+      );
+      await _settle(tester);
+      return (pack, service);
+    }
+
+    /// A finger on the mosaic cell of the picture made with [style] on
+    /// [model] (the repose round — the run has an img2img one too).
+    Future<void> pick(
+      WidgetTester tester,
+      StyleMapPack pack,
+      String style,
+      String model,
+    ) async {
+      final im = pack.images.firstWhere(
+        (im) =>
+            im.styleId == style &&
+            im.modelId == model &&
+            im.id.contains('repose'),
+      );
+      final box = tester.getRect(find.byKey(StyleMap.mosaicKey));
+      final rect = StyleMapView(
+        viewport: box.size,
+        aspect: pack.aspect,
+      ).rect.shift(box.topLeft);
+      await tester.tapAt(
+        rect.topLeft +
+            Offset(
+              (im.col + 0.5) * rect.width / pack.cols,
+              (im.row + 0.5) * rect.height / pack.rows,
+            ),
+      );
+      await tester.pump(const Duration(milliseconds: 200));
+      // The sharp preview is a file read and a decode away.
+      await _settle(tester);
+    }
+
+    testWidgets('50 the mosaic, a finger on Klimt', (tester) async {
+      final (pack, service) = await open(tester);
+      await pick(tester, pack, 'klimt-golden', 'juggernaut-xl');
+      await _shoot(tester, '50-mapa-mozaika');
+      service.report();
+    });
+
+    testWidgets('51 two measured properties as axes', (tester) async {
+      final (pack, service) = await open(tester);
+      await pick(tester, pack, 'vangogh-arles', 'juggernaut-xl');
+      await _tap(tester, find.byKey(const ValueKey('stylemap-mode-pad')));
+      await _shoot(tester, '51-mapa-osy');
+      service.report();
+    });
+
+    testWidgets('52 the wheel of dominant hues', (tester) async {
+      final (pack, service) = await open(tester);
+      await pick(tester, pack, 'matisse-cutout', 'juggernaut-xl');
+      await _tap(tester, find.byKey(const ValueKey('stylemap-mode-hue')));
+      await _shoot(tester, '52-mapa-barvy');
+      service.report();
+    });
+
+    testWidgets('53 search and facets', (tester) async {
+      final (pack, service) = await open(tester);
+      await pick(tester, pack, 'monet', 'juggernaut-xl');
+      await _tap(tester, find.byKey(StyleMap.filterKey));
+      await _shoot(tester, '53-mapa-filtr');
+      service.report();
     });
   });
 

@@ -345,7 +345,8 @@ void main() {
             body: StyleMap(
               pack: pack,
               atlas: await atlas(tester, pack),
-              thumbUrl: (im) => 'http://stylemap.test/${pack.thumbPath(im)}',
+              thumbOf: (im) =>
+                  NetworkImage('http://stylemap.test/${pack.thumbPath(im)}'),
               onChanged: picked.add,
             ),
           ),
@@ -397,7 +398,8 @@ void main() {
             body: StyleMap(
               pack: pack,
               atlas: await atlas(tester, pack),
-              thumbUrl: (im) => 'http://stylemap.test/${pack.thumbPath(im)}',
+              thumbOf: (im) =>
+                  NetworkImage('http://stylemap.test/${pack.thumbPath(im)}'),
               onChanged: picked.add,
             ),
           ),
@@ -457,10 +459,10 @@ void main() {
         pack.nearestOnPad(warm, lum, const Offset(1, 0)).id,
       );
 
-      await tester.tap(find.text(pack.axes[warm].label));
+      await tester.tap(find.text(pack.axes[warm].label.replaceAll('↔', '–')));
       await tester.pumpAndSettle();
       final sat = pack.axis('sat');
-      await tester.tap(find.text(pack.axes[sat].label));
+      await tester.tap(find.text(pack.axes[sat].label.replaceAll('↔', '–')));
       await tester.pumpAndSettle();
       await tester.tapAt(pad.bottomLeft + const Offset(13, -13));
       await tester.pump(const Duration(milliseconds: 200));

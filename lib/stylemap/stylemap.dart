@@ -43,8 +43,7 @@ class StyleMap extends StatefulWidget {
     super.key,
     required this.pack,
     required this.atlas,
-    required this.thumbUrl,
-    this.headers = const {},
+    required this.thumbOf,
     this.labelOf,
     this.valueLabel,
     this.onChanged,
@@ -54,10 +53,9 @@ class StyleMap extends StatefulWidget {
 
   /// The decoded mosaic ([StyleMapPack.atlasPath]).
   final ui.Image atlas;
-  final String Function(StyleMapImage) thumbUrl;
 
-  /// Sent with every preview request (CF Access).
-  final Map<String, String> headers;
+  /// The preview of a picture — where it comes from is the caller's.
+  final ImageProvider Function(StyleMapImage) thumbOf;
 
   /// What to print under the preview; defaults to [StyleMapImage.label]. The
   /// pack only knows registry ids, the caller knows their names.
@@ -231,8 +229,7 @@ class _StyleMapState extends State<StyleMap> {
     });
   }
 
-  ImageProvider _thumb(StyleMapImage im) =>
-      NetworkImage(widget.thumbUrl(im), headers: widget.headers);
+  ImageProvider _thumb(StyleMapImage im) => widget.thumbOf(im);
 
   /// Fetch the neighbours ahead of the finger, so the next step is instant.
   void _warm(StyleMapImage im) {
