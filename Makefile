@@ -1,4 +1,4 @@
-.PHONY: run debug build-ios build-android lab lab-dry lab-check lab-arcface lab-resume lab-score
+.PHONY: run debug build-ios build-android lab lab-dry lab-check lab-arcface lab-resume lab-score stylemap-env stylemap stylemap-serve stylemap-publish
 
 -include .env.local
 
@@ -14,7 +14,8 @@ DART_DEFINES = \
 	$(if $(VLLM_URL),--dart-define=VLLM_URL=$(VLLM_URL),) \
 	$(if $(UGC_FC_URL),--dart-define=UGC_FC_URL=$(UGC_FC_URL),) \
 	$(if $(AUDIO_URL),--dart-define=AUDIO_URL=$(AUDIO_URL),) \
-	$(if $(VIDEO_URL),--dart-define=VIDEO_URL=$(VIDEO_URL),)
+	$(if $(VIDEO_URL),--dart-define=VIDEO_URL=$(VIDEO_URL),) \
+	$(if $(STYLEMAP_URL),--dart-define=STYLEMAP_URL=$(STYLEMAP_URL),)
 
 run:
 	flutter run --release $(DART_DEFINES)
@@ -61,3 +62,43 @@ lab-arcface:
 	tools/lab/.venv/bin/pip install -q insightface onnxruntime opencv-python-headless numpy
 	mkdir -p $(HOME)/.insightface/models
 	rsync -a spark:Code/ComfyUI/models/insightface/models/antelopev2 $(HOME)/.insightface/models/
+
+# Style maps (tools/stylemap): a set of pictures → a pack the app's StyleMap
+# widget reads (map.json + atlas + previews in build/stylemap/<SET>).
+# The set is one or more FINETUNE gallery sessions, or a lab run on disk:
+#   make stylemap SET=noobai-artists SESSIONS="<id> <id>" TITLE="NoobAI — umělci"
+#   make stylemap SET=noobai-artists RUN=noobai-artists-v3
+# WHERE narrows a gallery set with /api/images filters (WHERE="score=1").
+# FULL=1 downloads the originals instead of the gallery's small thumbnails.
+# TAG_REGEX pulls the prompt fragment out of the prompt text — always for the
+# gallery, and for lab runs made before --prompts-yaml:
+#   TAG_REGEX='artist:[^,]+'
+STYLEMAP_PY = tools/stylemap/.venv/bin/python
+# Where the gallery keeps its data on the NAS (docker mount of /data).
+STYLEMAP_DEST ?= joda:/media/storage/FineTuneGallery/stylemaps
+
+stylemap-env:
+	python3 -m venv tools/stylemap/.venv
+	tools/stylemap/.venv/bin/pip install -q -r tools/stylemap/requirements.txt
+
+stylemap:
+	$(STYLEMAP_PY) tools/stylemap/extract_features.py --out build/stylemap/$(SET) \
+		$(if $(RUN),--run build/lab/$(RUN),) \
+		$(foreach s,$(SESSIONS),--session $(s)) $(foreach w,$(WHERE),--where $(w)) \
+		$(if $(FULL),--full,) $(if $(TAG_REGEX),--tag-regex '$(TAG_REGEX)',)
+	$(STYLEMAP_PY) tools/stylemap/build_map.py --set build/stylemap/$(SET) \
+		$(if $(TITLE),--title "$(TITLE)",)
+	$(STYLEMAP_PY) tools/stylemap/make_thumbs.py --set build/stylemap/$(SET)
+
+# Serves the packs to a phone on the LAN (STYLEMAP_URL=http://<mac-ip>:8770,
+# `make debug` only — cleartext). Generated pictures, no credentials.
+stylemap-serve:
+	cd build/stylemap && python3 -m http.server 8770
+
+# Copies the packs to the gallery, which serves them at /stylemaps/ — only what
+# the widget reads, not features, logs or the download cache.
+stylemap-publish:
+	rsync -av --prune-empty-dirs \
+		--include='index.json' --include='*/' --include='*/map.json' \
+		--include='*/atlas.webp' --include='*/t/*.webp' --exclude='*' \
+		build/stylemap/ $(STYLEMAP_DEST)/

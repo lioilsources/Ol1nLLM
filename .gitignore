@@ -53,3 +53,5 @@ app.*.map.json
 tools/lab/ol1n-lab
 # lab: venv pro ArcFace metriku (make lab-arcface)
 tools/lab/.venv/
+# stylemap: venv pro pipeline map stylů (make stylemap-env)
+tools/stylemap/.venv/
