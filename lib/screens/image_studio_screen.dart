@@ -17,11 +17,13 @@ import '../models/style_preset.dart';
 import '../models/video_scene.dart';
 import '../providers/image_studio_provider.dart';
 import '../services/comfyui_service.dart' show FaceIdentity;
+import '../stylemap/model.dart' show StyleMapPick;
 import '../widgets/image_session_drawer.dart';
 import 'figure_viewer_screen.dart';
 import 'hair_sheet.dart';
 import 'mask_editor_screen.dart';
 import 'model_viewer_screen.dart';
+import 'style_map_screen.dart';
 import 'video_player_screen.dart' show VideoPlayerScreen, saveVideo;
 
 /// Copy [text] to the clipboard and confirm with a brief snackbar. No-op for
@@ -2706,6 +2708,25 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
   final _focusNode = FocusNode();
   final _picker = ImagePicker();
 
+  /// Style map as a picker. A picture made with a style preset sets the
+  /// style chip; a prompt fragment (an artist tag) is appended to whatever is
+  /// typed, so the user's own text keeps the front of the prompt.
+  Future<void> _openStyleMap() async {
+    _dismissKeyboard();
+    final pick = await Navigator.of(context).push<StyleMapPick>(
+      MaterialPageRoute(builder: (_) => const StyleMapScreen(pick: true)),
+    );
+    if (pick == null || !mounted) return;
+    if (styleById(pick.styleId) != null) {
+      ref.read(imageStudioProvider.notifier).setStyle(pick.styleId);
+    }
+    final text = _controller.text.trim();
+    if (pick.tag.isEmpty || text.contains(pick.tag)) return;
+    setState(() {
+      _controller.text = text.isEmpty ? pick.tag : '$text, ${pick.tag}';
+    });
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -2916,6 +2937,13 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                       selected: widget.state.selectedStyleId,
                       onChanged: (v) =>
                           ref.read(imageStudioProvider.notifier).setStyle(v),
+                    ),
+                    const SizedBox(width: 8),
+                    _ChipShell(
+                      active: false,
+                      icon: Icons.grid_view_outlined,
+                      label: 'Mapa',
+                      onTap: _openStyleMap,
                     ),
                     // Only meaningful for a ComfyUI img2img round: the NIM
                     // backends have no denoise and inpaint always runs at 1.0.

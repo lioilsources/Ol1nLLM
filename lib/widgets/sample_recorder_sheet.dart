@@ -20,7 +20,29 @@ const kMaxRecordSeconds = 60;
 /// (radio, a speaker) — and pops with the path of the finished .m4a, or null
 /// when cancelled. The caller copies the file, like a picked one.
 class SampleRecorderSheet extends StatefulWidget {
-  const SampleRecorderSheet({super.key});
+  const SampleRecorderSheet({
+    super.key,
+    this.title = 'Nahrát z okolí',
+    this.idleHint =
+        'Podrž telefon u reproduktoru (rádio, repro) a klepni na '
+        'mikrofon. Studio pak z nahrávky vyčte žánr, tempo '
+        'a náladu jako u souboru.',
+    this.readyHint = 'Stačí 15–30 s. Po minutě se nahrávání zastaví samo.',
+    this.minSeconds = kMinRecordSeconds,
+    this.maxSeconds = kMaxRecordSeconds,
+  });
+
+  /// Defaults describe MusicStudio's use; Voice Studio records a speaker
+  /// with its own bounds and wording.
+  final String title;
+
+  /// Shown before recording starts.
+  final String idleHint;
+
+  /// Shown once the recording is long enough to stop.
+  final String readyHint;
+  final int minSeconds;
+  final int maxSeconds;
 
   @override
   State<SampleRecorderSheet> createState() => _SampleRecorderSheetState();
@@ -91,7 +113,7 @@ class _SampleRecorderSheetState extends State<SampleRecorderSheet> {
           });
       _ticker = Timer.periodic(const Duration(milliseconds: 250), (_) {
         if (!mounted) return;
-        if (_seconds >= kMaxRecordSeconds) {
+        if (_seconds >= widget.maxSeconds) {
           _stop();
         } else {
           setState(() {});
@@ -136,16 +158,16 @@ class _SampleRecorderSheetState extends State<SampleRecorderSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final canStop = _recording && _seconds >= kMinRecordSeconds;
+    final canStop = _recording && _seconds >= widget.minSeconds;
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Nahrát z okolí',
-              style: TextStyle(
+            Text(
+              widget.title,
+              style: const TextStyle(
                 color: AppTheme.textPrimary,
                 fontSize: 17,
                 fontWeight: FontWeight.w600,
@@ -155,11 +177,9 @@ class _SampleRecorderSheetState extends State<SampleRecorderSheet> {
             Text(
               _recording
                   ? (canStop
-                        ? 'Stačí 15–30 s. Po minutě se nahrávání zastaví samo.'
-                        : 'Nahrávám… zastavit jde po $kMinRecordSeconds s.')
-                  : 'Podrž telefon u reproduktoru (rádio, repro) a klepni na '
-                        'mikrofon. Studio pak z nahrávky vyčte žánr, tempo '
-                        'a náladu jako u souboru.',
+                        ? widget.readyHint
+                        : 'Nahrávám… zastavit jde po ${widget.minSeconds} s.')
+                  : widget.idleHint,
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: AppTheme.textSecondary,
@@ -170,7 +190,7 @@ class _SampleRecorderSheetState extends State<SampleRecorderSheet> {
             _LevelMeter(level: _recording ? _level : 0),
             const SizedBox(height: 12),
             Text(
-              '${_fmt(_seconds)} / ${_fmt(kMaxRecordSeconds)}',
+              '${_fmt(_seconds)} / ${_fmt(widget.maxSeconds)}',
               style: TextStyle(
                 color: _recording
                     ? AppTheme.textPrimary

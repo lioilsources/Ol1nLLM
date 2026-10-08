@@ -20,12 +20,17 @@ class MessageBubble extends StatefulWidget {
   /// Sends a turn from a contract-agent card (answers, "Sestavit dokument").
   final AgentSend? onAgentSend;
 
+  /// Shown under a finished assistant answer (the read-aloud button). Built
+  /// by the caller so the bubble itself needs no provider scope.
+  final Widget? footer;
+
   const MessageBubble({
     super.key,
     required this.message,
     this.isStreaming = false,
     this.isActiveLeaf = false,
     this.onAgentSend,
+    this.footer,
   });
 
   @override
@@ -171,7 +176,16 @@ class _MessageBubbleState extends State<MessageBubble>
     }
 
     // User input with an attached image (base64 in images list shown above)
-    return isUser ? _buildPlainText() : _buildAssistantBody(context);
+    if (isUser) return _buildPlainText();
+    final footer = widget.footer;
+    if (footer == null || widget.isStreaming || !hasText) {
+      return _buildAssistantBody(context);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [_buildAssistantBody(context), footer],
+    );
   }
 
   /// Assistant answer plus, for library (RAG) replies, the citations it was
