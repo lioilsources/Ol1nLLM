@@ -63,6 +63,12 @@ WINDOWS=${WINDOWS:-"07:10-12:50"}
 export LAB_SHARED_PAUSE=${PAUSE:-2.5}
 export LAB_MAX_CELL_SECONDS=${MAX_CELL:-120}
 export LAB_MAX_FIRST_CELL_SECONDS=${MAX_FIRST_CELL:-300}
+# SPARK logs its hottest zone once a minute (column zone_max_c). At 95 °C no
+# new cell starts until it is back under 90; when the log cannot be read the
+# run carries on.
+export LAB_THERMAL_CMD=${THERMAL_CMD-"ssh -o ConnectTimeout=5 -o BatchMode=yes spark 'tail -1 ~/ops/thermal.csv' | cut -d, -f9"}
+export LAB_THERMAL_MAX=${THERMAL_MAX:-95}
+export LAB_THERMAL_RESUME=${THERMAL_RESUME:-90}
 DRY=${DRY:-}
 TOP=${TOP:-}
 # The lab's own dump reads LIMIT from the environment and cuts the plan to

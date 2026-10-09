@@ -490,6 +490,11 @@ bez dozoru:
   buňka trvá déle než 120 s (`MAX_CELL`; první po výměně checkpointu 300 s,
   `MAX_FIRST_CELL`) — to ComfyUI spadl na CPU, a celá matice tím končí. V runneru
   to řídí `LAB_SHARED_PAUSE` a `LAB_MAX_CELL_SECONDS`; platí i pro `lab resume`.
+- **Teplota.** Jednou za minutu si přečte nejteplejší zónu SPARKu
+  (`~/ops/thermal.csv`, sloupec `zone_max_c`); od 95 °C nepustí další buňku,
+  dokud neklesne pod 90 °C (`LAB_THERMAL_CMD/MAX/RESUME`). Když se log přečíst
+  nedá, pokračuje. První hodina (2026-10-09, tři souběžné zátěže): zóna
+  průměr 89 °C, maximum 95,2 °C, bez throttlingu.
 - **Bez FLUXu.** Bere jen modely s generickým SDXL grafem; které to jsou a
   které čtou tagy, říká registr, které jsou nainstalované, ComfyUI.
 - **Tvář** (`FACE`, výchozí `faceid` — lehčí a rychlejší; `instantid` jde

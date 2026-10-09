@@ -717,10 +717,21 @@ func (r *Run) exportFailed(err error) {
 //
 // In this mode a "no face" error also stops the run instead of failing
 // thousands of cells one by one.
+//
+//	LAB_THERMAL_CMD     a shell command printing the machine's temperature
+//	LAB_THERMAL_MAX     at or above this no new cell starts …
+//	LAB_THERMAL_RESUME  … until it is back under this
+//
+// The temperature is read at most once a minute; a command that fails or
+// prints no number never holds the run up.
 type polite struct {
 	pause    time.Duration
 	maxCell  float64
 	maxFirst float64
+
+	thermalCmd                string
+	thermalMax, thermalResume float64
+	thermalAt                 *time.Time
 }
 
 func politeFromEnv() polite {
@@ -734,6 +745,13 @@ func politeFromEnv() polite {
 	if v, err := strconv.ParseFloat(os.Getenv("LAB_MAX_FIRST_CELL_SECONDS"), 64); err == nil && v > 0 {
 		p.maxFirst = v
 	}
+	p.thermalCmd = os.Getenv("LAB_THERMAL_CMD")
+	p.thermalMax, _ = strconv.ParseFloat(os.Getenv("LAB_THERMAL_MAX"), 64)
+	p.thermalResume, _ = strconv.ParseFloat(os.Getenv("LAB_THERMAL_RESUME"), 64)
+	if p.thermalResume <= 0 || p.thermalResume > p.thermalMax {
+		p.thermalResume = p.thermalMax
+	}
+	p.thermalAt = new(time.Time)
 	return p
 }
 
@@ -762,5 +780,41 @@ func (p polite) wait(ctx context.Context, c *Comfy) {
 			return
 		}
 	}
+	p.cool(sleep)
 	sleep(p.pause)
+}
+
+// temperature runs the configured command; ok is false when there is no
+// reading to act on.
+func (p polite) temperature() (float64, bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "/bin/sh", "-c", p.thermalCmd).Output()
+	if err != nil {
+		return 0, false
+	}
+	v, err := strconv.ParseFloat(strings.TrimSpace(string(out)), 64)
+	return v, err == nil
+}
+
+// cool holds the next cell back while the machine is too hot: from the
+// maximum down to the resume temperature, so it does not start again a
+// degree below the line and cross it with the next cell.
+func (p polite) cool(sleep func(time.Duration) bool) {
+	if p.thermalCmd == "" || p.thermalMax <= 0 || time.Since(*p.thermalAt) < time.Minute {
+		return
+	}
+	*p.thermalAt = time.Now()
+	t, ok := p.temperature()
+	if !ok || t < p.thermalMax {
+		return
+	}
+	fmt.Printf("▸ %.1f °C — čekám, až stroj vychladne pod %.0f °C\n", t, p.thermalResume)
+	for ok && t >= p.thermalResume {
+		if !sleep(time.Minute) {
+			return
+		}
+		t, ok = p.temperature()
+	}
+	*p.thermalAt = time.Now()
 }
