@@ -948,6 +948,13 @@ pouštějí znovu.
   a přednačítá osm snímků dopředu: na pomalé síti film zpomalí, místo aby
   ukazoval rozmazané výřezy z atlasu. Dotyk na mozaiku i posuvník přehrávání
   zastaví. Trasa po LPIPS skáče po mozaice, značka skáče s ní.
+- **Na celou obrazovku** (`fullscreen.dart`, ikona na konci lišty): film
+  přes celý displej, ovládání nad obrázkem (klepnutí ho schová) a **posuvník
+  rychlosti** 1–24 obrázků za vteřinu. Hraje to, co je zrovna na mapě — tedy
+  i výsledek filtru — a po zavření mapa pokračuje tam, kde film skončil, stejnou
+  rychlostí. Mapa i přehrávač jedou na jedné třídě `StyleMapPlayback`
+  (`playback.dart`), která o widgetech neví: čekání na náhled a přednačítání
+  (aspoň osm snímků, při vyšší rychlosti třetinu vteřiny) jsou tak jen jednou.
 - **Režimy** (`StyleMapMode`, ikony v rohu náhledu): tytéž obrázky jinak
   rozložené. *Mapa* je mozaika. *Osy* (`pad.dart`) je bodový graf dvou
   měřených vlastností (osy se vybírají z `axes[]` packu) a prst dostane

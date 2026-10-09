@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
 
 import 'filter.dart';
+import 'fullscreen.dart';
 import 'model.dart';
 import 'pad.dart';
+import 'playback.dart';
 import 'wheel.dart';
 
 /// How the pictures are laid out under the finger.
@@ -72,6 +74,7 @@ class StyleMap extends StatefulWidget {
   static const playKey = ValueKey('stylemap-play');
   static const filterKey = ValueKey('stylemap-filter');
   static const scrubKey = ValueKey('stylemap-scrub');
+  static const fullscreenKey = ValueKey('stylemap-fullscreen');
 
   @override
   State<StyleMap> createState() => _StyleMapState();
@@ -87,15 +90,9 @@ class _StyleMapState extends State<StyleMap> {
   /// read as a selection somewhere under the lifted hand.
   static const _afterPinch = Duration(milliseconds: 250);
 
-  /// Pictures per second while playing.
-  static const _speeds = [3, 6, 12];
-
-  /// Previews fetched ahead of the playhead.
-  static const _lookahead = 8;
-
-  /// How long playback holds a frame for a preview that has not arrived —
-  /// past that the blurry atlas crop is better than a film that stands still.
-  static const _maxWait = Duration(milliseconds: 800);
+  /// Pictures per second the speed button steps through; the full-screen
+  /// player has a slider for everything in between.
+  static const _speeds = [3.0, 6.0, 12.0];
 
   late StyleMapImage _selected;
 
@@ -142,8 +139,7 @@ class _StyleMapState extends State<StyleMap> {
       _filter = next;
       _pack = pack;
       _dimmed = next.isEmpty ? null : _holes(whole, pack);
-      _requested.clear();
-      _ready.clear();
+      _playback.reset();
       if (!kept) {
         _selected = pack.nearestTo(_selected.col, _selected.row);
         _sharp = _selected;
@@ -180,15 +176,20 @@ class _StyleMapState extends State<StyleMap> {
     _show(im);
   }
 
-  bool _playing = false;
-  int _speed = _speeds[1];
-  Timer? _playTimer;
-  DateTime? _waitingSince;
-
-  /// Previews of the frames ahead: asked for, and of those the ones that
-  /// have arrived (or failed — playback does not wait for those either).
-  final _requested = <int>{};
-  final _ready = <int>{};
+  late final _playback = StyleMapPlayback(
+    pack: () => _pack,
+    current: () => _selected,
+    fetch: (im) => precacheImage(_thumb(im), context, onError: (_, _) {}),
+    show: (im) {
+      if (!mounted) return;
+      setState(() {
+        _selected = im;
+        _sharp = im;
+      });
+      widget.onChanged?.call(im);
+    },
+    speed: _speeds[1],
+  );
 
   /// The picture whose sharp preview may be shown — [_selected] once settled.
   StyleMapImage? _sharp;
@@ -215,7 +216,7 @@ class _StyleMapState extends State<StyleMap> {
   @override
   void dispose() {
     _settleTimer?.cancel();
-    _playTimer?.cancel();
+    _playback.dispose();
     super.dispose();
   }
 
@@ -273,66 +274,52 @@ class _StyleMapState extends State<StyleMap> {
   }
 
   void _togglePlay() {
-    if (_playing) return _pause();
+    if (_playback.playing) return _pause();
     _settleTimer?.cancel();
-    setState(() => _playing = true);
-    _fetchAhead();
-    _playTimer = Timer(_frame, _advance);
+    setState(_playback.play);
   }
 
   void _pause() {
-    if (!_playing) return;
-    _playTimer?.cancel();
-    _waitingSince = null;
-    setState(() => _playing = false);
+    if (!_playback.playing) return;
+    setState(_playback.pause);
   }
 
-  Duration get _frame => Duration(milliseconds: 1000 ~/ _speed);
-
-  /// One frame of playback: on to the next picture of the route, once its
-  /// preview is there — so the film is sharp, and slows down on a bad
-  /// connection instead of going blurry.
-  void _advance() {
-    if (!mounted || !_playing) return;
-    final next = _pack.routeFrom(_selected, 1);
-    final since = _waitingSince ??= DateTime.now();
-    if (!_ready.contains(next.index) &&
-        DateTime.now().difference(since) < _maxWait) {
-      _playTimer = Timer(const Duration(milliseconds: 30), _advance);
-      return;
-    }
-    _waitingSince = null;
+  /// The film on the whole screen. It plays what is on the map now — a
+  /// filter included — and the map carries on from where it was closed.
+  Future<void> _openFullscreen() async {
+    _pause();
+    _settleTimer?.cancel();
+    final closed = await Navigator.of(context).push<StyleMapFullscreenResult>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => StyleMapFullscreen(
+          pack: _pack,
+          atlas: widget.atlas,
+          thumbOf: _thumb,
+          start: _selected,
+          speed: _playback.speed,
+          labelOf: widget.labelOf,
+        ),
+      ),
+    );
+    if (closed == null || !mounted) return;
+    final moved = closed.image.index != _selected.index;
     setState(() {
-      _selected = next;
-      _sharp = next;
+      _playback.speed = closed.speed;
+      _selected = closed.image;
+      _sharp = closed.image;
     });
-    widget.onChanged?.call(next);
-    _fetchAhead();
-    _playTimer = Timer(_frame, _advance);
+    if (moved) widget.onChanged?.call(closed.image);
   }
 
-  void _fetchAhead() {
-    final pack = _pack;
-    final ahead = {
-      for (var k = 1; k <= _lookahead && k < pack.route.length; k++)
-        pack.routeFrom(_selected, k),
-    };
-    // Only the window ahead is tracked: the image cache evicts, and a frame
-    // that comes round again on the next loop has to be asked for again.
-    final window = {for (final im in ahead) im.index};
-    _requested.retainAll(window);
-    _ready.retainAll(window);
-    for (final im in ahead) {
-      if (!_requested.add(im.index)) continue;
-      precacheImage(_thumb(im), context, onError: (_, _) {}).whenComplete(() {
-        if (_requested.contains(im.index)) _ready.add(im.index);
-      });
-    }
-  }
-
+  /// On to the next preset above the current speed — which may be anything,
+  /// once the full-screen slider has been at it.
   void _nextSpeed() {
     setState(() {
-      _speed = _speeds[(_speeds.indexOf(_speed) + 1) % _speeds.length];
+      _playback.speed = _speeds.firstWhere(
+        (v) => v > _playback.speed + 0.5,
+        orElse: () => _speeds.first,
+      );
     });
   }
 
@@ -370,7 +357,7 @@ class _StyleMapState extends State<StyleMap> {
           key: StyleMap.playKey,
           onPressed: _togglePlay,
           color: Colors.white,
-          icon: Icon(_playing ? Icons.pause : Icons.play_arrow),
+          icon: Icon(_playback.playing ? Icons.pause : Icons.play_arrow),
         ),
         Expanded(
           child: SliderTheme(
@@ -393,7 +380,17 @@ class _StyleMapState extends State<StyleMap> {
         ),
         TextButton(
           onPressed: _nextSpeed,
-          child: Text('$_speed/s', style: const TextStyle(color: Colors.white)),
+          child: Text(
+            '${_playback.speed.round()}/s',
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+        IconButton(
+          key: StyleMap.fullscreenKey,
+          tooltip: 'Na celou obrazovku',
+          onPressed: _openFullscreen,
+          color: Colors.white,
+          icon: const Icon(Icons.fullscreen),
         ),
       ],
     ),
@@ -493,7 +490,7 @@ class _StyleMapState extends State<StyleMap> {
                 fit: StackFit.expand,
                 children: [
                   CustomPaint(
-                    painter: _CellPainter(
+                    painter: StyleMapCellPainter(
                       widget.atlas,
                       pack.atlasRect(_selected),
                     ),
@@ -632,8 +629,8 @@ class _MapPainter extends CustomPainter {
 /// One cell of the atlas blown up to the preview's size — blurry, but there
 /// the instant the finger moves, with the sharp preview drawn over it once it
 /// has loaded.
-class _CellPainter extends CustomPainter {
-  _CellPainter(this.atlas, this.src);
+class StyleMapCellPainter extends CustomPainter {
+  StyleMapCellPainter(this.atlas, this.src);
 
   final ui.Image atlas;
   final Rect src;
@@ -654,5 +651,6 @@ class _CellPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_CellPainter old) => old.src != src || old.atlas != atlas;
+  bool shouldRepaint(StyleMapCellPainter old) =>
+      old.src != src || old.atlas != atlas;
 }
