@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ol1n_llm/stylemap/fullscreen.dart';
 import 'package:ol1n_llm/stylemap/model.dart';
 import 'package:ol1n_llm/stylemap/pad.dart';
 import 'package:ol1n_llm/stylemap/stylemap.dart';
@@ -562,6 +563,63 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 300));
       expect(picked.last.id, warm.id);
+    });
+
+    testWidgets('full screen plays on, takes a speed, hands both back', (
+      tester,
+    ) async {
+      final pack = _pack();
+      final picked = await pump(tester, pack);
+      final start = pack.routePosition(picked.single);
+
+      await tester.tap(find.byKey(StyleMap.fullscreenKey));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byType(StyleMapFullscreen), findsOneWidget);
+      // The map stays in the tree under the player, with a speed of its own.
+      Finder inPlayer(Finder f) =>
+          find.descendant(of: find.byType(StyleMapFullscreen), matching: f);
+      // Starts playing by itself, at the map's speed.
+      expect(inPlayer(find.byIcon(Icons.pause)), findsOneWidget);
+      expect(inPlayer(find.text('6/s')), findsOneWidget);
+      for (var k = 0; k < 20; k++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      // The map behind hears nothing while the film runs in front of it.
+      expect(picked, hasLength(1));
+
+      // The speed slider, pulled to its far end.
+      final bar = tester.getRect(find.byKey(StyleMapFullscreen.speedKey));
+      await tester.tapAt(Offset(bar.right - 2, bar.center.dy));
+      await tester.pump();
+      expect(inPlayer(find.text('24/s')), findsOneWidget);
+
+      // A tap on the picture hides the controls, another brings them back.
+      await tester.tapAt(const Offset(400, 200));
+      await tester.pump();
+      expect(find.byKey(StyleMapFullscreen.speedKey), findsNothing);
+      await tester.tapAt(const Offset(400, 200));
+      await tester.pump();
+
+      await tester.tap(find.byKey(StyleMapFullscreen.playKey));
+      await tester.pump();
+      await tester.tap(find.byKey(StyleMapFullscreen.closeKey));
+      await tester.pumpAndSettle();
+      expect(find.byType(StyleMapFullscreen), findsNothing);
+
+      // Back on the map: where the film stopped, at the speed it had.
+      expect(picked, hasLength(2));
+      final moved =
+          (pack.routePosition(picked.last) - start) % pack.route.length;
+      expect(moved, greaterThanOrEqualTo(3));
+      expect(find.text(picked.last.label), findsOneWidget);
+      expect(find.text('24/s'), findsOneWidget);
+      expect(find.byIcon(Icons.play_arrow), findsOneWidget);
+
+      // The speed button steps on from wherever the slider left it.
+      await tester.tap(find.text('24/s'));
+      await tester.pump();
+      expect(find.text('3/s'), findsOneWidget);
     });
 
     testWidgets('the scrub bar spans the route', (tester) async {
