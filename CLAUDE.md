@@ -1117,6 +1117,18 @@ Prohlížeč nemůže volat ComfyUI přímo (nevrací CORS hlavičky a CF Access
 odmítá preflight 403), proto ten lokální server; drží CF creds, takže
 poslouchá jen na loopbacku a mutující požadavky chtějí `X-Lab-Token`.
 
+**Kompletní matice z jedné fotky** (`make lab-complete REF=…`,
+`tools/lab/complete.sh`): repose s tváří přes všechny SDXL modely × všechny
+styly a na čtyřech modelech, které danbooru tagy znají, přes nativní umělce
+a postavy (`TOP=100` = sto s nejvíc díly na danbooru, pořadí v
+`candidates/native-*-ranked.tsv`). Strop 400 buněk se ho netýká — hlídá ho jen
+server pro UI. Běží sám po částech v oknech, kdy na SPARKu jede ComfyUI
+(07:10–12:50), a navazuje. Na sdíleném GPU se runner chová ohleduplně přes
+`LAB_SHARED_PAUSE` (čeká na prázdnou frontu, pauza mezi buňkami)
+a `LAB_MAX_CELL_SECONDS` / `LAB_MAX_FIRST_CELL_SECONDS` (pomalá buňka = pád na
+CPU ⇒ konec běhu); podrobnosti a podmínky dohodnuté s plánovačem SPARKu jsou
+v `tools/lab/README.md`.
+
 **Odeslání běhu do FINETUNE gallery**: `lab export DIR --send` (nebo tlačítko
 u dokončeného běhu; odesílání je opt-in, protože galerie nemá mazací
 endpoint). Jedna buňka = jeden uzel; předloha běhu je kořenový uzel
