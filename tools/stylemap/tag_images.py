@@ -36,11 +36,16 @@ from common import FACETS, TAG_CACHE, credentials
 
 SYSTEM = (
     "You catalogue the visual style of images. Ignore who or what is depicted; "
-    "describe only how the image is rendered. Answer with JSON only."
+    "describe only how the image is rendered. Answer with compact JSON on a "
+    "single line."
 )
+# Left to itself the model fills `words` with the five answers it has just
+# given ("warm palette", "soft lines"), which adds nothing to search.
 ASK = (
     "Describe the style of this image. `words`: 3 to 6 short lowercase English "
-    "style keywords (technique, art movement, era, lighting) — no subject words."
+    "keywords for what the other fields do not say — art movement, era, "
+    "technique, brushwork or rendering, lighting, an artist or school it "
+    "resembles. Do not repeat the other fields and do not name the subject."
 )
 SCHEMA = {
     "type": "object",
@@ -52,7 +57,7 @@ SCHEMA = {
     },
 }
 # Bump when the question changes: old answers are then asked again.
-VERSION = 1
+VERSION = 2
 
 
 def data_url(path: str, side: int) -> str:
@@ -63,10 +68,11 @@ def data_url(path: str, side: int) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
-def ask(url: str, model: str, key: str, path: str, side: int, timeout: float) -> dict:
+def ask(url: str, model: str, key: str, path: str, side: int, timeout: float,
+        temperature: float = 0) -> dict:
     body = {
         "model": model,
-        "temperature": 0,
+        "temperature": temperature,
         "max_tokens": 200,
         "messages": [
             {"role": "system", "content": SYSTEM},
@@ -183,35 +189,43 @@ def main() -> None:
         return got["tags"] if got.get("v") == VERSION and got.get("model") == args.model else None
 
     todo = [it for it in items if cached(it) is None]
+    have = len(items) - len(todo)
     if args.limit:
         todo = todo[:args.limit]
     stop = deadline(args.until)
-    print(f"{len(items)} obrázků, {len(items) - len(todo)} v cache, ptám se na {len(todo)} "
+    print(f"{len(items)} obrázků, {have} v cache, ptám se na {len(todo)} "
           f"({args.model}, souběžnost {args.jobs}, do {stop:%H:%M})", flush=True)
 
     state = {"done": 0, "failed": 0, "streak": 0, "halt": ""}
     t0 = time.time()
 
     def work(it: dict) -> None:
-        for attempt in range(3):
+        last = ""
+        for attempt in range(4):
             if state["halt"]:
                 return
             if datetime.now() >= stop:
                 state["halt"] = f"je {args.until}, okno modelu končí"
                 return
             try:
-                tags = ask(args.url, args.model, args.key, it["path"], args.side, args.timeout)
-            except (urllib.error.URLError, TimeoutError, ValueError, KeyError, json.JSONDecodeError) as e:
-                err = f"HTTP {e.code}: {e.read()[:200].decode(errors='replace')}" \
+                # At temperature 0 a bad answer is the same bad answer again
+                # (the schema lets the model pad with whitespace until it
+                # runs out of tokens), so a repeat is asked a little warmer.
+                tags = ask(args.url, args.model, args.key, it["path"], args.side,
+                           args.timeout, temperature=0.3 * attempt)
+            except (ValueError, KeyError) as e:  # the answer, not the server
+                last = repr(e)
+                continue
+            except (urllib.error.URLError, TimeoutError) as e:
+                last = f"HTTP {e.code}: {e.read()[:200].decode(errors='replace')}" \
                     if isinstance(e, urllib.error.HTTPError) else repr(e)
                 state["streak"] += 1
                 if state["streak"] >= 8:
-                    state["halt"] = f"osm chyb po sobě, poslední: {err}"
+                    state["halt"] = f"osm chyb serveru po sobě, poslední: {last}"
                     return
                 # A pause, not a tight loop: the model may be loading, or busy
                 # with whoever it is shared with.
                 time.sleep(20 * (attempt + 1))
-                last = err
                 continue
             state["streak"] = 0
             tmp = caches[it["id"]].with_suffix(".part")

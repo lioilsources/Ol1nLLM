@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -265,6 +266,8 @@ func (r *Run) Generate() {
 
 	r.update(func(s *RunState) { s.Status = "running"; s.Message = "" })
 	authFails := 0
+	polite := politeFromEnv()
+	lastModel := ""
 	for _, c := range cells {
 		select {
 		case <-ctx.Done():
@@ -275,6 +278,11 @@ func (r *Run) Generate() {
 		if _, err := os.Stat(r.imgPath(c.ID)); err == nil {
 			r.update(func(s *RunState) { r.markDone(s, c.ID, 0, false) })
 			continue
+		}
+		firstOfModel := c.Model != lastModel
+		lastModel = c.Model
+		if !r.Spec.Dry && c.Backend != BackendNim {
+			polite.wait(ctx, r.env.Comfy)
 		}
 		start := time.Now()
 		r.update(func(s *RunState) {
@@ -296,6 +304,12 @@ func (r *Run) Generate() {
 			} else {
 				authFails = 0
 			}
+			// The reference is the same in every cell, so a face the
+			// detector cannot find fails all of them the same way.
+			if polite.pause > 0 && strings.Contains(strings.ToLower(err.Error()), "no face") {
+				_ = r.fail("run", fmt.Errorf("na předloze není rozpoznatelná tvář (%v) — běh zastaven", err))
+				return
+			}
 			r.update(func(s *RunState) {
 				cs := s.Cells[c.ID]
 				cs.Status = CellFailed
@@ -308,6 +322,20 @@ func (r *Run) Generate() {
 		authFails = 0
 		secs := time.Since(start).Seconds()
 		r.update(func(s *RunState) { r.markDone(s, c.ID, secs, r.Spec.Dry) })
+		// A cell this slow means ComfyUI has fallen back to the CPU, and
+		// carrying on would cook the machine for hours. The first cell of a
+		// model pays for loading the checkpoint and gets a longer limit —
+		// but it gets one, because the fallback happens exactly there.
+		limit := polite.maxCell
+		if firstOfModel {
+			limit = polite.maxFirst
+		}
+		if limit > 0 && !r.Spec.Dry && secs > limit {
+			_ = r.fail("run", fmt.Errorf(
+				"buňka %s trvala %.0f s (strop %.0f s) — ComfyUI nejspíš počítá na CPU, běh zastaven",
+				c.ID, secs, limit))
+			return
+		}
 	}
 	r.computeMetrics()
 	r.update(func(s *RunState) {
@@ -675,4 +703,64 @@ func (r *Run) exportFailed(err error) {
 		s.Export.Error = err.Error()
 		s.Export.At = time.Now()
 	})
+}
+
+// polite is how a long run behaves on a ComfyUI it shares with people: it
+// never queues behind someone else's job and leaves a gap between its own
+// cells. Read from the environment rather than the spec so that `lab resume`
+// — which replays a stored spec — can be told too.
+//
+//	LAB_SHARED_PAUSE      seconds between cells; also turns on waiting for an
+//	                      empty queue before each one
+//	LAB_MAX_CELL_SECONDS  stop the run when a cell takes longer than this
+//	LAB_MAX_FIRST_CELL_SECONDS  the same for the first cell of a model
+//
+// In this mode a "no face" error also stops the run instead of failing
+// thousands of cells one by one.
+type polite struct {
+	pause    time.Duration
+	maxCell  float64
+	maxFirst float64
+}
+
+func politeFromEnv() polite {
+	var p polite
+	if v, err := strconv.ParseFloat(os.Getenv("LAB_SHARED_PAUSE"), 64); err == nil && v > 0 {
+		p.pause = time.Duration(v * float64(time.Second))
+	}
+	if v, err := strconv.ParseFloat(os.Getenv("LAB_MAX_CELL_SECONDS"), 64); err == nil && v > 0 {
+		p.maxCell = v
+	}
+	if v, err := strconv.ParseFloat(os.Getenv("LAB_MAX_FIRST_CELL_SECONDS"), 64); err == nil && v > 0 {
+		p.maxFirst = v
+	}
+	return p
+}
+
+// wait holds until nothing is running or pending — the lab submits one cell
+// at a time and waits for it, so anything in the queue here is someone
+// else's — and then for the pause. An unreachable queue does not block: the
+// cell will fail on its own and say why.
+func (p polite) wait(ctx context.Context, c *Comfy) {
+	if p.pause <= 0 {
+		return
+	}
+	sleep := func(d time.Duration) bool {
+		select {
+		case <-ctx.Done():
+			return false
+		case <-time.After(d):
+			return true
+		}
+	}
+	for {
+		q, err := c.Queue()
+		if err != nil || q.Running+q.Pending == 0 {
+			break
+		}
+		if !sleep(5 * time.Second) {
+			return
+		}
+	}
+	sleep(p.pause)
 }

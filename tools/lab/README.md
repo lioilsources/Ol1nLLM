@@ -462,3 +462,49 @@ spočítá jen nové buňky. Starší běh dostane čísla přes `lab score <adr
   stránka v prohlížeči.
 - Prohlížeč nemůže volat ComfyUI přímo: nevrací CORS hlavičky a CF Access
   odmítá preflight (403). Proto ten lokální server.
+
+## Kompletní matice z jedné fotky (`complete.sh`)
+
+```bash
+nohup make lab-complete REF=foto.jpg > build/lab/complete.log 2>&1 &
+```
+
+Repose s přenosem tváře z fotky přes všechno, co registry mají: každý SDXL
+model × každý styl (kultury, epochy i umělci) a na čtyřech modelech, které
+danbooru tagy opravdu znají (NoobAI, Illustrious, WAI, Animagine; `TAG_MODELS`),
+každý nativní umělec a každá nativní postava. Celé seznamy jsou ~20 000 buněk
+(14 modelů × 83, 4 × 979, 4 × 3 867), tedy týdny GPU — skript je proto stavěný na to, aby běžel
+bez dozoru:
+
+- **Strop 400 buněk tu neplatí.** Žije v odhadu, který kontroluje jen server
+  pro UI; `lab run` z terminálu se na něj nikdy neptal.
+- **Jeden běh na část**: `complete-<jméno>-styles`, `-artists-<model>`,
+  `-characters-<model>`. Každý je samostatná session v galerii a samostatná
+  mapa stylů; největší má 3 868 buněk, což je velikost, kterou lab už zvládl.
+- **Okna.** Pracuje jen v hodinách, kdy na SPARKu běží ComfyUI (`WINDOWS`,
+  výchozí 07:10–12:50 podle rozvrhu z 2026-10-08), a jen když ComfyUI opravdu
+  odpovídá. Na konci okna lab zastaví, v dalším naváže (`lab resume`). Stejně
+  naváže, když skript zabiješ a pustíš znovu se stejnou fotkou.
+- **Sdílené GPU.** Před každou buňkou čeká na prázdnou frontu ComfyUI (cizí
+  úloha má přednost), po buňce nechá 2,5 s (`PAUSE`) a běh zastaví, když
+  buňka trvá déle než 120 s (`MAX_CELL`; první po výměně checkpointu 300 s,
+  `MAX_FIRST_CELL`) — to ComfyUI spadl na CPU, a celá matice tím končí. V runneru
+  to řídí `LAB_SHARED_PAUSE` a `LAB_MAX_CELL_SECONDS`; platí i pro `lab resume`.
+- **Bez FLUXu.** Bere jen modely s generickým SDXL grafem; které to jsou a
+  které čtou tagy, říká registr, které jsou nainstalované, ComfyUI.
+- **Tvář** (`FACE`, výchozí `faceid` — lehčí a rychlejší; `instantid` jde
+  zapnout). Fotka bez rozpoznatelného obličeje shodí hned první buňku
+  („No face detected“) a tím celou matici, místo tisíců stejných chyb.
+- **Umělci a postavy** se berou z `candidates/native-*.yaml` (zatím na větvi
+  `lab/prompt-candidates`, skript si je odtud přečte), ale bez jejich námětu:
+  položka je jen tag (`artist:…`, `postava, série`) a před každou jde `TAGS`.
+  Námětem je fotka.
+- **`TOP=100`** vezme jen sto umělců a sto postav s nejvíc díly na danbooru
+  (`candidates/native-*-ranked.tsv`; pořadí stáhne `danbooru_top.py`, počty
+  jsou z 2026-10-09). To je matice na týden: 14 × 83 + 4 × 101 + 4 × 101 =
+  1 970 buněk. U 269 postav se tag na danbooru nenašel a jsou na konci pořadí.
+- `DRY=1 TOP=3` projede celý postup nanečisto, bez ComfyUI a bez čekání na okno.
+
+První den pusť jen hodinu (`WINDOWS="07:10-08:10"`), ať je vidět, co to dělá
+s teplotou stroje.
+
