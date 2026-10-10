@@ -11,6 +11,37 @@ Sepsáno 2026-10-10 po průzkumu obou rep a měření z 6. 10. Co je ověřené
 proti kódu nebo serveru, nese **[V]**; co je jen z popisu třetí strany,
 **[S]**; odhad **[I]**.
 
+> **Stav 2026-10-10 (implementováno téhož dne):** Fáze 0 změřena, cesta A
+> (mřížka + klik) postavená na serveru (AiStack PR #25, `app/tts/rhythm.py`)
+> i v appce (sekce „Rytmus" ve Voice Studiu). Cesta B se **nestaví**. Co
+> vyšlo jinak, než plán čekal — všechno změřené na SPARKu:
+> 1. **Frázování se nedá napsat do textu** (hypotéza §1 bod 2 padla). Tentýž
+>    odstavec jako próza a rozsekaný čárkami po ~8 slabikách: 12,0 a 12,5 s;
+>    `exaggeration` 0,3–1,2 a `cfg_weight` 0,3–0,7: 11,3–13,1 s. Rytmus dělá
+>    až zarovnání na serveru, textová transformace nic.
+> 2. **ACE-Step text nepřečte** (§1 bod 3): z osmi řádků českého rapu jich
+>    v přepisu Whisperem zůstaly čtyři zkomolené, z osmi anglických jeden.
+>    Klon tutéž větu přečte s WER 0,00. Na „přečti článek" nepoužitelné →
+>    §3 odpadá celý.
+> 3. **Natažení snese víc, než plán čekal** (§1 bod 1): srozumitelnost drží
+>    v celém rozsahu 0,7–1,6 (WER ≤ 0,07, atempo i rubberband; rubberband ve
+>    ffmpegu služby je). Meze jsou 0,75–1,5; přirozenost poslechem ověřená
+>    není — to je na uších uživatele.
+> 4. **Hustota textu se neodvozuje z BPM, ale z tempa řeči** (§2.1 tabulka
+>    „slabik/doba" neplatí): fráze dostane tolik slabik, kolik engine namluví
+>    v čase, který ve slotu má, takže natažení zůstává u 1,0 při jakémkoli
+>    BPM. Tempo řeči se měří za běhu (Piper ~6,5 slabik/s, klon ~5).
+> 5. **Dvě pasti enginu**: délka řeči má náběh ~0,8 s (bez něj se čtení
+>    rozpadlo na 73 útržků) a Chatterbox na útržku halucinuje (27,7 s zvuku
+>    ze dvou slabik). Obojí ošetřeno a popsáno v AiStack
+>    `services/audio/README.md`, „Řeč na mřížce".
+>
+> Hotová čtení článku o 600 znacích klonem: rap 90 BPM 16 frází, 64 dob,
+> 62 s syntézy, text zachován (WER 0,08); rap 140 BPM WER 0,07.
+> **Nepostaveno:** beat z Music Studia pod hlasem (§2.2 bod 5 — chce
+> detekci první doby v instrumentálu), ukázání „24 taktů, nataženo o 12 %"
+> v appce, a kalibrace hodnot stylů poslechem.
+
 ## 0. Co jde a co nejde — řekni to uživateli dřív, než se začne stavět
 
 Žádný engine na serveru **neumí „flow"**: ani XTTS, ani Chatterbox nemají
