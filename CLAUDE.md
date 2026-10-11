@@ -846,6 +846,23 @@ jako u MusicStudia (AiStack `services/audio`, sekce TTS v jeho README),
   (server je zapíše k hlasu a do manifestu každého jobu). Id hlasu na serveru
   je `voiceIdFor(jméno)`; obsazené jméno vrátí 409 a formulář chybu ukáže
   sám (snackbar by byl schovaný za sheetem, proto `createVoice()` hází).
+- **Rytmus** (sekce „Rytmus", `SpeechRhythm` v `voice.dart`): tempo v BPM,
+  styl frázování (`PhrasingStyle` — jména hodnot jsou id presetů serveru)
+  a klik. Server pak text rozdělí na fráze a každou zarovná na doby
+  (`rhythm` v `/v1/audio/tts`, AiStack `app/tts/rhythm.py`). **Není to
+  flow** — zarovnává se začátek a délka fráze, ne slabiky, a UI to říká.
+  Proč jen tohle (ACE-Step text nepřečte, tvar textu rytmus neudělá):
+  stavový blok v `docs/plan-voice-rhythm.md`. Rytmus je **nastavení studia**
+  (Hive `voice_studio`, klíč `rhythm`), ne persony ani hlasu, a platí pro
+  každé čtení včetně reproduktoru v chatu — ten má pak ikonu ekvalizéru
+  místo reproduktoru. Je součástí názvu souboru v cache (`speechFileName`)
+  i klíče čtení (`SpeechPlayer.keyOf(…, variant)`), jinak by cache vrátila
+  obyčejnou verzi. Tempo jde vyťukat (`tapTempo`: průměr posledních klepnutí,
+  pauza přes 2,5 s začíná znovu) nebo převzít z ukázky změřené v Music
+  Studiu — to je cesta k „jeho BPM". Kusy (`speechChunks`) zůstávají: každý
+  končí na konci frázového slotu, takže další začne zase na době; mezera
+  mezi soubory v přehrávači ale mřížku mezi kusy o zlomek doby posune.
+  Starší server pole `rhythm` tiše ignoruje a přečte text obyčejně.
 - **GPU enginy běží jen někdy.** Kokoro a Piper jsou CPU a jedou pořád; XTTS
   a Chatterbox nejsou v rozvrhu SPARKu (AiStack `CLAUDE.md`, sekce TTS). Když
   neběží, server odmítne `/tts` hned `503` s větou pro člověka a appka ji

@@ -5,14 +5,18 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:ol1n_llm/core/constants/theme.dart';
 import 'package:ol1n_llm/models/persona.dart';
+import 'package:ol1n_llm/models/music_project.dart';
 import 'package:ol1n_llm/models/voice.dart';
+import 'package:ol1n_llm/providers/music_studio_provider.dart';
 import 'package:ol1n_llm/providers/speech_player.dart';
 import 'package:ol1n_llm/providers/voice_studio_provider.dart';
 import 'package:ol1n_llm/screens/voice_studio_screen.dart';
+import 'package:ol1n_llm/services/music_service.dart';
 import 'package:ol1n_llm/services/persona_service.dart';
 import 'package:ol1n_llm/services/voice_service.dart';
 import 'package:ol1n_llm/widgets/music_playback.dart';
@@ -463,6 +467,81 @@ print('nečíst');
     });
   });
 
+  group('rhythm', () {
+    const rap = SpeechRhythm(bpm: 96, style: PhrasingStyle.rap, beat: true);
+
+    test('goes into the request only when set', () {
+      final plain = speechRequest(text: 'Ahoj.', voiceId: 'v', language: 'cs');
+      expect(plain.containsKey('rhythm'), isFalse);
+      final onBeat = speechRequest(
+        text: 'Ahoj.',
+        voiceId: 'v',
+        language: 'cs',
+        rhythm: rap,
+      );
+      // The shape AiStack's TtsRhythm takes.
+      expect(onBeat['rhythm'], {'bpm': 96, 'style': 'rap', 'beat': true});
+    });
+
+    test('style ids are the ones the server knows', () {
+      expect(PhrasingStyle.values.map((s) => s.name), [
+        'spoken',
+        'news',
+        'slam',
+        'rap',
+        'preacher',
+      ]);
+    });
+
+    test('survives storage; an unknown style reads as plain', () {
+      final back = SpeechRhythm.fromJson(
+        jsonDecode(jsonEncode(rap.toJson())) as Map<String, dynamic>,
+      );
+      expect(back.tag, rap.tag);
+      final odd = SpeechRhythm.fromJson({'bpm': 900, 'style': 'yodel'});
+      expect(odd.style, PhrasingStyle.spoken);
+      expect(odd.bpm, kMaxBpm);
+      expect(odd.beat, isFalse);
+    });
+
+    test('every rhythm is its own recording in the cache', () {
+      final names = {
+        speechFileName('v', 'cs', 'Ahoj.'),
+        speechFileName('v', 'cs', 'Ahoj.', rap),
+        speechFileName('v', 'cs', 'Ahoj.', rap.copyWith(bpm: 97)),
+        speechFileName('v', 'cs', 'Ahoj.', rap.copyWith(beat: false)),
+        speechFileName(
+          'v',
+          'cs',
+          'Ahoj.',
+          rap.copyWith(style: PhrasingStyle.slam),
+        ),
+      };
+      expect(names, hasLength(5));
+      expect(
+        SpeechPlayer.keyOf('Ahoj.', 'v'),
+        isNot(SpeechPlayer.keyOf('Ahoj.', 'v', rap.tag)),
+      );
+    });
+
+    test('tap tempo: mean of the recent taps, a long pause starts over', () {
+      final t0 = DateTime(2026, 10, 10, 12);
+      List<DateTime> every(int ms, int count, [DateTime? from]) => [
+        for (var i = 0; i < count; i++)
+          (from ?? t0).add(Duration(milliseconds: ms * i)),
+      ];
+      expect(tapTempo([]), isNull);
+      expect(tapTempo([t0]), isNull);
+      expect(tapTempo(every(500, 4)), 120);
+      expect(tapTempo(every(667, 5)), 90);
+      // Slow taps, a pause, then fast ones: only the fast run counts.
+      final later = t0.add(const Duration(seconds: 10));
+      expect(tapTempo([...every(1000, 3), ...every(400, 4, later)]), 150);
+      // Faster than anything readable is held at the limit.
+      expect(tapTempo(every(100, 4)), kMaxBpm);
+    });
+  });
+
   group('VoiceStudioNotifier', () {
     late Directory dir;
     late _FakeAudioServer server;
@@ -511,6 +590,27 @@ print('nečíst');
       // One catalogue fetch serves both.
       expect(server.count('GET', '/v1/audio/voices'), 1);
     });
+
+    test(
+      'with a rhythm set, readings go out on the beat and cache apart',
+      () async {
+        final plain = await notifier.speak('Ahoj.', kDefaultVoiceId);
+        await notifier.setRhythm(
+          const SpeechRhythm(bpm: 90, style: PhrasingStyle.rap),
+        );
+        final onBeat = await notifier.speak('Ahoj.', kDefaultVoiceId);
+        expect(onBeat, isNot(plain));
+        expect(server.bodies.map((b) => b['rhythm']), [
+          null,
+          {'bpm': 90, 'style': 'rap', 'beat': false},
+        ]);
+        // Off again: the plain recording is still there, nothing new is asked.
+        await notifier.setRhythm(null);
+        expect(notifier.state.rhythm, isNull);
+        expect(await notifier.speak('Ahoj.', kDefaultVoiceId), plain);
+        expect(server.count('POST', '/v1/audio/tts'), 2);
+      },
+    );
 
     test('an answer with nothing to read is refused before the network', () {
       expect(
@@ -642,6 +742,100 @@ print('nečíst');
     );
     expect(find.text('HOTOVÉ HLASY'), findsOneWidget);
     expect(find.text('Kasandra (medium)'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('rhythm section and tempo sheet at iPhone 12 mini width', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(375 * 3, 812 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final dir = Directory.systemTemp.createTempSync('voice_rhythm');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    // The music notifier saves its projects when the scope goes.
+    Hive.init(dir.path);
+    addTearDown(Hive.close);
+    final dead = MockClient((_) async => http.Response('', 500));
+    final notifier = VoiceStudioNotifier.preloaded(
+      VoiceStudioState(voices: _catalogue()),
+      service: VoiceService(client: dead),
+      dir: dir,
+    );
+    // A sample Music Studio has listened to: its tempo is on offer.
+    final music = MusicStudioNotifier.preloaded(
+      MusicStudioState(
+        projects: [
+          MusicProject.create(
+            name: 'lose-yourself.mp3',
+            sampleFile: 's.mp3',
+          ).copyWith(
+            analysis: SampleAnalysis.fromJson(const {
+              'caption': 'Tense hip-hop beat.',
+              'genre': 'Hip hop',
+              'bpm': 86,
+              'keyscale': 'D minor',
+              'timesignature': '4',
+              'instrumental': false,
+              'duration_s': 30.0,
+            }),
+          ),
+        ],
+      ),
+      service: MusicService(client: dead),
+      dir: dir,
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          voiceStudioProvider.overrideWith((_) => notifier),
+          musicStudioProvider.overrideWith((_) => music),
+          personaListProvider.overrideWith((_) async => const <Persona>[]),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark,
+          home: const VoiceStudioScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // Off: only the tempo chip, no phrasing to choose.
+    expect(find.text('Tempo: vypnuto'), findsOneWidget);
+    expect(find.text('Rap'), findsNothing);
+
+    await tester.tap(find.text('Tempo: vypnuto'));
+    await tester.pumpAndSettle();
+    expect(find.text('$kDefaultBpm BPM'), findsOneWidget);
+    // Nothing to turn off yet.
+    expect(find.text('Vypnout rytmus'), findsNothing);
+    await tester.tap(find.text('lose-yourself · 86'));
+    await tester.pump();
+    expect(find.text('86 BPM'), findsOneWidget);
+    await tester.tap(find.text('Použít'));
+    await tester.pumpAndSettle();
+    expect(notifier.state.rhythm!.bpm, 86);
+    expect(notifier.state.rhythm!.style, PhrasingStyle.spoken);
+
+    // The row scrolls sideways: phrasing does not fit next to the tempo.
+    await tester.ensureVisible(find.text('Rap'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rap'));
+    await tester.pumpAndSettle();
+    expect(notifier.state.rhythm!.style, PhrasingStyle.rap);
+    await tester.ensureVisible(find.text('Klik'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Klik'));
+    await tester.pumpAndSettle();
+    expect(notifier.state.rhythm!.tag, '86-rap-beat');
+    expect(find.textContaining('ne flow'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('86 BPM'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('86 BPM'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Vypnout rytmus'));
+    await tester.pumpAndSettle();
+    expect(notifier.state.rhythm, isNull);
     expect(tester.takeException(), isNull);
   });
 }
