@@ -58,6 +58,8 @@ dev_dependencies:
     sdk: flutter
 
   flutter_lints: ^6.0.0
+  # test/screenshots_test.dart fakes the app-support directory
+  path_provider_platform_interface: ^2.1.2
   flutter_launcher_icons: ^0.14.3
 
 # For information on the generic Dart part of this file, see the

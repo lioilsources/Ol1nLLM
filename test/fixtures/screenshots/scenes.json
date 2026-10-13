@@ -1,0 +1,175 @@
+{
+ "scenes": [
+  {
+   "id": "blink_smile",
+   "label": "Mrknutí a úsměv",
+   "desc": "Dýchá, pomalu mrkne, usměje se a podívá se do kamery. Nejjistější volba.",
+   "label_en": "Blink and smile",
+   "desc_en": "Breathes, blinks slowly, smiles and looks into the camera. The safest choice.",
+   "beats": 3,
+   "seconds": 13.4,
+   "audio": false,
+   "minutes_est": 7
+  },
+  {
+   "id": "booty_hip_hop",
+   "label": "Tanec · Hip hop boky",
+   "desc": "Hip hop s pohupováním boků a zvedáním kolen, ruce švihají a jdou za hlavu.",
+   "label_en": "Dance · Booty Hip Hop",
+   "desc_en": "Hip hop with hip bounces and knee lifts, arms swinging up behind the head.",
+   "beats": 4,
+   "seconds": 19.1,
+   "audio": false,
+   "minutes_est": 15
+  },
+  {
+   "id": "chicken_dance",
+   "label": "Tanec · Ptačí tanec",
+   "desc": "Zobáček z dlaní, mávání lokty jako křídly a vrtění v podřepu.",
+   "label_en": "Dance · Chicken Dance",
+   "desc_en": "Beak-pinching hands, elbows flapping like wings and a wiggle down low.",
+   "beats": 4,
+   "seconds": 19.1,
+   "audio": false,
+   "minutes_est": 15
+  },
+  {
+   "id": "icon_disco",
+   "label": "Ikony · Disco (70s)",
+   "desc": "Prst ukazuje nahoru do rohu, diagonální švih k boku, houpání boků, otočka, finální ukázání.",
+   "label_en": "Icons · Disco (70s)",
+   "desc_en": "A finger pointing up to the corner, a diagonal sweep to the hip, swaying hips, a spin, a closing point.",
+   "beats": 5,
+   "seconds": 18.8,
+   "audio": false,
+   "minutes_est": 10
+  },
+  {
+   "id": "icon_single_ladies",
+   "label": "Ikony · Single Ladies",
+   "desc": "Švih zápěstí před obličejem, vysunuté boky, ukázání na prsten, kývání kolen, otočka, freeze.",
+   "label_en": "Icons · Single Ladies",
+   "desc_en": "A wrist flick in front of the face, hips pushed out, pointing at the ring, knees rocking, a spin, a freeze.",
+   "beats": 5,
+   "seconds": 16.8,
+   "audio": false,
+   "minutes_est": 9
+  },
+  {
+   "id": "macarena",
+   "label": "Tanec · Macarena",
+   "desc": "Ruce vpřed, dlaně, ramena, za hlavu, na boky, zhoupnutí boků a podřep.",
+   "label_en": "Dance · Macarena",
+   "desc_en": "Arms forward, palms, shoulders, behind the head, onto the hips, a hip sway and a dip.",
+   "beats": 4,
+   "seconds": 19.1,
+   "audio": false,
+   "minutes_est": 15
+  },
+  {
+   "id": "maraschino_step",
+   "label": "Tanec · Hip hop Maraschino",
+   "desc": "Pérující hip-hopový krok na pokrčených kolenou, natočení bokem a zpět, ruce v rytmu.",
+   "label_en": "Dance · Maraschino Step",
+   "desc_en": "A bouncy hip hop step on bent knees, turning sideways and back, arms in rhythm.",
+   "beats": 4,
+   "seconds": 19.1,
+   "audio": false,
+   "minutes_est": 15
+  },
+  {
+   "id": "rumba",
+   "label": "Tanec · Rumba",
+   "desc": "Pomalé kroky ze strany na stranu, měkká kolena, ruce před hrudí, vlnění boků.",
+   "label_en": "Dance · Rumba",
+   "desc_en": "Slow side-to-side steps, soft knees, hands in front of the chest, swaying hips.",
+   "beats": 4,
+   "seconds": 19.1,
+   "audio": false,
+   "minutes_est": 15
+  },
+  {
+   "id": "salsa",
+   "label": "Tanec · Salsa",
+   "desc": "Salsa na místě: křížené kroky, ruka na boku, výpad s rozpaženou rukou a otočka dokola.",
+   "label_en": "Dance · Salsa",
+   "desc_en": "Salsa on the spot: crossing steps, a hand on the hip, a lunge with the arm out and a full turn.",
+   "beats": 4,
+   "seconds": 19.1,
+   "audio": false,
+   "minutes_est": 15
+  },
+  {
+   "id": "samba",
+   "label": "Tanec · Samba",
+   "desc": "Rychlé pérující kroky, rozpažené ruce, houpání boků a natáčení do stran.",
+   "label_en": "Dance · Samba",
+   "desc_en": "Quick bouncing steps, arms wide open, swaying hips and turns from side to side.",
+   "beats": 4,
+   "seconds": 19.1,
+   "audio": false,
+   "minutes_est": 15
+  },
+  {
+   "id": "sit_down",
+   "label": "Sedne si na zem",
+   "desc": "Pomalu se sníží k zemi, sedne si, zakloní hlavu se zavřenýma očima, pak úsměv do kamery.",
+   "label_en": "Sits down on the floor",
+   "desc_en": "Lowers slowly to the floor, sits down, head tipped back with eyes closed, then a smile into the camera.",
+   "beats": 5,
+   "seconds": 21.8,
+   "audio": false,
+   "minutes_est": 12
+  },
+  {
+   "id": "snake_hip_hop",
+   "label": "Tanec · Hip hop vlna",
+   "desc": "Hip hop s vlnou těla: předklon s rukama na kolenou, vlna vzhůru a ruka přes hlavu.",
+   "label_en": "Dance · Snake Hip Hop",
+   "desc_en": "Hip hop with body waves: bending forward with the hands on the knees, rolling up, an arm sweeping overhead.",
+   "beats": 4,
+   "seconds": 19.1,
+   "audio": false,
+   "minutes_est": 15
+  },
+  {
+   "id": "twerk",
+   "label": "Tanec · Twerk",
+   "desc": "Široký podřep s rukama na stehnech, rytmické pohupování boky, na konci drží pózu.",
+   "label_en": "Dance · Twerk",
+   "desc_en": "A wide low squat with hands on the thighs, rhythmic hip bounces, holding the pose at the end.",
+   "beats": 3,
+   "seconds": 14.4,
+   "audio": false,
+   "minutes_est": 11
+  },
+  {
+   "id": "wind_hair",
+   "label": "Vlasy ve větru",
+   "desc": "Lehký vánek zvedne vlasy, zastrčí si pramen za ucho, ohlédne se přes rameno.",
+   "label_en": "Hair in the wind",
+   "desc_en": "A light breeze lifts the hair, tucks a strand behind the ear, a glance back over the shoulder.",
+   "beats": 3,
+   "seconds": 13.4,
+   "audio": false,
+   "minutes_est": 7
+  },
+  {
+   "id": "wink",
+   "label": "Mrknutí na kameru",
+   "desc": "Pohled do kamery, hravé mrknutí jedním okem, tichý smích.",
+   "label_en": "Wink at the camera",
+   "desc_en": "A look into the camera, a playful wink with one eye, a silent laugh.",
+   "beats": 3,
+   "seconds": 11.4,
+   "audio": false,
+   "minutes_est": 6
+  }
+ ],
+ "custom": {
+  "max_beats": 3,
+  "max_prompt": 500,
+  "seconds_per_beat": 5.1,
+  "minutes_per_beat": 2
+ }
+}

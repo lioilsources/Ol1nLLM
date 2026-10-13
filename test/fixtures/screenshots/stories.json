@@ -1,0 +1,1880 @@
+{
+ "stories": [
+  {
+   "id": "lost_umbrella",
+   "title": "Ztracený deštník",
+   "title_en": "The Lost Umbrella",
+   "desc": "Mia hledá svůj deštník po celém domě. Najde ho venku — na hlavě kocoura.",
+   "desc_en": "Mia searches the whole house for her umbrella and finds it outside, on a cat's head.",
+   "setting": "Útulné městečko v deštivém jarním dni: dlážděná ulice, kaluže a teple svítící výlohy.",
+   "shots": 12,
+   "beats": 15,
+   "seconds": 69.7,
+   "minutes_est": 53,
+   "minutes_est_hd": 101,
+   "audio": true,
+   "languages": [
+    "cs",
+    "en"
+   ],
+   "characters": [
+    {
+     "role": "mia",
+     "name": "Mia",
+     "name_en": "Mia",
+     "desc": "a cheerful 7-year-old girl with a short black bob haircut and big brown eyes, wearing a bright yellow raincoat and red rubber boots",
+     "look": "Veselá sedmiletá holčička s černým mikádem a velkýma hnědýma očima, ve žluté pláštěnce a červených holínkách.",
+     "hero": true,
+     "default": false
+    },
+    {
+     "role": "cat",
+     "name": "kocour Mourek",
+     "name_en": "Tom the cat",
+     "desc": "a chubby fluffy grey tabby cat with round green eyes and a white chest",
+     "look": "Baculatý chlupatý šedý mourovatý kocour s kulatýma zelenýma očima a bílou náprsenkou.",
+     "hero": false,
+     "default": false
+    }
+   ],
+   "script": [
+    {
+     "id": "01",
+     "chars": [
+      "mia"
+     ],
+     "action": "Mia klečí na parapetu v pokojíčku a dívá se na déšť. Přitiskne nos na sklo, orosí ho dechem, pak se opře a usměje.",
+     "narration": "Pršelo. Mia se na déšť moc těšila.",
+     "narration_en": "It was raining. Mia loved rainy days.",
+     "control": null,
+     "camera": "zoom_in",
+     "beats": 1
+    },
+    {
+     "id": "02",
+     "chars": [
+      "mia"
+     ],
+     "action": "V předsíni stojí prázdný stojan na deštníky. Mia vyjekne a chytí se za tváře.",
+     "narration": "Jenže stojan na deštníky byl prázdný!",
+     "narration_en": "But the umbrella stand was empty!",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "03",
+     "chars": [
+      "mia"
+     ],
+     "action": "Mia leží na břiše a svítí baterkou pod postel. Pak si sedne, zavrtí hlavou a pokrčí rameny.",
+     "narration": "Hledala pod postelí. Byl tam jen míček a jedna ponožka.",
+     "narration_en": "She looked under the bed. Only a ball and one sock.",
+     "control": null,
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "04",
+     "chars": [
+      "mia"
+     ],
+     "action": "Mia otevře velkou dřevěnou skříň, nakoukne mezi kabáty a zase ji zavře.",
+     "narration": "Ve skříni byly kabáty, ale deštník ne.",
+     "narration_en": "The wardrobe had coats, but no umbrella.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "05",
+     "chars": [
+      "mia"
+     ],
+     "action": "V kuchyni Mia nadzvedne velkou konvici, podívá se za ni a vzdychne.",
+     "narration": "V kuchyni voněl čaj. Deštník nikde.",
+     "narration_en": "The kitchen smelled of tea. No umbrella.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "06",
+     "chars": [
+      "mia"
+     ],
+     "action": "Mia vyjde z domu na deštivou ulici bez deštníku, natáhne si kapuci a kouká do nebe.",
+     "narration": "Tak vyšla ven jen v pláštěnce.",
+     "narration_en": "So she went out in just her raincoat.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "07",
+     "chars": [
+      "mia"
+     ],
+     "action": "Mia skáče do velké kaluže a voda stříká kolem červených holínek. Skočí ještě jednou a hihňá se.",
+     "narration": "Kaluže! Mia skákala, až voda stříkala na všechny strany.",
+     "narration_en": "Puddles! Mia jumped and water splashed everywhere.",
+     "control": null,
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "08",
+     "chars": [
+      "mia",
+      "cat"
+     ],
+     "action": "Na nízkém plotě sedí kocour Mourek s Miiným červeným deštníkem na hlavě jako s kloboukem. Deštník se kýve, Mia na něj ukazuje a směje se.",
+     "narration": "Na plotě seděl kocour Mourek. S jejím deštníkem!",
+     "narration_en": "On the fence sat Tom. With her umbrella!",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "09",
+     "chars": [
+      "mia"
+     ],
+     "action": "Mia na mokré ulici před plotem tančí kuřecí tanec: mává lokty jako křídly, podřepne a tleská.",
+     "narration": "Mia se tak smála, že začala tancovat kuřecí tanec. Mourek jen koukal.",
+     "narration_en": "Mia laughed so hard she did the chicken dance. Tom just stared.",
+     "control": "chicken_dance",
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "10",
+     "chars": [
+      "mia",
+      "cat"
+     ],
+     "action": "Mourek packou dostrká deštník k Mie. Mia ho zvedne a otevře.",
+     "narration": "Mourek jí deštník vrátil. Hodný kocour.",
+     "narration_en": "Tom gave the umbrella back. What a kind cat.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "11",
+     "chars": [
+      "mia",
+      "cat"
+     ],
+     "action": "Mia a Mourek sedí na lavičce pod otevřeným červeným deštníkem. Kocour se přitulí a Mia ho hladí.",
+     "narration": "Pod deštníkem bylo místo pro oba.",
+     "narration_en": "There was room for both under the umbrella.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "12",
+     "chars": [
+      "mia",
+      "cat"
+     ],
+     "action": "Mia jde s deštníkem ulicí ke kameře, Mourek cupitá vedle ní. Déšť ustane a nad střechami svítí duha.",
+     "narration": "Déšť přestal a nad městem svítila duha.",
+     "narration_en": "The rain stopped and a rainbow shone over town.",
+     "control": null,
+     "camera": "zoom_out",
+     "beats": 1
+    }
+   ]
+  },
+  {
+   "id": "night_fright",
+   "title": "Noční strach",
+   "title_en": "The Night Fright",
+   "desc": "Kubu v noci vyleká stín na zdi. Lampička ukáže, že je to jen bunda — a medvídek je po ruce.",
+   "desc_en": "A shadow on the wall scares Jake at night. The lamp shows it is only a jacket, and Teddy is right there.",
+   "setting": "Útulný dětský pokojíček v noci: měsíční světlo z okna, postel s hvězdičkovou peřinou, polička s hračkami, židle s oblečením a tlumené modré barvy.",
+   "shots": 12,
+   "beats": 15,
+   "seconds": 69.7,
+   "minutes_est": 53,
+   "minutes_est_hd": 101,
+   "audio": true,
+   "languages": [
+    "cs",
+    "en"
+   ],
+   "characters": [
+    {
+     "role": "jake",
+     "name": "Kuba",
+     "name_en": "Jake",
+     "desc": "a 6-year-old boy with fluffy red hair and big blue eyes, wearing light blue pajamas with yellow stars",
+     "look": "Šestiletý kluk s načechranými zrzavými vlasy a velkýma modrýma očima, ve světle modrém pyžamu se žlutými hvězdičkami.",
+     "hero": true,
+     "default": false
+    },
+    {
+     "role": "teddy",
+     "name": "medvídek Bručoun",
+     "name_en": "Teddy",
+     "desc": "a soft old brown teddy bear with a patched ear, button eyes and a red bow tie",
+     "look": "Měkký starý hnědý plyšový medvídek se záplatou na uchu, knoflíkovýma očima a červeným motýlkem.",
+     "hero": false,
+     "default": false
+    }
+   ],
+   "script": [
+    {
+     "id": "01",
+     "chars": [
+      "jake"
+     ],
+     "action": "V tmavém pokojíčku leží Kuba pod hvězdičkovou peřinou s očima dokořán, po zdi se rozlévá měsíční světlo. Mrkne a vytáhne si peřinu k bradě.",
+     "narration": "Bylo zhasnuto. Kuba ale nemohl usnout.",
+     "narration_en": "The lights were out, but Jake couldn't sleep.",
+     "control": null,
+     "camera": "zoom_in",
+     "beats": 1
+    },
+    {
+     "id": "02",
+     "chars": [
+      "jake"
+     ],
+     "action": "Na zdi se kýve velký strašidelný stín s ostrými tvary. Kuba na něj zírá a svírá peřinu.",
+     "narration": "Na zdi byl velký stín. Hýbal se!",
+     "narration_en": "A big shadow moved on the wall!",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "03",
+     "chars": [
+      "jake"
+     ],
+     "action": "Kuba sklouzne pod peřinu a koukají mu jen oči. Peřina se chvěje, ještě jednou vykoukne na zeď a zase si oči zakryje.",
+     "narration": "Kuba se schoval pod peřinu. Srdíčko mu bušilo jako buben.",
+     "narration_en": "Jake hid under his quilt. His heart beat like a drum.",
+     "control": null,
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "04",
+     "chars": [
+      "teddy"
+     ],
+     "action": "Medvídek Bručoun se překlopí přes okraj poličky a měkce dopadne na koberec.",
+     "narration": "Bum! Něco spadlo z poličky.",
+     "narration_en": "Thump! Something fell off the shelf.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "05",
+     "chars": [
+      "jake"
+     ],
+     "action": "Kuba pomalu nadzvedne peřinu, vykulenýma očima kouká k zemi a ztuhne.",
+     "narration": "Kuba zatajil dech a poslouchal.",
+     "narration_en": "Jake held his breath and listened.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "06",
+     "chars": [
+      "jake"
+     ],
+     "action": "Stín na zdi se natahuje do výšky a dlouhé ruce se mu kývají. Kuba si přetáhne peřinu přes nos.",
+     "narration": "Stín byl čím dál větší.",
+     "narration_en": "The shadow grew bigger and bigger.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "07",
+     "chars": [
+      "jake"
+     ],
+     "action": "Kuba se nadechne a pomalu natáhne ruku k lampičce ve tvaru měsíce. Cvakne a pokoj zalije teplé žluté světlo.",
+     "narration": "Pak se nadechl, natáhl ruku… a rozsvítil lampičku.",
+     "narration_en": "Then he took a breath, reached out… and switched on the lamp.",
+     "control": null,
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "08",
+     "chars": [
+      "jake"
+     ],
+     "action": "Ve světle lampičky visí na židli bunda a šála a lehce se pohupují. Kuba se na ně podívá a začne se chichotat.",
+     "narration": "Stín byla jen bunda a šála na židli!",
+     "narration_en": "The shadow was just his jacket on a chair!",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "09",
+     "chars": [
+      "jake",
+      "teddy"
+     ],
+     "action": "Kuba zvedne Bručouna z koberce, pevně ho obejme a usměje se.",
+     "narration": "A na zemi ležel medvídek Bručoun.",
+     "narration_en": "And there on the floor lay Teddy.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "10",
+     "chars": [
+      "jake"
+     ],
+     "action": "Kuba v pyžamu tančí na koberci makarenu: ruce dopředu, na ramena, na boky a malý skok.",
+     "narration": "Kubovi se tak ulevilo, že zatančil makarenu.",
+     "narration_en": "Jake felt so relieved he danced the macarena.",
+     "control": "macarena",
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "11",
+     "chars": [
+      "jake",
+      "teddy"
+     ],
+     "action": "Kuba uloží Bručouna pod peřinu, pohladí ho po hlavě a lehne si vedle něj.",
+     "narration": "Uložil Bručouna vedle sebe.",
+     "narration_en": "He tucked Teddy in beside him.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "12",
+     "chars": [
+      "jake",
+      "teddy"
+     ],
+     "action": "Kuba klidně spí s Bručounem v náručí a lampička tiše svítí.",
+     "narration": "Už se nebál. Dobrou noc, Kubo.",
+     "narration_en": "He wasn't scared anymore. Good night, Jake.",
+     "control": null,
+     "camera": "zoom_out",
+     "beats": 1
+    }
+   ]
+  },
+  {
+   "id": "magic_pencil",
+   "title": "Kouzelná tužka",
+   "title_en": "The Magic Pencil",
+   "desc": "Co Ondra nakreslí zlatou tužkou, to ožije. Nakreslený pejsek udělá nepořádek — a pak přijde kamarádka.",
+   "desc_en": "Whatever Oliver draws with the golden pencil comes alive. A drawn puppy makes a mess, and then a friend arrives.",
+   "setting": "Útulný dětský pokoj s velkým bílým papírem na zemi, pastelkami, poličkami s hračkami a oknem.",
+   "shots": 12,
+   "beats": 15,
+   "seconds": 69.7,
+   "minutes_est": 53,
+   "minutes_est_hd": 101,
+   "audio": true,
+   "languages": [
+    "cs",
+    "en"
+   ],
+   "characters": [
+    {
+     "role": "oliver",
+     "name": "Ondra",
+     "name_en": "Oliver",
+     "desc": "a curious 7-year-old boy with spiky black hair and a big grin, wearing a red and white striped T-shirt and blue overalls",
+     "look": "Zvídavý sedmiletý kluk s ježatými černými vlasy a širokým úsměvem, v červenobíle pruhovaném tričku a modrých laclácích.",
+     "hero": true,
+     "default": false
+    },
+    {
+     "role": "spot",
+     "name": "pejsek Flíček",
+     "name_en": "Spot",
+     "desc": "a small fluffy white puppy with one black spot around his eye, floppy ears and a wagging tail, drawn with slightly sketchy crayon outlines",
+     "look": "Malé chlupaté bílé štěně s černou skvrnou kolem oka, klopenýma ušima a vrtícím ocáskem, s lehce načrtnutými obrysy jako od pastelky.",
+     "hero": false,
+     "default": false
+    }
+   ],
+   "script": [
+    {
+     "id": "01",
+     "chars": [
+      "oliver"
+     ],
+     "action": "Ondra sedí sám na zemi v uklizeném pokoji s bradou v dlaních, za oknem prší. Vzdychne a bubnuje prsty o podlahu.",
+     "narration": "Ondra se nudil. Venku pršelo.",
+     "narration_en": "Oliver was bored. It was raining outside.",
+     "control": null,
+     "camera": "zoom_in",
+     "beats": 1
+    },
+    {
+     "id": "02",
+     "chars": [
+      "oliver"
+     ],
+     "action": "Ondra vytáhne zpod postele zářící zlatou tužku. Zajiskří a Ondra vykulí oči.",
+     "narration": "Pod postelí našel zlatou tužku.",
+     "narration_en": "Under his bed he found a golden pencil.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "03",
+     "chars": [
+      "oliver"
+     ],
+     "action": "Ondra nakreslí na velký papír kruh a vybarví ho načerveno, z kresby stoupají jiskry. Z papíru vyskočí skutečný červený míč a skáče, Ondra překvapeně ucukne.",
+     "narration": "Nakreslil míč… a míč vyskočil z papíru!",
+     "narration_en": "He drew a ball… and it jumped off the paper!",
+     "control": null,
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "04",
+     "chars": [
+      "oliver"
+     ],
+     "action": "Nakreslený dort zajiskří a promění se ve skutečný dort s třešní. Ondra si olízne rty a směje se.",
+     "narration": "Nakreslil dort. A byl opravdový!",
+     "narration_en": "He drew a cake. And it was real!",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "05",
+     "chars": [
+      "oliver",
+      "spot"
+     ],
+     "action": "Ondra klečí nad papírem se zlatou tužkou a z papíru se souká pejsek Flíček, napůl kresba, napůl skutečný. Oklepe se, zavrtí ocáskem a olízne Ondrovi nos.",
+     "narration": "Pak nakreslil pejska. Flíček ožil a olízl mu nos!",
+     "narration_en": "Then he drew a puppy. Spot came alive and licked his nose!",
+     "control": null,
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "06",
+     "chars": [
+      "spot"
+     ],
+     "action": "Flíček se prožene pokojem a hračky padají z poliček. Pak se zastaví a vrtí ocáskem.",
+     "narration": "Flíček běhal a všechno rozházel.",
+     "narration_en": "Spot ran around and made a big mess.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "07",
+     "chars": [
+      "oliver"
+     ],
+     "action": "Ondra stojí v pokoji plném rozházených hraček, chytí se za hlavu a pak se rozesměje.",
+     "narration": "Jé, takový nepořádek!",
+     "narration_en": "Oh no, what a mess!",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "08",
+     "chars": [
+      "oliver"
+     ],
+     "action": "Ondra nakreslí velkou bednu, ta se zhmotní a hračky do ní jedna po druhé vlétnou. Víko se zavře.",
+     "narration": "Nakreslil bednu na hračky. Uklizeno!",
+     "narration_en": "He drew a toy box. All tidy!",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "09",
+     "chars": [
+      "oliver"
+     ],
+     "action": "Ondra v uklizeném pokoji tančí radostný hip hop a vlní tělem i rukama.",
+     "narration": "Ondra radostí tancoval a Flíček štěkal do rytmu.",
+     "narration_en": "Oliver danced for joy, and Spot barked along.",
+     "control": "snake_hip_hop",
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "10",
+     "chars": [
+      "oliver"
+     ],
+     "action": "Ondra opatrně kreslí zlatou tužkou holčičku s culíkem a z papíru stoupají jiskry.",
+     "narration": "Nakonec si nakreslil kamarádku.",
+     "narration_en": "Last of all, he drew a friend.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "11",
+     "chars": [
+      "oliver"
+     ],
+     "action": "Z papíru vystoupí usměvavá holčička s hnědým culíkem ve žlutých šatech a zamává. Ondra jí zamává zpátky.",
+     "narration": "Ahoj, jsem Ema! A už se nenudil.",
+     "narration_en": "Hi, I'm Emma! And he wasn't bored anymore.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "12",
+     "chars": [
+      "oliver",
+      "spot"
+     ],
+     "action": "Ondra hodí červený míč, Flíček za ním běží a přinese ho zpátky. Ondra se směje.",
+     "narration": "Hráli si spolu až do večera.",
+     "narration_en": "They played together until evening.",
+     "control": null,
+     "camera": "zoom_out",
+     "beats": 1
+    }
+   ]
+  },
+  {
+   "id": "first_day_school",
+   "title": "První den ve škole",
+   "title_en": "The First Day at School",
+   "desc": "Tomík se ve velké škole ztratí. Robot Bip mu ukáže cestu — a Tomík najde kamarádku.",
+   "desc_en": "Tommy gets lost in the big school. Bip the robot shows him the way, and Tommy finds a friend.",
+   "setting": "Světlá přátelská základní škola: velká okna, barevná třída, dlouhá chodba se skříňkami a slunný dvůr se stromy.",
+   "shots": 12,
+   "beats": 14,
+   "seconds": 64.9,
+   "minutes_est": 49,
+   "minutes_est_hd": 93,
+   "audio": true,
+   "languages": [
+    "cs",
+    "en"
+   ],
+   "characters": [
+    {
+     "role": "tom",
+     "name": "Tomík",
+     "name_en": "Tommy",
+     "desc": "a small shy 6-year-old boy with messy brown hair and round glasses, wearing a green hoodie, blue shorts and a huge orange backpack",
+     "look": "Malý nesmělý šestiletý kluk s rozcuchanými hnědými vlasy a kulatými brýlemi, v zelené mikině, modrých kraťasech a s obrovským oranžovým batohem.",
+     "hero": true,
+     "default": false
+    },
+    {
+     "role": "bip",
+     "name": "robot Bip",
+     "name_en": "Bip the robot",
+     "desc": "a friendly small round white robot with a blue screen face showing two dot eyes, short stubby arms, a single wheel and a little antenna with a red light",
+     "look": "Malý kulatý bílý robot s modrou obrazovkou místo obličeje, krátkými ručkami, jedním kolečkem a anténkou s červeným světýlkem.",
+     "hero": false,
+     "default": false
+    }
+   ],
+   "script": [
+    {
+     "id": "01",
+     "chars": [
+      "tom"
+     ],
+     "action": "Ráno před velkou školní bránou. Tomík se dívá nahoru na budovu, polkne a sevře popruhy batohu.",
+     "narration": "Tomík měl dnes první den ve škole.",
+     "narration_en": "Today was Tommy's first day at school.",
+     "control": null,
+     "camera": "zoom_in",
+     "beats": 1
+    },
+    {
+     "id": "02",
+     "chars": [
+      "tom"
+     ],
+     "action": "Tomík pomalu vejde do dlouhé chodby s mnoha dveřmi, rozhlédne se a zastaví se.",
+     "narration": "Chodba byla dlouhá a dveří tolik!",
+     "narration_en": "The hallway was long, with so many doors!",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "03",
+     "chars": [
+      "tom"
+     ],
+     "action": "Tomík stojí uprostřed chodby a otáčí se ke všem dveřím, oči má čím dál větší. Chytí se popruhů a rty se mu zachvějí.",
+     "narration": "Kam mám jít? Tomík se bál, že se ztratil.",
+     "narration_en": "Where do I go? Tommy was afraid he was lost.",
+     "control": null,
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "04",
+     "chars": [
+      "tom",
+      "bip"
+     ],
+     "action": "K Tomíkovi přijede robot Bip, zabliká anténkou a na obrazovce se mu objeví úsměv.",
+     "narration": "Vtom přijel robot Bip a zablikal.",
+     "narration_en": "Then Bip the robot rolled up and blinked.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "05",
+     "chars": [
+      "tom",
+      "bip"
+     ],
+     "action": "Bip ukáže ručkou do chodby. Tomík kývne a vydá se za ním.",
+     "narration": "Pojď se mnou, pípl Bip.",
+     "narration_en": "Follow me, beeped Bip.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "06",
+     "chars": [
+      "tom",
+      "bip"
+     ],
+     "action": "Tomík a Bip jdou vedle sebe slunnou chodbou. Tomík se trochu usmívá.",
+     "narration": "Šli spolu chodbou až ke třídě.",
+     "narration_en": "Together they went down the hall to class.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "07",
+     "chars": [
+      "tom"
+     ],
+     "action": "Ve třídě si Tomík sedne do lavice, sundá batoh a podívá se na holčičku s červenými copánky. Anička mu zamává a on nesměle zamává zpátky.",
+     "narration": "Ve třídě si sedl vedle Aničky. Anička mu zamávala.",
+     "narration_en": "In class he sat next to Annie. Annie waved hello.",
+     "control": null,
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "08",
+     "chars": [
+      "tom"
+     ],
+     "action": "O přestávce nabídne Tomík Aničce jablíčka ze svačiny. Vezme si a oba se smějí.",
+     "narration": "O přestávce se rozdělili o jablíčko.",
+     "narration_en": "At break they shared his apple slices.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "09",
+     "chars": [
+      "tom"
+     ],
+     "action": "Na slunném dvoře tančí Tomík robotí tanec: trhané, strojové pohyby rukama.",
+     "narration": "Na dvoře Tomík tančil jako robot.",
+     "narration_en": "In the yard, Tommy danced like a robot.",
+     "control": "robot",
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "10",
+     "chars": [
+      "tom",
+      "bip"
+     ],
+     "action": "Bip se radostí zatočí na kolečku a anténka bliká. Tomík tleská a směje se.",
+     "narration": "Bip se točil a všichni se smáli.",
+     "narration_en": "Bip spun around and everyone laughed.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "11",
+     "chars": [
+      "tom"
+     ],
+     "action": "Odpoledne vycházejí Tomík s Aničkou ze školní brány, houpají rukama a mávají škole na rozloučenou.",
+     "narration": "Domů už šel s novou kamarádkou.",
+     "narration_en": "He walked home with a new friend.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "12",
+     "chars": [
+      "tom"
+     ],
+     "action": "Večer u psacího stolu dokreslí Tomík obrázek robota, zvedne ho a hrdě se usměje.",
+     "narration": "Večer nakreslil Bipa. Zítra půjde rád.",
+     "narration_en": "That evening he drew Bip, happy for tomorrow.",
+     "control": null,
+     "camera": "zoom_out",
+     "beats": 1
+    }
+   ]
+  },
+  {
+   "id": "dragon_bubbles",
+   "title": "Dráček, který neuměl foukat oheň",
+   "title_en": "The Little Dragon Who Couldn't Breathe Fire",
+   "desc": "Pip místo ohně fouká bubliny. Ostatní se smějí — dokud bubliny nezachrání vesnici.",
+   "desc_en": "Pip blows bubbles instead of fire. The others laugh, until the bubbles save the village.",
+   "setting": "Slunné pohádkové údolí se zelenými kopci, vesnicí kulatých domků a dračí školou na mechové skále.",
+   "shots": 12,
+   "beats": 15,
+   "seconds": 69.7,
+   "minutes_est": 53,
+   "minutes_est_hd": 101,
+   "audio": true,
+   "languages": [
+    "cs",
+    "en"
+   ],
+   "characters": [
+    {
+     "role": "pip",
+     "name": "dráček Pip",
+     "name_en": "Pip",
+     "desc": "a small chubby green baby dragon standing upright on two legs, big round yellow eyes, tiny orange wings, a pale yellow belly and a short curly tail",
+     "look": "Malý baculatý zelený dráček, stojí na zadních, má velké žluté oči, oranžová křidélka, světlé bříško a zatočený ocásek.",
+     "hero": true,
+     "default": false
+    },
+    {
+     "role": "owl",
+     "name": "sova Hedvika",
+     "name_en": "Hedwig the owl",
+     "desc": "a wise round brown owl with big golden eyes, small round glasses and a tiny blue scarf",
+     "look": "Moudrá kulatá hnědá sova se zlatýma očima, kulatými brýlemi a modrou šálou.",
+     "hero": false,
+     "default": false
+    }
+   ],
+   "script": [
+    {
+     "id": "01",
+     "chars": [
+      "pip"
+     ],
+     "action": "Pip sedí v první lavici dračí školy na kopci, za ním stojí řada velkých draků. Rozhlíží se a vrtí ocáskem.",
+     "narration": "V dračí škole se učilo foukat oheň.",
+     "narration_en": "At dragon school, everyone learned to breathe fire.",
+     "control": null,
+     "camera": "zoom_in",
+     "beats": 1
+    },
+    {
+     "id": "02",
+     "chars": [
+      "pip"
+     ],
+     "action": "Velcí draci chrlí do nebe dlouhé plameny. Pip je pozoruje s otevřenou pusou.",
+     "narration": "Velcí draci chrlili dlouhé plameny.",
+     "narration_en": "The big dragons blew long, hot flames.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "03",
+     "chars": [
+      "pip"
+     ],
+     "action": "Pip stojí na plochém kameni, zhluboka se nadechne a nafoukne tváře. Zafouká a z pusy mu vyletí spousta lesklých mýdlových bublin. Překvapeně otevře oči.",
+     "narration": "Pip se nadechl, zafoukal… a místo ohně vyletěly bubliny!",
+     "narration_en": "Pip took a deep breath, blew… and out came bubbles!",
+     "control": null,
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "04",
+     "chars": [
+      "pip"
+     ],
+     "action": "Pip stojí mezi poletujícími bublinami, červená se a schovává obličej za křidélka.",
+     "narration": "Ostatní draci se smáli. Pip se styděl.",
+     "narration_en": "The other dragons laughed. Pip felt shy.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "05",
+     "chars": [
+      "pip"
+     ],
+     "action": "Při západu slunce sedí Pip sám na mechovém kameni u lesa. Povzdechne si a skane mu slza.",
+     "narration": "Sedl si na kámen a byl smutný.",
+     "narration_en": "He sat on a rock, feeling sad.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "06",
+     "chars": [
+      "pip",
+      "owl"
+     ],
+     "action": "Na větev vedle Pipa přiletí sova Hedvika a zvědavě nakloní hlavu.",
+     "narration": "Přiletěla moudrá sova Hedvika.",
+     "narration_en": "Hedwig the wise owl flew down.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "07",
+     "chars": [
+      "pip",
+      "owl"
+     ],
+     "action": "Sova Pipovi vlídně něco vysvětluje a ukazuje křídlem. Mezi nimi pluje bublina, Pip zvedne hlavu a usměje se.",
+     "narration": "Každý umí něco jiného, řekla sova. Tvoje bubliny jsou kouzelné.",
+     "narration_en": "Everyone has a different gift, said the owl. Your bubbles are magic.",
+     "control": null,
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "08",
+     "chars": [
+      "pip"
+     ],
+     "action": "Na návsi odlétají z ohně velké jiskry k seníku. Pip přiběhne a vyděšeně se zastaví.",
+     "narration": "Ve vesnici létaly jiskry k seníku!",
+     "narration_en": "In the village, sparks flew toward the haystack!",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "09",
+     "chars": [
+      "pip"
+     ],
+     "action": "Pip fouká velké bubliny, jiskry se v nich chytají a s tichým puknutím zhasínají.",
+     "narration": "Pip foukl bubliny a ty jiskry pochytaly.",
+     "narration_en": "Pip blew bubbles and they caught every spark.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "10",
+     "chars": [
+      "pip"
+     ],
+     "action": "Děti ze vsi tleskají a skáčou kolem Pipa. Pip se nesměle usmívá a mává.",
+     "narration": "Děti tleskaly. Pip zachránil vesnici!",
+     "narration_en": "The children cheered. Pip saved the village!",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "11",
+     "chars": [
+      "pip"
+     ],
+     "action": "Pip tančí na návsi sambu mezi poletujícími bublinami.",
+     "narration": "Radostí zatančil sambu mezi bublinami.",
+     "narration_en": "Full of joy, he danced a samba among the bubbles.",
+     "control": "samba",
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "12",
+     "chars": [
+      "pip"
+     ],
+     "action": "Pod hvězdnou oblohou spí Pip stočený na mechovém kameni. Z nosu mu vyletí poslední bublinka a odpluje.",
+     "narration": "Večer usnul s úsměvem. Dobrou noc, Pipe.",
+     "narration_en": "That night he fell asleep smiling. Good night, Pip.",
+     "control": null,
+     "camera": "zoom_out",
+     "beats": 1
+    }
+   ]
+  },
+  {
+   "id": "balcony_garden",
+   "title": "Zahrádka na balkóně",
+   "title_en": "The Balcony Garden",
+   "desc": "Lenka zasadí jedno semínko a učí se čekat. Z poupěte je nakonec květ — a přiletí motýl.",
+   "desc_en": "Lena plants a single seed and learns to wait. The bud turns into a flower, and a butterfly comes.",
+   "setting": "Malý slunný balkon vysoko v městském domě: květináče, konvička, za zábradlím střechy a modré nebe.",
+   "shots": 12,
+   "beats": 14,
+   "seconds": 64.9,
+   "minutes_est": 50,
+   "minutes_est_hd": 96,
+   "audio": true,
+   "languages": [
+    "cs",
+    "en"
+   ],
+   "characters": [
+    {
+     "role": "lena",
+     "name": "Lenka",
+     "name_en": "Lena",
+     "desc": "a sweet 7-year-old girl with long light brown hair in two braids, freckles and a big smile, wearing a pink dress with a white apron and green rubber boots",
+     "look": "Milá sedmiletá holčička s dlouhými světle hnědými vlasy ve dvou copech a pihami, v růžových šatech s bílou zástěrou a zelených holínkách.",
+     "hero": true,
+     "default": false
+    },
+    {
+     "role": "butterfly",
+     "name": "motýl",
+     "name_en": "the butterfly",
+     "desc": "a big friendly blue butterfly with shiny sky-blue wings with white spots and a cute smiling face",
+     "look": "Velký přátelský modrý motýl s lesklými blankytnými křídly s bílými tečkami a usměvavou tvářičkou.",
+     "hero": false,
+     "default": false
+    }
+   ],
+   "script": [
+    {
+     "id": "01",
+     "chars": [
+      "lena"
+     ],
+     "action": "Lenka na balkoně drží v otevřené dlani jediné semínko a s úžasem si ho prohlíží.",
+     "narration": "Lenka dostala od babičky jedno semínko.",
+     "narration_en": "Grandma gave Lena one tiny seed.",
+     "control": null,
+     "camera": "zoom_in",
+     "beats": 1
+    },
+    {
+     "id": "02",
+     "chars": [
+      "lena"
+     ],
+     "action": "Lenka zamáčkne semínko prstem do hlíny v hliněném květináči a hlínu uhladí.",
+     "narration": "Zasadila ho do květináče.",
+     "narration_en": "She planted it in a little pot.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "03",
+     "chars": [
+      "lena"
+     ],
+     "action": "Lenka zalévá květináč malou zelenou konvičkou a pak ji postaví vedle.",
+     "narration": "Každý den ho zalévala.",
+     "narration_en": "Every day she watered it.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "04",
+     "chars": [
+      "lena"
+     ],
+     "action": "Lenka sedí u okna s bradou v dlaních a dívá se, jak teplý déšť kropí květináč.",
+     "narration": "Pršelo. Semínko pilo vodu.",
+     "narration_en": "It rained. The seed drank the water.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "05",
+     "chars": [
+      "lena"
+     ],
+     "action": "Lenka leží na balkoně na sluníčku vedle květináče, protáhne se a se zavřenýma očima se usmívá.",
+     "narration": "Pak hřálo sluníčko.",
+     "narration_en": "Then the warm sun came out.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "06",
+     "chars": [
+      "lena"
+     ],
+     "action": "Lenka klečí u květináče s holou hlínou, poklepe na něj a zamračí se. Povzdechne si, opře bradu o kolena a čeká dál.",
+     "narration": "Ale nic nerostlo. Lenka čekala a čekala a čekala.",
+     "narration_en": "But nothing grew. Lena waited, and waited, and waited.",
+     "control": null,
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "07",
+     "chars": [
+      "lena"
+     ],
+     "action": "Z hlíny vykoukne drobný zelený klíček a rozvine dva lístky. Lenka vykulí oči a zakryje si pusu.",
+     "narration": "Jednoho rána vykoukl zelený lístek!",
+     "narration_en": "One morning, a little green leaf peeked out!",
+     "control": null,
+     "camera": "zoom_in",
+     "beats": 1
+    },
+    {
+     "id": "08",
+     "chars": [
+      "lena"
+     ],
+     "action": "V květináči roste vysoký stonek s poupětem. Lenka si ho měří dlaní a poupě se kývá ve vánku.",
+     "narration": "Rostl a rostl, až měl poupě.",
+     "narration_en": "It grew and grew, and then a bud appeared.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "09",
+     "chars": [
+      "lena",
+      "butterfly"
+     ],
+     "action": "Na poupě přiletí modrý motýl. Lenka se nakloní blíž a usměje se.",
+     "narration": "Přiletěl modrý motýl a sedl si na poupě.",
+     "narration_en": "A blue butterfly came and sat on the bud.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "10",
+     "chars": [
+      "lena",
+      "butterfly"
+     ],
+     "action": "Poupě se pomalu rozvine ve velký růžový květ, motýl vzlétne a Lenka tleská.",
+     "narration": "Poupě se rozvinulo v krásný růžový květ.",
+     "narration_en": "The bud opened into a lovely pink flower.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "11",
+     "chars": [
+      "lena"
+     ],
+     "action": "Lenka tančí vedle růžového květu pomalou radostnou rumbu.",
+     "narration": "Lenka tančila kolem svého prvního kvítku.",
+     "narration_en": "Lena danced around her very first flower.",
+     "control": "rumba",
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "12",
+     "chars": [
+      "lena"
+     ],
+     "action": "Balkon je plný kvetoucích květin všech barev. Lenka je zalévá, kolem létají motýli a ona se usměje do kamery.",
+     "narration": "Za rok byl celý balkon plný květin.",
+     "narration_en": "A year later, the balcony was full of flowers.",
+     "control": null,
+     "camera": "zoom_out",
+     "beats": 1
+    }
+   ]
+  },
+  {
+   "id": "snail_race",
+   "title": "Závod se šnekem",
+   "title_en": "The Race with the Snail",
+   "desc": "Rychlý zajíc se v závodě nudí a usne. Pomalý šnek cestou najde poklad i kamaráda.",
+   "desc_en": "The fast hare gets bored and falls asleep mid-race. The slow snail finds treasure and a friend on the way.",
+   "setting": "Slunná zelená louka s klikatou polní cestou, lučními květinami, velkým dubem a cílovou páskou mezi dvěma kolíky.",
+   "shots": 12,
+   "beats": 13,
+   "seconds": 60.1,
+   "minutes_est": 47,
+   "minutes_est_hd": 87,
+   "audio": true,
+   "languages": [
+    "cs",
+    "en"
+   ],
+   "characters": [
+    {
+     "role": "hare",
+     "name": "zajíc Rychlík",
+     "name_en": "Speedy",
+     "desc": "a tall slim white hare standing upright on two legs like a person, long ears, red sneakers and a blue sports shirt with the number 1",
+     "look": "Vysoký štíhlý bílý zajíc, chodí vzpřímeně jako člověk, má dlouhé uši, červené tenisky a modrý sportovní dres s číslem 1.",
+     "hero": true,
+     "default": false
+    },
+    {
+     "role": "snail",
+     "name": "šnek Pomalík",
+     "name_en": "Slowpoke",
+     "desc": "a small cheerful yellow snail with a big swirly orange shell, tiny eyes on stalks and a green cap",
+     "look": "Malý veselý žlutý šnek s velkou zatočenou oranžovou ulitou, očky na stopkách a zelenou kšiltovkou.",
+     "hero": false,
+     "default": false
+    }
+   ],
+   "script": [
+    {
+     "id": "01",
+     "chars": [
+      "hare",
+      "snail"
+     ],
+     "action": "Zajíc Rychlík a šnek Pomalík stojí na startovní čáře na louce. Zajíc si protahuje nohy, šnek pomalu kývne.",
+     "narration": "Zajíc Rychlík a šnek Pomalík dali závod.",
+     "narration_en": "Speedy the hare raced Slowpoke the snail.",
+     "control": null,
+     "camera": "zoom_in",
+     "beats": 1
+    },
+    {
+     "id": "02",
+     "chars": [
+      "hare"
+     ],
+     "action": "Rychlík vystřelí po cestě a za červenými teniskami se práší.",
+     "narration": "Start! Rychlík vystřelil jako šíp.",
+     "narration_en": "Go! Speedy shot off like an arrow.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "03",
+     "chars": [
+      "snail"
+     ],
+     "action": "Pomalík pomalu leze po cestě mezi květinami a očky na stopkách se rozhlíží.",
+     "narration": "Pomalík lezl pomalu, ale vesele.",
+     "narration_en": "Slowpoke crawled slowly, but happily.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "04",
+     "chars": [
+      "hare"
+     ],
+     "action": "Rychlík se zastaví u velkého dubu, ohlédne se po prázdné cestě a mohutně zívne. Sedne si ke kmeni, založí ruce a oči se mu zavřou.",
+     "narration": "Rychlík byl daleko napřed. Nudil se, zívl… a usnul.",
+     "narration_en": "Speedy was far ahead. He got bored, yawned… and fell asleep.",
+     "control": null,
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "05",
+     "chars": [
+      "snail"
+     ],
+     "action": "Pomalík se zastaví u lesklého modrého kamínku a posadí si ho na ulitu.",
+     "narration": "Pomalík zatím našel lesklý kamínek.",
+     "narration_en": "Meanwhile, Slowpoke found a shiny pebble.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "06",
+     "chars": [
+      "snail"
+     ],
+     "action": "Pomalík dojde k velké červené jahodě, spokojeně k ní přičichne a usměje se.",
+     "narration": "Pak našel velkou červenou jahodu.",
+     "narration_en": "Then he found a big red strawberry.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "07",
+     "chars": [
+      "snail"
+     ],
+     "action": "Pomalík opatrně postrčí brouka, který leží na zádech. Brouk se převrátí na nožičky a zamává.",
+     "narration": "A pomohl broukovi na nožičky.",
+     "narration_en": "And he helped a beetle back on its feet.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "08",
+     "chars": [
+      "hare"
+     ],
+     "action": "Pod dubem se Rychlík probudí, uši mu vystřelí nahoru a vyskočí na nohy.",
+     "narration": "Rychlík se probudil. Závod!",
+     "narration_en": "Speedy woke up. The race!",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "09",
+     "chars": [
+      "snail"
+     ],
+     "action": "Pomalík s kamínkem a jahodou na ulitě pomalu protlačí cílovou pásku. Páska spadne a on se hrdě usměje.",
+     "narration": "Ale Pomalík už byl v cíli!",
+     "narration_en": "But Slowpoke was already at the finish!",
+     "control": null,
+     "camera": "zoom_in",
+     "beats": 1
+    },
+    {
+     "id": "10",
+     "chars": [
+      "hare",
+      "snail"
+     ],
+     "action": "Rychlík se v cíli sehne a potřese Pomalíkovi ručkou, oba se usmívají.",
+     "narration": "Rychlík mu podal ruku a gratuloval.",
+     "narration_en": "Speedy shook his hand and said well done.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "11",
+     "chars": [
+      "hare"
+     ],
+     "action": "Rychlík v cíli předvede moonwalk, nohy mu kloužou dozadu.",
+     "narration": "Pak mu na oslavu předvedl moonwalk.",
+     "narration_en": "Then he did a moonwalk to celebrate.",
+     "control": "moonwalk",
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "12",
+     "chars": [
+      "hare",
+      "snail"
+     ],
+     "action": "Rychlík a Pomalík sedí pod dubem a ukusují z velké jahody.",
+     "narration": "A jahodu si rozdělili napůl.",
+     "narration_en": "And they shared the strawberry.",
+     "control": null,
+     "camera": "zoom_out",
+     "beats": 1
+    }
+   ]
+  },
+  {
+   "id": "lost_mitten",
+   "title": "Ztracená rukavice",
+   "title_en": "The Lost Mitten",
+   "desc": "Anetě se při koulování ztratí rukavice. Ráno ji najde — v ruce sněhuláka.",
+   "desc_en": "Annie loses a mitten in a snowball fight. In the morning she finds it, in the snowman's hand.",
+   "setting": "Zasněžený vesnický park v zimě: zapadané stromy, dřevěná lavička, jemné sněžení a modrobílé barvy.",
+   "shots": 12,
+   "beats": 15,
+   "seconds": 69.7,
+   "minutes_est": 53,
+   "minutes_est_hd": 101,
+   "audio": true,
+   "languages": [
+    "cs",
+    "en"
+   ],
+   "characters": [
+    {
+     "role": "annie",
+     "name": "Aneta",
+     "name_en": "Annie",
+     "desc": "a lively 7-year-old girl with long blond hair under a white knitted hat with a pompom, rosy cheeks, a purple winter coat, a pink scarf and red knitted mittens",
+     "look": "Živá sedmiletá holčička s dlouhými blond vlasy pod bílou pletenou čepicí s bambulí, s růžovými tvářemi, ve fialovém kabátku, s růžovou šálou a červenými pletenými rukavicemi.",
+     "hero": true,
+     "default": false
+    },
+    {
+     "role": "snowman",
+     "name": "sněhulák",
+     "name_en": "the snowman",
+     "desc": "a friendly round snowman with a carrot nose, coal eyes and a coal smile, two stick arms and a small black top hat",
+     "look": "Přátelský kulatý sněhulák s mrkví místo nosu, uhlíkovýma očima a úsměvem, s rukama z klacíků a malým černým cylindrem.",
+     "hero": false,
+     "default": false
+    }
+   ],
+   "script": [
+    {
+     "id": "01",
+     "chars": [
+      "annie"
+     ],
+     "action": "Aneta stojí v zasněženém parku, chytá vločky na červené rukavice a s úsměvem se dívá nahoru.",
+     "narration": "Napadl první sníh. Aneta běžela ven.",
+     "narration_en": "The first snow fell. Annie ran outside.",
+     "control": null,
+     "camera": "zoom_in",
+     "beats": 1
+    },
+    {
+     "id": "02",
+     "chars": [
+      "annie"
+     ],
+     "action": "Aneta nabere sníh, uplácá kouli a hodí ji daleko. Směje se, udělá další a hodí znovu.",
+     "narration": "Koulovala se, až jí čepice sjela do očí.",
+     "narration_en": "She threw snowballs until her hat slipped over her eyes.",
+     "control": null,
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "03",
+     "chars": [
+      "annie"
+     ],
+     "action": "Aneta udiveně zírá na holou ruku, jedna červená rukavice chybí. Zavrtí zmrzlými prsty a rozhlíží se.",
+     "narration": "Jejda! Jedna rukavice zmizela.",
+     "narration_en": "Oops! One mitten was gone.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "04",
+     "chars": [
+      "annie"
+     ],
+     "action": "Aneta klečí v hlubokém sněhu, hrabe v něm oběma rukama a pak zavrtí hlavou.",
+     "narration": "Hledala a hledala, ale nenašla ji.",
+     "narration_en": "She searched and searched, but couldn't find it.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "05",
+     "chars": [
+      "annie",
+      "snowman"
+     ],
+     "action": "Aneta zapíchne mrkev do obličeje sněhuláka, kterého právě postavila, couvne a zatleská.",
+     "narration": "Tak si aspoň postavila sněhuláka.",
+     "narration_en": "So she built a snowman instead.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "06",
+     "chars": [
+      "annie",
+      "snowman"
+     ],
+     "action": "Za soumraku Aneta zamává sněhulákovi a jde domů s jednou holou rukou v kapse. Padá sníh.",
+     "narration": "Domů šla s rukou v kapse.",
+     "narration_en": "She went home, one hand in her pocket.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "07",
+     "chars": [
+      "snowman"
+     ],
+     "action": "V noci pod měsícem stojí sněhulák sám v prázdném parku. Klacíková ruka s červenou rukavicí se pomalu zvedne a uhlíkové oči zajiskří.",
+     "narration": "V noci se v parku dělo kouzlo. Sněhulák držel červenou rukavici!",
+     "narration_en": "At night, magic happened. The snowman was holding a red mitten!",
+     "control": null,
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "08",
+     "chars": [
+      "annie"
+     ],
+     "action": "Ráno Aneta přiběhne do parku, zastaví se a podívá se ke sněhulákovi.",
+     "narration": "Ráno Aneta přiběhla do parku.",
+     "narration_en": "In the morning, Annie ran to the park.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "09",
+     "chars": [
+      "annie",
+      "snowman"
+     ],
+     "action": "Aneta sundá červenou rukavici ze sněhulákovy klacíkové ruky, vydechne a usměje se.",
+     "narration": "Její rukavice! Sněhulák ji našel.",
+     "narration_en": "Her mitten! The snowman had found it.",
+     "control": null,
+     "camera": "zoom_in",
+     "beats": 1
+    },
+    {
+     "id": "10",
+     "chars": [
+      "annie"
+     ],
+     "action": "Aneta v obou rukavicích tančí před sněhulákem radostné kroky do strany.",
+     "narration": "Aneta radostí tancovala a sněhulák se usmíval.",
+     "narration_en": "Annie danced for joy, and the snowman smiled.",
+     "control": "maraschino_step",
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "11",
+     "chars": [
+      "annie",
+      "snowman"
+     ],
+     "action": "Aneta omotá sněhulákovi kolem krku svou růžovou šálu, zaváže ji a poplácá ho.",
+     "narration": "Na poděkování mu dala svou šálu.",
+     "narration_en": "To say thanks, she gave him her scarf.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "12",
+     "chars": [
+      "annie",
+      "snowman"
+     ],
+     "action": "V prosluněném zasněženém parku Aneta objímá sněhuláka. Sníh se třpytí a ona se směje do kamery.",
+     "narration": "Od té doby byli nejlepší kamarádi.",
+     "narration_en": "From then on, they were best friends.",
+     "control": null,
+     "camera": "zoom_out",
+     "beats": 1
+    }
+   ]
+  },
+  {
+   "id": "flying_fish",
+   "title": "Ryba, která chtěla létat",
+   "title_en": "The Fish Who Wanted to Fly",
+   "desc": "Rybka Finka touží létat jako ptáci. Labuť Bělka ji vezme na záda a ukáže jí jezero shora.",
+   "desc_en": "Finn the fish longs to fly like the birds. Bella the swan takes her on her back to see the lake from above.",
+   "setting": "Průzračné modré jezero mezi zelenými kopci a rákosím, slunečná obloha s nadýchanými mráčky.",
+   "shots": 12,
+   "beats": 15,
+   "seconds": 69.7,
+   "minutes_est": 50,
+   "minutes_est_hd": 96,
+   "audio": true,
+   "languages": [
+    "cs",
+    "en"
+   ],
+   "characters": [
+    {
+     "role": "finn",
+     "name": "rybka Finka",
+     "name_en": "Finn",
+     "desc": "a small round bright orange fish with big sparkly blue eyes, flowing fins and a happy face",
+     "look": "Malá kulatá zářivě oranžová rybka s velkýma třpytivýma modrýma očima, vlajícími ploutvemi a veselou tvářičkou.",
+     "hero": true,
+     "default": false
+    },
+    {
+     "role": "bella",
+     "name": "labuť Bělka",
+     "name_en": "Bella",
+     "desc": "a gentle graceful white swan with a long neck, an orange beak and kind dark eyes",
+     "look": "Něžná ladná bílá labuť s dlouhým krkem, oranžovým zobákem a laskavýma tmavýma očima.",
+     "hero": false,
+     "default": false
+    }
+   ],
+   "script": [
+    {
+     "id": "01",
+     "chars": [
+      "finn"
+     ],
+     "action": "Pod hladinou plave rybka Finka mezi vodními rostlinami a shora prosvítají sluneční paprsky. Podívá se nahoru.",
+     "narration": "V jezeře žila malá rybka Finka.",
+     "narration_en": "In the lake lived a little fish named Finn.",
+     "control": null,
+     "camera": "zoom_in",
+     "beats": 1
+    },
+    {
+     "id": "02",
+     "chars": [
+      "finn"
+     ],
+     "action": "Finka se vznáší těsně pod hladinou a pozoruje ptáky, jak přelétají po nebi.",
+     "narration": "Celé dny se dívala na ptáky.",
+     "narration_en": "All day long she watched the birds.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "03",
+     "chars": [
+      "finn"
+     ],
+     "action": "Finka se rozplave a vyskočí z vody, plácá ploutvemi jako křídly. Spadne zpátky s velkým šplouchnutím a po hladině se rozejdou kruhy.",
+     "narration": "Chtěla létat! Vyskočila z vody… a žbluňk, zase dolů.",
+     "narration_en": "She wanted to fly! She leapt up… and splash, back down.",
+     "control": null,
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "04",
+     "chars": [
+      "finn"
+     ],
+     "action": "Finka pomalu klesá ke dnu, ploutve jí svěsí a zůstane ležet u kulatého kamene.",
+     "narration": "Finka byla smutná. Ryby přece nelétají.",
+     "narration_en": "Finn was sad. Fish can't fly, after all.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "05",
+     "chars": [
+      "finn",
+      "bella"
+     ],
+     "action": "Po hladině připluje labuť Bělka, skloní hlavu k vodě a podívá se na rybku.",
+     "narration": "Vtom kolem plula labuť Bělka.",
+     "narration_en": "Just then, Bella the swan glided by.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "06",
+     "chars": [
+      "finn",
+      "bella"
+     ],
+     "action": "Labuť skloní dlouhý krk, rybka vystrčí hlavu z vody a dívají se na sebe. Labuť kývne a roztáhne křídlo, rybce se rozzáří oči.",
+     "narration": "Proč jsi smutná? Chci létat. Tak poleť se mnou, řekla labuť.",
+     "narration_en": "Why so sad? I want to fly. Then fly with me, said the swan.",
+     "control": null,
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "07",
+     "chars": [
+      "finn",
+      "bella"
+     ],
+     "action": "Finka se usadí v lesklé kapce vody v měkkém peří na labutích zádech. Labuť se usměje a roztáhne křídla.",
+     "narration": "Finka se usadila v kapce na labutích zádech.",
+     "narration_en": "Finn rode in a bubble on the swan's back.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "08",
+     "chars": [
+      "finn",
+      "bella"
+     ],
+     "action": "Labuť se rozběhne po hladině, mává křídly a vznese se do vzduchu. Kolem létají kapky.",
+     "narration": "Raz, dva, tři… a labuť vzlétla!",
+     "narration_en": "One, two, three… and the swan took off!",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "09",
+     "chars": [
+      "finn",
+      "bella"
+     ],
+     "action": "Labuť klidně letí vysoko nad jezerem a zelenými kopci, rybka se dívá dolů na stromy.",
+     "narration": "Shora bylo jezero jako modré zrcadlo.",
+     "narration_en": "From above, the lake looked like a blue mirror.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "10",
+     "chars": [
+      "finn",
+      "bella"
+     ],
+     "action": "Labuť proplouvá nadýchaným mrakem, kolem víří mlha a rybka se směje.",
+     "narration": "Letěly mezi mráčky. Finka se smála.",
+     "narration_en": "They flew through the clouds. Finn laughed.",
+     "control": null,
+     "camera": "zoom_in",
+     "beats": 1
+    },
+    {
+     "id": "11",
+     "chars": [
+      "finn"
+     ],
+     "action": "Zpátky v jezeře krouží Finka mezi rybkami a nadšeně mává ploutvemi, jak vypráví. Pak radostí vyskočí z vody v malé smyčce a zase se ponoří.",
+     "narration": "Doma pak rybkám vyprávěla, jak vypadá svět shora.",
+     "narration_en": "Back home she told the other fish how the world looks from above.",
+     "control": null,
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "12",
+     "chars": [
+      "finn",
+      "bella"
+     ],
+     "action": "Při západu slunce pluje labuť po zlatém jezeře a Finka vedle ní vyskočí. Labuť skloní hlavu a slunce zapadá.",
+     "narration": "A každý večer si daly dobrou noc.",
+     "narration_en": "And every evening, they said good night.",
+     "control": null,
+     "camera": "zoom_out",
+     "beats": 1
+    }
+   ]
+  },
+  {
+   "id": "birthday_cake",
+   "title": "Nejlepší narozeninový dort",
+   "title_en": "The Best Birthday Cake",
+   "desc": "Kája s babičkou pečou dort pro tatínka a nic se nedaří. Tanec u trouby zachrání den.",
+   "desc_en": "Katie and Grandma bake a cake for Dad and everything goes wrong. A dance by the oven saves the day.",
+   "setting": "Teplá útulná stará kuchyň s dřevěným stolem, troubou, sklenicemi s moukou a cukrem a prosluněným oknem s květinami.",
+   "shots": 12,
+   "beats": 15,
+   "seconds": 69.7,
+   "minutes_est": 56,
+   "minutes_est_hd": 106,
+   "audio": true,
+   "languages": [
+    "cs",
+    "en"
+   ],
+   "characters": [
+    {
+     "role": "katie",
+     "name": "Kája",
+     "name_en": "Katie",
+     "desc": "a lively 8-year-old girl with curly dark hair tied in a high ponytail and a big smile, wearing a yellow T-shirt, blue shorts and a red apron",
+     "look": "Živá osmiletá holčička s kudrnatými tmavými vlasy ve vysokém culíku a širokým úsměvem, ve žlutém tričku, modrých kraťasech a červené zástěře.",
+     "hero": true,
+     "default": false
+    },
+    {
+     "role": "grandma",
+     "name": "babička",
+     "name_en": "Grandma",
+     "desc": "a cheerful plump grandmother with white hair in a bun, round glasses, rosy cheeks, a flowery blue dress and a white apron",
+     "look": "Veselá kyprá babička s bílými vlasy v drdolu, kulatými brýlemi a růžovými tvářemi, v modrých květovaných šatech a bílé zástěře.",
+     "hero": false,
+     "default": false
+    }
+   ],
+   "script": [
+    {
+     "id": "01",
+     "chars": [
+      "katie",
+      "grandma"
+     ],
+     "action": "Kája s babičkou stojí u kuchyňského stolu nad velkou kuchařkou. Kája ukazuje na recept, babička kývá a usmívá se.",
+     "narration": "Kája s babičkou pekly dort pro tatínka.",
+     "narration_en": "Katie and Grandma baked a cake for Dad.",
+     "control": null,
+     "camera": "zoom_in",
+     "beats": 1
+    },
+    {
+     "id": "02",
+     "chars": [
+      "katie"
+     ],
+     "action": "Kája nakloní pytlík s moukou, vyvalí se velký bílý oblak a obalí jí obličej.",
+     "narration": "Mouka! Všude samá mouka.",
+     "narration_en": "Flour! Flour everywhere.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "03",
+     "chars": [
+      "katie"
+     ],
+     "action": "Vajíčko Káje vyklouzne z prstů a rozplácne se na zemi. Kája si zakryje pusu.",
+     "narration": "Vajíčko jí vyklouzlo. Plesk!",
+     "narration_en": "An egg slipped. Splat!",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "04",
+     "chars": [
+      "katie"
+     ],
+     "action": "Těsto kyne a přetéká přes okraj mísy, Kája ho zkouší nabírat zpátky lžící. Přeteče ještě víc, Kája to vzdá a nervózně se zasměje.",
+     "narration": "Těsto přeteklo přes mísu. Kája ho chytala lžící, ale marně.",
+     "narration_en": "The batter spilled over. Katie tried to catch it with a spoon.",
+     "control": null,
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "05",
+     "chars": [
+      "katie"
+     ],
+     "action": "Z dvířek trouby se valí šedý kouř. Kája v chňapkách pootevře dvířka a odhání kouř.",
+     "narration": "A z trouby šel kouř!",
+     "narration_en": "And smoke came out of the oven!",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "06",
+     "chars": [
+      "katie"
+     ],
+     "action": "Kája si v chňapkách sedne na zem, po tvářích jí tečou slzy a popotahuje.",
+     "narration": "Kája se rozplakala. Všechno se pokazilo.",
+     "narration_en": "Katie cried. Everything went wrong.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "07",
+     "chars": [
+      "katie",
+      "grandma"
+     ],
+     "action": "Babička otočí knoflíkem starého rádia na poličce, začne hrát hudba a mrkne na Káju.",
+     "narration": "Babička pustila rádio a mrkla na ni.",
+     "narration_en": "Grandma turned on the radio and winked.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "08",
+     "chars": [
+      "grandma"
+     ],
+     "action": "Babička tančí uprostřed kuchyně u trouby salsu: křížené kroky, ruka v bok a malá otočka.",
+     "narration": "Když se nedaří, pomůže tanec! A babička tančila salsu.",
+     "narration_en": "When things go wrong, a dance helps! And Grandma danced salsa.",
+     "control": "salsa",
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "09",
+     "chars": [
+      "katie"
+     ],
+     "action": "Kája s moukou na nose se rozesměje a tančí u trouby salsu s babičkou.",
+     "narration": "Kája se rozesmála a tančila s ní. Pak to zkusily znovu.",
+     "narration_en": "Katie laughed and danced along. Then they tried again.",
+     "control": "salsa",
+     "camera": null,
+     "beats": 2
+    },
+    {
+     "id": "10",
+     "chars": [
+      "katie",
+      "grandma"
+     ],
+     "action": "Babička vytáhne z trouby kulatý, trochu nakřivo upečený dort. Kája se nakloní, přičichne a usměje se.",
+     "narration": "Dort byl trochu křivý, ale voněl.",
+     "narration_en": "The cake was a bit wonky, but smelled great.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "11",
+     "chars": [
+      "katie"
+     ],
+     "action": "Kája postaví na křivý dort jednu svíčku a vedle ní jahodu, pak hrdě couvne.",
+     "narration": "Kája na něj dala svíčku a jahody.",
+     "narration_en": "Katie added a candle and strawberries.",
+     "control": null,
+     "camera": null,
+     "beats": 1
+    },
+    {
+     "id": "12",
+     "chars": [
+      "katie",
+      "grandma"
+     ],
+     "action": "Tatínek sfoukne svíčku na křivém dortu, Kája s babičkou tleskají a obejmou se.",
+     "narration": "Tatínek řekl: Nejlepší dort na světě!",
+     "narration_en": "Dad said: The best cake in the world!",
+     "control": null,
+     "camera": "zoom_out",
+     "beats": 1
+    }
+   ]
+  }
+ ]
+}

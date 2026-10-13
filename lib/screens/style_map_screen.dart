@@ -16,16 +16,19 @@ import '../stylemap/stylemap.dart';
 /// (the picture's prompt fragment and/or style preset). Without it the
 /// fragment goes to the clipboard, so the screen is useful on its own.
 class StyleMapScreen extends StatefulWidget {
-  const StyleMapScreen({super.key, this.pick = false});
+  const StyleMapScreen({super.key, this.pick = false, this.service});
 
   final bool pick;
+
+  /// Where the packs are read from; the server by default.
+  final StyleMapService? service;
 
   @override
   State<StyleMapScreen> createState() => _StyleMapScreenState();
 }
 
 class _StyleMapScreenState extends State<StyleMapScreen> {
-  final _service = StyleMapService();
+  late final _service = widget.service ?? StyleMapService();
 
   List<StyleMapEntry>? _index;
   StyleMapPack? _pack;
@@ -164,8 +167,7 @@ class _StyleMapScreenState extends State<StyleMapScreen> {
                   key: ValueKey(pack.id),
                   pack: pack,
                   atlas: atlas,
-                  headers: _service.headers,
-                  thumbUrl: (im) => _service.thumbUrl(pack, im),
+                  thumbOf: (im) => _service.thumb(pack, im),
                   labelOf: _label,
                   valueLabel: (key, v) => key == 'model'
                       ? kImageModels
