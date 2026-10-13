@@ -33,7 +33,9 @@ jobs:
 
       - name: Test
         working-directory: .
-        run: flutter test
+        # The screenshot goldens compare pixels and borrow macOS system fonts;
+        # on this runner they would fail on rendering, not on a regression.
+        run: flutter test --exclude-tags screenshots
 
   build-android-debug:
     name: Android Debug Build
