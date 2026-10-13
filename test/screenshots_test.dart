@@ -161,8 +161,10 @@ Widget _app(ProviderContainer container, Widget home) =>
     );
 
 void _phoneView(WidgetTester tester) {
-  tester.view.physicalSize = _phone * 2;
-  tester.view.devicePixelRatio = 2;
+  // 3×: the store's lightbox zooms into these, and at 2× the 11 pt labels
+  // are already soft at the size they are first shown.
+  tester.view.physicalSize = _phone * 3;
+  tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
 }
 
