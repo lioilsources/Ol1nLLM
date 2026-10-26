@@ -94,6 +94,17 @@ class ComfyUIService implements ImageBackend {
   /// with distinct ids it keeps receiving every message).
   static String _newClientId() => const Uuid().v4();
   final http.Client _client = _makeClient();
+
+  /// The user's own prompt per prepared graph, without the preset's prefix —
+  /// what AILineage commits to ([signOutputs]). Keyed by the graph object, so
+  /// every `_prepare` → `_run` path carries it without new parameters.
+  final _userPrompt = Expando<String>();
+
+  /// Whether the server has the AILineage node; re-checked every
+  /// [_aiLineageRecheck] so a node installed later is picked up.
+  bool? _aiLineageAvailable;
+  DateTime _aiLineageCheckedAt = DateTime.fromMillisecondsSinceEpoch(0);
+  static const _aiLineageRecheck = Duration(minutes: 10);
   final Map<String, Map<String, dynamic>> _templateCache = {};
 
   String? _activeLora;
@@ -979,6 +990,14 @@ class ComfyUIService implements ImageBackend {
     }
     final clientId = _newClientId();
     final resuming = workflow == null;
+    if (workflow != null) {
+      final prompt = _userPrompt[workflow];
+      if (prompt != null &&
+          prompt.trim().isNotEmpty &&
+          await _aiLineageSupported()) {
+        signOutputs(workflow, prompt: prompt);
+      }
+    }
     promptId ??= await _queuePrompt(workflow!, clientId: clientId);
     yield GenSubmitted(promptId);
     yield const GenQueued(0);
@@ -1474,6 +1493,7 @@ class ComfyUIService implements ImageBackend {
     bool positivePrefix = true,
   }) {
     final wf = jsonDecode(jsonEncode(template)) as Map<String, dynamic>;
+    _userPrompt[wf] = prompt;
     final lora = _activeLora;
     final preset = _preset;
     final fullPrompt = !positivePrefix || preset.positivePrefix.isEmpty
@@ -2083,6 +2103,59 @@ class ComfyUIService implements ImageBackend {
       },
     };
     save['images'] = ['__face_detail__', 0];
+  }
+
+  // ── AILineage provenance ────────────────────────────────────
+  //
+  // With the ComfyUI-AILineage node installed, every SaveImage becomes
+  // AILineageSaveImage: same PNG output and filename scheme, plus an embedded,
+  // signed and timestamped manifest. The prompt goes in only as a salted hash;
+  // the plaintext stays on the server's private openings store. A server
+  // without the node gets the graph unchanged.
+
+  static const kAiLineageNode = 'AILineageSaveImage';
+
+  Future<bool> _aiLineageSupported() async {
+    final known = _aiLineageAvailable;
+    if (known != null &&
+        DateTime.now().difference(_aiLineageCheckedAt) < _aiLineageRecheck) {
+      return known;
+    }
+    var ok = false;
+    try {
+      final resp = await _client
+          .get(
+            Uri.parse('$_baseUrl/object_info/$kAiLineageNode'),
+            headers: _authHeaders,
+          )
+          .timeout(_pollTimeout);
+      ok = resp.statusCode == 200 &&
+          (jsonDecode(resp.body) as Map).containsKey(kAiLineageNode);
+    } catch (_) {
+      ok = false; // offline or old server: save unsigned, as before
+    }
+    _aiLineageAvailable = ok;
+    _aiLineageCheckedAt = DateTime.now();
+    return ok;
+  }
+
+  /// Turns every SaveImage of [wf] into the AILineage node, in place. Runs
+  /// after [_injectFaceDetailer], which looks SaveImage up by class.
+  @visibleForTesting
+  static void signOutputs(Map<String, dynamic> wf, {required String prompt}) {
+    for (final e in wf.values) {
+      final node = (e as Map).cast<String, dynamic>();
+      if (node['class_type'] != 'SaveImage') continue;
+      node['class_type'] = kAiLineageNode;
+      (node['inputs'] as Map).cast<String, dynamic>().addAll({
+        'format': 'png',
+        'quality': 95,
+        'prompt_storage': 'none',
+        'prompt_text': prompt,
+        'hash_weights': true,
+        'embed_workflow': false,
+      });
+    }
   }
 
   // ── LoRA source detection ───────────────────────────────────
