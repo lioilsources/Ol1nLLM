@@ -115,9 +115,17 @@ func (s *Server) guard(h http.HandlerFunc) http.HandlerFunc {
 				return
 			}
 		}
-		if r.Method != http.MethodGet && r.Header.Get("X-Lab-Token") != s.token {
-			http.Error(w, "chybí X-Lab-Token", http.StatusForbidden)
-			return
+		if r.Method != http.MethodGet {
+			switch got := r.Header.Get("X-Lab-Token"); {
+			case got == "":
+				http.Error(w, "chybí X-Lab-Token", http.StatusForbidden)
+				return
+			case got != s.token:
+				// The token is minted per start, so a tab left open across a
+				// restart of the lab sends the previous one.
+				http.Error(w, "stránka je ze staršího spuštění labu — obnov ji (⌘R)", http.StatusForbidden)
+				return
+			}
 		}
 		h(w, r)
 	}

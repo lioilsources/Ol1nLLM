@@ -62,7 +62,7 @@ func TestEstimateBlocksBeforeSpendingGPU(t *testing.T) {
 	// The ceiling exists because 600 cells took 3h40m once; an accidental
 	// sweep must hit a wall, not the GPU.
 	big := base
-	big.Prompts = make([]string, 200)
+	big.Prompts = make([]string, MaxCells+1)
 	for i := range big.Prompts {
 		big.Prompts[i] = "p"
 	}
