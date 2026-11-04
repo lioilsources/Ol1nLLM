@@ -2204,9 +2204,9 @@ class _StyleChip extends StatelessWidget {
   void _pick(BuildContext context) {
     _dismissKeyboard();
     var query = '';
-    // Sections only once there is something to split: cultures and epochs on
-    // one side, styles after a named artist on the other.
-    final sectioned = kStylePresets.any((s) => s.artist != null);
+    // With a few hundred entries an open list is a scroll to nowhere, so the
+    // sections start folded except the one holding the current style.
+    final open = <StyleKind>{styleById(selected)?.kind ?? StyleKind.culture};
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppTheme.surface,
@@ -2219,15 +2219,21 @@ class _StyleChip extends StatelessWidget {
           final hits = kStylePresets
               .where((s) => styleMatchesQuery(s, query))
               .toList();
-          final cultures = hits.where((s) => s.artist == null).toList();
-          final artists = hits.where((s) => s.artist != null).toList();
+          final searching = query.trim().isNotEmpty;
           // One flat list of headers and presets — the split is what makes
-          // ~90 entries findable, it does not need a widget tree of its own.
+          // the entries findable, it does not need a widget tree of its own.
+          // A search shows every hit: a fold must not hide what was asked for.
           final items = <Object>[
-            if (sectioned && cultures.isNotEmpty) 'Kultury a epochy',
-            ...cultures,
-            if (sectioned && artists.isNotEmpty) 'Umělci',
-            ...artists,
+            for (final kind in StyleKind.values)
+              ...() {
+                final inKind = hits.where((s) => s.kind == kind).toList();
+                final shown = searching || open.contains(kind);
+                return [
+                  if (inKind.isNotEmpty)
+                    (kind: kind, n: inKind.length, shown: shown),
+                  if (shown) ...inKind,
+                ];
+              }(),
           ];
           return Padding(
             // The search field is the only input here: once the user taps
@@ -2338,20 +2344,46 @@ class _StyleChip extends StatelessWidget {
                               itemCount: items.length,
                               itemBuilder: (_, i) {
                                 final item = items[i];
-                                if (item is String) {
-                                  return Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      16,
-                                      10,
-                                      16,
-                                      2,
-                                    ),
-                                    child: Text(
-                                      item,
-                                      style: const TextStyle(
-                                        color: AppTheme.textSecondary,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
+                                if (item case (
+                                  kind: final StyleKind kind,
+                                  n: final int n,
+                                  shown: final bool shown,
+                                )) {
+                                  return InkWell(
+                                    onTap: searching
+                                        ? null
+                                        : () => setSheetState(
+                                            () => shown
+                                                ? open.remove(kind)
+                                                : open.add(kind),
+                                          ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        16,
+                                        12,
+                                        12,
+                                        8,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              '${kind.label} · $n',
+                                              style: const TextStyle(
+                                                color: AppTheme.textSecondary,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                          Icon(
+                                            shown
+                                                ? Icons.expand_less
+                                                : Icons.expand_more,
+                                            size: 18,
+                                            color: AppTheme.textSecondary,
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   );
@@ -3211,7 +3243,6 @@ class _VideoNodeViewState extends State<_VideoNodeView> {
 /// What the 3D tile action makes: the printable model or a dancing figure.
 enum _ThreeDChoice { print, figure }
 
-
 /// What the „Rozhýbat" sheet returns: a scene, or the user's own motion text
 /// with a length in 5 s segments.
 class _AnimateChoice {
@@ -3300,7 +3331,8 @@ class _AnimateSheetState extends State<_AnimateSheet> {
                     fontSize: 14,
                   ),
                   decoration: InputDecoration(
-                    hintText: 'Co se má pohnout — např. „otočí se k oknu, '
+                    hintText:
+                        'Co se má pohnout — např. „otočí se k oknu, '
                         'usměje se a zamává"',
                     hintStyle: const TextStyle(
                       color: AppTheme.textSecondary,

@@ -298,3 +298,30 @@ Archy: [img2img](sheets/wave6-img2img-7models.html),
 **Co dál.** Repose i img2img teď mají baseline na tomhle datasetu — chybí
 sweep denoise (0.5 vs 0.9) přímo proti sobě na jednom běhu, aby šlo číst
 křivku, ne jen dva krajní body z různých vln.
+
+## Sedmá vlna — 7a: escapování závorek v tazích (2026-10-31)
+
+Registr posílal `oil painting (medium)` bez escapování a ComfyUI z toho udělá
+`oil painting` + `medium` s váhou 1.1. Oprava je v `StylePreset.blockFor()`.
+Plán očekával, že tohle vysvětlí nález vlny 5 („Pony nevyrobí médium“).
+**Měření to nepotvrdilo.**
+
+15 stylů s `(medium)`/`(style)`, 4 tagové modely, baletka + muž, seed 777 a 778,
+stejné tagy ve dvou variantách přes `param.styleDialect` (`natural` = bez
+escapování, `booru` = s ním), 512 buněk txt2img, L40S, 0 chyb. Průměrný rozdíl
+pixelů na 64×94:
+
+| model | escapováno × bez | escapováno × baseline | bez × baseline | escapováno dál od baseline |
+|---|---|---|---|---|
+| pony | 0.050 | 0.146 | 0.146 | 47 % párů |
+| illustrious-xl | 0.053 | 0.283 | 0.281 | 57 % |
+| noobai-xl | 0.060 | 0.277 | 0.278 | 53 % |
+| animagine-xl | 0.058 | 0.287 | 0.283 | 63 % |
+
+Dvojice escapovaná × neescapovaná je si vzájemně 3–5× blíž než kterákoli
+z nich baseline a směr nemá stranu. Pohledem na baletku u všech 15 stylů: tatáž
+scéna, paleta i stavba, liší se detail. Pony drží vlastní přemalbu a médium
+ani tak nepřijde. **Oprava je správně a zůstává, styl ale nezměnila.** Vysvětlení
+vlny 5 je jinde; kandidáti jsou mrtvé tagy (přepis v běhu 7h) a pozice stylu za
+score tagy (běh 7e). Verdikty vln 3–5 se tímhle nemění. Muže a seed 778 pokrývají
+jen čísla, ne pohled; repose (`7a-r777`) čeká ve frontě.

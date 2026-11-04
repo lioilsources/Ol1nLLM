@@ -126,8 +126,9 @@ async function loadConfig() {
   const styleChip = (s) =>
     `<button class="chip" data-style="${esc(s.id)}" aria-pressed="false" title="${esc(s.block)}">${esc(s.label)}</button>`;
   $('styles').innerHTML = [
-    ['kultury a epochy', cfg.styles.filter((s) => !s.artist)],
-    ['umělci', cfg.styles.filter((s) => s.artist)],
+    ['kultury a epochy', cfg.styles.filter((s) => s.kind === 'culture')],
+    ['umělci', cfg.styles.filter((s) => s.kind === 'artist')],
+    ['média a techniky', cfg.styles.filter((s) => s.kind === 'medium')],
   ].filter(([, list]) => list.length)
     .map(([label, list]) =>
       `<p class="grouplabel">${label}</p><div class="chips">${list.map(styleChip).join('')}</div>`)
@@ -762,10 +763,13 @@ function renderInner() {
   // Every finished cell sends an SSE tick. Rebuilding the whole table on each
   // one re-created every <img> and the grid visibly blinked, so a tick on an
   // unchanged layout only swaps the cells whose markup changed.
+  // Order and hiding both count: moving a hidden column, or a shown one past a
+  // hidden strip, leaves the shown ids in the same order.
+  const cols = runModels.map((m) => `${m.id}:${shownCol.has(m.id)}`).join();
   const layout = state.drawn;
   if (layout && layout.runId === state.runId && layout.page === state.page
       && layout.order === state.rowOrder && layout.manifest === man
-      && layout.cols === models.map((m) => m.id).join()
+      && layout.cols === cols
       && layout.pages === pages.length && $('runhead')) {
     if (layout.runhead !== runhead) { $('runhead').innerHTML = runhead; layout.runhead = runhead; }
     for (const sel of $('content').querySelectorAll('[data-pagesel]')) {
@@ -793,7 +797,7 @@ function renderInner() {
   }
   state.drawn = {
     runId: state.runId, page: state.page, order: state.rowOrder, manifest: man,
-    cols: models.map((m) => m.id).join(),
+    cols,
     pages: pages.length, runhead, cells: htmlById,
   };
 

@@ -53,6 +53,12 @@ void main() {
       expect(nouveau.artist, isNull);
     });
 
+    test('the section follows from what a style is', () {
+      for (final s in kStylePresets) {
+        expect(s.artist != null, s.kind == StyleKind.artist, reason: s.id);
+      }
+    });
+
     test('every preset carries a non-empty label and block', () {
       for (final s in kStylePresets) {
         expect(s.label.trim(), isNotEmpty, reason: s.id);
@@ -97,12 +103,29 @@ void main() {
     const plain = StylePreset(id: 'y', label: 'Y', block: 'flat colour areas');
 
     test('an anime model gets the tags, everything else the block', () {
-      expect(tagged.blockFor(PromptDialect.booru), tagged.booru);
+      expect(tagged.blockFor(PromptDialect.booru),
+          r'oil painting \(medium\), impasto');
       expect(tagged.blockFor(PromptDialect.natural), tagged.block);
       expect(
         applyStylePreset('a ballerina', tagged, dialect: PromptDialect.booru),
-        'a ballerina, oil painting (medium), impasto',
+        r'a ballerina, oil painting \(medium\), impasto',
       );
+    });
+
+    test('tag parentheses survive the ComfyUI weight parser', () {
+      // Bare, `(medium)` is a 1.1 weight on the word "medium", not the tag.
+      for (final s in kStylePresets) {
+        final sent = s.blockFor(PromptDialect.booru);
+        expect(sent, isNot(matches(r'(?<!\\)[()]')), reason: s.id);
+        expect(sent.replaceAll(r'\', ''), s.booru ?? s.block, reason: s.id);
+      }
+      expect(escapeTagParens(escapeTagParens('a (b)')), r'a \(b\)');
+    });
+
+    test('a phrase model never gets a backslash', () {
+      for (final s in kStylePresets) {
+        expect(s.blockFor(PromptDialect.natural), s.block, reason: s.id);
+      }
     });
 
     test('a style without tags sends what it always sent', () {
@@ -168,6 +191,10 @@ void main() {
     test('an empty query keeps everything', () {
       expect(styleMatchesQuery(zrzavy, ''), isTrue);
       expect(styleMatchesQuery(zrzavy, '   '), isTrue);
+    });
+
+    test('a period is searchable', () {
+      expect(styleMatchesQuery(styleById('lempicka')!, '1925'), isTrue);
     });
 
     test('a style without an artist matches by label alone', () {

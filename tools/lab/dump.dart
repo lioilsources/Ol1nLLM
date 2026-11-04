@@ -813,6 +813,7 @@ void main() {
             for (final s in kStylePresets)
               {
                 'id': s.id,
+                'kind': s.kind.name,
                 'label': s.label,
                 'block': s.block,
                 if (s.booru != null) 'booru': s.booru,
