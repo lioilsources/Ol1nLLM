@@ -21,6 +21,11 @@ const state = {
   pageAnchor: null,
   hiddenModels: new Set(loadHiddenModels()),
   modelOrder: loadModelOrder(),
+  // Output filter (header above the table): picked styles win, otherwise the
+  // query narrows. Per opened run — another run has other styles.
+  outStyles: new Set(),
+  outQuery: '',
+  outSig: '',
   runId: null,
   run: null,
   manifest: null,
@@ -578,7 +583,7 @@ async function refreshRuns() {
 }
 
 async function openRun(id) {
-  if (id !== state.runId) state.page = 0;
+  if (id !== state.runId) { state.page = 0; state.outStyles.clear(); state.outQuery = ''; }
   state.runId = id;
   location.hash = `#/run/${id}`;
   if (state.es) state.es.close();
@@ -615,10 +620,12 @@ function renderInner() {
   const run = state.run, man = state.manifest;
   if (!run) return;
   if (!man) {
+    $('outfilter').hidden = true;
     $('content').innerHTML = `<div class="empty"><h2>${esc(run.status)}</h2>
       <p>${esc(run.message || 'pracuje se…')}</p></div>`;
     return;
   }
+  renderOutFilter();
   const runModels = orderModels(man.models.filter((m) => man.cells.some((c) => c.model === m.id)));
   // Hidden columns drop out of the paging too, so a page holds more rows
   // instead of fewer pictures. The last visible column cannot be switched off
@@ -646,7 +653,8 @@ function renderInner() {
     (n, m) => n + (byKey.get(cellKey(r.flow, m.id, r.prompt, r.style)) || []).length, 0);
   const rows = [];
   for (const flow of [...new Set(man.cells.map((c) => c.flow))]) {
-    const inFlow = man.cells.filter((c) => c.flow === flow);
+    const inFlow = man.cells.filter((c) => c.flow === flow && outStyleVisible(c.style));
+    if (!inFlow.length) continue;
     const primaryOf = (c) => (byStyle ? c.style : String(c.promptIndex));
     const secondaryOf = (c) => (byStyle ? String(c.promptIndex) : c.style);
     const primaries = [...new Set(inFlow.map(primaryOf))];
@@ -970,6 +978,84 @@ function rowId(r) {
   return `${r.flow}|${r.prompt}|${r.style}`;
 }
 
+// ── output filter ──────────────────────────────────────────
+// Styles of the opened run in manifest order, with the text the filter reads:
+// label, id, registry artist/period/block/booru, and the style text the cells
+// actually got (candidates from --styles-file are not in the registry).
+function runStyles() {
+  const man = state.manifest;
+  if (!man) return [];
+  const out = new Map();
+  for (const c of man.cells) {
+    if (c.style === '__baseline') continue;
+    let e = out.get(c.style);
+    if (!e) {
+      const s = (state.config?.styles || []).find((x) => x.id === c.style) || {};
+      e = { id: c.style, label: styleLabel(c.style),
+        text: [c.style, styleLabel(c.style), s.artist, s.period, s.block, s.booru] };
+      out.set(c.style, e);
+    }
+    if (c.styleText) e.text.push(c.styleText);
+  }
+  return [...out.values()].map((e) => ({ ...e, hay: fold(e.text.filter(Boolean).join(' ')) }));
+}
+
+function outQueryMatches(hay) {
+  return fold(state.outQuery).split(/\s+/).filter(Boolean).every((w) => hay.includes(w));
+}
+
+// The baseline always stays: without it a style row cannot be read.
+function outStyleVisible(style) {
+  if (style === '__baseline') return true;
+  if (state.outStyles.size) return state.outStyles.has(style);
+  if (!state.outQuery.trim()) return true;
+  const e = (state.outHay || new Map()).get(style);
+  return e ? outQueryMatches(e) : true;
+}
+
+// Lives outside #content on purpose: #content is rebuilt on every progress
+// event, and an input inside it would lose focus mid-word.
+function renderOutFilter() {
+  const styles = runStyles();
+  const box = $('outfilter');
+  box.hidden = styles.length < 2;
+  if (box.hidden) return;
+  const sig = state.runId + '|' + styles.map((s) => s.id).join(',');
+  if (sig !== state.outSig) {
+    state.outSig = sig;
+    state.outHay = new Map(styles.map((s) => [s.id, s.hay]));
+    $('outquery').value = state.outQuery;
+    $('outstyles').innerHTML = styles.map((s) =>
+      `<button class="chip" data-outstyle="${esc(s.id)}" aria-pressed="false">${esc(s.label)}</button>`).join('');
+  }
+  let shown = 0;
+  $('outstyles').querySelectorAll('[data-outstyle]').forEach((b) => {
+    const id = b.dataset.outstyle;
+    b.hidden = !outQueryMatches(state.outHay.get(id) || '') && !state.outStyles.has(id);
+    b.setAttribute('aria-pressed', state.outStyles.has(id));
+    if (outStyleVisible(id)) shown++;
+  });
+  $('outcount').textContent = shown === styles.length
+    ? `${styles.length} stylů` : `zobrazeno ${shown} z ${styles.length} stylů (+ baseline)`;
+}
+
+function initOutFilter() {
+  $('outquery').oninput = () => { state.outQuery = $('outquery').value; state.page = 0; render(); };
+  $('outstyles').onclick = (e) => {
+    const b = e.target.closest('[data-outstyle]');
+    if (!b) return;
+    const id = b.dataset.outstyle;
+    if (state.outStyles.has(id)) state.outStyles.delete(id); else state.outStyles.add(id);
+    state.page = 0;
+    render();
+  };
+  $('outclear').onclick = () => {
+    state.outStyles.clear(); state.outQuery = ''; $('outquery').value = '';
+    state.page = 0;
+    render();
+  };
+}
+
 function cellHTML(c) {
   const st = (state.run.cells || {})[c.id] || { status: 'pending' };
   const src = st.status === 'done' ? `/media/${state.runId}/thumb/${encodeURIComponent(c.id)}.jpg` : '';
@@ -1093,6 +1179,7 @@ function esc(s) {
 (async function boot() {
   // Each step is independent: a failing config load must not cost you the run
   // list, and a broken run must not cost you the form.
+  initOutFilter();
   try { await refreshHealth(); } catch { /* lamps stay grey */ }
   try { await loadConfig(); } catch (err) {
     $('estimate').innerHTML = `<span class="danger">${esc(err.message)}</span>`;

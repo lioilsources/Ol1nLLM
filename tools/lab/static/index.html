@@ -165,6 +165,12 @@
 
   <main>
     <div class="runlist" id="runlist"></div>
+    <div class="outfilter" id="outfilter" hidden>
+      <input type="text" id="outquery" placeholder="filtr výstupu podle stylu: název, umělec, text bloku…" autocomplete="off">
+      <span id="outcount"></span>
+      <button type="button" class="chip" id="outclear">vše</button>
+      <div class="chips" id="outstyles"></div>
+    </div>
     <div id="content">
       <div class="empty">
         <h2>Zatím tu nic neběželo</h2>
