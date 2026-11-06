@@ -11,15 +11,39 @@ final musicPlaybackProvider = ChangeNotifierProvider.autoDispose(
   (ref) => MusicPlayback(),
 );
 
-class MusicPlayback extends ChangeNotifier {
+/// What a sequence of audio files needs from a player — the part of
+/// [MusicPlayback] that speech uses, so its sequencing is testable without
+/// the native player.
+abstract interface class AudioOutput implements Listenable {
+  /// The loaded file, null when nothing is.
+  String? get path;
+  bool isPlaying(String path);
+
+  /// True once [path] has played to its end.
+  bool isCompleted(String path);
+
+  /// Start [path], or pause / resume it when it is the loaded file.
+  Future<void> toggle(String path);
+  Future<void> stop();
+}
+
+class MusicPlayback extends ChangeNotifier implements AudioOutput {
   VideoPlayerController? _controller;
   String? _path;
   bool _disposed = false;
 
+  @override
   String? get path => _path;
+
+  @override
+  bool isCompleted(String path) {
+    final v = _controller?.value;
+    return _path == path && v != null && v.isInitialized && v.isCompleted;
+  }
 
   bool isCurrent(String path) => _path == path;
 
+  @override
   bool isPlaying(String path) =>
       _path == path && (_controller?.value.isPlaying ?? false);
 
@@ -36,6 +60,7 @@ class MusicPlayback extends ChangeNotifier {
       ? (_controller?.value.position ?? Duration.zero)
       : Duration.zero;
 
+  @override
   Future<void> toggle(String path) async {
     final c = _controller;
     if (_path == path && c != null && c.value.isInitialized) {
@@ -73,6 +98,7 @@ class MusicPlayback extends ChangeNotifier {
     _notify();
   }
 
+  @override
   Future<void> stop() async {
     final c = _controller;
     _controller = null;

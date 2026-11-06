@@ -15,11 +15,11 @@ import 'package:http/http.dart' as http;
 /// first request after the model container starts waits for its weights —
 /// longer than Cloudflare's 100 s edge timeout.
 class MusicService {
-  static const _root = String.fromEnvironment(
+  static const root = String.fromEnvironment(
     'AUDIO_URL',
     defaultValue: 'https://llm.ol1n.com',
   );
-  static const _base = '$_root/v1/audio';
+  static const _base = '$root/v1/audio';
   static const _cfId = String.fromEnvironment('CF_ACCESS_CLIENT_ID');
   static const _cfSecret = String.fromEnvironment('CF_ACCESS_CLIENT_SECRET');
   static const _timeout = Duration(seconds: 30);
@@ -39,7 +39,7 @@ class MusicService {
 
   /// CF Access is optional so a LAN build (`AUDIO_URL=http://…:8093`) works
   /// without it; through Cloudflare a missing token surfaces as a 403.
-  Map<String, String> get _auth => {
+  static Map<String, String> get auth => {
     if (_cfId.isNotEmpty) 'CF-Access-Client-Id': _cfId,
     if (_cfSecret.isNotEmpty) 'CF-Access-Client-Secret': _cfSecret,
   };
@@ -47,15 +47,15 @@ class MusicService {
   /// Body as UTF-8. FastAPI sends `application/json` without a charset, and
   /// `Response.body` would then decode Latin-1 — every Czech error message
   /// from the server would arrive garbled.
-  static String _text(http.Response r) =>
+  static String bodyText(http.Response r) =>
       utf8.decode(r.bodyBytes, allowMalformed: true);
 
-  static Map<String, dynamic> _json(http.Response r) =>
-      jsonDecode(_text(r)) as Map<String, dynamic>;
+  static Map<String, dynamic> bodyJson(http.Response r) =>
+      jsonDecode(bodyText(r)) as Map<String, dynamic>;
 
   /// Human-readable error from a FastAPI `{"detail": …}` body.
-  static String _snippet(http.Response r) {
-    var msg = _text(r);
+  static String errorSnippet(http.Response r) {
+    var msg = bodyText(r);
     try {
       final j = jsonDecode(msg);
       if (j is Map && j['detail'] is String) {
@@ -83,15 +83,15 @@ class MusicService {
   /// file was analysed before — the id is a hash of the bytes.
   Future<UploadedSample> uploadSample(File file, String name) async {
     final req = http.MultipartRequest('POST', Uri.parse('$_base/vibe/samples'))
-      ..headers.addAll(_auth)
+      ..headers.addAll(auth)
       ..files.add(
         await http.MultipartFile.fromPath('sample', file.path, filename: name),
       );
     final r = await http.Response.fromStream(
       await _client.send(req).timeout(_uploadTimeout),
     );
-    if (r.statusCode != 200) throw MusicServiceException(_snippet(r));
-    return UploadedSample.fromJson(_json(r));
+    if (r.statusCode != 200) throw MusicServiceException(errorSnippet(r));
+    return UploadedSample.fromJson(bodyJson(r));
   }
 
   Future<String> analyze(String sampleId) =>
@@ -104,13 +104,13 @@ class MusicService {
     final r = await _client
         .post(
           Uri.parse('$_base$path'),
-          headers: {..._auth, 'Content-Type': 'application/json'},
+          headers: {...auth, 'Content-Type': 'application/json'},
           body: jsonEncode(body),
         )
         .timeout(_timeout);
     if (r.statusCode == 404) throw const SampleGoneException();
-    if (r.statusCode != 202) throw MusicServiceException(_snippet(r));
-    return _json(r)['job_id'] as String;
+    if (r.statusCode != 202) throw MusicServiceException(errorSnippet(r));
+    return bodyJson(r)['job_id'] as String;
   }
 
   /// Poll job [jobId] to a terminal state. A run of network failures ends in
@@ -122,14 +122,14 @@ class MusicService {
       Map<String, dynamic> j;
       try {
         final r = await _client
-            .get(Uri.parse('$_base/jobs/$jobId'), headers: _auth)
+            .get(Uri.parse('$_base/jobs/$jobId'), headers: auth)
             .timeout(_timeout);
         if (r.statusCode == 404) {
           yield const MusicFailed('Job na serveru už neexistuje');
           return;
         }
-        if (r.statusCode != 200) throw MusicServiceException(_snippet(r));
-        j = _json(r);
+        if (r.statusCode != 200) throw MusicServiceException(errorSnippet(r));
+        j = bodyJson(r);
         failures = 0;
       } on Exception catch (e) {
         if (++failures >= _maxPollFailures) {
@@ -167,9 +167,9 @@ class MusicService {
   Future<Uint8List> download(String url, {int? expectedBytes}) async {
     for (var attempt = 0; ; attempt++) {
       final r = await _client
-          .get(Uri.parse('$_root$url'), headers: _auth)
+          .get(Uri.parse('$root$url'), headers: auth)
           .timeout(_downloadTimeout);
-      if (r.statusCode != 200) throw MusicServiceException(_snippet(r));
+      if (r.statusCode != 200) throw MusicServiceException(errorSnippet(r));
       final declared =
           expectedBytes ?? int.tryParse(r.headers['content-length'] ?? '');
       if (declared == null || r.bodyBytes.length == declared) {

@@ -131,9 +131,41 @@ async function loadConfig() {
     ['média a techniky', cfg.styles.filter((s) => s.kind === 'medium')],
   ].filter(([, list]) => list.length)
     .map(([label, list]) =>
-      `<p class="grouplabel">${label}</p><div class="chips">${list.map(styleChip).join('')}</div>`)
+      `<div class="stylegroup"><p class="grouplabel">${label}</p><div class="chips">${list.map(styleChip).join('')}</div></div>`)
     .join('');
-  $('styles').onclick = (e) => toggle(e, 'style', state.styles);
+  $('styles').onclick = (e) => { toggle(e, 'style', state.styles); updateStyleCount(); };
+
+  // One filter across both groups: every text a style carries (label, artist,
+  // period, CLIP block, booru tags), diacritics-insensitive, all words must hit.
+  // Selection survives filtering — a hidden chip stays in the batch.
+  const hay = new Map(cfg.styles.map((s) => [s.id,
+    fold([s.id, s.label, s.artist, s.period, s.block, s.booru].filter(Boolean).join(' '))]));
+  $('stylefilter').oninput = () => {
+    const words = fold($('stylefilter').value).split(/\s+/).filter(Boolean);
+    $('styles').querySelectorAll('[data-style]').forEach((b) => {
+      const h = hay.get(b.dataset.style) || '';
+      b.hidden = !words.every((w) => h.includes(w));
+    });
+    $('styles').querySelectorAll('.stylegroup').forEach((g) => {
+      g.hidden = !g.querySelector('[data-style]:not([hidden])');
+    });
+    updateStyleCount();
+  };
+  $('styleselshown').onclick = () => {
+    $('styles').querySelectorAll('[data-style]:not([hidden])').forEach((b) => {
+      state.styles.add(b.dataset.style);
+      b.setAttribute('aria-pressed', 'true');
+    });
+    updateStyleCount();
+    estimate();
+  };
+  $('styleclear').onclick = () => {
+    state.styles.clear();
+    $('styles').querySelectorAll('[data-style]').forEach((b) => b.setAttribute('aria-pressed', 'false'));
+    updateStyleCount();
+    estimate();
+  };
+  updateStyleCount();
 
   $('flows').innerHTML = Object.entries(FLOW_LABEL).map(([id, label]) =>
     `<button class="chip" data-flow="${id}" data-flowsel="${id}" aria-pressed="${state.flows.has(id)}">${label}</button>`).join('');
@@ -289,6 +321,20 @@ $('lora').onchange = () => {
 $('loraStrength').oninput = () => {
   $('loraStrengthOut').textContent = Number($('loraStrength').value).toFixed(2);
 };
+
+// Lowercase without diacritics, so "dürer" finds "Durer" and "secese" "Secese".
+function fold(s) {
+  return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+function updateStyleCount() {
+  const all = $('styles').querySelectorAll('[data-style]');
+  const shown = $('styles').querySelectorAll('[data-style]:not([hidden])').length;
+  const sel = state.styles.size;
+  $('stylecount').textContent = shown === all.length
+    ? `vybráno ${sel} z ${all.length}`
+    : `zobrazeno ${shown} z ${all.length} · vybráno ${sel}`;
+}
 
 function toggle(e, attr, set) {
   const b = e.target.closest(`[data-${attr}]`);

@@ -59,6 +59,12 @@
 
     <fieldset>
       <legend>styly</legend>
+      <input type="text" id="stylefilter" placeholder="filtr: název, umělec, epocha, text bloku…" autocomplete="off">
+      <p class="stylebar">
+        <span id="stylecount"></span>
+        <button type="button" class="chip" id="styleselshown">vybrat zobrazené</button>
+        <button type="button" class="chip" id="styleclear">zrušit výběr</button>
+      </p>
       <div id="styles"></div>
       <p class="hint">Bez výběru se jede jen holý prompt. S výběrem se navíc
         vygeneruje baseline bez stylu — bez něj nejde poznat „model na styl
