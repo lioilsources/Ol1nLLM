@@ -1,0 +1,1038 @@
+[
+ {
+  "id": "aztec@v1",
+  "kind": "culture",
+  "label": "Aztec codex / stone relief (dnes)",
+  "block": "aztec codex and stone relief style, bold black outlines, vibrant red turquoise and gold accents, geometric feather and sun motifs, formal stylized figures",
+  "booru": "codex, mesoamerican, stone relief, black outline, thick outlines, flat color, red theme, turquoise, gold, geometric pattern, sun symbol, feather pattern, traditional media"
+ },
+ {
+  "id": "aztec@v2",
+  "kind": "culture",
+  "label": "Aztec codex / stone relief (tagy v2)",
+  "block": "aztec codex and stone relief style, bold black outlines, vibrant red turquoise and gold accents, geometric feather and sun motifs, formal stylized figures",
+  "booru": "carving, black outline, thick outlines, flat color, red theme, aqua theme, gold, geometric pattern, sun symbol, traditional media"
+ },
+ {
+  "id": "ashanti@v1",
+  "kind": "culture",
+  "label": "Ashanti (Ghana) (dnes)",
+  "block": "ashanti inspired style, rich gold tones, geometric textile patterns, strong stylized figures, decorative symbols, warm earth and gold palette",
+  "booru": "kente, african, geometric pattern, patterned background, gold, yellow theme, orange theme, warm colors, symbols, stylized, traditional media"
+ },
+ {
+  "id": "ashanti@v2",
+  "kind": "culture",
+  "label": "Ashanti (Ghana) (tagy v2)",
+  "block": "ashanti inspired style, rich gold tones, geometric textile patterns, strong stylized figures, decorative symbols, warm earth and gold palette",
+  "booru": "patterned clothing, geometric pattern, patterned background, gold, yellow theme, orange theme, warm colors, traditional media"
+ },
+ {
+  "id": "himba@v1",
+  "kind": "culture",
+  "label": "Himba (Namibia) (dnes)",
+  "block": "himba inspired style, rich red ochre skin tones, minimal clothing emphasis, strong natural anatomy, warm desert light, textured skin details",
+  "booru": "african, red ochre, earth tones, orange theme, warm lighting, desert, textured, painting (medium), traditional media"
+ },
+ {
+  "id": "himba@v2",
+  "kind": "culture",
+  "label": "Himba (Namibia) (tagy v2)",
+  "block": "himba inspired style, rich red ochre skin tones, minimal clothing emphasis, strong natural anatomy, warm desert light, textured skin details",
+  "booru": "red theme, brown theme, orange theme, warm colors, desert, canvas texture, painting (medium), traditional media"
+ },
+ {
+  "id": "maasai@v1",
+  "kind": "culture",
+  "label": "Maasai (dnes)",
+  "block": "maasai inspired style, bold red and beadwork patterns, elongated elegant figures, strong vertical composition, vibrant contrasting colors",
+  "booru": "african, beadwork, beads, red theme, geometric pattern, vertical composition, vibrant colors, high contrast, stylized, traditional media"
+ },
+ {
+  "id": "maasai@v2",
+  "kind": "culture",
+  "label": "Maasai (tagy v2)",
+  "block": "maasai inspired style, bold red and beadwork patterns, elongated elegant figures, strong vertical composition, vibrant contrasting colors",
+  "booru": "beads, red theme, geometric pattern, colorful, high contrast, traditional media"
+ },
+ {
+  "id": "aboriginal@v1",
+  "kind": "culture",
+  "label": "Aboriginal dot painting (dnes)",
+  "block": "australian aboriginal dot painting style, intricate dot patterns, earth pigment colors, x-ray style internal forms, symbolic story elements, flat ceremonial composition",
+  "booru": "aboriginal art, dot painting, pointillism, dots, earth tones, brown theme, orange theme, symbols, abstract, flat color, traditional media"
+ },
+ {
+  "id": "aboriginal@v2",
+  "kind": "culture",
+  "label": "Aboriginal dot painting (tagy v2)",
+  "block": "australian aboriginal dot painting style, intricate dot patterns, earth pigment colors, x-ray style internal forms, symbolic story elements, flat ceremonial composition",
+  "booru": "pointillism, stippling (texture), brown theme, orange theme, abstract, flat color, traditional media"
+ },
+ {
+  "id": "polynesian@v1",
+  "kind": "culture",
+  "label": "Traditional Polynesian (dnes)",
+  "block": "traditional polynesian style, bold geometric tattoos, strong black outlines, stylized powerful bodies, warm skin tones, carved wood aesthetic",
+  "booru": "polynesian, tribal tattoo, tribal pattern, geometric pattern, black outline, thick outlines, wood carving, warm colors, brown theme, stylized, traditional media"
+ },
+ {
+  "id": "polynesian@v2",
+  "kind": "culture",
+  "label": "Traditional Polynesian (tagy v2)",
+  "block": "traditional polynesian style, bold geometric tattoos, strong black outlines, stylized powerful bodies, warm skin tones, carved wood aesthetic",
+  "booru": "tribal, tribal tattoo, geometric pattern, black outline, thick outlines, carving, warm colors, brown theme, traditional media"
+ },
+ {
+  "id": "burmese@v1",
+  "kind": "culture",
+  "label": "Burmese temple painting (dnes)",
+  "block": "traditional burmese temple painting style, flowing elegant lines, rich gold and red tones, ornate decorative details, soft idealized faces, luminous atmosphere",
+  "booru": "temple mural, southeast asian, gold, red theme, ornate, flowing lines, glowing, soft lighting, painting (medium), traditional media"
+ },
+ {
+  "id": "burmese@v2",
+  "kind": "culture",
+  "label": "Burmese temple painting (tagy v2)",
+  "block": "traditional burmese temple painting style, flowing elegant lines, rich gold and red tones, ornate decorative details, soft idealized faces, luminous atmosphere",
+  "booru": "mural, gold, red theme, ornate, glowing, soft focus, painting (medium), traditional media"
+ },
+ {
+  "id": "mesopotamian@v1",
+  "kind": "culture",
+  "label": "Mesopotamian relief (dnes)",
+  "block": "mesopotamian relief style, composite profile views, formal hierarchical proportions, detailed patterned hair, carved stone texture, earthy tones",
+  "booru": "ancient, stone relief, carved, from side, profile, patterned hair, stone texture, brown theme, sepia, stylized, traditional media"
+ },
+ {
+  "id": "mesopotamian@v2",
+  "kind": "culture",
+  "label": "Mesopotamian relief (tagy v2)",
+  "block": "mesopotamian relief style, composite profile views, formal hierarchical proportions, detailed patterned hair, carved stone texture, earthy tones",
+  "booru": "carving, from side, profile, patterned hair, brown theme, sepia, traditional media"
+ },
+ {
+  "id": "arabian@v1",
+  "kind": "culture",
+  "label": "Pre-Islamic Arabian (dnes)",
+  "block": "pre-islamic arabian style, elegant elongated figures, soft desert tones, flowing drapery, refined facial features, calm monumental presence",
+  "booru": "ancient, desert, brown theme, beige, muted colors, flowing lines, elongated, elegant, soft lighting, painting (medium), traditional media"
+ },
+ {
+  "id": "arabian@v2",
+  "kind": "culture",
+  "label": "Pre-Islamic Arabian (tagy v2)",
+  "block": "pre-islamic arabian style, elegant elongated figures, soft desert tones, flowing drapery, refined facial features, calm monumental presence",
+  "booru": "desert, brown theme, muted colors, soft focus, painting (medium), traditional media"
+ },
+ {
+  "id": "hebrew@v1",
+  "kind": "culture",
+  "label": "Ancient Near Eastern Hebrew (dnes)",
+  "block": "ancient near eastern hebrew inspired style, simple strong outlines, modest earth palette, solemn dignified figures, subtle patterned textiles, formal composition",
+  "booru": "ancient, lineart, thick outlines, earth tones, brown theme, muted colors, textile pattern, flat color, solemn, traditional media"
+ },
+ {
+  "id": "hebrew@v2",
+  "kind": "culture",
+  "label": "Ancient Near Eastern Hebrew (tagy v2)",
+  "block": "ancient near eastern hebrew inspired style, simple strong outlines, modest earth palette, solemn dignified figures, subtle patterned textiles, formal composition",
+  "booru": "lineart, thick outlines, brown theme, muted colors, patterned clothing, flat color, serious, traditional media"
+ },
+ {
+  "id": "indian@v1",
+  "kind": "culture",
+  "label": "Classical Indian miniature (dnes)",
+  "block": "detailed indian miniature painting, flat vibrant colors, intricate decorative patterns, stylized elongated figures, ornate borders, rich reds and golds",
+  "booru": "indian miniature, miniature painting, gouache (medium), flat color, intricate pattern, ornate border, border, red theme, gold, stylized, traditional media"
+ },
+ {
+  "id": "indian@v2",
+  "kind": "culture",
+  "label": "Classical Indian miniature (tagy v2)",
+  "block": "detailed indian miniature painting, flat vibrant colors, intricate decorative patterns, stylized elongated figures, ornate borders, rich reds and golds",
+  "booru": "painting (medium), gouache (medium), flat color, ornate, ornate border, border, red theme, gold, traditional media"
+ },
+ {
+  "id": "artnouveau@v1",
+  "kind": "culture",
+  "label": "Art Nouveau (dnes)",
+  "block": "art nouveau lithograph poster by Alphonse Mucha, woman framed by a circular halo motif, flowing decorative hair, ornamental mosaic border, pale pastel tones with gold, elegant whiplash lines, stylised flowers, flat poster colours",
+  "booru": "art nouveau, poster, halo, circle, ornate border, mosaic, flowing hair, flower, pastel colors, gold, flat color, thick outlines, elegant, lithograph"
+ },
+ {
+  "id": "artnouveau@v2",
+  "kind": "culture",
+  "label": "Art Nouveau (tagy v2)",
+  "block": "art nouveau lithograph poster by Alphonse Mucha, woman framed by a circular halo motif, flowing decorative hair, ornamental mosaic border, pale pastel tones with gold, elegant whiplash lines, stylised flowers, flat poster colours",
+  "booru": "art nouveau, poster (medium), halo, circle, ornate border, mosaic art, floating hair, flower, pastel colors, gold, flat color, thick outlines"
+ },
+ {
+  "id": "byzantine@v1",
+  "kind": "culture",
+  "label": "Byzantská ikona (dnes)",
+  "block": "byzantine icon style, flat gold leaf ground, elongated solemn figures, stylized drapery folds, red and deep blue robes, hieratic frontal composition",
+  "booru": "byzantine art, religious icon, gold background, tempera, flat color, elongated, stylized, red and blue, symmetry, facing viewer, traditional media"
+ },
+ {
+  "id": "byzantine@v2",
+  "kind": "culture",
+  "label": "Byzantská ikona (tagy v2)",
+  "block": "byzantine icon style, flat gold leaf ground, elongated solemn figures, stylized drapery folds, red and deep blue robes, hieratic frontal composition",
+  "booru": "painting (medium), gold background, flat color, red theme, blue theme, symmetry, facing viewer, traditional media"
+ },
+ {
+  "id": "stainedglass@v1",
+  "kind": "culture",
+  "label": "Vitráž (dnes)",
+  "block": "gothic stained glass window style, bold black lead lines, luminous saturated colour panels, flat shapes, backlit glow, geometric tracery",
+  "booru": "stained glass, mosaic, lead lines, black outline, vibrant colors, flat color, backlighting, glowing, geometric pattern, gothic"
+ },
+ {
+  "id": "stainedglass@v2",
+  "kind": "culture",
+  "label": "Vitráž (tagy v2)",
+  "block": "gothic stained glass window style, bold black lead lines, luminous saturated colour panels, flat shapes, backlit glow, geometric tracery",
+  "booru": "stained glass, mosaic art, black outline, colorful, flat color, backlighting, glowing, geometric pattern"
+ },
+ {
+  "id": "artdeco@v1",
+  "kind": "culture",
+  "label": "Art Deco plakát (dnes)",
+  "block": "art deco poster style, streamlined geometric forms, strong symmetry, metallic gold and black, flat colour blocks, elegant stylized figure",
+  "booru": "art deco, 1920s (style), retro artstyle, poster (medium), geometric, symmetry, gold, black and gold, flat color, streamlined"
+ },
+ {
+  "id": "artdeco@v2",
+  "kind": "culture",
+  "label": "Art Deco plakát (tagy v2)",
+  "block": "art deco poster style, streamlined geometric forms, strong symmetry, metallic gold and black, flat colour blocks, elegant stylized figure",
+  "booru": "art deco, retro artstyle, poster (medium), geometric pattern, symmetry, gold, black theme, flat color"
+ },
+ {
+  "id": "constructivist@v1",
+  "kind": "culture",
+  "label": "Konstruktivistický plakát (dnes)",
+  "block": "russian constructivist poster style, bold diagonal composition, red black and cream, geometric shapes, photomontage feel, heavy sans-serif blocks",
+  "booru": "constructivism, soviet poster, poster (medium), diagonal composition, red theme, black and white, geometric shapes, photomontage, limited palette, retro artstyle"
+ },
+ {
+  "id": "constructivist@v2",
+  "kind": "culture",
+  "label": "Konstruktivistický plakát (tagy v2)",
+  "block": "russian constructivist poster style, bold diagonal composition, red black and cream, geometric shapes, photomontage feel, heavy sans-serif blocks",
+  "booru": "poster (medium), dutch angle, red theme, spot color, geometric pattern, collage, limited palette, retro artstyle"
+ },
+ {
+  "id": "secession@v1",
+  "kind": "culture",
+  "label": "Vídeňská secese (dnes)",
+  "block": "vienna secession style, flat gilded ornament, geometric mosaic patterns, elongated figure, decorative square motifs, gold and muted green",
+  "booru": "vienna secession, art nouveau, gold, gilded, mosaic, geometric pattern, square pattern, ornate, flat color, green and gold, elongated"
+ },
+ {
+  "id": "secession@v2",
+  "kind": "culture",
+  "label": "Vídeňská secese (tagy v2)",
+  "block": "vienna secession style, flat gilded ornament, geometric mosaic patterns, elongated figure, decorative square motifs, gold and muted green",
+  "booru": "art nouveau, gold, gold trim, mosaic art, geometric pattern, ornate, flat color, green theme"
+ },
+ {
+  "id": "rinpa@v1",
+  "kind": "culture",
+  "label": "Rinpa zlatý paraván (dnes)",
+  "block": "japanese rinpa screen style, gold leaf background, bold flat silhouettes, stylized waves and grasses, mineral pigments, decorative asymmetry",
+  "booru": "rinpa, folding screen, japanese art, gold background, gold leaf, flat color, silhouette, stylized waves, grass, asymmetry, traditional media"
+ },
+ {
+  "id": "rinpa@v2",
+  "kind": "culture",
+  "label": "Rinpa zlatý paraván (tagy v2)",
+  "block": "japanese rinpa screen style, gold leaf background, bold flat silhouettes, stylized waves and grasses, mineral pigments, decorative asymmetry",
+  "booru": "nihonga, folding screen, ukiyo-e, gold background, flat color, silhouette, grass, asymmetry, traditional media"
+ },
+ {
+  "id": "papercut@v1",
+  "kind": "culture",
+  "label": "Vystřihovánka (dnes)",
+  "block": "traditional paper cut style, single flat colour silhouette, intricate symmetrical cutouts, sharp negative space, decorative floral lattice",
+  "booru": "paper cutout, papercraft, silhouette, single color, limited palette, symmetry, negative space, floral pattern, lattice, flat color"
+ },
+ {
+  "id": "papercut@v2",
+  "kind": "culture",
+  "label": "Vystřihovánka (tagy v2)",
+  "block": "traditional paper cut style, single flat colour silhouette, intricate symmetrical cutouts, sharp negative space, decorative floral lattice",
+  "booru": "paper cutout, silhouette, monochrome, limited palette, symmetry, negative space, floral print, lattice, flat color"
+ },
+ {
+  "id": "huichol@v1",
+  "kind": "culture",
+  "label": "Huichol příze (dnes)",
+  "block": "huichol yarn painting style, dense parallel yarn lines, vivid contrasting colours, symbolic peyote and deer motifs, flat filled forms",
+  "booru": "yarn art, yarn, string art, parallel lines, vibrant colors, high contrast, psychedelic, symbols, flat color, mexican folk art"
+ },
+ {
+  "id": "huichol@v2",
+  "kind": "culture",
+  "label": "Huichol příze (tagy v2)",
+  "block": "huichol yarn painting style, dense parallel yarn lines, vivid contrasting colours, symbolic peyote and deer motifs, flat filled forms",
+  "booru": "yarn, hatching (texture), colorful, high contrast, psychedelic, flat color"
+ },
+ {
+  "id": "davinci@v1",
+  "kind": "artist",
+  "label": "Da Vinci — sfumato portrét (dnes)",
+  "block": "portrait painting by Leonardo da Vinci, sfumato, soft smoky shadows without hard edges, enigmatic half smile, muted olive umber and dark green palette, hazy distant landscape, high renaissance oil on poplar",
+  "booru": "oil painting (medium), traditional media, renaissance, sfumato, soft shading, muted colors, brown theme, dark green background, faint smile, realistic, fine art parody",
+  "artist": "Leonardo da Vinci",
+  "period": "sfumato, c. 1490–1510"
+ },
+ {
+  "id": "davinci@v2",
+  "kind": "artist",
+  "label": "Da Vinci — sfumato portrét (tagy v2)",
+  "block": "portrait painting by Leonardo da Vinci, sfumato, soft smoky shadows without hard edges, enigmatic half smile, muted olive umber and dark green palette, hazy distant landscape, high renaissance oil on poplar",
+  "booru": "oil painting (medium), traditional media, renaissance, soft focus, no lineart, muted colors, brown theme, green background, light smile, realistic, fine art parody",
+  "artist": "Leonardo da Vinci",
+  "period": "sfumato, c. 1490–1510"
+ },
+ {
+  "id": "davinci-chalk@v1",
+  "kind": "artist",
+  "label": "Da Vinci — červená křída (studie) (dnes)",
+  "block": "red chalk figure study by Leonardo da Vinci, sanguine on toned paper, fine parallel hatching, anatomical precision, unfinished sketch edges, faint mirror handwriting notes in the margin",
+  "booru": "sketch, traditional media, red chalk, sanguine, monochrome, hatching, anatomy study, unfinished, paper texture, renaissance, sepia theme",
+  "artist": "Leonardo da Vinci",
+  "period": "studie křídou a stříbrnou tužkou"
+ },
+ {
+  "id": "davinci-chalk@v2",
+  "kind": "artist",
+  "label": "Da Vinci — červená křída (studie) (tagy v2)",
+  "block": "red chalk figure study by Leonardo da Vinci, sanguine on toned paper, fine parallel hatching, anatomical precision, unfinished sketch edges, faint mirror handwriting notes in the margin",
+  "booru": "sketch, traditional media, red theme, monochrome, hatching, anatomy study, unfinished, paper texture, renaissance, sepia",
+  "artist": "Leonardo da Vinci",
+  "period": "studie křídou a stříbrnou tužkou"
+ },
+ {
+  "id": "picasso-blue@v1",
+  "kind": "artist",
+  "label": "Picasso — modré období (dnes)",
+  "block": "blue period painting by Pablo Picasso, monochrome cold blue and blue-green palette, gaunt melancholic figure, elongated hands, hunched posture, flat sombre background, thin dry paint",
+  "booru": "oil painting (medium), traditional media, blue theme, monochrome, melancholy, thin, hunched, elongated hands, flat background, post-impressionism, fine art parody",
+  "artist": "Pablo Picasso",
+  "period": "modré období 1901–1904"
+ },
+ {
+  "id": "picasso-blue@v2",
+  "kind": "artist",
+  "label": "Picasso — modré období (tagy v2)",
+  "block": "blue period painting by Pablo Picasso, monochrome cold blue and blue-green palette, gaunt melancholic figure, elongated hands, hunched posture, flat sombre background, thin dry paint",
+  "booru": "oil painting (medium), traditional media, blue theme, monochrome, sad, skinny, slouching, long fingers, simple background, impressionism, fine art parody",
+  "artist": "Pablo Picasso",
+  "period": "modré období 1901–1904"
+ },
+ {
+  "id": "picasso-rose@v1",
+  "kind": "artist",
+  "label": "Picasso — růžové období (harlekýni) (dnes)",
+  "block": "rose period painting by Pablo Picasso, warm pink ochre and terracotta palette, harlequin diamond costume, circus saltimbanque figure, quiet dignity, flat dusty background, delicate thin paint",
+  "booru": "oil painting (medium), traditional media, pink theme, orange theme, harlequin, checkered clothes, circus, muted colors, flat background, melancholy, fine art parody",
+  "artist": "Pablo Picasso",
+  "period": "růžové období 1904–1906"
+ },
+ {
+  "id": "picasso-rose@v2",
+  "kind": "artist",
+  "label": "Picasso — růžové období (harlekýni) (tagy v2)",
+  "block": "rose period painting by Pablo Picasso, warm pink ochre and terracotta palette, harlequin diamond costume, circus saltimbanque figure, quiet dignity, flat dusty background, delicate thin paint",
+  "booru": "oil painting (medium), traditional media, pink theme, orange theme, harlequin, checkered clothes, circus, muted colors, simple background, sad, fine art parody",
+  "artist": "Pablo Picasso",
+  "period": "růžové období 1904–1906"
+ },
+ {
+  "id": "picasso-cubist@v1",
+  "kind": "artist",
+  "label": "Picasso — kubistický portrét (Dora Maar) (dnes)",
+  "block": "cubist portrait by Pablo Picasso, face shown in profile and frontal view at once, both eyes on one side, fractured angular planes, thick black outlines, bold flat red yellow green and purple, patterned wallpaper",
+  "booru": "cubism, abstract face, asymmetrical eyes, angular, thick outlines, flat color, multicolored, geometric, oil painting (medium), traditional media, patterned background, fine art parody",
+  "artist": "Pablo Picasso",
+  "period": "figurální kubismus 1937–1940"
+ },
+ {
+  "id": "picasso-cubist@v2",
+  "kind": "artist",
+  "label": "Picasso — kubistický portrét (Dora Maar) (tagy v2)",
+  "block": "cubist portrait by Pablo Picasso, face shown in profile and frontal view at once, both eyes on one side, fractured angular planes, thick black outlines, bold flat red yellow green and purple, patterned wallpaper",
+  "booru": "cubism, abstract, asymmetrical eyes, thick outlines, flat color, colorful, geometric pattern, oil painting (medium), traditional media, patterned background, fine art parody",
+  "artist": "Pablo Picasso",
+  "period": "figurální kubismus 1937–1940"
+ },
+ {
+  "id": "basquiat@v1",
+  "kind": "artist",
+  "label": "Basquiat (dnes)",
+  "block": "neo-expressionist painting by Jean-Michel Basquiat, raw scrawled figure with skull-like head, three-pointed crown, exposed anatomy lines, graffiti text fragments and crossed-out words, oil stick and acrylic on rough canvas, chaotic bright colours",
+  "booru": "graffiti, scribble, crown, skull, rough sketch, acrylic paint (medium), traditional media, text, crayon (medium), messy, colorful, thick outlines, flat color, naive art",
+  "artist": "Jean-Michel Basquiat",
+  "period": "1981–1983"
+ },
+ {
+  "id": "basquiat@v2",
+  "kind": "artist",
+  "label": "Basquiat (tagy v2)",
+  "block": "neo-expressionist painting by Jean-Michel Basquiat, raw scrawled figure with skull-like head, three-pointed crown, exposed anatomy lines, graffiti text fragments and crossed-out words, oil stick and acrylic on rough canvas, chaotic bright colours",
+  "booru": "graffiti, scribble, crown, skull, sketch, acrylic paint (medium), traditional media, crayon (medium), messy, colorful, thick outlines, flat color",
+  "artist": "Jean-Michel Basquiat",
+  "period": "1981–1983"
+ },
+ {
+  "id": "hockney-pool@v1",
+  "kind": "artist",
+  "label": "Hockney — bazén, ploché akryly (dnes)",
+  "block": "1960s Los Angeles acrylic painting by David Hockney, flat clean colour fields, turquoise swimming pool with stylised ripples, modernist house and palm trees, crisp shadows, bright even sunlight, deadpan cool stillness",
+  "booru": "acrylic paint (medium), traditional media, flat color, pool, blue theme, palm tree, minimalism, clean lines, sunlight, mid-century, pop art, sharp shadows",
+  "artist": "David Hockney",
+  "period": "Los Angeles 1964–1972"
+ },
+ {
+  "id": "hockney-pool@v2",
+  "kind": "artist",
+  "label": "Hockney — bazén, ploché akryly (tagy v2)",
+  "block": "1960s Los Angeles acrylic painting by David Hockney, flat clean colour fields, turquoise swimming pool with stylised ripples, modernist house and palm trees, crisp shadows, bright even sunlight, deadpan cool stillness",
+  "booru": "acrylic paint (medium), traditional media, flat color, pool, blue theme, palm tree, minimalism, sunlight, 1960s (style), pop art, shadow",
+  "artist": "David Hockney",
+  "period": "Los Angeles 1964–1972"
+ },
+ {
+  "id": "monet@v1",
+  "kind": "artist",
+  "label": "Monet — figura v plenéru (dnes)",
+  "block": "plein air painting by Claude Monet, figure with parasol in a windswept meadow, dappled sunlight and moving clouds, loose feathery brushstrokes, lavender and green shadows, bright airy sky, form dissolving in light",
+  "booru": "impressionism, oil painting (medium), traditional media, parasol, meadow, wind, dappled sunlight, painterly, loose brushwork, pastel colors, sky, cloud",
+  "artist": "Claude Monet",
+  "period": "figury v plenéru, 1870s"
+ },
+ {
+  "id": "monet@v2",
+  "kind": "artist",
+  "label": "Monet — figura v plenéru (tagy v2)",
+  "block": "plein air painting by Claude Monet, figure with parasol in a windswept meadow, dappled sunlight and moving clouds, loose feathery brushstrokes, lavender and green shadows, bright airy sky, form dissolving in light",
+  "booru": "impressionism, oil painting (medium), traditional media, parasol, meadow, wind, dappled sunlight, painterly, pastel colors, sky, cloud",
+  "artist": "Claude Monet",
+  "period": "figury v plenéru, 1870s"
+ },
+ {
+  "id": "kahlo@v1",
+  "kind": "artist",
+  "label": "Frida Kahlo (dnes)",
+  "block": "self-portrait painting by Frida Kahlo, frontal gaze, joined eyebrows, flowers braided into hair, embroidered Tehuana dress, lush tropical leaves and a small monkey, flat naive Mexican folk retablo style, saturated colours",
+  "booru": "traditional media, oil painting (medium), naive art, thick eyebrows, flower in hair, mexican, embroidery, monkey, leaf background, looking at viewer, flat shading, vivid colors, folk art",
+  "artist": "Frida Kahlo",
+  "period": "autoportréty 1930–1950"
+ },
+ {
+  "id": "kahlo@v2",
+  "kind": "artist",
+  "label": "Frida Kahlo (tagy v2)",
+  "block": "self-portrait painting by Frida Kahlo, frontal gaze, joined eyebrows, flowers braided into hair, embroidered Tehuana dress, lush tropical leaves and a small monkey, flat naive Mexican folk retablo style, saturated colours",
+  "booru": "traditional media, oil painting (medium), thick eyebrows, hair flower, mexico, embroidery, monkey, leaf background, looking at viewer, flat color, colorful",
+  "artist": "Frida Kahlo",
+  "period": "autoportréty 1930–1950"
+ },
+ {
+  "id": "goya-black@v1",
+  "kind": "artist",
+  "label": "Goya — černé malby (dnes)",
+  "block": "black painting by Francisco Goya, murky black brown and ochre palette, grotesque haunted figure emerging from darkness, wild frantic brushstrokes, gaping mouth and staring eyes, nightmare mural on plaster",
+  "booru": "oil painting (medium), traditional media, dark, black background, brown theme, horror, grotesque, wide-eyed, open mouth, painterly, rough brushwork, nightmare, romanticism",
+  "artist": "Francisco Goya",
+  "period": "černé malby 1819–1823"
+ },
+ {
+  "id": "goya-black@v2",
+  "kind": "artist",
+  "label": "Goya — černé malby (tagy v2)",
+  "block": "black painting by Francisco Goya, murky black brown and ochre palette, grotesque haunted figure emerging from darkness, wild frantic brushstrokes, gaping mouth and staring eyes, nightmare mural on plaster",
+  "booru": "oil painting (medium), traditional media, dark, black background, brown theme, horror (theme), wide-eyed, open mouth, painterly, nightmare",
+  "artist": "Francisco Goya",
+  "period": "černé malby 1819–1823"
+ },
+ {
+  "id": "goya-caprichos@v1",
+  "kind": "artist",
+  "label": "Goya — Caprichos (lept, akvatinta) (dnes)",
+  "block": "etching and aquatint by Francisco Goya from Los Caprichos, monochrome sepia print, grainy aquatint shadows, satirical grotesque figure, owls and bats in the gloom, hand-written caption below",
+  "booru": "etching, monochrome, sepia, traditional media, satire, grotesque, owl, bat, dark, grainy, caption, ink (medium), print",
+  "artist": "Francisco Goya",
+  "period": "Caprichos, lepty 1797–1799"
+ },
+ {
+  "id": "goya-caprichos@v2",
+  "kind": "artist",
+  "label": "Goya — Caprichos (lept, akvatinta) (tagy v2)",
+  "block": "etching and aquatint by Francisco Goya from Los Caprichos, monochrome sepia print, grainy aquatint shadows, satirical grotesque figure, owls and bats in the gloom, hand-written caption below",
+  "booru": "hatching (texture), monochrome, sepia, traditional media, satire, horror (theme), owl, bat (animal), dark, film grain, caption, ink (medium)",
+  "artist": "Francisco Goya",
+  "period": "Caprichos, lepty 1797–1799"
+ },
+ {
+  "id": "kandinsky-early@v1",
+  "kind": "artist",
+  "label": "Kandinskij — raná pohádková tempera (dnes)",
+  "block": "early tempera painting by Wassily Kandinsky before abstraction, fairy-tale folk scene, rider in old Russian costume, jewel-like dabs of colour on dark ground, glowing pointillist dots, medieval towers, night blue with gold and crimson",
+  "booru": "tempera (medium), traditional media, fairy tale, russian clothes, horseback riding, dark background, pointillism, glowing, jewel tones, night, castle, folk art, colorful",
+  "artist": "Vasilij Kandinskij",
+  "period": "pohádkové tempery 1903–1909 (před abstrakcí)"
+ },
+ {
+  "id": "kandinsky-early@v2",
+  "kind": "artist",
+  "label": "Kandinskij — raná pohádková tempera (tagy v2)",
+  "block": "early tempera painting by Wassily Kandinsky before abstraction, fairy-tale folk scene, rider in old Russian costume, jewel-like dabs of colour on dark ground, glowing pointillist dots, medieval towers, night blue with gold and crimson",
+  "booru": "painting (medium), traditional media, russian clothes, horseback riding, dark background, pointillism, glowing, night, castle, colorful",
+  "artist": "Vasilij Kandinskij",
+  "period": "pohádkové tempery 1903–1909 (před abstrakcí)"
+ },
+ {
+  "id": "vangogh-arles@v1",
+  "kind": "artist",
+  "label": "Van Gogh — Arles, impasto portrét (dnes)",
+  "block": "portrait painting by Vincent van Gogh in Arles, thick impasto brushstrokes, vivid complementary colours, yellow and blue, green shadows on the face, flat patterned background, directional hatched strokes following the form, visible paint ridges",
+  "booru": "oil painting (medium), traditional media, impasto, post-impressionism, thick brushstrokes, yellow theme, blue theme, complementary colors, painterly, textured, flat background, visible brushstrokes",
+  "artist": "Vincent van Gogh",
+  "period": "Arles 1888–1889 (portréty)"
+ },
+ {
+  "id": "vangogh-arles@v2",
+  "kind": "artist",
+  "label": "Van Gogh — Arles, impasto portrét (tagy v2)",
+  "block": "portrait painting by Vincent van Gogh in Arles, thick impasto brushstrokes, vivid complementary colours, yellow and blue, green shadows on the face, flat patterned background, directional hatched strokes following the form, visible paint ridges",
+  "booru": "oil painting (medium), traditional media, impasto, impressionism, yellow theme, blue theme, complementary colors, painterly, canvas texture, simple background",
+  "artist": "Vincent van Gogh",
+  "period": "Arles 1888–1889 (portréty)"
+ },
+ {
+  "id": "vangogh-saintremy@v1",
+  "kind": "artist",
+  "label": "Van Gogh — Saint-Rémy, vířivé tahy (dnes)",
+  "block": "late painting by Vincent van Gogh in Saint-Rémy, swirling turbulent brushstrokes, spiralling sky and cypress, rhythmic curling lines around the figure, deep blue and glowing yellow, restless energy, thick oil",
+  "booru": "oil painting (medium), traditional media, impasto, swirl, spiral, night sky, cypress, blue theme, yellow theme, post-impressionism, painterly, dynamic brushstrokes",
+  "artist": "Vincent van Gogh",
+  "period": "Saint-Rémy 1889–1890 (víry)"
+ },
+ {
+  "id": "vangogh-saintremy@v2",
+  "kind": "artist",
+  "label": "Van Gogh — Saint-Rémy, vířivé tahy (tagy v2)",
+  "block": "late painting by Vincent van Gogh in Saint-Rémy, swirling turbulent brushstrokes, spiralling sky and cypress, rhythmic curling lines around the figure, deep blue and glowing yellow, restless energy, thick oil",
+  "booru": "oil painting (medium), traditional media, impasto, swirl, spiral, starry sky, blue theme, yellow theme, impressionism, painterly",
+  "artist": "Vincent van Gogh",
+  "period": "Saint-Rémy 1889–1890 (víry)"
+ },
+ {
+  "id": "lautrec-poster@v1",
+  "kind": "artist",
+  "label": "Toulouse-Lautrec — plakát (litografie) (dnes)",
+  "block": "lithograph poster by Henri de Toulouse-Lautrec, flat bold colour areas, sinuous black silhouette contours, Moulin Rouge dancer, spattered crachis texture, cropped Japanese composition, bold hand-lettered title, ochre red and black",
+  "booru": "poster, lithograph, flat color, thick outlines, silhouette, dancer, can-can, cabaret, art nouveau, limited palette, red, black, text, cropped, ukiyo-e influence",
+  "artist": "Henri de Toulouse-Lautrec",
+  "period": "litografické plakáty 1891–1896"
+ },
+ {
+  "id": "lautrec-poster@v2",
+  "kind": "artist",
+  "label": "Toulouse-Lautrec — plakát (litografie) (tagy v2)",
+  "block": "lithograph poster by Henri de Toulouse-Lautrec, flat bold colour areas, sinuous black silhouette contours, Moulin Rouge dancer, spattered crachis texture, cropped Japanese composition, bold hand-lettered title, ochre red and black",
+  "booru": "poster (medium), flat color, thick outlines, silhouette, dancer, art nouveau, limited palette, red theme, black theme, cropped, ukiyo-e",
+  "artist": "Henri de Toulouse-Lautrec",
+  "period": "litografické plakáty 1891–1896"
+ },
+ {
+  "id": "lautrec-cabaret@v1",
+  "kind": "artist",
+  "label": "Toulouse-Lautrec — kabaret na kartonu (dnes)",
+  "block": "cabaret painting by Henri de Toulouse-Lautrec, thinned oil on raw cardboard, streaky diagonal strokes, sickly green gaslight on the face, red lips and orange hair, Montmartre bar interior, unfinished sketchy edges, brown cardboard showing through",
+  "booru": "oil painting (medium), traditional media, sketchy, cardboard, streaky, green skin, gaslight, bar, cabaret, post-impressionism, unfinished, brown theme, loose brushwork",
+  "artist": "Henri de Toulouse-Lautrec",
+  "period": "kabaretní malby 1888–1895"
+ },
+ {
+  "id": "lautrec-cabaret@v2",
+  "kind": "artist",
+  "label": "Toulouse-Lautrec — kabaret na kartonu (tagy v2)",
+  "block": "cabaret painting by Henri de Toulouse-Lautrec, thinned oil on raw cardboard, streaky diagonal strokes, sickly green gaslight on the face, red lips and orange hair, Montmartre bar interior, unfinished sketchy edges, brown cardboard showing through",
+  "booru": "oil painting (medium), traditional media, sketch, cardboard, green skin, bar (place), impressionism, unfinished, brown theme, painterly",
+  "artist": "Henri de Toulouse-Lautrec",
+  "period": "kabaretní malby 1888–1895"
+ },
+ {
+  "id": "mucha-slav-epic@v1",
+  "kind": "artist",
+  "label": "Mucha — Slovanská epopej (dnes)",
+  "block": "monumental egg tempera painting by Alphonse Mucha from the Slav Epic, pale luminous blue and white tones, crowd of Slavic figures in linen folk dress, glowing symbolic figure hovering above, misty historical vision, soft muted fresco-like surface",
+  "booru": "tempera (medium), traditional media, pale colors, blue theme, white theme, crowd, folk costume, linen, glowing, floating, mist, historical, symbolism, epic, soft shading",
+  "artist": "Alfons Mucha",
+  "period": "Slovanská epopej 1910–1928"
+ },
+ {
+  "id": "mucha-slav-epic@v2",
+  "kind": "artist",
+  "label": "Mucha — Slovanská epopej (tagy v2)",
+  "block": "monumental egg tempera painting by Alphonse Mucha from the Slav Epic, pale luminous blue and white tones, crowd of Slavic figures in linen folk dress, glowing symbolic figure hovering above, misty historical vision, soft muted fresco-like surface",
+  "booru": "painting (medium), traditional media, pale colors, blue theme, white theme, crowd, traditional clothes, glowing, floating, fog, symbolism, no lineart",
+  "artist": "Alfons Mucha",
+  "period": "Slovanská epopej 1910–1928"
+ },
+ {
+  "id": "kubista@v1",
+  "kind": "artist",
+  "label": "Kubišta — kuboexpresionismus (dnes)",
+  "block": "Czech cubo-expressionist painting by Bohumil Kubista, figure built from sharp crystalline facets, cold blue green and ochre planes, dramatic raking light and deep shadow, tense angular composition, intense staring face, dense heavy oil",
+  "booru": "cubism, expressionism, oil painting (medium), traditional media, angular, geometric, faceted, blue theme, green theme, ochre, dramatic lighting, sharp shadows, intense, staring",
+  "artist": "Bohumil Kubišta",
+  "period": "kuboexpresionismus 1910–1912"
+ },
+ {
+  "id": "kubista@v2",
+  "kind": "artist",
+  "label": "Kubišta — kuboexpresionismus (tagy v2)",
+  "block": "Czech cubo-expressionist painting by Bohumil Kubista, figure built from sharp crystalline facets, cold blue green and ochre planes, dramatic raking light and deep shadow, tense angular composition, intense staring face, dense heavy oil",
+  "booru": "cubism, painterly, oil painting (medium), traditional media, geometric pattern, blue theme, green theme, orange theme, chiaroscuro, shadow, staring",
+  "artist": "Bohumil Kubišta",
+  "period": "kuboexpresionismus 1910–1912"
+ },
+ {
+  "id": "schiele@v1",
+  "kind": "artist",
+  "label": "Schiele (dnes)",
+  "block": "figure drawing by Egon Schiele, nervous jagged contour line, contorted angular pose, bony elongated hands, gouache and watercolour patches of orange red and sickly green on bare paper, empty white background, raw expressionist intensity",
+  "booru": "expressionism, watercolor (medium), traditional media, sketch, jagged lines, contorted, bony, long fingers, thin, white background, orange, green skin, angular, nude, unfinished",
+  "artist": "Egon Schiele",
+  "period": "1910–1918"
+ },
+ {
+  "id": "schiele@v2",
+  "kind": "artist",
+  "label": "Schiele (tagy v2)",
+  "block": "figure drawing by Egon Schiele, nervous jagged contour line, contorted angular pose, bony elongated hands, gouache and watercolour patches of orange red and sickly green on bare paper, empty white background, raw expressionist intensity",
+  "booru": "painterly, watercolor (medium), traditional media, sketch, skinny, long fingers, white background, orange theme, green skin, nude, unfinished",
+  "artist": "Egon Schiele",
+  "period": "1910–1918"
+ },
+ {
+  "id": "klimt-golden@v1",
+  "kind": "artist",
+  "label": "Klimt — zlaté období (dnes)",
+  "block": "golden period painting by Gustav Klimt, figure wrapped in a flat gold leaf robe of spirals and rectangles, realistic softly painted face and hands, mosaic ornament, byzantine gold background, embrace, jewel colours",
+  "booru": "art nouveau, gold, gold leaf, mosaic, spiral pattern, ornate, flat pattern, realistic face, jewel tones, hug, traditional media, oil painting (medium), decorative",
+  "artist": "Gustav Klimt",
+  "period": "zlaté období 1901–1909"
+ },
+ {
+  "id": "klimt-golden@v2",
+  "kind": "artist",
+  "label": "Klimt — zlaté období (tagy v2)",
+  "block": "golden period painting by Gustav Klimt, figure wrapped in a flat gold leaf robe of spirals and rectangles, realistic softly painted face and hands, mosaic ornament, byzantine gold background, embrace, jewel colours",
+  "booru": "art nouveau, gold, gold background, mosaic art, spiral, ornate, patterned background, realistic, colorful, hug, traditional media, oil painting (medium)",
+  "artist": "Gustav Klimt",
+  "period": "zlaté období 1901–1909"
+ },
+ {
+  "id": "vermeer@v1",
+  "kind": "artist",
+  "label": "Vermeer (dnes)",
+  "block": "painting by Johannes Vermeer, soft daylight from a window on the left, pearl earring and turban, ultramarine and lemon yellow, quiet domestic interior, pointillé highlights, calm serene stillness, smooth Dutch golden age oil",
+  "booru": "oil painting (medium), traditional media, baroque, window light, soft lighting, pearl earring, turban, blue theme, yellow theme, indoors, calm, realistic, smooth shading",
+  "artist": "Johannes Vermeer",
+  "period": "Delft 1660s"
+ },
+ {
+  "id": "vermeer@v2",
+  "kind": "artist",
+  "label": "Vermeer (tagy v2)",
+  "block": "painting by Johannes Vermeer, soft daylight from a window on the left, pearl earring and turban, ultramarine and lemon yellow, quiet domestic interior, pointillé highlights, calm serene stillness, smooth Dutch golden age oil",
+  "booru": "oil painting (medium), traditional media, chiaroscuro, window light, soft focus, earrings, turban, blue theme, yellow theme, indoors, realistic, no lineart",
+  "artist": "Johannes Vermeer",
+  "period": "Delft 1660s"
+ },
+ {
+  "id": "botticelli@v1",
+  "kind": "artist",
+  "label": "Botticelli (dnes)",
+  "block": "early renaissance tempera painting by Sandro Botticelli, graceful linear contours, long flowing golden hair, pale porcelain skin, transparent fluttering drapery, flowers and orange grove, gentle wistful expression, delicate pastel palette",
+  "booru": "tempera (medium), traditional media, renaissance, long hair, wavy hair, blonde hair, pale skin, see-through, flowing dress, flower, orange tree, pastel colors, elegant, lineart, soft shading",
+  "artist": "Sandro Botticelli",
+  "period": "1480s (Zrození Venuše, Primavera)"
+ },
+ {
+  "id": "botticelli@v2",
+  "kind": "artist",
+  "label": "Botticelli (tagy v2)",
+  "block": "early renaissance tempera painting by Sandro Botticelli, graceful linear contours, long flowing golden hair, pale porcelain skin, transparent fluttering drapery, flowers and orange grove, gentle wistful expression, delicate pastel palette",
+  "booru": "painting (medium), traditional media, renaissance, long hair, wavy hair, blonde hair, pale skin, see-through clothes, flower, orange tree, pastel colors, lineart",
+  "artist": "Sandro Botticelli",
+  "period": "1480s (Zrození Venuše, Primavera)"
+ },
+ {
+  "id": "elgreco@v1",
+  "kind": "artist",
+  "label": "El Greco (dnes)",
+  "block": "mannerist painting by El Greco, dramatically elongated flame-like figure, upturned ecstatic eyes, cold flickering light, stormy grey sky, acid green crimson and silver, restless swirling drapery, spiritual intensity",
+  "booru": "oil painting (medium), traditional media, mannerism, elongated, thin, looking up, dramatic lighting, stormy sky, grey theme, green, red, flowing robe, dynamic, religious",
+  "artist": "El Greco",
+  "period": "Toledo 1580–1614"
+ },
+ {
+  "id": "elgreco@v2",
+  "kind": "artist",
+  "label": "El Greco (tagy v2)",
+  "block": "mannerist painting by El Greco, dramatically elongated flame-like figure, upturned ecstatic eyes, cold flickering light, stormy grey sky, acid green crimson and silver, restless swirling drapery, spiritual intensity",
+  "booru": "oil painting (medium), traditional media, skinny, looking up, chiaroscuro, cloudy sky, grey theme, green theme, red theme",
+  "artist": "El Greco",
+  "period": "Toledo 1580–1614"
+ },
+ {
+  "id": "munch@v1",
+  "kind": "artist",
+  "label": "Munch (dnes)",
+  "block": "expressionist painting by Edvard Munch, anxious figure, wavy undulating brushstrokes flowing through sky and ground, blood orange sky over dark blue fjord, hollow skull-like face, thinly scrubbed paint, existential dread",
+  "booru": "expressionism, oil painting (medium), traditional media, wavy lines, orange sky, blue theme, fjord, skull-like face, scared, thin paint, painterly, dramatic",
+  "artist": "Edvard Munch",
+  "period": "1892–1900 (Výkřik, Madona)"
+ },
+ {
+  "id": "munch@v2",
+  "kind": "artist",
+  "label": "Munch (tagy v2)",
+  "block": "expressionist painting by Edvard Munch, anxious figure, wavy undulating brushstrokes flowing through sky and ground, blood orange sky over dark blue fjord, hollow skull-like face, thinly scrubbed paint, existential dread",
+  "booru": "oil painting (medium), traditional media, swirl, orange sky, blue theme, scared, painterly",
+  "artist": "Edvard Munch",
+  "period": "1892–1900 (Výkřik, Madona)"
+ },
+ {
+  "id": "matisse-fauve@v1",
+  "kind": "artist",
+  "label": "Matisse — fauvismus (dnes)",
+  "block": "fauvist painting by Henri Matisse, wild unmixed colour, green stripe down the face, red and turquoise flat planes, loose broad brushstrokes, decorative patterned interior, joyful bold simplicity",
+  "booru": "fauvism, oil painting (medium), traditional media, vivid colors, green skin, red theme, flat color, bold brushstrokes, patterned background, simplified, colorful, painterly",
+  "artist": "Henri Matisse",
+  "period": "fauvismus 1905–1910"
+ },
+ {
+  "id": "matisse-fauve@v2",
+  "kind": "artist",
+  "label": "Matisse — fauvismus (tagy v2)",
+  "block": "fauvist painting by Henri Matisse, wild unmixed colour, green stripe down the face, red and turquoise flat planes, loose broad brushstrokes, decorative patterned interior, joyful bold simplicity",
+  "booru": "oil painting (medium), traditional media, green skin, red theme, flat color, patterned background, minimalism, colorful, painterly",
+  "artist": "Henri Matisse",
+  "period": "fauvismus 1905–1910"
+ },
+ {
+  "id": "matisse-cutout@v1",
+  "kind": "artist",
+  "label": "Matisse — výstřižky (Modrý akt) (dnes)",
+  "block": "paper cut-out by Henri Matisse, figure as a single flat cobalt blue silhouette cut from gouache-painted paper, simplified curving limbs, white background, scissors-cut edges, leaf and star shapes, jazz-like playfulness",
+  "booru": "paper cutout, flat color, silhouette, blue theme, white background, simplified, minimalism, curves, leaf, star, collage, abstract, playful",
+  "artist": "Henri Matisse",
+  "period": "papírové výstřižky 1943–1954"
+ },
+ {
+  "id": "matisse-cutout@v2",
+  "kind": "artist",
+  "label": "Matisse — výstřižky (Modrý akt) (tagy v2)",
+  "block": "paper cut-out by Henri Matisse, figure as a single flat cobalt blue silhouette cut from gouache-painted paper, simplified curving limbs, white background, scissors-cut edges, leaf and star shapes, jazz-like playfulness",
+  "booru": "paper cutout, flat color, silhouette, blue theme, white background, minimalism, leaf, star (symbol), collage, abstract",
+  "artist": "Henri Matisse",
+  "period": "papírové výstřižky 1943–1954"
+ },
+ {
+  "id": "gauguin@v1",
+  "kind": "artist",
+  "label": "Gauguin — Tahiti (dnes)",
+  "block": "Tahitian painting by Paul Gauguin, flat cloisonné colour areas with dark outlines, saturated warm ochre pink and violet, tropical foliage, calm monumental figure, matte chalky surface, symbolist stillness",
+  "booru": "post-impressionism, oil painting (medium), traditional media, flat color, thick outlines, warm colors, pink, purple, tropical, dark skin, calm, matte, symbolism",
+  "artist": "Paul Gauguin",
+  "period": "Tahiti 1891–1903"
+ },
+ {
+  "id": "gauguin@v2",
+  "kind": "artist",
+  "label": "Gauguin — Tahiti (tagy v2)",
+  "block": "Tahitian painting by Paul Gauguin, flat cloisonné colour areas with dark outlines, saturated warm ochre pink and violet, tropical foliage, calm monumental figure, matte chalky surface, symbolist stillness",
+  "booru": "impressionism, oil painting (medium), traditional media, flat color, thick outlines, warm colors, pink theme, purple theme, tropical, dark skin, symbolism",
+  "artist": "Paul Gauguin",
+  "period": "Tahiti 1891–1903"
+ },
+ {
+  "id": "cezanne@v1",
+  "kind": "artist",
+  "label": "Cézanne (dnes)",
+  "block": "painting by Paul Cezanne, figure built from patches of parallel constructive brushstrokes, blue-green ochre and grey-violet palette, solid geometric volumes, slightly tilted perspective, calm weighty stillness",
+  "booru": "post-impressionism, oil painting (medium), traditional media, hatching, patchy, blue theme, green theme, geometric, sculptural, muted colors, still, painterly",
+  "artist": "Paul Cézanne",
+  "period": "1890s (Hráči karet, Koupající se)"
+ },
+ {
+  "id": "cezanne@v2",
+  "kind": "artist",
+  "label": "Cézanne (tagy v2)",
+  "block": "painting by Paul Cezanne, figure built from patches of parallel constructive brushstrokes, blue-green ochre and grey-violet palette, solid geometric volumes, slightly tilted perspective, calm weighty stillness",
+  "booru": "impressionism, oil painting (medium), traditional media, hatching, blue theme, green theme, geometric pattern, muted colors, painterly",
+  "artist": "Paul Cézanne",
+  "period": "1890s (Hráči karet, Koupající se)"
+ },
+ {
+  "id": "seurat@v1",
+  "kind": "artist",
+  "label": "Seurat — pointilismus (dnes)",
+  "block": "pointillist painting by Georges Seurat, entire image built from tiny dots of pure colour, stiff formal figures in profile, sunny riverside park, optical mixing, calm frozen geometry, soft shimmering surface",
+  "booru": "pointillism, oil painting (medium), traditional media, dots, stippling, profile, park, riverside, sunny, stiff, formal, shimmering, pastel colors",
+  "artist": "Georges Seurat",
+  "period": "pointilismus 1884–1891"
+ },
+ {
+  "id": "seurat@v2",
+  "kind": "artist",
+  "label": "Seurat — pointilismus (tagy v2)",
+  "block": "pointillist painting by Georges Seurat, entire image built from tiny dots of pure colour, stiff formal figures in profile, sunny riverside park, optical mixing, calm frozen geometry, soft shimmering surface",
+  "booru": "pointillism, oil painting (medium), traditional media, stippling (texture), profile, park, river, sunlight, pastel colors",
+  "artist": "Georges Seurat",
+  "period": "pointilismus 1884–1891"
+ },
+ {
+  "id": "hopper@v1",
+  "kind": "artist",
+  "label": "Hopper (dnes)",
+  "block": "painting by Edward Hopper, solitary figure in a quiet room or diner, hard raking morning sunlight, long geometric shadows, muted greens and ochres, large window, american realism, melancholy urban stillness",
+  "booru": "oil painting (medium), traditional media, realism, solo, indoors, window, sunlight, sharp shadows, muted colors, green theme, lonely, diner, quiet, americana",
+  "artist": "Edward Hopper",
+  "period": "1927–1960"
+ },
+ {
+  "id": "hopper@v2",
+  "kind": "artist",
+  "label": "Hopper (tagy v2)",
+  "block": "painting by Edward Hopper, solitary figure in a quiet room or diner, hard raking morning sunlight, long geometric shadows, muted greens and ochres, large window, american realism, melancholy urban stillness",
+  "booru": "oil painting (medium), traditional media, realistic, solo, indoors, window, sunlight, shadow, muted colors, green theme, lonely, diner",
+  "artist": "Edward Hopper",
+  "period": "1927–1960"
+ },
+ {
+  "id": "warhol@v1",
+  "kind": "artist",
+  "label": "Warhol — sítotisk (dnes)",
+  "block": "pop art silkscreen portrait by Andy Warhol, high-contrast photo reduced to flat blocks, misregistered neon colour fills, hot pink turquoise and yellow, repeated grid of the same face, halftone grain, flat glossy celebrity icon",
+  "booru": "pop art, silkscreen, high contrast, flat color, neon colors, pink, cyan, yellow, repeated, grid, halftone, misaligned, portrait, poster",
+  "artist": "Andy Warhol",
+  "period": "sítotisky 1962–1967 (Marilyn)"
+ },
+ {
+  "id": "warhol@v2",
+  "kind": "artist",
+  "label": "Warhol — sítotisk (tagy v2)",
+  "block": "pop art silkscreen portrait by Andy Warhol, high-contrast photo reduced to flat blocks, misregistered neon colour fills, hot pink turquoise and yellow, repeated grid of the same face, halftone grain, flat glossy celebrity icon",
+  "booru": "pop art, limited palette, high contrast, flat color, neon palette, pink theme, aqua theme, yellow theme, grid, halftone, chromatic aberration, portrait",
+  "artist": "Andy Warhol",
+  "period": "sítotisky 1962–1967 (Marilyn)"
+ },
+ {
+  "id": "lichtenstein@v1",
+  "kind": "artist",
+  "label": "Lichtenstein — komiksové rastry (dnes)",
+  "block": "pop art painting by Roy Lichtenstein, enlarged comic strip panel, Ben-Day dot shading, thick black outlines, primary red yellow and blue, dramatic close-up face, speech bubble with bold text, flat printed look",
+  "booru": "pop art, comic, halftone, dots, thick outlines, primary colors, red, yellow, blue, flat color, close-up, speech bubble, text, retro, 1960s",
+  "artist": "Roy Lichtenstein",
+  "period": "pop art 1961–1965"
+ },
+ {
+  "id": "lichtenstein@v2",
+  "kind": "artist",
+  "label": "Lichtenstein — komiksové rastry (tagy v2)",
+  "block": "pop art painting by Roy Lichtenstein, enlarged comic strip panel, Ben-Day dot shading, thick black outlines, primary red yellow and blue, dramatic close-up face, speech bubble with bold text, flat printed look",
+  "booru": "pop art, comic, halftone, thick outlines, colorful, red theme, yellow theme, blue theme, flat color, close-up, speech bubble, retro artstyle",
+  "artist": "Roy Lichtenstein",
+  "period": "pop art 1961–1965"
+ },
+ {
+  "id": "haring@v1",
+  "kind": "artist",
+  "label": "Haring (dnes)",
+  "block": "painting by Keith Haring, figure as a thick black outline pictogram, radiant motion lines around the body, flat bright red yellow and blue, dancing pose, dense playful pattern, subway chalk graffiti energy",
+  "booru": "thick outlines, flat color, pictogram, simplified, motion lines, red, yellow, blue, dancing, pattern, graffiti, pop art, no face, bold",
+  "artist": "Keith Haring",
+  "period": "1982–1989"
+ },
+ {
+  "id": "haring@v2",
+  "kind": "artist",
+  "label": "Haring (tagy v2)",
+  "block": "painting by Keith Haring, figure as a thick black outline pictogram, radiant motion lines around the body, flat bright red yellow and blue, dancing pose, dense playful pattern, subway chalk graffiti energy",
+  "booru": "thick outlines, flat color, minimalism, motion lines, red theme, yellow theme, blue theme, dancing, patterned background, graffiti, pop art, faceless",
+  "artist": "Keith Haring",
+  "period": "1982–1989"
+ },
+ {
+  "id": "bacon@v1",
+  "kind": "artist",
+  "label": "Francis Bacon (dnes)",
+  "block": "painting by Francis Bacon, smeared distorted figure with blurred twisting face, seated inside a thin drawn cage of lines, flat orange or violet ground, raw fleshy pinks, isolated on a bare stage, visceral unease",
+  "booru": "expressionism, oil painting (medium), traditional media, distorted, blurry face, smeared, twisted, sitting, cage, lines, orange background, flat background, flesh, disturbing",
+  "artist": "Francis Bacon",
+  "period": "1949–1975"
+ },
+ {
+  "id": "bacon@v2",
+  "kind": "artist",
+  "label": "Francis Bacon (tagy v2)",
+  "block": "painting by Francis Bacon, smeared distorted figure with blurred twisting face, seated inside a thin drawn cage of lines, flat orange or violet ground, raw fleshy pinks, isolated on a bare stage, visceral unease",
+  "booru": "painterly, oil painting (medium), traditional media, distortion, blurry, motion blur, sitting, cage, orange background, simple background, flesh, horror (theme)",
+  "artist": "Francis Bacon",
+  "period": "1949–1975"
+ },
+ {
+  "id": "rivera@v1",
+  "kind": "artist",
+  "label": "Rivera — mexický murál (dnes)",
+  "block": "mural fresco by Diego Rivera, monumental rounded figure with simplified solid volumes, Mexican worker or calla lily seller, earthy terracotta ochre and green, flat matte surface, social realism, crowded composition",
+  "booru": "fresco, mural, traditional media, mexican, rounded, sculptural, simplified, calla lily, worker, earth tones, orange, green, flat shading, social realism, crowd",
+  "artist": "Diego Rivera",
+  "period": "mexické murály 1923–1935"
+ },
+ {
+  "id": "rivera@v2",
+  "kind": "artist",
+  "label": "Rivera — mexický murál (tagy v2)",
+  "block": "mural fresco by Diego Rivera, monumental rounded figure with simplified solid volumes, Mexican worker or calla lily seller, earthy terracotta ochre and green, flat matte surface, social realism, crowded composition",
+  "booru": "painting (medium), mural, traditional media, mexico, minimalism, calla lily, brown theme, orange theme, green theme, flat color, crowd",
+  "artist": "Diego Rivera",
+  "period": "mexické murály 1923–1935"
+ },
+ {
+  "id": "chagall@v1",
+  "kind": "artist",
+  "label": "Chagall (dnes)",
+  "block": "dreamlike painting by Marc Chagall, floating lovers drifting over a village, upside-down cow and fiddler, glowing cobalt blue and crimson, soft translucent layers, folk fairy tale, weightless joy",
+  "booru": "surreal, oil painting (medium), traditional media, floating, flying, couple, village, cow, violin, blue theme, red, translucent, dreamy, folk art, whimsical",
+  "artist": "Marc Chagall",
+  "period": "1911–1950"
+ },
+ {
+  "id": "chagall@v2",
+  "kind": "artist",
+  "label": "Chagall (tagy v2)",
+  "block": "dreamlike painting by Marc Chagall, floating lovers drifting over a village, upside-down cow and fiddler, glowing cobalt blue and crimson, soft translucent layers, folk fairy tale, weightless joy",
+  "booru": "surreal, oil painting (medium), traditional media, floating, flying, couple, village, cow, violin, blue theme, red theme, translucent",
+  "artist": "Marc Chagall",
+  "period": "1911–1950"
+ },
+ {
+  "id": "dali@v1",
+  "kind": "artist",
+  "label": "Dalí — surrealismus (dnes)",
+  "block": "surrealist painting by Salvador Dali, figure in a vast empty desert plain under a clear sky, melting soft forms propped on crutches, long shadows, ants and drawers, hyper-smooth academic rendering, uncanny dream logic",
+  "booru": "surreal, oil painting (medium), traditional media, desert, melting, crutch, long shadows, drawer, ant, clear sky, realistic, smooth shading, dream, empty background",
+  "artist": "Salvador Dalí",
+  "period": "surrealismus 1931–1945"
+ },
+ {
+  "id": "dali@v2",
+  "kind": "artist",
+  "label": "Dalí — surrealismus (tagy v2)",
+  "block": "surrealist painting by Salvador Dali, figure in a vast empty desert plain under a clear sky, melting soft forms propped on crutches, long shadows, ants and drawers, hyper-smooth academic rendering, uncanny dream logic",
+  "booru": "surreal, oil painting (medium), traditional media, desert, melting, crutch, long shadow, drawer, ant, clear sky, realistic, no lineart",
+  "artist": "Salvador Dalí",
+  "period": "surrealismus 1931–1945"
+ },
+ {
+  "id": "magritte@v1",
+  "kind": "artist",
+  "label": "Magritte (dnes)",
+  "block": "surrealist painting by Rene Magritte, bowler hat and dark overcoat, face hidden behind a floating green apple, cloudy blue daytime sky, flat deadpan illustrative rendering, uncanny calm, clean smooth paint",
+  "booru": "surreal, oil painting (medium), traditional media, bowler hat, black coat, apple, covered face, blue sky, cloud, flat shading, clean, calm, deadpan",
+  "artist": "René Magritte",
+  "period": "1926–1966"
+ },
+ {
+  "id": "magritte@v2",
+  "kind": "artist",
+  "label": "Magritte (tagy v2)",
+  "block": "surrealist painting by Rene Magritte, bowler hat and dark overcoat, face hidden behind a floating green apple, cloudy blue daytime sky, flat deadpan illustrative rendering, uncanny calm, clean smooth paint",
+  "booru": "surreal, oil painting (medium), traditional media, bowler hat, black coat, apple, covered face, blue sky, cloud, flat color, clean, deadpan",
+  "artist": "René Magritte",
+  "period": "1926–1966"
+ },
+ {
+  "id": "lempicka@v1",
+  "kind": "artist",
+  "label": "Lempicka — art deco portrét (dnes)",
+  "block": "art deco portrait by Tamara de Lempicka, glossy metallic sculpted figure, streamlined drapery in silver green and scarlet, sharp geometric shading, skyscraper backdrop, cool glamorous stare, polished tubular volumes",
+  "booru": "art deco, oil painting (medium), traditional media, metallic, glossy, streamlined, sculptural, geometric shading, green, red, skyscraper, glamorous, smooth shading, 1920s",
+  "artist": "Tamara de Lempicka",
+  "period": "art deco portréty 1925–1935"
+ },
+ {
+  "id": "lempicka@v2",
+  "kind": "artist",
+  "label": "Lempicka — art deco portrét (tagy v2)",
+  "block": "art deco portrait by Tamara de Lempicka, glossy metallic sculpted figure, streamlined drapery in silver green and scarlet, sharp geometric shading, skyscraper backdrop, cool glamorous stare, polished tubular volumes",
+  "booru": "art deco, oil painting (medium), traditional media, shiny, shiny skin, green theme, red theme, skyscraper, no lineart, retro artstyle",
+  "artist": "Tamara de Lempicka",
+  "period": "art deco portréty 1925–1935"
+ },
+ {
+  "id": "beardsley@v1",
+  "kind": "artist",
+  "label": "Beardsley — perokresba (dnes)",
+  "block": "pen and ink illustration by Aubrey Beardsley, stark black and white, large flat black areas against blank white, single sinuous ink line, peacock and rose ornament, decadent elegant figure, japanese asymmetry",
+  "booru": "ink (medium), lineart, monochrome, black and white, high contrast, flat black, thin lines, art nouveau, peacock, rose, elegant, decorative, asymmetrical",
+  "artist": "Aubrey Beardsley",
+  "period": "perokresby 1893–1898"
+ },
+ {
+  "id": "beardsley@v2",
+  "kind": "artist",
+  "label": "Beardsley — perokresba (tagy v2)",
+  "block": "pen and ink illustration by Aubrey Beardsley, stark black and white, large flat black areas against blank white, single sinuous ink line, peacock and rose ornament, decadent elegant figure, japanese asymmetry",
+  "booru": "ink (medium), lineart, monochrome, greyscale, high contrast, black theme, art nouveau, peacock, rose, ornate, asymmetry",
+  "artist": "Aubrey Beardsley",
+  "period": "perokresby 1893–1898"
+ },
+ {
+  "id": "lada@v1",
+  "kind": "artist",
+  "label": "Lada — česká lidová ilustrace (dnes)",
+  "block": "Czech folk illustration by Josef Lada, round-faced jolly figure with rosy cheeks, thick black outlines, flat cheerful colours, snowy village with pointed roofs, naive childlike proportions, gentle humour, gouache",
+  "booru": "illustration, naive art, thick outlines, flat color, round face, blush, chubby, village, snow, cottage, cheerful, childlike, gouache (medium), folk art",
+  "artist": "Josef Lada",
+  "period": "lidová ilustrace 1920–1957"
+ },
+ {
+  "id": "lada@v2",
+  "kind": "artist",
+  "label": "Lada — česká lidová ilustrace (tagy v2)",
+  "block": "Czech folk illustration by Josef Lada, round-faced jolly figure with rosy cheeks, thick black outlines, flat cheerful colours, snowy village with pointed roofs, naive childlike proportions, gentle humour, gouache",
+  "booru": "thick outlines, flat color, blush, plump, village, snow, cottage, gouache (medium)",
+  "artist": "Josef Lada",
+  "period": "lidová ilustrace 1920–1957"
+ },
+ {
+  "id": "josef-capek@v1",
+  "kind": "artist",
+  "label": "Josef Čapek — naivní kubismus (dnes)",
+  "block": "Czech painting by Josef Capek, blocky simplified figure like a wooden toy, rough thick outlines, chunky flat planes of brick red ochre and grey-blue, childlike naive geometry, coarse matte texture, tender humour",
+  "booru": "naive art, cubism, oil painting (medium), traditional media, blocky, simplified, thick outlines, flat color, red, ochre, grey-blue, wooden, rough, matte, childlike",
+  "artist": "Josef Čapek",
+  "period": "naivní kubismus 1913–1938"
+ },
+ {
+  "id": "josef-capek@v2",
+  "kind": "artist",
+  "label": "Josef Čapek — naivní kubismus (tagy v2)",
+  "block": "Czech painting by Josef Capek, blocky simplified figure like a wooden toy, rough thick outlines, chunky flat planes of brick red ochre and grey-blue, childlike naive geometry, coarse matte texture, tender humour",
+  "booru": "cubism, oil painting (medium), traditional media, geometric pattern, minimalism, thick outlines, flat color, red theme, orange theme, grey theme, painterly",
+  "artist": "Josef Čapek",
+  "period": "naivní kubismus 1913–1938"
+ }
+]

@@ -1,0 +1,261 @@
+# Nativní umělci — danbooru tagy umělců, které model zná z tréninku.
+# Zdroj: build/lab/noobai-artists-v3 (2026-09-21), 978 jmen. Tam měl každý
+# umělec jinou pózu, oblečení i účes, takže se buňky nedaly srovnat; tady je
+# námět pevný a mění se jen tag umělce.
+#
+# Jen rodina `danbooru` — soubor je pro tagové modely. S modelem z jiné rodiny
+# (Juggernaut, FLUX) lab běh zastaví, a to je správně: tag umělce jim nic neříká.
+# Syntaxe `artist:jméno` je ta, kterou čte NoobAI; `baseline` je námět bez tagu.
+# Výběr: každý 8. položka celého seznamu (abecedně), ne podle kvality.
+#
+#   lab run --prompts-yaml tools/lab/candidates/native-artists-sample.yaml \
+#           --models noobai-xl,illustrious-xl,wai-illustrious --flows txt2img --no-styles --latent 832x1216
+
+baseline:
+  danbooru: '1girl, solo, full body, standing, looking at viewer, dress, outdoors'
+'23_(real_xxiii)':
+  danbooru: '1girl, solo, artist:23_\(real_xxiii\), full body, standing, looking at viewer, dress, outdoors'
+'a_re':
+  danbooru: '1girl, solo, artist:a_re, full body, standing, looking at viewer, dress, outdoors'
+'agahari':
+  danbooru: '1girl, solo, artist:agahari, full body, standing, looking at viewer, dress, outdoors'
+'akasaai':
+  danbooru: '1girl, solo, artist:akasaai, full body, standing, looking at viewer, dress, outdoors'
+'aldehyde':
+  danbooru: '1girl, solo, artist:aldehyde, full body, standing, looking at viewer, dress, outdoors'
+'anbe_yoshirou':
+  danbooru: '1girl, solo, artist:anbe_yoshirou, full body, standing, looking at viewer, dress, outdoors'
+'aoshima':
+  danbooru: '1girl, solo, artist:aoshima, full body, standing, looking at viewer, dress, outdoors'
+'asanagi_shion':
+  danbooru: '1girl, solo, artist:asanagi_shion, full body, standing, looking at viewer, dress, outdoors'
+'avogado6':
+  danbooru: '1girl, solo, artist:avogado6, full body, standing, looking at viewer, dress, outdoors'
+'azusa_(hws)':
+  danbooru: '1girl, solo, artist:azusa_\(hws\), full body, standing, looking at viewer, dress, outdoors'
+'bee_(deadflow)':
+  danbooru: '1girl, solo, artist:bee_\(deadflow\), full body, standing, looking at viewer, dress, outdoors'
+'binsen':
+  danbooru: '1girl, solo, artist:binsen, full body, standing, looking at viewer, dress, outdoors'
+'bunbun':
+  danbooru: '1girl, solo, artist:bunbun, full body, standing, looking at viewer, dress, outdoors'
+'cato_(monocatienus)':
+  danbooru: '1girl, solo, artist:cato_\(monocatienus\), full body, standing, looking at viewer, dress, outdoors'
+'chihuri':
+  danbooru: '1girl, solo, artist:chihuri, full body, standing, looking at viewer, dress, outdoors'
+'colonel_aki':
+  danbooru: '1girl, solo, artist:colonel_aki, full body, standing, looking at viewer, dress, outdoors'
+'crow_(siranui)':
+  danbooru: '1girl, solo, artist:crow_\(siranui\), full body, standing, looking at viewer, dress, outdoors'
+'dandon_fuga':
+  danbooru: '1girl, solo, artist:dandon_fuga, full body, standing, looking at viewer, dress, outdoors'
+'deco_(geigeki_honey)':
+  danbooru: '1girl, solo, artist:deco_\(geigeki_honey\), full body, standing, looking at viewer, dress, outdoors'
+'diva_(hyxpk)':
+  danbooru: '1girl, solo, artist:diva_\(hyxpk\), full body, standing, looking at viewer, dress, outdoors'
+'ebinku':
+  danbooru: '1girl, solo, artist:ebinku, full body, standing, looking at viewer, dress, outdoors'
+'em_(totsuzen_no_hakike)':
+  danbooru: '1girl, solo, artist:em_\(totsuzen_no_hakike\), full body, standing, looking at viewer, dress, outdoors'
+'eu03':
+  danbooru: '1girl, solo, artist:eu03, full body, standing, looking at viewer, dress, outdoors'
+'fu-ta':
+  danbooru: '1girl, solo, artist:fu-ta, full body, standing, looking at viewer, dress, outdoors'
+'funamusea_(artist)':
+  danbooru: '1girl, solo, artist:funamusea_\(artist\), full body, standing, looking at viewer, dress, outdoors'
+'fuzichoco':
+  danbooru: '1girl, solo, artist:fuzichoco, full body, standing, looking at viewer, dress, outdoors'
+'gibagiba':
+  danbooru: '1girl, solo, artist:gibagiba, full body, standing, looking at viewer, dress, outdoors'
+'gogiga_gagagigo':
+  danbooru: '1girl, solo, artist:gogiga_gagagigo, full body, standing, looking at viewer, dress, outdoors'
+'greenteaneko':
+  danbooru: '1girl, solo, artist:greenteaneko, full body, standing, looking at viewer, dress, outdoors'
+'hairu':
+  danbooru: '1girl, solo, artist:hairu, full body, standing, looking at viewer, dress, outdoors'
+'haniwa_(leaf_garden)':
+  danbooru: '1girl, solo, artist:haniwa_\(leaf_garden\), full body, standing, looking at viewer, dress, outdoors'
+'haru_(konomi_150)':
+  danbooru: '1girl, solo, artist:haru_\(konomi_150\), full body, standing, looking at viewer, dress, outdoors'
+'heripantomorrow':
+  danbooru: '1girl, solo, artist:heripantomorrow, full body, standing, looking at viewer, dress, outdoors'
+'himura_kiseki':
+  danbooru: '1girl, solo, artist:himura_kiseki, full body, standing, looking at viewer, dress, outdoors'
+'hisona_(suaritesumi)':
+  danbooru: '1girl, solo, artist:hisona_\(suaritesumi\), full body, standing, looking at viewer, dress, outdoors'
+'hood_(james_x)':
+  danbooru: '1girl, solo, artist:hood_\(james_x\), full body, standing, looking at viewer, dress, outdoors'
+'hu_dako':
+  danbooru: '1girl, solo, artist:hu_dako, full body, standing, looking at viewer, dress, outdoors'
+'ichikawa_feesu':
+  danbooru: '1girl, solo, artist:ichikawa_feesu, full body, standing, looking at viewer, dress, outdoors'
+'ikeuchi_tanuma':
+  danbooru: '1girl, solo, artist:ikeuchi_tanuma, full body, standing, looking at viewer, dress, outdoors'
+'ini_(inunabe00)':
+  danbooru: '1girl, solo, artist:ini_\(inunabe00\), full body, standing, looking at viewer, dress, outdoors'
+'ixy':
+  danbooru: '1girl, solo, artist:ixy, full body, standing, looking at viewer, dress, outdoors'
+'jeneral':
+  danbooru: '1girl, solo, artist:jeneral, full body, standing, looking at viewer, dress, outdoors'
+'juurouta':
+  danbooru: '1girl, solo, artist:juurouta, full body, standing, looking at viewer, dress, outdoors'
+'kahasina_(moment_silicon)':
+  danbooru: '1girl, solo, artist:kahasina_\(moment_silicon\), full body, standing, looking at viewer, dress, outdoors'
+'kamezaemon':
+  danbooru: '1girl, solo, artist:kamezaemon, full body, standing, looking at viewer, dress, outdoors'
+'kamukamu_(ars)':
+  danbooru: '1girl, solo, artist:kamukamu_\(ars\), full body, standing, looking at viewer, dress, outdoors'
+'kanon_(kurogane_knights)':
+  danbooru: '1girl, solo, artist:kanon_\(kurogane_knights\), full body, standing, looking at viewer, dress, outdoors'
+'karutamo':
+  danbooru: '1girl, solo, artist:karutamo, full body, standing, looking at viewer, dress, outdoors'
+'katou_shinobu':
+  danbooru: '1girl, solo, artist:katou_shinobu, full body, standing, looking at viewer, dress, outdoors'
+'kelvin_hiu':
+  danbooru: '1girl, solo, artist:kelvin_hiu, full body, standing, looking at viewer, dress, outdoors'
+'kinkymation':
+  danbooru: '1girl, solo, artist:kinkymation, full body, standing, looking at viewer, dress, outdoors'
+'kitahara_tomoe_(kitahara_koubou)':
+  danbooru: '1girl, solo, artist:kitahara_tomoe_\(kitahara_koubou\), full body, standing, looking at viewer, dress, outdoors'
+'komori_kuzuyu':
+  danbooru: '1girl, solo, artist:komori_kuzuyu, full body, standing, looking at viewer, dress, outdoors'
+'kotatsu_(g-rough)':
+  danbooru: '1girl, solo, artist:kotatsu_\(g-rough\), full body, standing, looking at viewer, dress, outdoors'
+'kouji_(campus_life)':
+  danbooru: '1girl, solo, artist:kouji_\(campus_life\), full body, standing, looking at viewer, dress, outdoors'
+'kujou_karasuma':
+  danbooru: '1girl, solo, artist:kujou_karasuma, full body, standing, looking at viewer, dress, outdoors'
+'kurokoshou_(emuburemu123)':
+  danbooru: '1girl, solo, artist:kurokoshou_\(emuburemu123\), full body, standing, looking at viewer, dress, outdoors'
+'lee_(dragon_garou)':
+  danbooru: '1girl, solo, artist:lee_\(dragon_garou\), full body, standing, looking at viewer, dress, outdoors'
+'m-da_s-tarou':
+  danbooru: '1girl, solo, artist:m-da_s-tarou, full body, standing, looking at viewer, dress, outdoors'
+'masami_chie':
+  danbooru: '1girl, solo, artist:masami_chie, full body, standing, looking at viewer, dress, outdoors'
+'matsumoto_tomoyohi':
+  danbooru: '1girl, solo, artist:matsumoto_tomoyohi, full body, standing, looking at viewer, dress, outdoors'
+'mayo_riyo':
+  danbooru: '1girl, solo, artist:mayo_riyo, full body, standing, looking at viewer, dress, outdoors'
+'merryweather':
+  danbooru: '1girl, solo, artist:merryweather, full body, standing, looking at viewer, dress, outdoors'
+'miclot':
+  danbooru: '1girl, solo, artist:miclot, full body, standing, looking at viewer, dress, outdoors'
+'mikozin':
+  danbooru: '1girl, solo, artist:mikozin, full body, standing, looking at viewer, dress, outdoors'
+'minew':
+  danbooru: '1girl, solo, artist:minew, full body, standing, looking at viewer, dress, outdoors'
+'misumi_(macaroni)':
+  danbooru: '1girl, solo, artist:misumi_\(macaroni\), full body, standing, looking at viewer, dress, outdoors'
+'miya_(miyaruta)':
+  danbooru: '1girl, solo, artist:miya_\(miyaruta\), full body, standing, looking at viewer, dress, outdoors'
+'mizumoto_tadashi':
+  danbooru: '1girl, solo, artist:mizumoto_tadashi, full body, standing, looking at viewer, dress, outdoors'
+'moke_ro':
+  danbooru: '1girl, solo, artist:moke_ro, full body, standing, looking at viewer, dress, outdoors'
+'monori_rogue':
+  danbooru: '1girl, solo, artist:monori_rogue, full body, standing, looking at viewer, dress, outdoors'
+'mozukuzu_(manukedori)':
+  danbooru: '1girl, solo, artist:mozukuzu_\(manukedori\), full body, standing, looking at viewer, dress, outdoors'
+'mutsuki_(moonknives)':
+  danbooru: '1girl, solo, artist:mutsuki_\(moonknives\), full body, standing, looking at viewer, dress, outdoors'
+'nakajima_yuka':
+  danbooru: '1girl, solo, artist:nakajima_yuka, full body, standing, looking at viewer, dress, outdoors'
+'nanase_nao':
+  danbooru: '1girl, solo, artist:nanase_nao, full body, standing, looking at viewer, dress, outdoors'
+'natsuya_(kuttuki)':
+  danbooru: '1girl, solo, artist:natsuya_\(kuttuki\), full body, standing, looking at viewer, dress, outdoors'
+'neon-tetora':
+  danbooru: '1girl, solo, artist:neon-tetora, full body, standing, looking at viewer, dress, outdoors'
+'nironiro':
+  danbooru: '1girl, solo, artist:nironiro, full body, standing, looking at viewer, dress, outdoors'
+'niwatazumi':
+  danbooru: '1girl, solo, artist:niwatazumi, full body, standing, looking at viewer, dress, outdoors'
+'nori_tamago':
+  danbooru: '1girl, solo, artist:nori_tamago, full body, standing, looking at viewer, dress, outdoors'
+'nullma':
+  danbooru: '1girl, solo, artist:nullma, full body, standing, looking at viewer, dress, outdoors'
+'ojipon':
+  danbooru: '1girl, solo, artist:ojipon, full body, standing, looking at viewer, dress, outdoors'
+'ootomo_takuji':
+  danbooru: '1girl, solo, artist:ootomo_takuji, full body, standing, looking at viewer, dress, outdoors'
+'oso_(toolate)':
+  danbooru: '1girl, solo, artist:oso_\(toolate\), full body, standing, looking at viewer, dress, outdoors'
+'peach88':
+  danbooru: '1girl, solo, artist:peach88, full body, standing, looking at viewer, dress, outdoors'
+'piyodera_mucha':
+  danbooru: '1girl, solo, artist:piyodera_mucha, full body, standing, looking at viewer, dress, outdoors'
+'poronegi':
+  danbooru: '1girl, solo, artist:poronegi, full body, standing, looking at viewer, dress, outdoors'
+'radishkek':
+  danbooru: '1girl, solo, artist:radishkek, full body, standing, looking at viewer, dress, outdoors'
+'re_ghotion':
+  danbooru: '1girl, solo, artist:re_ghotion, full body, standing, looking at viewer, dress, outdoors'
+'riichu':
+  danbooru: '1girl, solo, artist:riichu, full body, standing, looking at viewer, dress, outdoors'
+'riyo_(lyomsnpmp)':
+  danbooru: '1girl, solo, artist:riyo_\(lyomsnpmp\), full body, standing, looking at viewer, dress, outdoors'
+'ru_zhai':
+  danbooru: '1girl, solo, artist:ru_zhai, full body, standing, looking at viewer, dress, outdoors'
+'saitou_masatsugu':
+  danbooru: '1girl, solo, artist:saitou_masatsugu, full body, standing, looking at viewer, dress, outdoors'
+'sakimori_dan':
+  danbooru: '1girl, solo, artist:sakimori_dan, full body, standing, looking at viewer, dress, outdoors'
+'sasanon_(sasapoliton)':
+  danbooru: '1girl, solo, artist:sasanon_\(sasapoliton\), full body, standing, looking at viewer, dress, outdoors'
+'scottie_(phantom2)':
+  danbooru: '1girl, solo, artist:scottie_\(phantom2\), full body, standing, looking at viewer, dress, outdoors'
+'seo_tatsuya':
+  danbooru: '1girl, solo, artist:seo_tatsuya, full body, standing, looking at viewer, dress, outdoors'
+'shikushiku_(amamori_weekly)':
+  danbooru: '1girl, solo, artist:shikushiku_\(amamori_weekly\), full body, standing, looking at viewer, dress, outdoors'
+'shirokuma_a':
+  danbooru: '1girl, solo, artist:shirokuma_a, full body, standing, looking at viewer, dress, outdoors'
+'shnva':
+  danbooru: '1girl, solo, artist:shnva, full body, standing, looking at viewer, dress, outdoors'
+'somebody_(leiking00)':
+  danbooru: '1girl, solo, artist:somebody_\(leiking00\), full body, standing, looking at viewer, dress, outdoors'
+'stanley_lau':
+  danbooru: '1girl, solo, artist:stanley_lau, full body, standing, looking at viewer, dress, outdoors'
+'suo_bu_ye_feng':
+  danbooru: '1girl, solo, artist:suo_bu_ye_feng, full body, standing, looking at viewer, dress, outdoors'
+'swordsouls':
+  danbooru: '1girl, solo, artist:swordsouls, full body, standing, looking at viewer, dress, outdoors'
+'takaman_(gaffe)':
+  danbooru: '1girl, solo, artist:takaman_\(gaffe\), full body, standing, looking at viewer, dress, outdoors'
+'takepoison':
+  danbooru: '1girl, solo, artist:takepoison, full body, standing, looking at viewer, dress, outdoors'
+'tanaka_ryou':
+  danbooru: '1girl, solo, artist:tanaka_ryou, full body, standing, looking at viewer, dress, outdoors'
+'teshima_nari':
+  danbooru: '1girl, solo, artist:teshima_nari, full body, standing, looking at viewer, dress, outdoors'
+'tomose_shunsaku':
+  danbooru: '1girl, solo, artist:tomose_shunsaku, full body, standing, looking at viewer, dress, outdoors'
+'tori_(minamopa)':
+  danbooru: '1girl, solo, artist:tori_\(minamopa\), full body, standing, looking at viewer, dress, outdoors'
+'tsukiyo_(skymint)':
+  danbooru: '1girl, solo, artist:tsukiyo_\(skymint\), full body, standing, looking at viewer, dress, outdoors'
+'twrlare':
+  danbooru: '1girl, solo, artist:twrlare, full body, standing, looking at viewer, dress, outdoors'
+'umishima_senbon':
+  danbooru: '1girl, solo, artist:umishima_senbon, full body, standing, looking at viewer, dress, outdoors'
+'vilde_loh_hocen':
+  danbooru: '1girl, solo, artist:vilde_loh_hocen, full body, standing, looking at viewer, dress, outdoors'
+'watanabe_akio':
+  danbooru: '1girl, solo, artist:watanabe_akio, full body, standing, looking at viewer, dress, outdoors'
+'xinzoruo':
+  danbooru: '1girl, solo, artist:xinzoruo, full body, standing, looking at viewer, dress, outdoors'
+'yanagi_(nurikoboshi)':
+  danbooru: '1girl, solo, artist:yanagi_\(nurikoboshi\), full body, standing, looking at viewer, dress, outdoors'
+'yd_(orange_maru)':
+  danbooru: '1girl, solo, artist:yd_\(orange_maru\), full body, standing, looking at viewer, dress, outdoors'
+'yopparai_oni':
+  danbooru: '1girl, solo, artist:yopparai_oni, full body, standing, looking at viewer, dress, outdoors'
+'yuichirou':
+  danbooru: '1girl, solo, artist:yuichirou, full body, standing, looking at viewer, dress, outdoors'
+'yukito_(dreamrider)':
+  danbooru: '1girl, solo, artist:yukito_\(dreamrider\), full body, standing, looking at viewer, dress, outdoors'
+'yuureidoushi_(yuurei6214)':
+  danbooru: '1girl, solo, artist:yuureidoushi_\(yuurei6214\), full body, standing, looking at viewer, dress, outdoors'
+'zounose':
+  danbooru: '1girl, solo, artist:zounose, full body, standing, looking at viewer, dress, outdoors'

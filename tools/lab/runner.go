@@ -8,8 +8,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -264,56 +266,199 @@ func (r *Run) Generate() {
 	sort.SliceStable(cells, func(i, j int) bool { return cells[i].Model < cells[j].Model })
 
 	r.update(func(s *RunState) { s.Status = "running"; s.Message = "" })
-	authFails := 0
+	// LAB_PARALLEL keeps that many prompts in ComfyUI's queue. One at a time, the
+	// 3 s history poll leaves the GPU idle between cells; on a GPU of our own
+	// that is a third of its time. The default stays 1: on a shared box the
+	// queue is not ours to fill.
+	workers := labParallel()
+	slots := make(chan struct{}, workers)
+	var wg sync.WaitGroup
+	var authFails, netFails atomic.Int32
+	var aborted atomic.Bool
+	polite := politeFromEnv()
+	lastModel := ""
+loop:
 	for _, c := range cells {
 		select {
 		case <-ctx.Done():
-			r.update(func(s *RunState) { s.Status = "cancelled"; s.Message = "zrušeno" })
-			return
+			break loop
 		default:
+		}
+		if aborted.Load() {
+			break
 		}
 		if _, err := os.Stat(r.imgPath(c.ID)); err == nil {
 			r.update(func(s *RunState) { r.markDone(s, c.ID, 0, false) })
 			continue
 		}
-		start := time.Now()
-		r.update(func(s *RunState) {
-			cs := s.Cells[c.ID]
-			cs.Status = CellRunning
-			s.Cells[c.ID] = cs
-		})
-		err := r.generateCell(ctx, c)
-		if err != nil {
-			var he *HTTPError
-			if asHTTPError(err, &he) && he.IsAuth() {
-				authFails++
-				// Three in a row means the token is wrong, not that one cell is
-				// unlucky — failing 400 cells one by one helps nobody.
-				if authFails >= 3 {
-					_ = r.fail("run", fmt.Errorf("CF Access odmítá požadavky (%v) — zkontroluj .env.local", he))
-					return
-				}
-			} else {
-				authFails = 0
-			}
+		firstOfModel := c.Model != lastModel
+		lastModel = c.Model
+		if !r.Spec.Dry && c.Backend != BackendNim && workers == 1 {
+			polite.wait(ctx, r.env.Comfy)
+		}
+		slots <- struct{}{}
+		wg.Add(1)
+		go func(c ManifestCell) {
+			defer func() { <-slots; wg.Done() }()
+			start := time.Now()
 			r.update(func(s *RunState) {
 				cs := s.Cells[c.ID]
-				cs.Status = CellFailed
-				cs.Error = err.Error()
+				cs.Status = CellRunning
 				s.Cells[c.ID] = cs
-				s.Failed++
 			})
-			continue
-		}
-		authFails = 0
-		secs := time.Since(start).Seconds()
-		r.update(func(s *RunState) { r.markDone(s, c.ID, secs, r.Spec.Dry) })
+			err := r.generateCell(ctx, c)
+			if err != nil {
+				var he *HTTPError
+				if asHTTPError(err, &he) && he.IsAuth() {
+					// Three in a row means the token is wrong, not that one cell
+					// is unlucky — failing 400 cells one by one helps nobody.
+					if authFails.Add(1) >= 3 && aborted.CompareAndSwap(false, true) {
+						_ = r.fail("run", fmt.Errorf("CF Access odmítá požadavky (%v) — zkontroluj .env.local", he))
+					}
+				} else {
+					authFails.Store(0)
+				}
+				// A lost connection is not a verdict on the cell. Without this
+				// a dropped tunnel fails thousands of cells in seconds and the
+				// run reports itself finished.
+				if isConnectionLoss(err) {
+					if netFails.Add(1) >= 8 && aborted.CompareAndSwap(false, true) {
+						_ = r.fail("run", fmt.Errorf("ComfyUI nedostupné (%v) — běh lze navázat", err))
+					}
+				} else {
+					netFails.Store(0)
+				}
+				r.update(func(s *RunState) {
+					cs := s.Cells[c.ID]
+					cs.Status = CellFailed
+					cs.Error = err.Error()
+					s.Cells[c.ID] = cs
+					s.Failed++
+				})
+				return
+			}
+			authFails.Store(0)
+			netFails.Store(0)
+			secs := time.Since(start).Seconds()
+			r.update(func(s *RunState) { r.markDone(s, c.ID, secs, r.Spec.Dry) })
+			// A cell this slow means ComfyUI has fallen back to the CPU, and
+			// carrying on would cook the machine for hours. The first cell of
+			// a model pays for loading the checkpoint and gets a longer limit
+			// — but it gets one, because the fallback happens exactly there.
+			// With several cells queued the time includes the queue, so the
+			// limit only reads true one at a time.
+			limit := polite.maxCell
+			if firstOfModel {
+				limit = polite.maxFirst
+			}
+			if workers == 1 && limit > 0 && !r.Spec.Dry && secs > limit &&
+				aborted.CompareAndSwap(false, true) {
+				_ = r.fail("run", fmt.Errorf(
+					"buňka %s trvala %.0f s (strop %.0f s) — ComfyUI nejspíš počítá na CPU, běh zastaven",
+					c.ID, secs, limit))
+			}
+		}(c)
+	}
+	wg.Wait()
+	if aborted.Load() {
+		return
+	}
+	if ctx.Err() != nil {
+		r.update(func(s *RunState) { s.Status = "cancelled"; s.Message = "zrušeno" })
+		return
 	}
 	r.computeMetrics()
 	r.update(func(s *RunState) {
 		s.Status = "done"
 		s.Message = fmt.Sprintf("hotovo: %d ok, %d chyb", s.Done, s.Failed)
 	})
+}
+
+// fluxToCheckpoint rewrites a split FLUX graph (UNETLoader + DualCLIPLoader +
+// VAELoader) to one all-in-one checkpoint, for a ComfyUI that has only that.
+// LAB_FLUX_CKPT turns it on. The weights differ from the app's, so results from
+// such a run are a shortlist, not a measurement of what the app sends.
+func fluxToCheckpoint(wf map[string]any, ckpt string) {
+	unet, clip, vae := "", "", ""
+	for id, raw := range wf {
+		n, _ := raw.(map[string]any)
+		switch n["class_type"] {
+		case "UNETLoader":
+			unet = id
+		case "DualCLIPLoader":
+			clip = id
+		case "VAELoader":
+			vae = id
+		}
+	}
+	if unet == "" {
+		return
+	}
+	wf[unet] = map[string]any{
+		"class_type": "CheckpointLoaderSimple",
+		"inputs":     map[string]any{"ckpt_name": ckpt},
+	}
+	for _, raw := range wf {
+		n, _ := raw.(map[string]any)
+		inputs, _ := n["inputs"].(map[string]any)
+		for k, v := range inputs {
+			edge, ok := v.([]any)
+			if !ok || len(edge) != 2 {
+				continue
+			}
+			switch edge[0] {
+			case clip:
+				inputs[k] = []any{unet, float64(1)}
+			case vae:
+				inputs[k] = []any{unet, float64(2)}
+			}
+		}
+	}
+	delete(wf, clip)
+	delete(wf, vae)
+}
+
+// schnellGraph renders a gen-queue flux-schnell request on ComfyUI instead, for
+// a host without the NIM. LAB_SCHNELL_CKPT turns it on and names the
+// all-in-one checkpoint. Prompt, size, steps and seed come from the request the
+// app built; the sampler (euler/simple, cfg 1) is ComfyUI's stock Schnell
+// setting, not the NIM's, so such a run is a shortlist, not a measurement.
+func schnellGraph(req map[string]any, ckpt string) map[string]any {
+	num := func(k string, def float64) float64 {
+		if v, ok := req[k].(float64); ok {
+			return v
+		}
+		return def
+	}
+	return map[string]any{
+		"1": map[string]any{"class_type": "CheckpointLoaderSimple", "inputs": map[string]any{"ckpt_name": ckpt}},
+		"2": map[string]any{"class_type": "CLIPTextEncode", "inputs": map[string]any{"text": req["prompt"], "clip": []any{"1", float64(1)}}},
+		"3": map[string]any{"class_type": "CLIPTextEncode", "inputs": map[string]any{"text": "", "clip": []any{"1", float64(1)}}},
+		"4": map[string]any{"class_type": "EmptySD3LatentImage", "inputs": map[string]any{"width": num("width", 1024), "height": num("height", 1024), "batch_size": float64(1)}},
+		"5": map[string]any{"class_type": "KSampler", "inputs": map[string]any{
+			"model": []any{"1", float64(0)}, "positive": []any{"2", float64(0)}, "negative": []any{"3", float64(0)},
+			"latent_image": []any{"4", float64(0)}, "seed": num("seed", 0), "steps": num("steps", 4),
+			"cfg": float64(1), "sampler_name": "euler", "scheduler": "simple", "denoise": float64(1)}},
+		"6": map[string]any{"class_type": "VAEDecode", "inputs": map[string]any{"samples": []any{"5", float64(0)}, "vae": []any{"1", float64(2)}}},
+		"7": map[string]any{"class_type": "SaveImage", "inputs": map[string]any{"images": []any{"6", float64(0)}, "filename_prefix": "lab_schnell"}},
+	}
+}
+
+func isConnectionLoss(err error) bool {
+	msg := err.Error()
+	for _, m := range []string{"connection refused", "connection reset", "EOF", "no route to host", "i/o timeout", "broken pipe"} {
+		if strings.Contains(msg, m) {
+			return true
+		}
+	}
+	return false
+}
+
+func labParallel() int {
+	if n, err := strconv.Atoi(os.Getenv("LAB_PARALLEL")); err == nil && n > 1 {
+		return n
+	}
+	return 1
 }
 
 func (r *Run) markDone(s *RunState, id string, secs float64, placeholder bool) {
@@ -338,7 +483,8 @@ func (r *Run) generateCell(ctx context.Context, c ManifestCell) error {
 		}
 		return writeFile(r.thumbPath(c.ID), Placeholder(213, 320, c.ID))
 	}
-	if c.Backend == BackendNim {
+	schnell := os.Getenv("LAB_SCHNELL_CKPT")
+	if c.Backend == BackendNim && schnell == "" {
 		return r.generateNimCell(ctx, c)
 	}
 	raw, err := os.ReadFile(filepath.Join(r.Dir, "wf", c.ID+".json"))
@@ -346,8 +492,22 @@ func (r *Run) generateCell(ctx context.Context, c ManifestCell) error {
 		return err
 	}
 	var wf map[string]any
-	if err := json.Unmarshal(raw, &wf); err != nil {
+	if c.Backend == BackendNim {
+		var payload struct {
+			Request map[string]any `json:"request"`
+		}
+		if err := json.Unmarshal(raw, &payload); err != nil {
+			return err
+		}
+		if payload.Request == nil {
+			return fmt.Errorf("%s: gen-queue request bez těla", c.ID)
+		}
+		wf = schnellGraph(payload.Request, schnell)
+	} else if err := json.Unmarshal(raw, &wf); err != nil {
 		return err
+	}
+	if ckpt := os.Getenv("LAB_FLUX_CKPT"); ckpt != "" {
+		fluxToCheckpoint(wf, ckpt)
 	}
 	promptID, err := r.env.Comfy.Submit(wf, "lab-"+r.state.ID)
 	if err != nil {
@@ -675,4 +835,118 @@ func (r *Run) exportFailed(err error) {
 		s.Export.Error = err.Error()
 		s.Export.At = time.Now()
 	})
+}
+
+// polite is how a long run behaves on a ComfyUI it shares with people: it
+// never queues behind someone else's job and leaves a gap between its own
+// cells. Read from the environment rather than the spec so that `lab resume`
+// — which replays a stored spec — can be told too.
+//
+//	LAB_SHARED_PAUSE      seconds between cells; also turns on waiting for an
+//	                      empty queue before each one
+//	LAB_MAX_CELL_SECONDS  stop the run when a cell takes longer than this
+//	LAB_MAX_FIRST_CELL_SECONDS  the same for the first cell of a model
+//
+// In this mode a "no face" error also stops the run instead of failing
+// thousands of cells one by one.
+//
+//	LAB_THERMAL_CMD     a shell command printing the machine's temperature
+//	LAB_THERMAL_MAX     at or above this no new cell starts …
+//	LAB_THERMAL_RESUME  … until it is back under this
+//
+// The temperature is read at most once a minute; a command that fails or
+// prints no number never holds the run up.
+type polite struct {
+	pause    time.Duration
+	maxCell  float64
+	maxFirst float64
+
+	thermalCmd                string
+	thermalMax, thermalResume float64
+	thermalAt                 *time.Time
+}
+
+func politeFromEnv() polite {
+	var p polite
+	if v, err := strconv.ParseFloat(os.Getenv("LAB_SHARED_PAUSE"), 64); err == nil && v > 0 {
+		p.pause = time.Duration(v * float64(time.Second))
+	}
+	if v, err := strconv.ParseFloat(os.Getenv("LAB_MAX_CELL_SECONDS"), 64); err == nil && v > 0 {
+		p.maxCell = v
+	}
+	if v, err := strconv.ParseFloat(os.Getenv("LAB_MAX_FIRST_CELL_SECONDS"), 64); err == nil && v > 0 {
+		p.maxFirst = v
+	}
+	p.thermalCmd = os.Getenv("LAB_THERMAL_CMD")
+	p.thermalMax, _ = strconv.ParseFloat(os.Getenv("LAB_THERMAL_MAX"), 64)
+	p.thermalResume, _ = strconv.ParseFloat(os.Getenv("LAB_THERMAL_RESUME"), 64)
+	if p.thermalResume <= 0 || p.thermalResume > p.thermalMax {
+		p.thermalResume = p.thermalMax
+	}
+	p.thermalAt = new(time.Time)
+	return p
+}
+
+// wait holds until nothing is running or pending — the lab submits one cell
+// at a time and waits for it, so anything in the queue here is someone
+// else's — and then for the pause. An unreachable queue does not block: the
+// cell will fail on its own and say why.
+func (p polite) wait(ctx context.Context, c *Comfy) {
+	if p.pause <= 0 {
+		return
+	}
+	sleep := func(d time.Duration) bool {
+		select {
+		case <-ctx.Done():
+			return false
+		case <-time.After(d):
+			return true
+		}
+	}
+	for {
+		q, err := c.Queue()
+		if err != nil || q.Running+q.Pending == 0 {
+			break
+		}
+		if !sleep(5 * time.Second) {
+			return
+		}
+	}
+	p.cool(sleep)
+	sleep(p.pause)
+}
+
+// temperature runs the configured command; ok is false when there is no
+// reading to act on.
+func (p polite) temperature() (float64, bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "/bin/sh", "-c", p.thermalCmd).Output()
+	if err != nil {
+		return 0, false
+	}
+	v, err := strconv.ParseFloat(strings.TrimSpace(string(out)), 64)
+	return v, err == nil
+}
+
+// cool holds the next cell back while the machine is too hot: from the
+// maximum down to the resume temperature, so it does not start again a
+// degree below the line and cross it with the next cell.
+func (p polite) cool(sleep func(time.Duration) bool) {
+	if p.thermalCmd == "" || p.thermalMax <= 0 || time.Since(*p.thermalAt) < time.Minute {
+		return
+	}
+	*p.thermalAt = time.Now()
+	t, ok := p.temperature()
+	if !ok || t < p.thermalMax {
+		return
+	}
+	fmt.Printf("▸ %.1f °C — čekám, až stroj vychladne pod %.0f °C\n", t, p.thermalResume)
+	for ok && t >= p.thermalResume {
+		if !sleep(time.Minute) {
+			return
+		}
+		t, ok = p.temperature()
+	}
+	*p.thermalAt = time.Now()
 }

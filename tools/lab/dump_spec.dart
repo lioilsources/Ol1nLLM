@@ -164,6 +164,8 @@ StylePreset _candidate(int i, Object? raw) {
     throw FormatException('kandidát "$id" nemá block');
   }
   return StylePreset(
+    kind: StyleKind.values.asNameMap()[raw['kind']] ??
+        (raw['artist'] != null ? StyleKind.artist : StyleKind.culture),
     id: id,
     label: (raw['label'] as String?) ?? id,
     block: block,

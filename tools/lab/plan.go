@@ -12,7 +12,7 @@ import (
 // MaxCells is the hard ceiling on one run. A sweep multiplies four axes, and
 // the arithmetic that turns "all models × all styles" into four hours is easy
 // to do by accident — see docs/style-matrix.md, where 600 cells took 3h40m.
-const MaxCells = 400
+const MaxCells = 4000
 
 // ConfirmCells is where the UI stops and asks rather than just starting.
 const ConfirmCells = 120

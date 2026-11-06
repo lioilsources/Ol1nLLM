@@ -198,7 +198,7 @@ void main() {
         },
       ]);
       expect(c.single.blockFor(PromptDialect.booru),
-          'impasto, oil painting (medium)');
+          r'impasto, oil painting \(medium\)');
       expect(styleDialectFor(null, PromptDialect.booru), PromptDialect.booru);
       expect(styleDialectFor('natural', PromptDialect.booru),
           PromptDialect.natural);

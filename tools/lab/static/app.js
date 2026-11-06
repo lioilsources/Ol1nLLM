@@ -17,6 +17,10 @@ const state = {
   promptsYaml: null,
   promptsYamlName: '',
   rowOrder: localStorage.getItem('labRowOrder') || 'style',
+  page: 0,
+  pageAnchor: null,
+  hiddenModels: new Set(loadHiddenModels()),
+  modelOrder: loadModelOrder(),
   // Output filter (header above the table): picked styles win, otherwise the
   // query narrows. Per opened run — another run has other styles.
   outStyles: new Set(),
@@ -28,6 +32,32 @@ const state = {
   metrics: null,
   es: null,
 };
+
+// Model columns the reader switched off, kept across runs: a model that is
+// not worth looking at in one run usually is not in the next one either.
+function loadHiddenModels() {
+  try { return JSON.parse(localStorage.getItem('labHiddenModels') || '[]'); }
+  catch { return []; }
+}
+
+// Column order the reader dragged into place, kept across runs like the hidden
+// columns. Models it does not name keep the run's order after the named ones.
+function loadModelOrder() {
+  try { return JSON.parse(localStorage.getItem('labModelOrder') || '[]'); }
+  catch { return []; }
+}
+
+function orderModels(list) {
+  const rank = new Map(state.modelOrder.map((id, i) => [id, i]));
+  return list
+    .map((m, i) => [rank.has(m.id) ? rank.get(m.id) : state.modelOrder.length + i, m])
+    .sort((a, b) => a[0] - b[0])
+    .map(([, m]) => m);
+}
+
+// Cells per page of the run matrix — the old whole-run ceiling, which the
+// thumbnails were sized for (see thumbMax in imageutil.go).
+const PAGE_CELLS = 400;
 
 const FLOW_LABEL = {
   txt2img: 'txt2img',
@@ -101,8 +131,9 @@ async function loadConfig() {
   const styleChip = (s) =>
     `<button class="chip" data-style="${esc(s.id)}" aria-pressed="false" title="${esc(s.block)}">${esc(s.label)}</button>`;
   $('styles').innerHTML = [
-    ['kultury a epochy', cfg.styles.filter((s) => !s.artist)],
-    ['umělci', cfg.styles.filter((s) => s.artist)],
+    ['kultury a epochy', cfg.styles.filter((s) => s.kind === 'culture')],
+    ['umělci', cfg.styles.filter((s) => s.kind === 'artist')],
+    ['média a techniky', cfg.styles.filter((s) => s.kind === 'medium')],
   ].filter(([, list]) => list.length)
     .map(([label, list]) =>
       `<div class="stylegroup"><p class="grouplabel">${label}</p><div class="chips">${list.map(styleChip).join('')}</div></div>`)
@@ -409,9 +440,16 @@ $('promptsYaml').onchange = async () => {
     if (!res.ok) throw new Error(data.error);
     state.promptsYaml = data.localPath;
     state.promptsYamlName = file.name;
-    info.innerHTML = `<p class="hint">${data.prompts.length} promptů: ${
-      data.prompts.map((p) => `${esc(p.id)} <span class="fam">${
-        p.families.map(esc).join('/')}</span>`).join(', ')}</p>`;
+    // One line, not the whole file back: the ids are in the file, and the
+    // estimate warns about a model whose family is missing. The full list
+    // stays in the tooltip.
+    const fams = [...new Set(data.prompts.flatMap((p) => p.families))];
+    const gaps = fams.map((f) => [f, data.prompts.filter((p) => !p.families.includes(f)).length])
+      .filter(([, n]) => n).map(([f, n]) => `${n}× bez ${esc(f)}`);
+    const full = data.prompts.map((p) => `${p.id}: ${p.families.join('/')}`).join('\n');
+    info.innerHTML = `<p class="hint" title="${esc(full)}">${esc(file.name)} · ${
+      data.prompts.length} promptů · <span class="fam">${fams.map(esc).join('/')}</span>${
+      gaps.length ? ` · <span class="warnline">${gaps.join(', ')}</span>` : ''}</p>`;
   } catch (err) {
     state.promptsYaml = null;
     info.innerHTML = `<p class="hint danger">${esc(err.message)}</p>`;
@@ -545,7 +583,7 @@ async function refreshRuns() {
 }
 
 async function openRun(id) {
-  if (state.runId !== id) { state.outStyles.clear(); state.outQuery = ''; }
+  if (id !== state.runId) { state.page = 0; state.outStyles.clear(); state.outQuery = ''; }
   state.runId = id;
   location.hash = `#/run/${id}`;
   if (state.es) state.es.close();
@@ -588,7 +626,13 @@ function renderInner() {
     return;
   }
   renderOutFilter();
-  const models = man.models.filter((m) => man.cells.some((c) => c.model === m.id));
+  const runModels = orderModels(man.models.filter((m) => man.cells.some((c) => c.model === m.id)));
+  // Hidden columns drop out of the paging too, so a page holds more rows
+  // instead of fewer pictures. The last visible column cannot be switched off
+  // (see the click handler); a run whose every model was hidden elsewhere
+  // shows them all.
+  const visible = runModels.filter((m) => !state.hiddenModels.has(m.id));
+  const models = visible.length ? visible : runModels;
   // Models are the bounded axis, so they stay the columns; flows keep their own
   // band because their metrics live on different scales and mixing them in one
   // column would make the numbers lie. What varies inside a flow is the row
@@ -596,11 +640,21 @@ function renderInner() {
   // with different prompts under each other, grouping by prompt does the
   // opposite.
   const byStyle = state.rowOrder === 'style';
+  // Every SSE tick redraws the table, so cells are looked up by key rather
+  // than filtered per row × model — at 4000 cells the filter was quadratic.
+  const cellKey = (flow, model, prompt, style) => `${flow}\u0000${model}\u0000${prompt}\u0000${style}`;
+  const byKey = new Map();
+  for (const c of man.cells) {
+    const k = cellKey(c.flow, c.model, c.promptIndex, c.style);
+    if (!byKey.has(k)) byKey.set(k, []);
+    byKey.get(k).push(c);
+  }
+  const rowCells = (r) => models.reduce(
+    (n, m) => n + (byKey.get(cellKey(r.flow, m.id, r.prompt, r.style)) || []).length, 0);
   const rows = [];
   for (const flow of [...new Set(man.cells.map((c) => c.flow))]) {
     const inFlow = man.cells.filter((c) => c.flow === flow && outStyleVisible(c.style));
     if (!inFlow.length) continue;
-    rows.push({ band: flow });
     const primaryOf = (c) => (byStyle ? c.style : String(c.promptIndex));
     const secondaryOf = (c) => (byStyle ? String(c.promptIndex) : c.style);
     const primaries = [...new Set(inFlow.map(primaryOf))];
@@ -610,31 +664,99 @@ function renderInner() {
       const secondaries = [...new Set(sub.map(secondaryOf))];
       if (!byStyle) { /* secondaries are styles, keep manifest order */ }
       else secondaries.sort((a, b) => Number(a) - Number(b));
-      if (secondaries.length > 1) {
-        rows.push({ group: byStyle ? styleRowLabel(primary) : promptRowLabel(man, Number(primary)) });
-      }
+      const groupKey = secondaries.length > 1
+        ? `${flow}|${primary}` : null;
+      const groupLabel = groupKey
+        ? (byStyle ? styleRowLabel(primary) : promptRowLabel(man, Number(primary))) : '';
       for (const secondary of secondaries) {
-        rows.push({
+        const r = {
           flow,
+          groupKey,
+          groupLabel,
           style: byStyle ? primary : secondary,
           prompt: Number(byStyle ? secondary : primary),
           single: secondaries.length === 1,
-        });
+        };
+        r.n = rowCells(r);
+        // A row whose cells are all in hidden columns would be a row of dashes.
+        if (r.n) rows.push(r);
       }
     }
   }
 
-  const head = `<thead><tr><th></th>${models.map((m) => `
-    <th><div class="mname">${esc(m.label)}</div>
-        <div class="mnote">${esc(m.styleNote || '')}</div></th>`).join('')}</tr></thead>`;
+  // Pages hold whole rows, filled up to PAGE_CELLS cells: a 4000-cell run on
+  // one page is thousands of <img> and a redraw per finished cell. A page that
+  // starts mid-flow or mid-group repeats its headers, so it reads on its own.
+  const pages = [];
+  let cur = [], curN = 0;
+  for (const r of rows) {
+    if (cur.length && curN + r.n > PAGE_CELLS) { pages.push(cur); cur = []; curN = 0; }
+    cur.push(r); curN += r.n;
+  }
+  if (cur.length) pages.push(cur);
+  // Toggling a column moves the page boundaries; stay on the page that holds
+  // the row that was on top, not on the same page number.
+  if (state.pageAnchor) {
+    const at = pages.findIndex((p) => p.some((r) => rowId(r) === state.pageAnchor));
+    if (at >= 0) state.page = at;
+    state.pageAnchor = null;
+  }
+  state.page = Math.min(Math.max(state.page, 0), Math.max(pages.length - 1, 0));
+  const pageRows = pages[state.page] || [];
+  const firstCell = pages.slice(0, state.page).flat().reduce((n, r) => n + r.n, 0);
+  const pageN = pageRows.reduce((n, r) => n + r.n, 0);
+  const shownTotal = rows.reduce((n, r) => n + r.n, 0);
+  // Progress per page in the picker, so a long run's frontier is findable
+  // without paging through it.
+  const statusOf = (c) => ((state.run.cells || {})[c.id] || {}).status || 'pending';
+  const pageDone = pages.map((p) => {
+    let done = 0, n = 0;
+    for (const r of p) {
+      for (const m of models) {
+        for (const c of byKey.get(cellKey(r.flow, m.id, r.prompt, r.style)) || []) {
+          n++; if (statusOf(c) === 'done') done++;
+        }
+      }
+    }
+    return { done, n };
+  });
+  const pager = pages.length > 1 ? `<div class="pager">
+      <button class="chip" data-page="${state.page - 1}" ${state.page === 0 ? 'disabled' : ''}>‹ předchozí</button>
+      <select data-pagesel>${pages.map((_, i) => `<option value="${i}" ${i === state.page ? 'selected' : ''}>
+        strana ${i + 1}/${pages.length} · ${pageDone[i].done}/${pageDone[i].n}</option>`).join('')}</select>
+      <button class="chip" data-page="${state.page + 1}" ${state.page === pages.length - 1 ? 'disabled' : ''}>další ›</button>
+      <span class="hint" style="margin:0">buňky ${firstCell + 1}–${firstCell + pageN} z ${shownTotal}</span>
+    </div>` : '';
 
-  const body = rows.map((r) => {
+  const shown = [];
+  let lastFlow = null, lastGroup = null;
+  for (const r of pageRows) {
+    if (r.flow !== lastFlow) { shown.push({ band: r.flow }); lastFlow = r.flow; lastGroup = null; }
+    if (r.groupKey && r.groupKey !== lastGroup) shown.push({ group: r.groupLabel });
+    lastGroup = r.groupKey;
+    shown.push(r);
+  }
+
+  // The model header is the column switch. A hidden column stays as a narrow
+  // strip with its name, so there is something to click to bring it back.
+  const shownCol = new Set(models.map((m) => m.id));
+  const head = `<thead><tr><th></th>${runModels.map((m) => shownCol.has(m.id)
+    ? `<th class="colhead" draggable="true" data-col="${esc(m.id)}" title="${
+        models.length > 1 ? 'kliknutím sloupec skryješ, tažením přesuneš' : 'poslední viditelný sloupec'}">
+        <div class="mname">${esc(m.label)}</div>
+        <div class="mnote">${esc(m.styleNote || '')}</div></th>`
+    : `<th class="colhead collapsed" draggable="true" data-col="${esc(m.id)}" title="${esc(m.label)} — kliknutím sloupec ukážeš, tažením přesuneš">
+        <div class="mname">${esc(m.label)}</div></th>`).join('')}</tr></thead>`;
+  const span = runModels.length + 1;
+
+  const htmlById = new Map();
+  const body = shown.map((r) => {
     if (r.band) {
-      return `<tr class="band"><th colspan="${models.length + 1}">
+      return `<tr class="band"><th colspan="${span}">
         <span class="flowtag" data-flow="${esc(r.band)}">${esc(FLOW_LABEL[r.band] || r.band)}</span></th></tr>`;
     }
     if (r.group) {
-      return `<tr class="sub"><th colspan="${models.length + 1}">${esc(r.group)}</th></tr>`;
+      return `<tr class="sub"><th colspan="${span}">${esc(r.group)}</th></tr>`;
     }
     // Inside a group the row head names the axis that varies; when a group has
     // a single row it names both, so nothing is left implicit.
@@ -645,14 +767,18 @@ function renderInner() {
     const secondTxt = byStyle && !showBoth ? '' : (man.prompts.length > 1 ? promptTxt : '');
     const label = `<span class="styleid">${esc(primaryTxt)}</span>`;
     const promptLine = secondTxt ? `<div class="promptline">${esc(secondTxt)}</div>` : '';
-    const cols = models.map((m) => {
-      const cells = man.cells.filter((c) => c.flow === r.flow && c.model === m.id
-        && c.promptIndex === r.prompt && c.style === r.style);
+    const cols = runModels.map((m) => {
+      if (!shownCol.has(m.id)) return '<td class="collapsed"></td>';
+      const cells = byKey.get(cellKey(r.flow, m.id, r.prompt, r.style)) || [];
       if (!cells.length) {
         const skip = (man.skipped || []).find((s) => s.cell.includes(`__${m.id}__`));
         return `<td><div class="skiprow" title="${esc(skip ? skip.reason : '')}">—</div></td>`;
       }
-      return `<td><div class="cellstrip">${cells.map(cellHTML).join('')}</div></td>`;
+      return `<td><div class="cellstrip">${cells.map((c) => {
+        const h = cellHTML(c);
+        htmlById.set(c.id, h);
+        return h;
+      }).join('')}</div></td>`;
     }).join('');
     return `<tr><th class="rowhead">${label}${promptLine}</th>${cols}</tr>`;
   }).join('');
@@ -680,21 +806,137 @@ function renderInner() {
       ? '<button id="cancelbtn" class="chip" style="padding:6px 12px">Zastavit</button>'
       : '') + exportHTML(run);
 
-  $('content').innerHTML =
+  const runhead =
     `<p class="hint">${esc(run.status)} — ${esc(run.message || '')}${
       run.total ? ` · ${run.done}/${run.total}` : ''}${
       run.dry ? ' · nanečisto (placeholdery)' : ''}</p>
      ${actions ? `<p style="margin:6px 0 10px">${actions}</p>` : ''}
      ${skipped}
-     ${state.metrics?.identityNote ? `<p class="hint">${esc(state.metrics.identityNote)}</p>` : ''}
+     ${state.metrics?.identityNote ? `<p class="hint">${esc(state.metrics.identityNote)}</p>` : ''}`;
+
+  // Every finished cell sends an SSE tick. Rebuilding the whole table on each
+  // one re-created every <img> and the grid visibly blinked, so a tick on an
+  // unchanged layout only swaps the cells whose markup changed.
+  // Order and hiding both count: moving a hidden column, or a shown one past a
+  // hidden strip, leaves the shown ids in the same order.
+  const cols = runModels.map((m) => `${m.id}:${shownCol.has(m.id)}`).join();
+  const layout = state.drawn;
+  if (layout && layout.runId === state.runId && layout.page === state.page
+      && layout.order === state.rowOrder && layout.manifest === man
+      && layout.cols === cols
+      && layout.pages === pages.length && $('runhead')) {
+    if (layout.runhead !== runhead) { $('runhead').innerHTML = runhead; layout.runhead = runhead; }
+    for (const sel of $('content').querySelectorAll('[data-pagesel]')) {
+      pageDone.forEach((d, i) => {
+        const txt = `strana ${i + 1}/${pages.length} · ${d.done}/${d.n}`;
+        if (sel.options[i].textContent !== txt) sel.options[i].textContent = txt;
+      });
+    }
+    for (const [id, html] of htmlById) {
+      if (layout.cells.get(id) === html) continue;
+      const old = $('content').querySelector(`[data-cell="${CSS.escape(id)}"]`);
+      if (!old) continue;
+      const tpl = document.createElement('template');
+      tpl.innerHTML = html.trim();
+      const fresh = tpl.content.firstElementChild;
+      // Same picture, new chip or tooltip: keep the decoded <img>.
+      const oldImg = old.querySelector('img'), newImg = fresh.querySelector('img');
+      if (oldImg && newImg && oldImg.getAttribute('src') === newImg.getAttribute('src')) {
+        newImg.replaceWith(oldImg);
+      }
+      old.replaceWith(fresh);
+      layout.cells.set(id, html);
+    }
+    return;
+  }
+  state.drawn = {
+    runId: state.runId, page: state.page, order: state.rowOrder, manifest: man,
+    cols,
+    pages: pages.length, runhead, cells: htmlById,
+  };
+
+  $('content').innerHTML =
+    `<div id="runhead">${runhead}</div>
      <div class="ordering">
        <span class="grouplabel" style="margin:0">řádky</span>
        <button class="chip" data-order="style" aria-pressed="${byStyle}">styl → prompty pod sebou</button>
        <button class="chip" data-order="prompt" aria-pressed="${!byStyle}">prompt → styly pod sebou</button>
      </div>
-     <div class="tablewrap"><table class="matrix">${head}<tbody>${body}</tbody></table></div>`;
+     ${pager}
+     <div class="tablewrap"><table class="matrix">${head}<tbody>${body}</tbody></table></div>
+     ${pager}`;
 
+  const goPage = (p) => {
+    state.page = p;
+    render();
+    $('content').scrollIntoView({ block: 'start' });
+  };
+  $('content').onchange = (e) => {
+    if (e.target.matches('[data-pagesel]')) goPage(Number(e.target.value));
+  };
+  // Drag a model header onto another to move the column there (left half =
+  // before it, right half = after). Native HTML5 drag and drop; the order is
+  // saved like the hidden columns.
+  let dragCol = null;
+  const dropSide = (e, th) => {
+    const r = th.getBoundingClientRect();
+    return e.clientX < r.left + r.width / 2 ? 'before' : 'after';
+  };
+  const clearDrop = () => $('content').querySelectorAll('th.dropbefore, th.dropafter')
+    .forEach((t) => t.classList.remove('dropbefore', 'dropafter'));
+  $('content').ondragstart = (e) => {
+    const th = e.target.closest('th[data-col]');
+    if (!th) return;
+    dragCol = th.dataset.col;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', dragCol);
+    th.classList.add('dragging');
+  };
+  $('content').ondragover = (e) => {
+    const th = e.target.closest('th[data-col]');
+    if (!dragCol || !th) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    clearDrop();
+    if (th.dataset.col !== dragCol) th.classList.add(dropSide(e, th) === 'before' ? 'dropbefore' : 'dropafter');
+  };
+  $('content').ondragleave = (e) => { if (!e.relatedTarget || !$('content').contains(e.relatedTarget)) clearDrop(); };
+  $('content').ondragend = () => { dragCol = null; clearDrop();
+    $('content').querySelectorAll('th.dragging').forEach((t) => t.classList.remove('dragging')); };
+  $('content').ondrop = (e) => {
+    const th = e.target.closest('th[data-col]');
+    const from = dragCol;
+    if (!from || !th) return;
+    e.preventDefault();
+    const to = th.dataset.col, side = dropSide(e, th);
+    dragCol = null; clearDrop();
+    if (to === from) return;
+    const ids = runModels.map((m) => m.id).filter((id) => id !== from);
+    ids.splice(ids.indexOf(to) + (side === 'after' ? 1 : 0), 0, from);
+    // Models of other runs keep their place behind this run's order.
+    state.modelOrder = [...ids, ...state.modelOrder.filter((id) => !ids.includes(id))];
+    try { localStorage.setItem('labModelOrder', JSON.stringify(state.modelOrder)); } catch {}
+    render();
+  };
   $('content').onclick = async (e) => {
+    const col = e.target.closest('[data-col]');
+    if (col) {
+      const id = col.dataset.col;
+      if (models.length === 1 && models[0].id === id) return;
+      state.pageAnchor = pageRows.length ? rowId(pageRows[0]) : null;
+      // What is on screen is the truth (it may be the all-hidden fallback), so
+      // a shown column gets hidden and a hidden one shown.
+      const shownIds = new Set(models.map((m) => m.id));
+      runModels.forEach((m) => state.hiddenModels.delete(m.id));
+      runModels.forEach((m) => { if (!shownIds.has(m.id)) state.hiddenModels.add(m.id); });
+      if (shownIds.has(id)) state.hiddenModels.add(id);
+      else state.hiddenModels.delete(id);
+      try { localStorage.setItem('labHiddenModels', JSON.stringify([...state.hiddenModels])); } catch {}
+      render();
+      return;
+    }
+    const pg = e.target.closest('[data-page]');
+    if (pg && !pg.disabled) { goPage(Number(pg.dataset.page)); return; }
     const cell = e.target.closest('[data-cell]');
     if (cell) { openCell(cell.dataset.cell); return; }
     if (e.target.id === 'exportbtn') {
@@ -720,6 +962,7 @@ function renderInner() {
     const order = e.target.closest('[data-order]');
     if (order) {
       state.rowOrder = order.dataset.order;
+      state.page = 0;
       localStorage.setItem('labRowOrder', state.rowOrder);
       render();
       return;
@@ -729,6 +972,10 @@ function renderInner() {
       await api(`/api/runs/${state.runId}/cancel`, { method: 'POST' });
     }
   };
+}
+
+function rowId(r) {
+  return `${r.flow}|${r.prompt}|${r.style}`;
 }
 
 // ── output filter ──────────────────────────────────────────
@@ -793,16 +1040,18 @@ function renderOutFilter() {
 }
 
 function initOutFilter() {
-  $('outquery').oninput = () => { state.outQuery = $('outquery').value; render(); };
+  $('outquery').oninput = () => { state.outQuery = $('outquery').value; state.page = 0; render(); };
   $('outstyles').onclick = (e) => {
     const b = e.target.closest('[data-outstyle]');
     if (!b) return;
     const id = b.dataset.outstyle;
     if (state.outStyles.has(id)) state.outStyles.delete(id); else state.outStyles.add(id);
+    state.page = 0;
     render();
   };
   $('outclear').onclick = () => {
     state.outStyles.clear(); state.outQuery = ''; $('outquery').value = '';
+    state.page = 0;
     render();
   };
 }

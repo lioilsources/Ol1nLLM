@@ -218,6 +218,30 @@ tr.sub th {
 .outfilter .chips { flex-basis: 100%; max-height: 92px; overflow-y: auto; }
 .ordering { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
 .ordering .grouplabel { margin-right: 2px; }
+table.matrix thead th.colhead { cursor: pointer; }
+table.matrix thead th.colhead:hover .mname { text-decoration: underline; }
+table.matrix thead th.colhead[draggable="true"] { cursor: grab; }
+table.matrix thead th.dragging { opacity: .4; }
+table.matrix thead th.dropbefore { box-shadow: inset 3px 0 0 var(--flow-txt2img); }
+table.matrix thead th.dropafter { box-shadow: inset -3px 0 0 var(--flow-txt2img); }
+table.matrix thead th.collapsed {
+  min-width: 0; width: 26px; padding: 8px 4px; vertical-align: top;
+  background: var(--panel-2); border-left: 1px dashed var(--line); border-right: 1px dashed var(--line);
+}
+th.collapsed .mname {
+  writing-mode: vertical-rl; white-space: nowrap; color: var(--dim);
+  text-decoration: line-through;
+}
+td.collapsed {
+  width: 26px; background: var(--panel-2);
+  border-left: 1px dashed var(--line); border-right: 1px dashed var(--line);
+}
+.pager { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0; }
+.pager .chip[disabled] { opacity: .4; cursor: default; }
+.pager select {
+  background: var(--panel); color: var(--paper); border: 1px solid var(--line);
+  border-radius: 5px; padding: 5px 6px; font: inherit; font-size: 12px; width: auto;
+}
 
 .skiprow { color: var(--dim); font-size: 11px; padding: 6px 10px; font-family: var(--sans); }
 

@@ -98,9 +98,11 @@ type ManifestStyle struct {
 	ID    string `json:"id"`
 	Label string `json:"label"`
 	Block string `json:"block"`
+	// Kind is culture, artist or medium; the UI splits the chips on it.
+	Kind string `json:"kind,omitempty"`
 	// Booru is the tag variant anime models get instead of Block.
 	Booru string `json:"booru,omitempty"`
-	// Artist is empty for cultures and epochs; the UI splits the chips on it.
+	// Artist is empty for cultures and epochs.
 	Artist string `json:"artist,omitempty"`
 	Period string `json:"period,omitempty"`
 }
