@@ -85,6 +85,9 @@ textarea { min-height: 68px; resize: vertical; font-size: 12px; }
 .row > * { flex: 1; min-width: 0; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.stylebar { display: flex; align-items: center; gap: 5px; margin: 6px 0 8px;
+  color: var(--dim); font-size: 11px; }
+.stylebar span { flex: 1; }
 .chip {
   border: 1px solid var(--line); background: var(--ink); color: var(--muted);
   border-radius: 4px; padding: 4px 8px; font-size: 11.5px; cursor: pointer;
