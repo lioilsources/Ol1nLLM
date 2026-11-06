@@ -212,6 +212,10 @@ tr.sub th {
   border-top: 1px solid var(--line); text-align: left;
   padding: 6px 10px; font-weight: 400; font-size: 11.5px; color: var(--paper);
 }
+.outfilter { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 10px; }
+.outfilter #outquery { flex: 1; min-width: 220px; max-width: 420px; }
+.outfilter #outcount { color: var(--dim); font-size: 11px; }
+.outfilter .chips { flex-basis: 100%; max-height: 92px; overflow-y: auto; }
 .ordering { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
 .ordering .grouplabel { margin-right: 2px; }
 
