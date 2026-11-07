@@ -2218,7 +2218,7 @@ class _StyleChip extends StatelessWidget {
       ),
       builder: (_) => StatefulBuilder(
         builder: (ctx, setSheetState) {
-          final hits = kStylePresets
+          final hits = kStylePresetsSorted
               .where((s) => styleMatchesQuery(s, query))
               .toList();
           final searching = query.trim().isNotEmpty;
@@ -2403,7 +2403,7 @@ class _StyleChip extends StatelessWidget {
                                     size: 20,
                                   ),
                                   title: Text(
-                                    st.label,
+                                    st.labelWithYear,
                                     style: TextStyle(
                                       color: isSel
                                           ? AppTheme.accent

@@ -54,6 +54,7 @@ class StylePreset {
     this.booru,
     this.artist,
     this.period,
+    this.year,
   });
 
   final StyleKind kind;
@@ -73,6 +74,18 @@ class StylePreset {
   /// a podtitulek; do promptu nejdou. Kulturní styly je nemají.
   final String? artist;
   final String? period;
+
+  /// Řazení v pickeru: u umělce rok narození, u kultury přibližný začátek
+  /// (př. n. l. záporně). Jen pro UI; média ho nemají a řadí se podle abecedy.
+  final int? year;
+
+  /// [label] s rokem na konci, jak ho ukazuje picker: „Vermeer (1632)“,
+  /// „Jeskynní malba (Lascaux) (17 000 př. n. l.)“. Média rok nemají.
+  String get labelWithYear {
+    final y = year;
+    if (y == null) return label;
+    return y < 0 ? '$label (${_thousands(-y)} př. n. l.)' : '$label ($y)';
+  }
 
   /// Text, který dostane model daného dialektu.
   ///
@@ -95,6 +108,77 @@ const kStylePresets = <StylePreset>[
   ..._kArtistStyles,
   ..._kMediumStyles,
 ];
+
+/// [kStylePresets] v pořadí pickeru: kultury a umělci podle [StylePreset.year]
+/// (při shodě drží pořadí registru, takže období jednoho autora jdou po sobě),
+/// média podle české abecedy. Registr sám zůstává v pořadí měření.
+final List<StylePreset> kStylePresetsSorted = () {
+  final indexed = kStylePresets.indexed.toList();
+  indexed.sort((a, b) {
+    final (ia, sa) = a;
+    final (ib, sb) = b;
+    if (sa.kind != sb.kind) return sa.kind.index - sb.kind.index;
+    final byKey = sa.kind == StyleKind.medium
+        ? compareCzech(sa.label, sb.label)
+        : (sa.year ?? 0).compareTo(sb.year ?? 0);
+    return byKey != 0 ? byKey : ia - ib;
+  });
+  return List<StylePreset>.unmodifiable(indexed.map((e) => e.$2));
+}();
+
+/// 25000 → „25 000“; čtyřmístné roky (1632) se neoddělují, jak je v češtině
+/// zvykem.
+String _thousands(int n) {
+  if (n < 10000) return '$n';
+  final s = '$n';
+  final buf = StringBuffer();
+  for (var i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) buf.write('\u00a0');
+    buf.write(s[i]);
+  }
+  return buf.toString();
+}
+
+/// Česká abeceda bez locale balíku: háčková písmena za základním, „ch“ za
+/// „h“; čárka a kroužek rozhodují až při jinak shodných řetězcích.
+int compareCzech(String a, String b) {
+  final ka = _czechKey(a), kb = _czechKey(b);
+  for (var i = 0; i < ka.length && i < kb.length; i++) {
+    if (ka[i] != kb[i]) return ka[i] - kb[i];
+  }
+  final byLength = ka.length - kb.length;
+  return byLength != 0 ? byLength : a.compareTo(b);
+}
+
+List<int> _czechKey(String s) {
+  final lower = _foldAcuteRing(s.toLowerCase());
+  final key = <int>[];
+  for (var i = 0; i < lower.length; i++) {
+    final c = lower[i];
+    if (c == 'c' && i + 1 < lower.length && lower[i + 1] == 'h') {
+      key.add('h'.codeUnitAt(0) * 4 + 2);
+      i++;
+    } else if (_hacek.containsKey(c)) {
+      key.add(_hacek[c]!.codeUnitAt(0) * 4 + 1);
+    } else {
+      key.add(c.codeUnitAt(0) * 4);
+    }
+  }
+  return key;
+}
+
+const _hacek = {'č': 'c', 'ř': 'r', 'š': 's', 'ž': 'z'};
+
+String _foldAcuteRing(String s) {
+  const from = 'áéěíóúůýďťň';
+  const to = 'aeeiouuydtn';
+  final buf = StringBuffer();
+  for (final unit in s.split('')) {
+    final i = from.indexOf(unit);
+    buf.write(i < 0 ? unit : to[i]);
+  }
+  return buf.toString();
+}
 
 StylePreset? styleById(String? id) {
   if (id == null) return null;
@@ -133,7 +217,7 @@ String applyStylePreset(
 bool styleMatchesQuery(StylePreset style, String query) {
   final q = _fold(query.trim());
   if (q.isEmpty) return true;
-  return _fold(style.label).contains(q) ||
+  return _fold(style.labelWithYear).contains(q) ||
       (style.artist != null && _fold(style.artist!).contains(q)) ||
       (style.period != null && _fold(style.period!).contains(q));
 }

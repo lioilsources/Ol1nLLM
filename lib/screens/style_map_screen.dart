@@ -121,7 +121,7 @@ class _StyleMapScreenState extends State<StyleMapScreen> {
   /// The pack carries registry ids; here they get the names the rest of the
   /// app shows. An id the registry no longer has stays as it is.
   String _label(StyleMapImage im) {
-    final style = styleById(im.styleId)?.label ?? im.styleId;
+    final style = styleById(im.styleId)?.labelWithYear ?? im.styleId;
     final model = _manyModels
         ? kImageModels.where((m) => m.id == im.modelId).firstOrNull?.label ??
               im.modelId
