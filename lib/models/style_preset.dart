@@ -6,6 +6,8 @@
 /// (viz `docs/style-matrix.md`). 42 stylů podle konkrétních umělců prošlo
 /// týmž testem na pěti modelech, už s textem pro každý dialekt zvlášť. Styly,
 /// u kterých vyšel jen barevný posun bez převzetí stylu, se sem nedostaly.
+/// Vlna 7 přidala 228 stylů (57 kultur, 61 umělců, 110 médií), změřených na
+/// všech 17 modelech; o vyřazení rozhodl uživatel nad archy, ne metrika.
 /// Text se připojuje **za** uživatelův prompt — vlastní zadání má přednost,
 /// blok jen dobarvuje. Na uzlu se persistuje jen [StylePreset.id]: text je
 /// z něj a z modelu uzlu odvoditelný, takže se (stejně jako u póz) neukládá

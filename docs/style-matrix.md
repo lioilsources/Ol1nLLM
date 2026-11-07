@@ -325,3 +325,19 @@ ani tak nepřijde. **Oprava je správně a zůstává, styl ale nezměnila.** Vy
 vlny 5 je jinde; kandidáti jsou mrtvé tagy (přepis v běhu 7h) a pozice stylu za
 score tagy (běh 7e). Verdikty vln 3–5 se tímhle nemění. Muže a seed 778 pokrývají
 jen čísla, ne pohled; repose (`7a-r777`) čeká ve frontě.
+
+## Sedmá vlna — zápis do registru (2026-11-07)
+
+243 kandidátů (`tools/lab/candidates/media.json`, `artists-wave7.json`,
+`cultures-wave7.json`) prošlo txt2img na všech 17 modelech, seed 777, 0 chyb.
+Verdikt dělal uživatel nad stránkou s archy (`tools/lab/wave7_page.py`), ne
+metrika: výchozí bylo ponechat a vyřadilo se 15 stylů — `brick-toy`,
+`colored-pencil`, `dix`, `fayum`, `isometric-diagram`, `latte-art`, `mezzotint`,
+`okeeffe`, `paper-collage`, `papier-mache`, `pixel-art`, `risograph`,
+`screentone-manga`, `sgraffito-plaster`, `voxel`. Ty zůstávají v souborech
+kandidátů pro lab. Do registru šlo **228** (57 kultur, 61 umělců, 110 médií),
+celkem 310.
+
+Restyler a Tsumiki styly zatím nedostaly: tam se styluje fotka s držením
+tváře (InstantID / PuLID) a txt2img měření o tom nic neříká. Přijdou až po
+vlastním měření s portréty.
