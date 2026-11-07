@@ -203,7 +203,9 @@ třetí vlny v `docs/style-matrix.md`.
 **Picker stylů**: jedna zploštělá lista se sekcemi „Kultury a epochy" /
 „Umělci" (podle `StylePreset.artist`; `artist` a `period` jsou jen pro UI,
 do promptu nejdou) a hledáním podle labelu a autora bez ohledu na diakritiku
-(`styleMatchesQuery`). Vyhledávací pole se samo nefokusuje a seznam schovává
+(`styleMatchesQuery`). Pořadí v sekcích dává `kStylePresetsSorted`: kultury podle
+přibližného začátku, umělci podle roku narození (`StylePreset.year`), média
+podle české abecedy; registr sám zůstává v pořadí měření. Vyhledávací pole se samo nefokusuje a seznam schovává
 klávesnici při tažení. Podtitulek je vždy `block`, i u anime modelu — tagy by
 se četly hůř.
 

@@ -5,6 +5,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'davinci',
+    year: 1452,
     label: 'Da Vinci — sfumato portrét',
     block:
         'portrait painting by Leonardo da Vinci, sfumato, soft smoky shadows without hard edges, enigmatic half smile, muted olive umber and dark green palette, hazy distant landscape, high renaissance oil on poplar',
@@ -16,6 +17,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'davinci-chalk',
+    year: 1452,
     label: 'Da Vinci — červená křída (studie)',
     block:
         'red chalk figure study by Leonardo da Vinci, sanguine on toned paper, fine parallel hatching, anatomical precision, unfinished sketch edges, faint mirror handwriting notes in the margin',
@@ -27,6 +29,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'picasso-blue',
+    year: 1881,
     label: 'Picasso — modré období',
     block:
         'blue period painting by Pablo Picasso, monochrome cold blue and blue-green palette, gaunt melancholic figure, elongated hands, hunched posture, flat sombre background, thin dry paint',
@@ -38,6 +41,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'picasso-rose',
+    year: 1881,
     label: 'Picasso — růžové období (harlekýni)',
     block:
         'rose period painting by Pablo Picasso, warm pink ochre and terracotta palette, harlequin diamond costume, circus saltimbanque figure, quiet dignity, flat dusty background, delicate thin paint',
@@ -49,6 +53,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'picasso-cubist',
+    year: 1881,
     label: 'Picasso — kubistický portrét (Dora Maar)',
     block:
         'cubist portrait by Pablo Picasso, face shown in profile and frontal view at once, both eyes on one side, fractured angular planes, thick black outlines, bold flat red yellow green and purple, patterned wallpaper',
@@ -60,6 +65,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'basquiat',
+    year: 1960,
     label: 'Basquiat',
     block:
         'neo-expressionist painting by Jean-Michel Basquiat, raw scrawled figure with skull-like head, three-pointed crown, exposed anatomy lines, graffiti text fragments and crossed-out words, oil stick and acrylic on rough canvas, chaotic bright colours',
@@ -71,6 +77,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'hockney-pool',
+    year: 1937,
     label: 'Hockney — bazén, ploché akryly',
     block:
         '1960s Los Angeles acrylic painting by David Hockney, flat clean colour fields, turquoise swimming pool with stylised ripples, modernist house and palm trees, crisp shadows, bright even sunlight, deadpan cool stillness',
@@ -82,6 +89,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'monet',
+    year: 1840,
     label: 'Monet — figura v plenéru',
     block:
         'plein air painting by Claude Monet, figure with parasol in a windswept meadow, dappled sunlight and moving clouds, loose feathery brushstrokes, lavender and green shadows, bright airy sky, form dissolving in light',
@@ -93,6 +101,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'kahlo',
+    year: 1907,
     label: 'Frida Kahlo',
     block:
         'self-portrait painting by Frida Kahlo, frontal gaze, joined eyebrows, flowers braided into hair, embroidered Tehuana dress, lush tropical leaves and a small monkey, flat naive Mexican folk retablo style, saturated colours',
@@ -104,6 +113,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'goya-black',
+    year: 1746,
     label: 'Goya — černé malby',
     block:
         'black painting by Francisco Goya, murky black brown and ochre palette, grotesque haunted figure emerging from darkness, wild frantic brushstrokes, gaping mouth and staring eyes, nightmare mural on plaster',
@@ -115,6 +125,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'goya-caprichos',
+    year: 1746,
     label: 'Goya — Caprichos (lept, akvatinta)',
     block:
         'etching and aquatint by Francisco Goya from Los Caprichos, monochrome sepia print, grainy aquatint shadows, satirical grotesque figure, owls and bats in the gloom, hand-written caption below',
@@ -126,6 +137,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'kandinsky-early',
+    year: 1866,
     label: 'Kandinskij — raná pohádková tempera',
     block:
         'early tempera painting by Wassily Kandinsky before abstraction, fairy-tale folk scene, rider in old Russian costume, jewel-like dabs of colour on dark ground, glowing pointillist dots, medieval towers, night blue with gold and crimson',
@@ -137,6 +149,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'vangogh-arles',
+    year: 1853,
     label: 'Van Gogh — Arles, impasto portrét',
     block:
         'portrait painting by Vincent van Gogh in Arles, thick impasto brushstrokes, vivid complementary colours, yellow and blue, green shadows on the face, flat patterned background, directional hatched strokes following the form, visible paint ridges',
@@ -148,6 +161,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'vangogh-saintremy',
+    year: 1853,
     label: 'Van Gogh — Saint-Rémy, vířivé tahy',
     block:
         'late painting by Vincent van Gogh in Saint-Rémy, swirling turbulent brushstrokes, spiralling sky and cypress, rhythmic curling lines around the figure, deep blue and glowing yellow, restless energy, thick oil',
@@ -159,6 +173,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'lautrec-poster',
+    year: 1864,
     label: 'Toulouse-Lautrec — plakát (litografie)',
     block:
         'lithograph poster by Henri de Toulouse-Lautrec, flat bold colour areas, sinuous black silhouette contours, Moulin Rouge dancer, spattered crachis texture, cropped Japanese composition, bold hand-lettered title, ochre red and black',
@@ -170,6 +185,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'lautrec-cabaret',
+    year: 1864,
     label: 'Toulouse-Lautrec — kabaret na kartonu',
     block:
         'cabaret painting by Henri de Toulouse-Lautrec, thinned oil on raw cardboard, streaky diagonal strokes, sickly green gaslight on the face, red lips and orange hair, Montmartre bar interior, unfinished sketchy edges, brown cardboard showing through',
@@ -181,6 +197,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'mucha-slav-epic',
+    year: 1860,
     label: 'Mucha — Slovanská epopej',
     block:
         'monumental egg tempera painting by Alphonse Mucha from the Slav Epic, pale luminous blue and white tones, crowd of Slavic figures in linen folk dress, glowing symbolic figure hovering above, misty historical vision, soft muted fresco-like surface',
@@ -192,6 +209,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'kubista',
+    year: 1884,
     label: 'Kubišta — kuboexpresionismus',
     block:
         'Czech cubo-expressionist painting by Bohumil Kubista, figure built from sharp crystalline facets, cold blue green and ochre planes, dramatic raking light and deep shadow, tense angular composition, intense staring face, dense heavy oil',
@@ -203,6 +221,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'schiele',
+    year: 1890,
     label: 'Schiele',
     block:
         'figure drawing by Egon Schiele, nervous jagged contour line, contorted angular pose, bony elongated hands, gouache and watercolour patches of orange red and sickly green on bare paper, empty white background, raw expressionist intensity',
@@ -214,6 +233,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'klimt-golden',
+    year: 1862,
     label: 'Klimt — zlaté období',
     block:
         'golden period painting by Gustav Klimt, figure wrapped in a flat gold leaf robe of spirals and rectangles, realistic softly painted face and hands, mosaic ornament, byzantine gold background, embrace, jewel colours',
@@ -225,6 +245,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'vermeer',
+    year: 1632,
     label: 'Vermeer',
     block:
         'painting by Johannes Vermeer, soft daylight from a window on the left, pearl earring and turban, ultramarine and lemon yellow, quiet domestic interior, pointillé highlights, calm serene stillness, smooth Dutch golden age oil',
@@ -236,6 +257,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'botticelli',
+    year: 1445,
     label: 'Botticelli',
     block:
         'early renaissance tempera painting by Sandro Botticelli, graceful linear contours, long flowing golden hair, pale porcelain skin, transparent fluttering drapery, flowers and orange grove, gentle wistful expression, delicate pastel palette',
@@ -247,6 +269,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'elgreco',
+    year: 1541,
     label: 'El Greco',
     block:
         'mannerist painting by El Greco, dramatically elongated flame-like figure, upturned ecstatic eyes, cold flickering light, stormy grey sky, acid green crimson and silver, restless swirling drapery, spiritual intensity',
@@ -258,6 +281,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'munch',
+    year: 1863,
     label: 'Munch',
     block:
         'expressionist painting by Edvard Munch, anxious figure, wavy undulating brushstrokes flowing through sky and ground, blood orange sky over dark blue fjord, hollow skull-like face, thinly scrubbed paint, existential dread',
@@ -269,6 +293,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'matisse-fauve',
+    year: 1869,
     label: 'Matisse — fauvismus',
     block:
         'fauvist painting by Henri Matisse, wild unmixed colour, green stripe down the face, red and turquoise flat planes, loose broad brushstrokes, decorative patterned interior, joyful bold simplicity',
@@ -280,6 +305,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'matisse-cutout',
+    year: 1869,
     label: 'Matisse — výstřižky (Modrý akt)',
     block:
         'paper cut-out by Henri Matisse, figure as a single flat cobalt blue silhouette cut from gouache-painted paper, simplified curving limbs, white background, scissors-cut edges, leaf and star shapes, jazz-like playfulness',
@@ -291,6 +317,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'gauguin',
+    year: 1848,
     label: 'Gauguin — Tahiti',
     block:
         'Tahitian painting by Paul Gauguin, flat cloisonné colour areas with dark outlines, saturated warm ochre pink and violet, tropical foliage, calm monumental figure, matte chalky surface, symbolist stillness',
@@ -302,6 +329,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'cezanne',
+    year: 1839,
     label: 'Cézanne',
     block:
         'painting by Paul Cezanne, figure built from patches of parallel constructive brushstrokes, blue-green ochre and grey-violet palette, solid geometric volumes, slightly tilted perspective, calm weighty stillness',
@@ -313,6 +341,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'seurat',
+    year: 1859,
     label: 'Seurat — pointilismus',
     block:
         'pointillist painting by Georges Seurat, entire image built from tiny dots of pure colour, stiff formal figures in profile, sunny riverside park, optical mixing, calm frozen geometry, soft shimmering surface',
@@ -324,6 +353,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'hopper',
+    year: 1882,
     label: 'Hopper',
     block:
         'painting by Edward Hopper, solitary figure in a quiet room or diner, hard raking morning sunlight, long geometric shadows, muted greens and ochres, large window, american realism, melancholy urban stillness',
@@ -335,6 +365,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'warhol',
+    year: 1928,
     label: 'Warhol — sítotisk',
     block:
         'pop art silkscreen portrait by Andy Warhol, high-contrast photo reduced to flat blocks, misregistered neon colour fills, hot pink turquoise and yellow, repeated grid of the same face, halftone grain, flat glossy celebrity icon',
@@ -346,6 +377,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'lichtenstein',
+    year: 1923,
     label: 'Lichtenstein — komiksové rastry',
     block:
         'pop art painting by Roy Lichtenstein, enlarged comic strip panel, Ben-Day dot shading, thick black outlines, primary red yellow and blue, dramatic close-up face, speech bubble with bold text, flat printed look',
@@ -357,6 +389,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'haring',
+    year: 1958,
     label: 'Haring',
     block:
         'painting by Keith Haring, figure as a thick black outline pictogram, radiant motion lines around the body, flat bright red yellow and blue, dancing pose, dense playful pattern, subway chalk graffiti energy',
@@ -368,6 +401,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'bacon',
+    year: 1909,
     label: 'Francis Bacon',
     block:
         'painting by Francis Bacon, smeared distorted figure with blurred twisting face, seated inside a thin drawn cage of lines, flat orange or violet ground, raw fleshy pinks, isolated on a bare stage, visceral unease',
@@ -379,6 +413,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'rivera',
+    year: 1886,
     label: 'Rivera — mexický murál',
     block:
         'mural fresco by Diego Rivera, monumental rounded figure with simplified solid volumes, Mexican worker or calla lily seller, earthy terracotta ochre and green, flat matte surface, social realism, crowded composition',
@@ -390,6 +425,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'chagall',
+    year: 1887,
     label: 'Chagall',
     block:
         'dreamlike painting by Marc Chagall, floating lovers drifting over a village, upside-down cow and fiddler, glowing cobalt blue and crimson, soft translucent layers, folk fairy tale, weightless joy',
@@ -401,6 +437,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'dali',
+    year: 1904,
     label: 'Dalí — surrealismus',
     block:
         'surrealist painting by Salvador Dali, figure in a vast empty desert plain under a clear sky, melting soft forms propped on crutches, long shadows, ants and drawers, hyper-smooth academic rendering, uncanny dream logic',
@@ -412,6 +449,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'magritte',
+    year: 1898,
     label: 'Magritte',
     block:
         'surrealist painting by Rene Magritte, bowler hat and dark overcoat, face hidden behind a floating green apple, cloudy blue daytime sky, flat deadpan illustrative rendering, uncanny calm, clean smooth paint',
@@ -423,6 +461,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'lempicka',
+    year: 1898,
     label: 'Lempicka — art deco portrét',
     block:
         'art deco portrait by Tamara de Lempicka, glossy metallic sculpted figure, streamlined drapery in silver green and scarlet, sharp geometric shading, skyscraper backdrop, cool glamorous stare, polished tubular volumes',
@@ -434,6 +473,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'beardsley',
+    year: 1872,
     label: 'Beardsley — perokresba',
     block:
         'pen and ink illustration by Aubrey Beardsley, stark black and white, large flat black areas against blank white, single sinuous ink line, peacock and rose ornament, decadent elegant figure, japanese asymmetry',
@@ -445,6 +485,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'lada',
+    year: 1887,
     label: 'Lada — česká lidová ilustrace',
     block:
         'Czech folk illustration by Josef Lada, round-faced jolly figure with rosy cheeks, thick black outlines, flat cheerful colours, snowy village with pointed roofs, naive childlike proportions, gentle humour, gouache',
@@ -456,6 +497,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'josef-capek',
+    year: 1887,
     label: 'Josef Čapek — naivní kubismus',
     block:
         'Czech painting by Josef Capek, blocky simplified figure like a wooden toy, rough thick outlines, chunky flat planes of brick red ochre and grey-blue, childlike naive geometry, coarse matte texture, tender humour',
@@ -468,6 +510,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'durer-engraving',
+    year: 1471,
     label: 'Dürer — mědiryty',
     block:
         'copper engraving by Albrecht Dürer, black ink on cream paper, dense cross-hatching, swelling burin lines, sharp contour, fine parallel modelling, northern renaissance precision, crisp printed plate surface',
@@ -479,6 +522,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'bosch',
+    year: 1450,
     label: 'Bosch — panoramatická alegorie',
     block:
         'oil panel painting by Hieronymus Bosch, high panoramic viewpoint, swarming tiny figures across the surface, pale pink and sea-green palette, thin translucent paint, fantastical hybrid forms, crackled oak panel',
@@ -490,6 +534,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'bruegel',
+    year: 1525,
     label: 'Bruegel — vesnice z nadhledu',
     block:
         'oil panel painting by Pieter Bruegel the Elder, elevated distant viewpoint, small stocky figures, muted earthy browns with cold grey-green, flat clear daylight, deep receding landscape, thin dry paint on oak panel',
@@ -501,6 +546,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'van-eyck',
+    year: 1390,
     label: 'Van Eyck — lazurový olej',
     block:
         'early netherlandish oil painting by Jan van Eyck, luminous transparent glazes, microscopic detail, jewel-like crimson and deep green, crisp textile folds, cool even light, enamel-smooth panel surface',
@@ -512,6 +558,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'titian',
+    year: 1488,
     label: 'Tizian — benátský kolorit',
     block:
         'venetian oil painting by Titian, warm glowing colour, deep reds and golden flesh tones, loose broken late brushwork, soft dissolving contours, layered glazes, rough visible canvas weave',
@@ -523,6 +570,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'caravaggio',
+    year: 1571,
     label: 'Caravaggio — modely ze tmy',
     block:
         'tenebrist oil painting by Caravaggio, single hard raking light from upper left, figures emerging from pure black, ordinary unidealised models, sharp shadow edge, earthy red and ochre, dark smooth canvas',
@@ -534,6 +582,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'velazquez',
+    year: 1599,
     label: 'Velázquez — stříbřitá paleta',
     block:
         'court portrait painting by Diego Velázquez, silvery grey palette, restrained blacks and rose, loose shorthand brushstrokes that resolve at a distance, airy neutral background, thin fluid oil paint on canvas',
@@ -545,6 +594,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'rubens',
+    year: 1577,
     label: 'Rubens — vířivá kompozice',
     block:
         'flemish baroque oil painting by Peter Paul Rubens, rosy luminous flesh with pearly blue half-tones, swirling diagonal composition, full fleshy forms, warm reds, fluid sweeping brushwork, thin glowing paint',
@@ -556,6 +606,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'fragonard',
+    year: 1732,
     label: 'Fragonard — hravý štětec',
     block:
         'rococo oil painting by Jean-Honoré Fragonard, feathery playful brushwork, pastel pink, peach and sea-green, frothy foliage light, soft powdery atmosphere, swift flickering touches on canvas',
@@ -567,6 +618,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'david-neoclassical',
+    year: 1748,
     label: 'David — neoklasicismus',
     block:
         'neoclassical oil painting by Jacques-Louis David, invisible smooth brushwork, sculptural marble-like bodies, frieze-like shallow stage, hard clear outlines, stern red and white accents, plain dark background, polished canvas',
@@ -578,6 +630,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'ingres',
+    year: 1780,
     label: 'Ingres — porcelánová pleť',
     block:
         'neoclassical oil portrait by Jean-Auguste-Dominique Ingres, porcelain smooth skin, elongated sinuous contours, pure unbroken line, cool pale tones, crisp silk surfaces, enamel-like invisible brushwork',
@@ -589,6 +642,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'friedrich',
+    year: 1774,
     label: 'Friedrich — mlžná krajina',
     block:
         'german romantic oil painting by Caspar David Friedrich, vast hazy depth, cold grey-blue and violet dusk tones, silhouetted forms against pale sky, still symmetrical composition, thin smooth paint',
@@ -600,6 +654,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'turner',
+    year: 1775,
     label: 'Turner — rozpuštěné světlo',
     block:
         'late oil painting by J. M. W. Turner, forms dissolved into blazing light, swirling vortex of yellow and white, scumbled translucent veils, barely any contour, rough scraped impasto surface',
@@ -611,6 +666,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'blake',
+    year: 1757,
     label: 'Blake — barevné tisky',
     block:
         'colour-printed relief etching by William Blake, elongated muscular figures, flamelike rhythmic outlines, mottled pigment, hand-tinted watercolour washes in ochre and blue, reticulated printed paper surface',
@@ -622,6 +678,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'hokusai',
+    year: 1760,
     label: 'Hokusai — manga skici',
     block:
         'woodblock sketchbook page by Katsushika Hokusai, nimble calligraphic brush line, black outline with pale grey and soft pink tone, comic candid gesture, sparse empty ground, warm washi paper',
@@ -633,6 +690,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'hiroshige',
+    year: 1797,
     label: 'Hirošige — bokashi',
     block:
         'ukiyo-e woodblock landscape print by Utagawa Hiroshige, bokashi gradient from deep indigo into pale sky, flat colour shapes, thin dark outline, slanting fine line rhythm, soft washi paper grain',
@@ -644,6 +702,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'yoshitoshi',
+    year: 1839,
     label: 'Jošitoši — poslední ukiyo-e',
     block:
         'meiji woodblock print by Tsukioka Yoshitoshi, dramatic twisting pose, nervous elegant line, restrained muted palette with sudden red accent, sparse gradient ground, fine woodgrain printed on paper',
@@ -655,6 +714,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'kuniyoshi',
+    year: 1797,
     label: 'Kunijoši — hrdinské listy',
     block:
         'ukiyo-e warrior print by Utagawa Kuniyoshi, explosive packed composition filling the sheet, bold swirling black line, dense interlocking patterns, saturated red and indigo, heavy muscular action, woodblock ink texture',
@@ -666,6 +726,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'manet',
+    year: 1832,
     label: 'Manet — černá jako barva',
     block:
         'oil painting by Édouard Manet, flat frontal light, black used as a full colour, abrupt shift between light and dark, pale simplified flesh, broad summary brushwork, creamy paint on canvas',
@@ -677,6 +738,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'renoir',
+    year: 1841,
     label: 'Renoir — skvrny světla',
     block:
         'impressionist oil painting by Pierre-Auguste Renoir, dappled sunlight patches, soft feathery brushstrokes, warm rosy flesh, shimmering blue shadows, blurred contours, creamy vibrating paint surface',
@@ -688,6 +750,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'cassatt',
+    year: 1844,
     label: 'Cassattová — pastel a japonský výřez',
     block:
         'pastel by Mary Cassatt, asymmetric japanese-print cropping, high tilted viewpoint, soft hatched chalk strokes, tender pink and pale green, flat patterned areas, velvety toned paper surface',
@@ -699,6 +762,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'whistler',
+    year: 1834,
     label: 'Whistler — nokturno',
     block:
         'nocturne by James McNeill Whistler, tonal harmony of blue and silver, thin liquid paint washed across canvas, vague dissolved shapes in fog, near monochrome, sparse flecks of gold, smooth veiled surface',
@@ -710,6 +774,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'sargent',
+    year: 1856,
     label: 'Sargent — bravurní tah',
     block:
         'portrait painting by John Singer Sargent, long bravura wet brushstrokes, glinting white satin highlights, dark tonal background, elegant loose edges, confident impasto accents on smooth canvas',
@@ -721,6 +786,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'sorolla',
+    year: 1863,
     label: 'Sorolla — středomořské slunce',
     block:
         'oil painting by Joaquín Sorolla, blazing mediterranean sunlight, luminous whites with violet shadows, broad fluid wet strokes, sparkling reflections, intense warm-cool contrast, thick loose paint',
@@ -732,6 +798,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'zorn',
+    year: 1860,
     label: 'Zorn — čtyřbarevná paleta',
     block:
         'oil painting by Anders Zorn, limited palette of ochre, vermilion, ivory black and white, ruddy warm flesh, broad decisive slashing strokes, shimmering rippling light, creamy impasto on canvas',
@@ -743,6 +810,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'repin',
+    year: 1844,
     label: 'Repin — ruský realismus',
     block:
         'russian realist oil painting by Ilya Repin, psychological character study, weathered faces, sombre browns and grey daylight, solid vigorous brushwork, open-air naturalism, thick earthy canvas surface',
@@ -754,6 +822,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'bilibin',
+    year: 1876,
     label: 'Bilibin — ruské pohádky',
     block:
         'russian fairytale illustration by Ivan Bilibin, thick black contour lines, flat watercolour fills, decorative ornamental border, folk embroidery patterns, muted ochre and teal, printed book page surface',
@@ -765,6 +834,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'vrubel',
+    year: 1856,
     label: 'Vrubel — krystalické fasety',
     block:
         'symbolist oil painting by Mikhail Vrubel, crystalline faceted brush planes, mosaic of shattered strokes, deep violet and dusky blue with gleaming pearl, heavy palette-knife impasto',
@@ -776,6 +846,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'kirchner',
+    year: 1880,
     label: 'Kirchner — Die Brücke',
     block:
         'german expressionist oil painting by Ernst Ludwig Kirchner, sharp jagged angles, acid pink and poison green, elongated masklike faces, slashing hatched brushstrokes, raw unblended paint',
@@ -787,6 +858,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'marc',
+    year: 1880,
     label: 'Marc — barevné prizmy',
     block:
         'expressionist painting by Franz Marc, prismatic intersecting colour planes, saturated cobalt blue, crimson and yellow, curved rhythmic contours, crystalline fractured space, flat bright oil paint',
@@ -798,6 +870,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'klee',
+    year: 1879,
     label: 'Klee — mřížky barev',
     block:
         'painting by Paul Klee, grid of soft glowing colour squares, childlike thin wandering line, hieroglyphic signs, muted warm watercolour washes, dry chalky textured ground',
@@ -809,6 +882,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'leger',
+    year: 1881,
     label: 'Léger — trubkové postavy',
     block:
         'painting by Fernand Léger, tubular machine-like figures, thick black outline, flat red, yellow and blue, stark white ground, offset colour bands, smooth poster-flat paint',
@@ -820,6 +894,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'de-chirico',
+    year: 1888,
     label: 'De Chirico — metafyzické náměstí',
     block:
         'metaphysical painting by Giorgio de Chirico, deep empty perspective, long raking shadows, arcades, featureless mannequin forms, dark green-blue sky, hot ochre ground, flat dry paint',
@@ -831,6 +906,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'miro',
+    year: 1893,
     label: 'Miró — biomorfní znaky',
     block:
         'painting by Joan Miró, floating biomorphic shapes, thin black wire lines, spots of pure red, blue and yellow, scattered star signs, open washed ground, childlike flatness',
@@ -842,6 +918,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'rousseau',
+    year: 1844,
     label: 'Rousseau — naivní džungle',
     block:
         'naive oil painting by Henri Rousseau, oversized flat layered leaves, dozens of graded greens, stiff frontal figures, crisp hard-edged shapes, dense airless space, smooth enamel paint',
@@ -853,6 +930,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'ensor',
+    year: 1860,
     label: 'Ensor — masky',
     block:
         'expressionist painting by James Ensor, grotesque masklike faces, acid reds, greens and whites, crowded shallow space, scratchy nervous line, crusted raw impasto',
@@ -864,6 +942,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'hammershoi',
+    year: 1864,
     label: 'Hammershøi — šedé ticho',
     block:
         'oil painting by Vilhelm Hammershøi, near monochrome pearl greys, soft cool window light, empty stillness, reduced geometric composition, blurred quiet edges, muted thin dry brushwork',
@@ -875,6 +954,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'larsson',
+    year: 1853,
     label: 'Larsson — švédský domov',
     block:
         'watercolour illustration by Carl Larsson, firm flowing ink outline, clear light washes, swedish red and pale green, airy white ground, flat decorative patterning, fresh sunlit paper',
@@ -886,6 +966,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'wyspianski',
+    year: 1869,
     label: 'Wyspiański — pastelová secese',
     block:
         'polish art nouveau pastel by Stanisław Wyspiański, sensitive sweeping contour, bare toned paper left unworked, soft blue and ochre chalk strokes, decorative outline, delicate dry powdery texture',
@@ -897,6 +978,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'malczewski',
+    year: 1854,
     label: 'Malczewski — polský symbolismus',
     block:
         'polish symbolist oil painting by Jacek Malczewski, hard sharp academic drawing, dry bright daylight, grassy ochre and cold blue, flat theatrical staging, enigmatic stillness, thin precise paint',
@@ -908,6 +990,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'beksinski',
+    year: 1929,
     label: 'Beksiński — dystopie',
     block:
         'dystopian oil painting by Zdzisław Beksiński, rust brown and bone ochre haze, crumbling eroded forms, skeletal decay, dry luminous dust, meticulous fine brushwork on hardboard',
@@ -919,6 +1002,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'wyeth',
+    year: 1917,
     label: 'Wyeth — tempera',
     block:
         'egg tempera painting by Andrew Wyeth, thousands of fine dry hatched strokes, faded straw and umber, cold pale light, sparse austere composition, chalky matte panel surface',
@@ -930,6 +1014,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'grant-wood',
+    year: 1891,
     label: 'Grant Wood — regionalismus',
     block:
         'american regionalist oil painting by Grant Wood, smooth rounded sculpted forms, hard precise detail, flemish-style polish, soft green and ochre, decorative patterned stippling, enamel-smooth panel surface',
@@ -941,6 +1026,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'jacob-lawrence',
+    year: 1917,
     label: 'Lawrence — ploché tempery',
     block:
         'painting by Jacob Lawrence, casein tempera on hardboard, flat matte colour shapes, angular faceted figures, saturated red, yellow and blue with black, rhythmic repeated forms',
@@ -952,6 +1038,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'bearden',
+    year: 1911,
     label: 'Bearden — koláž',
     block:
         'photomontage collage by Romare Bearden, cut magazine photographs and coloured paper, fragmented mismatched faces, abrupt scale shifts, flat torn shapes, visible glue seams',
@@ -963,6 +1050,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'kehinde-wiley',
+    year: 1977,
     label: 'Wiley — florální pozadí',
     block:
         'portrait painting by Kehinde Wiley, photorealistic frontal figure, saturated ornamental baroque floral wallpaper behind, tendrils growing over the body, glossy oil, crisp high-contrast skin',
@@ -974,6 +1062,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'kusama',
+    year: 1929,
     label: 'Kusama — puntíky',
     block:
         'painting by Yayoi Kusama, obsessive polka dots covering every surface, repeating infinity net loops, stark yellow and black, hypnotic all-over pattern, flat glossy acrylic',
@@ -985,6 +1074,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'murakami',
+    year: 1962,
     label: 'Murakami — superflat',
     block:
         'superflat painting by Takashi Murakami, seamless flat colour, repeating grinning flower pattern, candy rainbow palette, thick clean outline, glossy lacquered surface',
@@ -996,6 +1086,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'moebius',
+    year: 1938,
     label: 'Moebius — jemná linka',
     block:
         'french comic art by Moebius, fine even pen line, delicate stippling and hatching, soft pastel flat colour, spacious clean composition, airy luminous light, smooth printed paper',
@@ -1007,6 +1098,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'frazetta',
+    year: 1928,
     label: 'Frazetta — olejová fantasy',
     block:
         'fantasy oil painting by Frank Frazetta, explosive muscular anatomy, dynamic twisting action, warm umber darkness, glowing flesh against black, loose rapid brushwork, rough canvas',
@@ -1018,6 +1110,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'giger',
+    year: 1940,
     label: 'Giger — biomechanika',
     block:
         'biomechanical airbrush painting by H. R. Giger, monochrome grey ink, fused organic and machine forms, ribbed tubular surfaces, smooth sprayed gradients, stencilled edges',
@@ -1029,6 +1122,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'rackham',
+    year: 1867,
     label: 'Rackham — sépiové pohádky',
     block:
         'edwardian book illustration by Arthur Rackham, sinuous sepia pen line, muted transparent watercolour washes, gnarled knotty contours, dusty brown and grey-green, aged paper',
@@ -1040,6 +1134,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'dore',
+    year: 1832,
     label: 'Doré — xylografie',
     block:
         'wood engraving after Gustave Doré, dense parallel hatching, dramatic theatrical light against deep black, sweeping vast depth, black ink on white book paper',
@@ -1051,6 +1146,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'sorayama',
+    year: 1947,
     label: 'Sorayama — chrom',
     block:
         'airbrush illustration by Hajime Sorayama, liquid mirror chrome surfaces, razor sharp specular reflections, smooth sprayed gradients, soft studio glow, flawless polished finish',
@@ -1062,6 +1158,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'burian',
+    year: 1905,
     label: 'Burian — teplý realismus',
     block:
         'illustration by Zdeněk Burian, warm naturalistic realism, broad confident brushwork, rich amber and earth tones, soft atmospheric depth, matte painted book plate surface',
@@ -1073,6 +1170,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'born',
+    year: 1930,
     label: 'Born — karikatura',
     block:
         'czech caricature illustration by Adolf Born, tall elongated figures, long noses, scratchy nervous pen line, soft pastel watercolour washes, witty flat staging, grainy paper',
@@ -1084,6 +1182,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'trnka',
+    year: 1912,
     label: 'Trnka — loutkové pohádky',
     block:
         'czech fairytale illustration by Jiří Trnka, soft rounded puppet-like figures, tender simple faces, muted warm tempera, gentle folk colour, dreamy blurred background, matte textured paper',
@@ -1095,6 +1194,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'ales',
+    year: 1852,
     label: 'Aleš — národní kresba',
     block:
         'czech pen drawing by Mikoláš Aleš, hard firm contour, lunette-like decorative composition, simple sparse hatching, flat folk ornament, restrained ochre tint, sgraffito-like cream surface',
@@ -1106,6 +1206,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'toyen',
+    year: 1902,
     label: 'Toyen — surrealismus',
     block:
         'czech surrealist painting by Toyen, smoky diffused grey and sand tones, sprayed veiled forms, ghostly dissolving outlines, empty open space, smooth matte canvas surface',
@@ -1117,6 +1218,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'kupka-early',
+    year: 1871,
     label: 'Kupka — spektrum',
     block:
         'symbolist painting by František Kupka, figure modelled in vertical planes of colour, spectral rainbow shifts, thin rhythmic drawn contour, glowing violet and orange, smooth dreamlike paint',
@@ -1128,6 +1230,7 @@ const _kArtistStyles = <StylePreset>[
   StylePreset(
     kind: StyleKind.artist,
     id: 'preisler',
+    year: 1872,
     label: 'Preisler — secesní symbolismus',
     block:
         'czech art nouveau symbolist oil painting by Jan Preisler, muted blue-green and dusky turquoise, soft decorative contours, flattened dreamy space, melancholy stillness, thin matte brushwork',
