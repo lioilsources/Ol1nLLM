@@ -34,12 +34,12 @@ void main() {
       // Dropped as duplicates; Mucha's text went into artnouveau instead.
       expect(ids, isNot(contains('rembrandt'))); // = baroque
       expect(ids, isNot(contains('mucha-poster'))); // → artnouveau
-      expect(kStylePresets.length, 82);
+      expect(kStylePresets.length, 310);
     });
 
     test('every artist style carries its period and a tag variant', () {
       final artists = kStylePresets.where((s) => s.artist != null).toList();
-      expect(artists.length, 42);
+      expect(artists.length, 103);
       for (final s in artists) {
         expect(s.period, isNotNull, reason: s.id);
         expect(s.booru, isNotNull, reason: s.id);

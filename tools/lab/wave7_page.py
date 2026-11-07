@@ -116,7 +116,7 @@ def gallery():
         rows = []
         for st in styles:
             figs = "".join(
-                f'<figure><img loading="lazy" alt="{m}" src="{thumb(cells[(mid, st)], 104)}"><figcaption>{m}</figcaption></figure>'
+                f'<figure><img loading="lazy" alt="{m}" src="{thumb(cells[(mid, st)], 124)}"><figcaption>{m}</figcaption></figure>'
                 if (mid, st) in cells and cells[(mid, st)].exists() else f'<figure><div class="miss"></div><figcaption>{m}</figcaption></figure>'
                 for mid, m in shown)
             name = "bez stylu (srovnání)" if st == "__baseline" else labels[st]
@@ -154,6 +154,8 @@ details{border-top:1px solid var(--line);padding-top:10px}summary{cursor:pointer
 .ctext b{display:block;font-weight:600;margin-bottom:4px}.ctext code{font:12px/1.45 "IBM Plex Mono",ui-monospace,monospace;color:var(--dim);display:block;overflow-wrap:anywhere}
 .strip{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:6px}.strip img,.miss{width:100%;aspect-ratio:2/3;object-fit:cover;display:block;background:var(--track)}
 @media (max-width:760px){.strip{grid-template-columns:repeat(4,minmax(0,1fr))}}
+body.sized .strip{grid-template-columns:repeat(auto-fill,minmax(min(var(--tw),100%),1fr))}
+.size{display:flex;gap:8px;align-items:center}.size input{width:140px;accent-color:var(--fg)}
 .chead{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
 .pick{font:500 13px "Instrument Sans",system-ui,sans-serif;padding:5px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--dim);cursor:pointer;flex:none}
 .pick:hover{border-color:var(--fg);color:var(--fg)}
@@ -163,6 +165,7 @@ details{border-top:1px solid var(--line);padding-top:10px}summary{cursor:pointer
 .verdict b{font-weight:600}.verdict .dim{color:var(--dim)}.verdict label{display:flex;gap:6px;align-items:center;cursor:pointer}
 .verdict ul{flex-basis:100%;margin:0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:4px 12px;color:var(--dim)}
 body.only-dropped .cand:not(.dropped){display:none}
+body.can-pick .cand[data-id]{cursor:pointer;-webkit-tap-highlight-color:transparent}body.can-pick .cand[data-id]:hover .ctext b{text-decoration:underline}
 """
 
 
@@ -179,27 +182,42 @@ function render() {
   count.textContent = dropped.size ? `Vyřazeno ${dropped.size} z ${cands.length}` : `Všech ${cands.length} stylů zůstává`;
   list.replaceChildren(...[...dropped.values()].sort().map(l => Object.assign(document.createElement("li"), {textContent: l})));
 }
+const tw = document.getElementById("tw");
+// At the minimum every model fits one row; above it the value is a tile width and rows wrap.
+const setTw = (v, save) => {
+  document.documentElement.style.setProperty("--tw", v + "px");
+  document.body.classList.toggle("sized", +v > +tw.min);
+  if (save) try { localStorage.setItem("w7tw", v); } catch {}
+};
+try { const v = localStorage.getItem("w7tw"); if (v !== null) tw.value = v; } catch {}
+setTw(tw.value); tw.oninput = () => setTw(tw.value, true);
 document.getElementById("onlydrop").onchange = e => document.body.classList.toggle("only-dropped", e.target.checked);
 (async () => {
   const db = await claude.use("db"), user = await claude.use("user");
   const note = bar.querySelector(".dim");
   if (!db) { note.textContent = "Výběr se tu nedá uložit, otevři stránku přihlášený na claude.ai."; return; }
   const col = db.collection("verdicts");
-  const canWrite = user ? await user.isOwner() : false;
+  // isOwner() can answer false in viewers that don't resolve ownership; the db rule still guards writes.
+  const canWrite = user ? (await user.isOwner()) || (await user.can("data.write")) !== false : true;
   const t = setTimeout(() => note.textContent = "Výběr se nenačetl.", 10000);
   col.onSnapshot(snap => {
     clearTimeout(t);
     dropped = new Map(snap.docs.filter(d => d.data().drop).map(d => [d.id, d.data().label || d.id]));
-    note.textContent = canWrite ? "Výchozí je ponechat. Klepni na Vyřadit u stylu, který do appky nechceš, výběr se ukládá hned." : "Výběr dělá vlastník stránky.";
+    note.textContent = canWrite ? "Výchozí je ponechat. Klepni na řádek stylu, který do appky nechceš, druhé klepnutí ho vrátí. Výběr se ukládá hned." : "Výběr dělá vlastník stránky.";
     render();
   }, () => { clearTimeout(t); note.textContent = "Výběr se nenačetl."; });
   if (!canWrite) return;
+  document.body.classList.add("can-pick");
   for (const c of cands) {
     const b = c.querySelector(".pick"); b.hidden = false;
-    b.onclick = async () => {
-      const id = c.dataset.id, doc = col.doc(id); b.disabled = true;
-      try { dropped.has(id) ? await doc.delete() : await doc.set({drop: true, label: c.dataset.label}); }
-      catch { note.textContent = "Uložení se nepovedlo, zkus to znovu."; }
+    c.onclick = async () => {
+      if (b.disabled) return;
+      const id = c.dataset.id, doc = col.doc(id), was = dropped.has(id); b.disabled = true;
+      // Optimistic toggle so the tap shows at once; the snapshot then confirms or reverts it.
+      was ? dropped.delete(id) : dropped.set(id, c.dataset.label); render();
+      try { was ? await doc.delete() : await doc.set({drop: true, label: c.dataset.label}); }
+      catch (e) { was ? dropped.set(id, c.dataset.label) : dropped.delete(id); render();
+        note.textContent = "Uložení se nepovedlo (" + (e && (e.code || e.message) || "chyba") + "), zkus to znovu."; }
       finally { b.disabled = false; }
     };
   }
@@ -217,7 +235,7 @@ def page():
 <main>
 <header><h1>Vlna 7 stylů</h1>
 <p class="lead">243 nových stylů je změřeno na všech 17 modelech, které appka umí pro txt2img. První kolo je kompletní. O tom, co půjde do appky, rozhoduješ ty.</p></header>
-<section><h2>Nové styly</h2><p>Každý kandidát vlny 7 na jednom řádku: jeho text a týž námět na všech modelech, které už ho prošly, seed 777. FLUX dev a Schnell jely na L40S s vahami fp8, jsou jen předvýběr. Deset modelů, které dřív nikdo neměřil (SDXL base, RealVis, Hassaku, CyberRealistic, AutismMix, Lustify, Juggernaut Lightning, WAI, Atomix, SD 1.5), jelo na L40S celé, i přes 82 stylů z registru. Nahoře je pro srovnání obrázek bez stylu. Do appky zatím nic nešlo, vybíráš ty. Oba náměty a všechny varianty jsou v archech níž.</p><div class="verdict" id="verdict"><b id="vcount"></b><label><input type="checkbox" id="onlydrop"> jen vyřazené</label><span class="dim">Načítám výběr…</span><ul></ul></div>{gallery()}</section>
+<section><h2>Nové styly</h2><p>Každý kandidát vlny 7 na jednom řádku: jeho text a týž námět na všech modelech, které už ho prošly, seed 777. FLUX dev a Schnell jely na L40S s vahami fp8, jsou jen předvýběr. Deset modelů, které dřív nikdo neměřil (SDXL base, RealVis, Hassaku, CyberRealistic, AutismMix, Lustify, Juggernaut Lightning, WAI, Atomix, SD 1.5), jelo na L40S celé, i přes 82 stylů z registru. Nahoře je pro srovnání obrázek bez stylu. Do appky zatím nic nešlo, vybíráš ty. Oba náměty a všechny varianty jsou v archech níž.</p><div class="verdict" id="verdict"><b id="vcount"></b><label><input type="checkbox" id="onlydrop"> jen vyřazené</label><label class="size">náhledy <input type="range" id="tw" min="50" max="400" step="10" value="50" aria-label="Velikost náhledů"></label><span class="dim">Načítám výběr…</span><ul></ul></div>{gallery()}</section>
 <section><h2>Stav měření</h2><div class="wrap"><table><thead><tr><th>běh</th><th>stroj</th><th>obrázky</th><th>průběh</th><th>stav</th></tr></thead><tbody>{status_rows()}</tbody></table></div></section>
 <section><h2>Závorky v tazích styl nezměnily</h2>
 <p>Tag <code>oil painting (medium)</code> šel do ComfyUI bez escapování, takže ho model nedostal celý. Oprava je správná a zůstává. Čekal jsem, že přinese médium i na Pony, ale měření to nepotvrdilo: obrázek s opravou a bez ní jsou si 3–5× blíž než kterýkoli z nich obrázku bez stylu a žádný směr nevyhrává.</p>
