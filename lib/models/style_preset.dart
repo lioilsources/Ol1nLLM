@@ -79,6 +79,14 @@ class StylePreset {
   /// (př. n. l. záporně). Jen pro UI; média ho nemají a řadí se podle abecedy.
   final int? year;
 
+  /// [label] s rokem na konci, jak ho ukazuje picker: „Vermeer (1632)“,
+  /// „Jeskynní malba (Lascaux) (17 000 př. n. l.)“. Média rok nemají.
+  String get labelWithYear {
+    final y = year;
+    if (y == null) return label;
+    return y < 0 ? '$label (${_thousands(-y)} př. n. l.)' : '$label ($y)';
+  }
+
   /// Text, který dostane model daného dialektu.
   ///
   /// Tagy se escapují až tady, ne v registru: ten zůstává čitelný danbooru
@@ -117,6 +125,19 @@ final List<StylePreset> kStylePresetsSorted = () {
   });
   return List<StylePreset>.unmodifiable(indexed.map((e) => e.$2));
 }();
+
+/// 25000 → „25 000“; čtyřmístné roky (1632) se neoddělují, jak je v češtině
+/// zvykem.
+String _thousands(int n) {
+  if (n < 10000) return '$n';
+  final s = '$n';
+  final buf = StringBuffer();
+  for (var i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) buf.write('\u00a0');
+    buf.write(s[i]);
+  }
+  return buf.toString();
+}
 
 /// Česká abeceda bez locale balíku: háčková písmena za základním, „ch“ za
 /// „h“; čárka a kroužek rozhodují až při jinak shodných řetězcích.
@@ -196,7 +217,7 @@ String applyStylePreset(
 bool styleMatchesQuery(StylePreset style, String query) {
   final q = _fold(query.trim());
   if (q.isEmpty) return true;
-  return _fold(style.label).contains(q) ||
+  return _fold(style.labelWithYear).contains(q) ||
       (style.artist != null && _fold(style.artist!).contains(q)) ||
       (style.period != null && _fold(style.period!).contains(q));
 }

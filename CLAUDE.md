@@ -205,7 +205,9 @@ třetí vlny v `docs/style-matrix.md`.
 do promptu nejdou) a hledáním podle labelu a autora bez ohledu na diakritiku
 (`styleMatchesQuery`). Pořadí v sekcích dává `kStylePresetsSorted`: kultury podle
 přibližného začátku, umělci podle roku narození (`StylePreset.year`), média
-podle české abecedy; registr sám zůstává v pořadí měření. Vyhledávací pole se samo nefokusuje a seznam schovává
+podle české abecedy; registr sám zůstává v pořadí měření. Řádek pickeru
+a mapa stylů ukazují `labelWithYear` („Vermeer (1632)“), chip v input baru
+kvůli šířce jen `label`. Vyhledávací pole se samo nefokusuje a seznam schovává
 klávesnici při tažení. Podtitulek je vždy `block`, i u anime modelu — tagy by
 se četly hůř.
 

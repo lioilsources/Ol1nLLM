@@ -279,6 +279,23 @@ void main() {
       expect(media.first, startsWith('Airbrush'));
     });
 
+    test('label carries the year at the end', () {
+      expect(styleById('vermeer')!.labelWithYear, 'Vermeer (1632)');
+      expect(
+        styleById('cave-painting')!.labelWithYear,
+        'Jeskynní malba (Lascaux) (17\u00a0000 př. n. l.)',
+      );
+      expect(
+        styleById('egyptian')!.labelWithYear,
+        'Ancient Egyptian wall painting (2600 př. n. l.)',
+      );
+      final medium = kStylePresets.firstWhere(
+        (s) => s.kind == StyleKind.medium,
+      );
+      expect(medium.labelWithYear, medium.label);
+      expect(styleMatchesQuery(styleById('vermeer')!, '1632'), isTrue);
+    });
+
     test('Czech collation', () {
       final words = [
         'Šablona',

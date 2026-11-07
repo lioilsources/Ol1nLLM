@@ -2403,7 +2403,7 @@ class _StyleChip extends StatelessWidget {
                                     size: 20,
                                   ),
                                   title: Text(
-                                    st.label,
+                                    st.labelWithYear,
                                     style: TextStyle(
                                       color: isSel
                                           ? AppTheme.accent
