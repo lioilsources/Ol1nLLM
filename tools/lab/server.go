@@ -212,7 +212,10 @@ func (s *Server) registries() (*Manifest, error) {
 		m, err := ReadManifest(manPath)
 		// A manifest from before the LoRA registry existed is not usable as a
 		// cache hit — it would silently leave every LoRA unclassified.
-		if err == nil && (len(m.Loras) > 0 || len(s.cache.loras) == 0) {
+		// Likewise one from before the picker order: its styles would come in
+		// registry order and without years.
+		ordered := err == nil && (len(m.Styles) == 0 || m.Styles[0].LabelWithYear != "")
+		if ordered && (len(m.Loras) > 0 || len(s.cache.loras) == 0) {
 			return m, nil
 		}
 	}

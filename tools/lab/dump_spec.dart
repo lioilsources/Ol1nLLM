@@ -172,6 +172,7 @@ StylePreset _candidate(int i, Object? raw) {
     booru: raw['booru'] as String?,
     artist: raw['artist'] as String?,
     period: raw['period'] as String?,
+    year: (raw['year'] as num?)?.toInt(),
   );
 }
 

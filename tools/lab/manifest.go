@@ -105,6 +105,10 @@ type ManifestStyle struct {
 	// Artist is empty for cultures and epochs.
 	Artist string `json:"artist,omitempty"`
 	Period string `json:"period,omitempty"`
+	// Year orders the picker (birth year, a culture's rough start, BCE
+	// negative); LabelWithYear is how the app shows it: „Vermeer (1632)“.
+	Year          *int   `json:"year,omitempty"`
+	LabelWithYear string `json:"labelWithYear,omitempty"`
 }
 
 type ManifestPose struct {

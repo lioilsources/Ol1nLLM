@@ -1014,6 +1014,9 @@ a volá `ComfyUIService.prepareForTest` → `_prepare`, takže lab měří to, c
 appka opravdu posílá. Modely, styly i pózy se čtou z registrů (`kImageModels`
 prořezané podle nainstalovaných checkpointů, `kStylePresets`, `kPoseTemplates`)
 a přes `manifest.json` tečou do UI — Dart zůstává jediným zdrojem pravdy.
+Styly jdou v pořadí pickeru appky (`kStylePresetsSorted`) i s `labelWithYear`;
+UI tím pořadím řadí panel, řádky výstupu i čipy filtru až při vykreslení, takže
+i staré běhy (baseline první, kandidáti mimo registr hned za ní).
 
 **Modely bez grafu (gen-queue / NIM)**: `flux-schnell` jede přes gen-queue, ne
 ComfyUI, takže do `wf/<id>.json` jde místo grafu **request body** — a staví ho

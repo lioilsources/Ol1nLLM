@@ -129,7 +129,7 @@ async function loadConfig() {
   // wrap of them is unusable. Cultures and epochs are the styles without an
   // artist; the tooltip is the CLIP block, the one text that reads as prose.
   const styleChip = (s) =>
-    `<button class="chip" data-style="${esc(s.id)}" aria-pressed="false" title="${esc(s.block)}">${esc(s.label)}</button>`;
+    `<button class="chip" data-style="${esc(s.id)}" aria-pressed="false" title="${esc(s.block)}">${esc(s.labelWithYear || s.label)}</button>`;
   $('styles').innerHTML = [
     ['kultury a epochy', cfg.styles.filter((s) => s.kind === 'culture')],
     ['umělci', cfg.styles.filter((s) => s.kind === 'artist')],
@@ -144,7 +144,7 @@ async function loadConfig() {
   // period, CLIP block, booru tags), diacritics-insensitive, all words must hit.
   // Selection survives filtering — a hidden chip stays in the batch.
   const hay = new Map(cfg.styles.map((s) => [s.id,
-    fold([s.id, s.label, s.artist, s.period, s.block, s.booru].filter(Boolean).join(' '))]));
+    fold([s.id, s.labelWithYear || s.label, s.artist, s.period, s.block, s.booru].filter(Boolean).join(' '))]));
   $('stylefilter').oninput = () => {
     const words = fold($('stylefilter').value).split(/\s+/).filter(Boolean);
     $('styles').querySelectorAll('[data-style]').forEach((b) => {
@@ -659,10 +659,11 @@ function renderInner() {
     const secondaryOf = (c) => (byStyle ? String(c.promptIndex) : c.style);
     const primaries = [...new Set(inFlow.map(primaryOf))];
     if (!byStyle) primaries.sort((a, b) => Number(a) - Number(b));
+    else primaries.sort(byStyleRank);
     for (const primary of primaries) {
       const sub = inFlow.filter((c) => primaryOf(c) === primary);
       const secondaries = [...new Set(sub.map(secondaryOf))];
-      if (!byStyle) { /* secondaries are styles, keep manifest order */ }
+      if (!byStyle) secondaries.sort(byStyleRank);
       else secondaries.sort((a, b) => Number(a) - Number(b));
       const groupKey = secondaries.length > 1
         ? `${flow}|${primary}` : null;
@@ -997,7 +998,8 @@ function runStyles() {
     }
     if (c.styleText) e.text.push(c.styleText);
   }
-  return [...out.values()].map((e) => ({ ...e, hay: fold(e.text.filter(Boolean).join(' ')) }));
+  return [...out.values()].sort((a, b) => byStyleRank(a.id, b.id))
+    .map((e) => ({ ...e, hay: fold(e.text.filter(Boolean).join(' ')) }));
 }
 
 function outQueryMatches(hay) {
@@ -1090,9 +1092,27 @@ function promptRowLabel(man, idx) {
   return p.length > 90 ? p.slice(0, 90) + '…' : p;
 }
 
+// The app's picker order, which the config already arrives in (Dart's
+// kStylePresetsSorted): cultures by history, artists by birth year, media A–Z.
+// Applied at render time, so runs dumped before the order existed read the
+// same way. Baseline first; ids outside the registry (--styles-file
+// candidates) next, in the run's own order — the run exists for them.
+function styleRank(id) {
+  if (id === '__baseline') return -2;
+  if (!state.styleRanks || state.styleRanksOf !== state.config) {
+    state.styleRanksOf = state.config;
+    state.styleRanks = new Map((state.config?.styles || []).map((s, i) => [s.id, i]));
+  }
+  return state.styleRanks.has(id) ? state.styleRanks.get(id) : -1;
+}
+
+function byStyleRank(a, b) {
+  return styleRank(a) - styleRank(b);
+}
+
 function styleLabel(id) {
   const s = (state.config?.styles || []).find((x) => x.id === id);
-  if (s) return s.label;
+  if (s) return s.labelWithYear || s.label;
   // Candidates from --styles-file are not in the registry; their label travels
   // with the cells instead.
   const c = (state.manifest?.cells || []).find((x) => x.style === id && x.styleLabel);
