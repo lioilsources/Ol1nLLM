@@ -109,7 +109,9 @@ void main() {
                     jsonDecode(File(env['STYLES_FILE']!).readAsStringSync())
                         as List<dynamic>,
                   ),
-            registry: kStylePresets,
+            // Picker order (cultures by history, artists by birth year,
+            // media A–Z), so a registry run reads like the app's list.
+            registry: kStylePresetsSorted,
             wanted: _csv(env['STYLES']),
           );
 
@@ -413,7 +415,7 @@ void main() {
                 'model': m.id,
                 'modelLabel': m.label,
                 'style': styleId,
-                'styleLabel': style?.label,
+                'styleLabel': style?.labelWithYear,
                 'styleText': style?.blockFor(dialect),
                 'promptIndex': pi,
                 // Which entry of the prompt file this column came from; null
@@ -601,7 +603,7 @@ void main() {
                 'model': m.id,
                 'modelLabel': m.label,
                 'style': styleId,
-                'styleLabel': style?.label,
+                'styleLabel': style?.labelWithYear,
                 'styleText': style?.blockFor(dialect),
                 'promptIndex': pi,
                 'promptBody': prompts[pi].body?.id,
@@ -810,11 +812,13 @@ void main() {
               },
           ],
           'styles': [
-            for (final s in kStylePresets)
+            for (final s in kStylePresetsSorted)
               {
                 'id': s.id,
                 'kind': s.kind.name,
                 'label': s.label,
+                'labelWithYear': s.labelWithYear,
+                if (s.year != null) 'year': s.year,
                 'block': s.block,
                 if (s.booru != null) 'booru': s.booru,
                 if (s.artist != null) 'artist': s.artist,

@@ -288,6 +288,21 @@ void main() {
       );
     });
 
+    test('a registry run keeps the picker order, a candidate its year', () {
+      // dump.dart hands the lab kStylePresetsSorted; selection keeps the pool
+      // order, so picked registry styles read like the app's list.
+      final picked = selectStyles(
+        candidates: null,
+        registry: kStylePresetsSorted,
+        wanted: const ['vermeer', 'cave-painting', 'davinci'],
+      );
+      expect(picked.map((s) => s.id), ['cave-painting', 'davinci', 'vermeer']);
+      final c = parseStyleCandidates([
+        {'id': 'x', 'block': 'flat colour', 'label': 'X', 'year': 1900},
+      ]);
+      expect(c.single.labelWithYear, 'X (1900)');
+    });
+
     test('an id the file lacks comes from the registry', () {
       // The duplicate check needs the old style next to the candidate, under
       // the same seed and reference — i.e. in the same run.
