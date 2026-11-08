@@ -276,6 +276,91 @@ List<String> speechChunks(String spoken) {
   return chunks;
 }
 
+const kMinBpm = 40;
+const kMaxBpm = 220;
+const kDefaultBpm = 90;
+
+/// How the text is laid on the beat — the server's phrasing presets
+/// (AiStack `app/tts/rhythm.py`, `STYLES`). The value's name is the id it
+/// takes.
+enum PhrasingStyle {
+  spoken('Čtení', 'Klidné čtení s krátkou pauzou po každé frázi.'),
+  news('Zprávy', 'Rovně a hustě, skoro bez pauz.'),
+  slam('Slam', 'Pomalu, s dlouhým tichem po každé frázi.'),
+  rap('Rap', 'Hustý text, krátké fráze, důrazný projev.'),
+  preacher('Kazatel', 'Pomalu a přehnaně, s dlouhými pauzami.');
+
+  const PhrasingStyle(this.label, this.description);
+
+  final String label;
+  final String description;
+}
+
+/// Speech on a grid: the server cuts the text into phrases and fits each to
+/// its beats, so the reading keeps a tempo and a click or a beat can go under
+/// it. It aligns where a phrase starts and how long it takes, not syllables —
+/// this is rhythmic reading, not flow.
+class SpeechRhythm {
+  final int bpm;
+  final PhrasingStyle style;
+
+  /// Click under the voice, accented on the first beat of the bar.
+  final bool beat;
+
+  const SpeechRhythm({
+    this.bpm = kDefaultBpm,
+    this.style = PhrasingStyle.spoken,
+    this.beat = false,
+  });
+
+  SpeechRhythm copyWith({int? bpm, PhrasingStyle? style, bool? beat}) =>
+      SpeechRhythm(
+        bpm: (bpm ?? this.bpm).clamp(kMinBpm, kMaxBpm),
+        style: style ?? this.style,
+        beat: beat ?? this.beat,
+      );
+
+  /// As `rhythm` of `POST /v1/audio/tts`, and as stored in Hive.
+  Map<String, dynamic> toJson() => {
+    'bpm': bpm,
+    'style': style.name,
+    'beat': beat,
+  };
+
+  factory SpeechRhythm.fromJson(Map<String, dynamic> j) => SpeechRhythm(
+    bpm: ((j['bpm'] as num?)?.round() ?? kDefaultBpm).clamp(kMinBpm, kMaxBpm),
+    // A style this build does not know (a newer server's) reads as plain.
+    style: PhrasingStyle.values.asNameMap()[j['style']] ?? PhrasingStyle.spoken,
+    beat: j['beat'] as bool? ?? false,
+  );
+
+  /// Distinguishes this rhythm from any other — in cache file names and in
+  /// what counts as "the same reading".
+  String get tag => '$bpm-${style.name}-${beat ? 'beat' : 'voice'}';
+
+  String get label => '$bpm BPM · ${style.label}';
+}
+
+/// BPM from the moments a finger tapped: the mean interval of the last taps.
+/// Null until there are two, and a pause over 2.5 s starts a new count —
+/// that is someone coming back to the button, not a 24 BPM song.
+int? tapTempo(List<DateTime> taps) {
+  final run = <DateTime>[];
+  for (final t in taps) {
+    if (run.isNotEmpty &&
+        t.difference(run.last) > const Duration(milliseconds: 2500)) {
+      run.clear();
+    }
+    run.add(t);
+  }
+  if (run.length < 2) return null;
+  final recent = run.length > 6 ? run.sublist(run.length - 6) : run;
+  final ms =
+      recent.last.difference(recent.first).inMilliseconds / (recent.length - 1);
+  if (ms <= 0) return null;
+  return (60000 / ms).round().clamp(kMinBpm, kMaxBpm);
+}
+
 /// Body of `POST /v1/audio/tts`.
 ///
 /// `commercial_only` is false on purpose: the app is a private tool and the
@@ -287,15 +372,27 @@ Map<String, dynamic> speechRequest({
   required String text,
   required String voiceId,
   required String language,
+  SpeechRhythm? rhythm,
 }) => {
   'text': text,
   'language': language,
   'voice': voiceId,
   'commercial_only': false,
   'format': 'mp3',
+  'rhythm': ?rhythm?.toJson(),
 };
 
 /// File name of the synthesised audio — the same text in the same voice is
 /// synthesised once and replayed from disk.
-String speechFileName(String voiceId, String language, String text) =>
-    '${sha1.convert(utf8.encode('$voiceId\n$language\n$text'))}.mp3';
+///
+/// The rhythm is part of the name: the same sentence at 90 BPM is another
+/// recording, and without it the cache would answer with the plain one.
+String speechFileName(
+  String voiceId,
+  String language,
+  String text, [
+  SpeechRhythm? rhythm,
+]) {
+  final key = [voiceId, language, ?rhythm?.tag, text].join('\n');
+  return '${sha1.convert(utf8.encode(key))}.mp3';
+}

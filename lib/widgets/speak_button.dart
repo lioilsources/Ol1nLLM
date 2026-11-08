@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/constants/theme.dart';
 import '../providers/speech_player.dart';
+import '../providers/voice_studio_provider.dart';
 
 /// Reads [text] aloud in voice [voiceId] through the app's one
 /// [SpeechPlayer]: a tap starts reading (sound comes after the first short
@@ -25,7 +26,11 @@ class SpeakButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final key = SpeechPlayer.keyOf(text, voiceId);
+    // The studio's rhythm applies to every reading, so the same answer read
+    // on the beat is a different reading than the plain one.
+    final rhythm = ref.watch(voiceStudioProvider.select((s) => s.rhythm));
+    final variant = rhythm?.tag ?? '';
+    final key = SpeechPlayer.keyOf(text, voiceId, variant);
     ref.listen(speechPlayerProvider, (_, player) {
       final error = player.takeError(key);
       if (error == null) return;
@@ -57,7 +62,8 @@ class SpeakButton extends ConsumerWidget {
         color: AppTheme.accent,
       ),
       SpeechStatus.idle => Icon(
-        Icons.volume_up_outlined,
+        // A different icon when the reading will come out on the beat.
+        rhythm == null ? Icons.volume_up_outlined : Icons.graphic_eq,
         size: size,
         color: color,
       ),
@@ -66,12 +72,13 @@ class SpeakButton extends ConsumerWidget {
       SpeechStatus.loading => 'Zrušit čtení',
       SpeechStatus.playing => 'Pozastavit',
       SpeechStatus.paused => 'Pokračovat',
-      SpeechStatus.idle => 'Přečíst nahlas',
+      SpeechStatus.idle =>
+        rhythm == null ? 'Přečíst nahlas' : 'Přečíst v rytmu (${rhythm.label})',
     };
     void tap() {
       // Listening is not typing.
       FocusManager.instance.primaryFocus?.unfocus();
-      ref.read(speechPlayerProvider).toggle(text, voiceId);
+      ref.read(speechPlayerProvider).toggle(text, voiceId, variant: variant);
     }
 
     if (filled) {

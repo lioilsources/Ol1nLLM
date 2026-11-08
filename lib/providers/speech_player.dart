@@ -57,7 +57,10 @@ class SpeechPlayer extends ChangeNotifier {
   ({String key, String message})? _error;
   bool _disposed = false;
 
-  static String keyOf(String text, String voiceId) => '$voiceId\n$text';
+  /// [variant] tells apart readings of the same text in the same voice that
+  /// sound different (the rhythm it is read in).
+  static String keyOf(String text, String voiceId, [String variant = '']) =>
+      '$voiceId\n$variant\n$text';
 
   SpeechStatus status(String key) {
     if (key != _key) return SpeechStatus.idle;
@@ -77,8 +80,12 @@ class SpeechPlayer extends ChangeNotifier {
 
   /// Start reading, pause / resume it, or — while it is still waiting for
   /// audio — give up on it.
-  Future<void> toggle(String text, String voiceId) async {
-    final key = keyOf(text, voiceId);
+  Future<void> toggle(
+    String text,
+    String voiceId, {
+    String variant = '',
+  }) async {
+    final key = keyOf(text, voiceId, variant);
     if (key == _key) {
       final path = _path;
       if (path == null || !_started) return stop();
