@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/constants/theme.dart';
+import '../models/music_project.dart';
 import '../models/persona.dart';
 import '../models/voice.dart';
+import '../providers/music_studio_provider.dart';
 import '../providers/voice_studio_provider.dart';
 import '../services/persona_service.dart';
 import '../widgets/music_playback.dart';
@@ -188,6 +190,24 @@ class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
     }
   }
 
+  /// Tempo sheet: pops with a BPM, or 0 for "no rhythm".
+  Future<void> _pickTempo() async {
+    _dismissKeyboard();
+    final notifier = ref.read(voiceStudioProvider.notifier);
+    final current = ref.read(voiceStudioProvider).rhythm;
+    final bpm = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      isScrollControlled: true,
+      shape: _sheetShape,
+      builder: (_) => _TempoSheet(initial: current?.bpm),
+    );
+    if (bpm == null) return;
+    await notifier.setRhythm(
+      bpm == 0 ? null : (current ?? const SpeechRhythm()).copyWith(bpm: bpm),
+    );
+  }
+
   Future<void> _assignPersona(Persona persona) async {
     _dismissKeyboard();
     final state = ref.read(voiceStudioProvider);
@@ -246,6 +266,8 @@ class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
               voiceId: _selected,
               voiceLabel: state.voiceLabel(_selected),
             ),
+            const _SectionTitle('Rytmus'),
+            _RhythmSection(rhythm: state.rhythm, onPickTempo: _pickTempo),
             _SectionTitle(
               'Moje hlasy',
               trailing: state.loading
@@ -391,6 +413,227 @@ String _customSubtitle(Voice v, StoredVoice? stored) {
     else
       'česky: ${czech.map((m) => '${m.model} (${m.licenseLabel})').join(', ')}',
   ].join(' · ');
+}
+
+/// Tempo, phrasing and click for every reading. Phrasing and click only
+/// mean something once there is a tempo, so they appear with it.
+class _RhythmSection extends ConsumerWidget {
+  const _RhythmSection({required this.rhythm, required this.onPickTempo});
+
+  final SpeechRhythm? rhythm;
+  final VoidCallback onPickTempo;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final rhythm = this.rhythm;
+    final notifier = ref.read(voiceStudioProvider.notifier);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              ActionChip(
+                avatar: Icon(
+                  Icons.speed,
+                  size: 16,
+                  color: rhythm == null
+                      ? AppTheme.textSecondary
+                      : AppTheme.accent,
+                ),
+                label: Text(
+                  rhythm == null ? 'Tempo: vypnuto' : '${rhythm.bpm} BPM',
+                ),
+                onPressed: onPickTempo,
+              ),
+              if (rhythm != null) ...[
+                for (final style in PhrasingStyle.values)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: ChoiceChip(
+                      label: Text(style.label),
+                      selected: style == rhythm.style,
+                      onSelected: (_) {
+                        _dismissKeyboard();
+                        notifier.setRhythm(rhythm.copyWith(style: style));
+                      },
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: FilterChip(
+                    label: const Text('Klik'),
+                    selected: rhythm.beat,
+                    onSelected: (on) {
+                      _dismissKeyboard();
+                      notifier.setRhythm(rhythm.copyWith(beat: on));
+                    },
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            rhythm == null
+                ? 'Se zapnutým tempem se text čte po frázích zarovnaných '
+                      'na doby — v chatu i tady.'
+                : '${rhythm.style.description} Zarovnávají se fráze, ne '
+                      'slabiky: je to čtení v tempu, ne flow.',
+            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Picks a BPM: slider, tapping it out, or taking the tempo Music Studio
+/// measured in a sample (the way to "his BPM": have his track analysed
+/// there). Pops with the BPM, or 0 to turn the rhythm off.
+class _TempoSheet extends ConsumerStatefulWidget {
+  const _TempoSheet({required this.initial});
+
+  /// Null when the rhythm is off.
+  final int? initial;
+
+  @override
+  ConsumerState<_TempoSheet> createState() => _TempoSheetState();
+}
+
+class _TempoSheetState extends ConsumerState<_TempoSheet> {
+  late int _bpm = widget.initial ?? kDefaultBpm;
+  final _taps = <DateTime>[];
+
+  void _tap() {
+    _taps.add(DateTime.now());
+    final bpm = tapTempo(_taps);
+    setState(() {
+      if (bpm != null) _bpm = bpm;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final measured = [
+      for (final p in ref.watch(musicStudioProvider).projects)
+        if (p.analysis?.bpm case final int bpm
+            when bpm >= kMinBpm && bpm <= kMaxBpm)
+          (project: p, bpm: bpm),
+    ];
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Tempo',
+              style: TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '$_bpm BPM',
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 34,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            ),
+            Slider(
+              value: _bpm.toDouble(),
+              min: kMinBpm.toDouble(),
+              max: kMaxBpm.toDouble(),
+              divisions: kMaxBpm - kMinBpm,
+              activeColor: AppTheme.accent,
+              onChanged: (v) => setState(() {
+                _bpm = v.round();
+                _taps.clear();
+              }),
+            ),
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: FilledButton.tonalIcon(
+                icon: const Icon(Icons.touch_app_outlined),
+                label: Text(
+                  _taps.length < 2
+                      ? 'Ťukej do rytmu'
+                      : 'Ťukej dál… (${_taps.length})',
+                ),
+                onPressed: _tap,
+              ),
+            ),
+            if (measured.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Změřeno v Music Studiu',
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    for (final m in measured.take(8))
+                      ActionChip(
+                        label: Text('${_shortName(m.project)} · ${m.bpm}'),
+                        onPressed: () => setState(() {
+                          _bpm = m.bpm;
+                          _taps.clear();
+                        }),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 18),
+            // Wraps rather than overflows when large text makes the two
+            // buttons wider than the sheet.
+            SizedBox(
+              width: double.infinity,
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                runAlignment: WrapAlignment.end,
+                spacing: 8,
+                children: [
+                  if (widget.initial != null)
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, 0),
+                      child: const Text('Vypnout rytmus'),
+                    )
+                  else
+                    const SizedBox.shrink(),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context, _bpm),
+                    child: const Text('Použít'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _shortName(MusicProject p) {
+  final dot = p.name.lastIndexOf('.');
+  final name = dot > 0 ? p.name.substring(0, dot) : p.name;
+  return name.length > 18 ? '${name.substring(0, 17)}…' : name;
 }
 
 class _SectionTitle extends StatelessWidget {

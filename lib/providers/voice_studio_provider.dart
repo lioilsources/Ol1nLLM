@@ -27,6 +27,10 @@ class VoiceStudioState {
   /// Persona id → voice id. Personas missing here speak [kDefaultVoiceId].
   final Map<String, String> personaVoices;
 
+  /// Tempo and phrasing every reading uses; null = plain reading. A setting
+  /// of the studio, not of a persona or a voice.
+  final SpeechRhythm? rhythm;
+
   final bool loading;
 
   /// A reference sample is going up.
@@ -43,6 +47,7 @@ class VoiceStudioState {
     this.voices = const [],
     this.stored = const {},
     this.personaVoices = const {},
+    this.rhythm,
     this.loading = false,
     this.uploading = false,
     this.dir,
@@ -69,6 +74,8 @@ class VoiceStudioState {
     List<Voice>? voices,
     Map<String, StoredVoice>? stored,
     Map<String, String>? personaVoices,
+    SpeechRhythm? rhythm,
+    bool clearRhythm = false,
     bool? loading,
     bool? uploading,
     String? dir,
@@ -80,6 +87,7 @@ class VoiceStudioState {
     voices: voices ?? this.voices,
     stored: stored ?? this.stored,
     personaVoices: personaVoices ?? this.personaVoices,
+    rhythm: clearRhythm ? null : rhythm ?? this.rhythm,
     loading: loading ?? this.loading,
     uploading: uploading ?? this.uploading,
     dir: dir ?? this.dir,
@@ -112,6 +120,7 @@ class VoiceStudioNotifier extends StateNotifier<VoiceStudioState> {
 
   static const _boxName = 'voice_studio';
   static const _personaKey = 'persona_voices';
+  static const _rhythmKey = 'rhythm';
 
   final VoiceService _service;
   final Directory? _dirOverride;
@@ -132,9 +141,15 @@ class VoiceStudioNotifier extends StateNotifier<VoiceStudioState> {
       final dir = await _dirFuture;
       final box = await Hive.openBox(_boxName);
       final raw = box.get(_personaKey);
+      final rhythm = box.get(_rhythmKey);
       if (!mounted) return;
       state = state.copyWith(
         dir: dir.path,
+        rhythm: rhythm == null
+            ? null
+            : SpeechRhythm.fromJson(
+                jsonDecode(rhythm as String) as Map<String, dynamic>,
+              ),
         personaVoices: raw == null
             ? null
             : (jsonDecode(raw as String) as Map).cast<String, String>(),
@@ -293,6 +308,24 @@ class VoiceStudioNotifier extends StateNotifier<VoiceStudioState> {
     }
   }
 
+  // ── Rhythm ───────────────────────────────────────────────────────────────
+
+  /// Read on the beat from now on; null goes back to plain reading.
+  Future<void> setRhythm(SpeechRhythm? rhythm) async {
+    state = state.copyWith(rhythm: rhythm, clearRhythm: rhythm == null);
+    if (_dirOverride != null) return;
+    try {
+      final box = await Hive.openBox(_boxName);
+      if (rhythm == null) {
+        await box.delete(_rhythmKey);
+      } else {
+        await box.put(_rhythmKey, jsonEncode(rhythm.toJson()));
+      }
+    } catch (e) {
+      debugPrint('VoiceStudioNotifier.setRhythm error: $e');
+    }
+  }
+
   // ── Speech ───────────────────────────────────────────────────────────────
 
   final Map<String, Future<String>> _inFlight = {};
@@ -313,11 +346,17 @@ class VoiceStudioNotifier extends StateNotifier<VoiceStudioState> {
     // catalogue the request would go out as Czech even for an English voice.
     if (state.voices.isEmpty) await loadVoices();
     final language = speechLanguage(state.voice(voiceId));
-    final name = speechFileName(voiceId, language, spoken);
+    final rhythm = state.rhythm;
+    final name = speechFileName(voiceId, language, spoken, rhythm);
     return _inFlight[name] ??=
         _synthesise(
           name,
-          speechRequest(text: spoken, voiceId: voiceId, language: language),
+          speechRequest(
+            text: spoken,
+            voiceId: voiceId,
+            language: language,
+            rhythm: rhythm,
+          ),
         ).whenComplete(() {
           // Block body: returning the removed future would make it wait on
           // itself.
