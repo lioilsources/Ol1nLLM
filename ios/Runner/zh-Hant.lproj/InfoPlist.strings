@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "用於拍攝照片，以便在影像工作室中開始創作或最佳化影像。";
+"NSMicrophoneUsageDescription" = "音樂工作室會錄製你周遭播放的音樂作為作曲範本，語音工作室會錄製要複製的聲音。";
+"NSPhotoLibraryAddUsageDescription" = "用於將生成的影像儲存至你的照片圖庫。";
+"NSPhotoLibraryUsageDescription" = "用於選擇要編輯和進行 OCR 的影像。";
