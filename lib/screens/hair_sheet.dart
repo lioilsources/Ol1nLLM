@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/hairstyle_preset.dart';
 import '../core/constants/theme.dart';
+import '../l10n/l10n.dart';
 
 /// What the Kadeřník sheet picked: a hairstyle id (null = keep the cut) and a
 /// colour id (null = keep the colour). Never both null.
@@ -58,19 +59,18 @@ class _HairSheetState extends State<HairSheet> {
         height: MediaQuery.of(context).size.height * 0.75,
         child: Column(
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 4),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
               child: Text(
-                'Kadeřník',
-                style: TextStyle(color: AppTheme.textPrimary, fontSize: 17),
+                context.l10n.hairdresser,
+                style: const TextStyle(color: AppTheme.textPrimary, fontSize: 17),
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
               child: Text(
-                'Tvář zůstane; barva vlasů taky, pokud nevybereš novou. '
-                'Nejlíp funguje čelní portrét s celými vlasy, bez čepice.',
-                style: TextStyle(color: AppTheme.textSecondary, height: 1.4),
+                context.l10n.hairdresserHint,
+                style: const TextStyle(color: AppTheme.textSecondary, height: 1.4),
               ),
             ),
             if (widget.colours.isNotEmpty)
@@ -93,7 +93,7 @@ class _HairSheetState extends State<HairSheet> {
                                       : CircleAvatar(
                                           backgroundColor: Color(c!.swatch!),
                                         ),
-                                  label: Text(c?.label ?? 'Barva beze změny'),
+                                  label: Text(c?.label ?? context.l10n.colourUnchanged),
                                   selected: _colour == c?.id,
                                   onSelected: (_) =>
                                       setState(() => _colour = c?.id),
@@ -110,17 +110,17 @@ class _HairSheetState extends State<HairSheet> {
                           : () => Navigator.of(
                               context,
                             ).pop((style: null, colour: _colour)),
-                      child: const Text('Jen barva'),
+                      child: Text(context.l10n.colourOnly),
                     ),
                   ],
                 ),
               ),
             if (widget.catalog.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(20),
+              Padding(
+                padding: const EdgeInsets.all(20),
                 child: Text(
-                  'Zatím žádné účesy.',
-                  style: TextStyle(color: AppTheme.textSecondary),
+                  context.l10n.noHairstylesYet,
+                  style: const TextStyle(color: AppTheme.textSecondary),
                 ),
               )
             else ...[
@@ -136,9 +136,9 @@ class _HairSheetState extends State<HairSheet> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                 child: TextField(
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.search),
-                    hintText: 'Hledat účes',
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.search),
+                    hintText: context.l10n.searchHairstyle,
                     isDense: true,
                   ),
                   onChanged: (v) => setState(() => _query = v),
