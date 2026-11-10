@@ -768,6 +768,12 @@ func defaultSecondsPerCell(m ManifestModel) float64 {
 	if m.Backend == BackendNim {
 		per = 10
 	}
+	// Qwen-Image's graph has its numbers baked in, so the preset says nothing.
+	// Measured on SPARK 2026-11-10: 131–167 s of execution per 1328² picture
+	// at 20 steps, next to another run's Illustrious cells.
+	if m.ID == "qwen-image" {
+		per = 150
+	}
 	return per
 }
 

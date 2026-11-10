@@ -42,7 +42,7 @@ PromptFamily promptFamilyFor(ImageModelSpec m) {
 
 /// Qwen-Image's dedicated txt2img graph (UNETLoader + Qwen2.5-VL encoder,
 /// AuraFlow shift 3.1, 1328², 20 steps, cfg 2.5 — the ComfyUI reference
-/// setting, measured on the L40S at 20–35 s a picture).
+/// setting; 131–167 s a picture on SPARK, 20–35 s on the L40S).
 const kQwenImageTxt2img = 'assets/comfyui/qwen_image_txt2img.api.json';
 
 /// The diffusion weights that graph loads, for pruning by the server's list.
