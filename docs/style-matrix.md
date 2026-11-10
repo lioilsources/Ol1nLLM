@@ -362,3 +362,58 @@ picker ztlumí jen ticho a nic neskrývá. Práh 0.15 je nad rozptylem seedu
 (7a: escapovaná × neescapovaná varianta 0.05–0.06), ale `egyptian` ve vlně 4
 ukázal, že lokální detail (hieroglyfy na lemu) pod ním projde — proto
 ztlumení, ne zákaz.
+
+## Sedmá vlna — 7e: poloha stylu a prefix kvality (2026-11-10)
+
+Otázka z telefonu: Illustrious maluje u technik čmáranice bez postavy, WAI,
+NoobAI a Hassaku techniku „nechápou“, Pony a Animagine nereagují na malíře.
+Dvě hypotézy, které appka nikdy neměřila: **kde v promptu blok stylu stojí**
+(appka: prefix, námět, styl) a jestli mu **prefix kvalitních tagů** (score
+tagy, `masterpiece`, u NoobAI `very awa`) nebere váhu. Běh 7e na L40S: 24
+stylů (12 technik, 12 epoch a malířů) × 6 tagových modelů (pony,
+illustrious-xl, noobai-xl, animagine-xl, wai-illustrious,
+hassaku-illustrious) × 2 náměty (baletka na špičce; muž čte u stolu), seed
+777. `param.stylePosition=end|front|first` s prefixem (`w7-7e-pos`, 900
+buněk) a `end|front` s `param.qualityPrefix=off` (`w7-7e-nopfx`, 600 buněk),
+0 chyb. Archy po modelech staví `tools/lab/wave7e_page.py`.
+
+Barevná metrika (reakce vůči baseline téhož běhu, průměr ze 48 buněk; za
+tečkou počet tichých dvojic pod 0.15):
+
+| model | end (appka) | front | first | end, bez prefixu | front, bez prefixu |
+|---|---|---|---|---|---|
+| pony | 0.54 · 0 | 0.54 · 1 | 0.53 · 0 | 0.60 · 2 | 0.62 · 0 |
+| illustrious-xl | 0.82 · 0 | 0.82 · 0 | 0.83 · 0 | 0.83 · 0 | 0.83 · 0 |
+| noobai-xl | 0.59 · 0 | 0.63 · 0 | 0.61 · 0 | 0.63 · 0 | 0.63 · 0 |
+| animagine-xl | 0.55 · 0 | 0.53 · 0 | 0.52 · 0 | 0.63 · 8 | 0.61 · 7 |
+| wai-illustrious | 0.68 · 0 | 0.70 · 0 | 0.70 · 0 | 0.76 · 0 | 0.79 · 0 |
+| hassaku-illustrious | 0.42 · 6 | 0.46 · 8 | 0.44 · 7 | 0.48 · 0 | 0.50 · 1 |
+
+Poloha stylu barvu nemění (rozdíly do 0.04), ale archy říkají, proč:
+
+- **Blok na konci (dnešní appka) je všude nejlepší nebo stejný.** Posunutý
+  před námět nebo na první místo udělá z tagu média *námět obrazu*: Hassaku
+  a NoobAI namalují u `charcoal` kus uhlu, u `crayon` krabici pastelek, u
+  `watercolor` list papíru, a muž u stolu zmizí; na konci promptu drží
+  postava u Hassaku i Illustrious (charcoal, linocut, crayon). U malířů
+  a epoch (vermeer, caravaggio, hokusai, egyptian) je poloha jedno.
+  **Složení promptu se nemění.**
+- **Prefix vypnutý** vrátí postavu tam, kde s ním mizela: Illustrious muž
+  u stolu v akvarelu (s prefixem duch, bez něj čitelná figura), Pony
+  caravaggio a hokusai (s prefixem abstraktní vír, bez něj červená
+  monochromní postava / tušová kresba). Na Animagine a WAI je bez prefixu
+  stejné, na Hassaku a NoobAI akvarel a uhel selžou tak i tak. Není to čistá
+  výhra (Animagine bez prefixu 8 tichých dvojic, Pony ztrácí „score“ look),
+  takže zůstává zapnutý; kandidát na per-model přepínač až po širším běhu.
+- **Skutečná příčina čmáranic není poloha ani prefix, ale próza proti
+  tagům.** Na Illustrious-linii vyhrají silné tagy média (`watercolor
+  \(medium\)`, `charcoal \(medium\)`) nad prózou „a man reading at a table“,
+  protože model ji čte slabě; baletka přežila líp, protože `ballerina`,
+  `tutu`, `pointe shoes` jsou tagy samy o sobě. Lék je otagovaný námět, ne
+  jiné pořadí: PR #47 (překlad promptu na Danbooru tagy pro booru modely)
+  míří přesně sem a 7e je jeho měřitelná kontrola — stejných 24 stylů × 6
+  modelů s přeloženým námětem.
+- WAI techniky bere ve všech variantách (kvaš, fix, pastel, propiska), na
+  baletce i na muži u stolu; „WAI nechápe techniku“ z telefonu se tu
+  nereprodukovalo — stojí za to porovnat přesný prompt z telefonu (dvojice,
+  pozice) s laboratorním.
