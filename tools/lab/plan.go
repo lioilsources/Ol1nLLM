@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -229,6 +230,16 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 	}
 	for _, msg := range missingPromptTexts(bodies, families) {
 		e.Blockers = append(e.Blockers, "prompty: "+msg)
+	}
+	// A negative typed for a FLUX model goes nowhere: its graph runs at cfg 1
+	// and has no negative input, and the NIM request has no such field. Worth
+	// saying before the run — in a restyle the position model is often FLUX,
+	// and the photo is then drawn without the negative the box promised.
+	if deaf := families[FamilyFlux]; len(deaf) > 0 && (strings.TrimSpace(s.Negative) != "" || hasNegative(bodies)) {
+		sort.Strings(deaf)
+		e.Warnings = append(e.Warnings, fmt.Sprintf(
+			"negativ: %s ho nečte (FLUX negativ nemá) — u těch buněk se neuplatní",
+			strings.Join(deaf, ", ")))
 	}
 	var est float64
 	// Stage 1: one photo per prompt column, not per style and not per sweep

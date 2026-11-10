@@ -157,10 +157,26 @@ Pozice jako tabulka — sloupec `pony` je rodina `danbooru`, oddělovač může 
 čárka, středník i tabulátor (český Excel), BOM nevadí:
 
 ```csv
-id,juggernaut,pony,flux
-standing,"a woman standing, full body","1girl, solo, standing, full body","A photograph of a woman standing, full body."
-sitting,"a woman sitting on a chair","1girl, solo, sitting, chair","A photograph of a woman sitting on a chair."
+id,juggernaut,pony,flux,negative
+standing,"a woman standing, full body","1girl, solo, standing, full body","A photograph of a woman standing, full body.","sitting, chair"
+sitting,"a woman sitting on a chair","1girl, solo, sitting, chair","A photograph of a woman sitting on a chair.",
 ```
+
+**Negativ pozice** (sloupec `negative`, v YAML klíč `negative:` vedle rodin)
+je volitelný a říká, co na téhle jedné pozici být nemá. Je jeden pro všechny
+rodiny a s negativem běhu (`--negative`, pole „negativ“) se **sčítá**:
+
+```
+negativ modelu (preset)  +  negativ běhu  +  negativ pozice
+```
+
+spojené čárkou v tomhle pořadí; tag, který je v negativu běhu i pozice, jde
+jednou. Platí v obou krocích — fotka pozice i každý její restyle — protože
+co na pozici nepatří, nepatří ani na přemalbu. Prázdná buňka = pozice jede jen
+s negativem běhu. **Čte ho jen generická SDXL šablona**: `flux-manga` (cfg 1)
+a `flux-schnell` negativní podmínění nemají, takže u nich se neuplatní žádný
+z těch tří a odhad to před startem řekne jmenovitě. Co do buňky opravdu šlo,
+je v manifestu jako `negative` (čtené zpátky z grafu).
 
 Postavy jsou obyčejný text, řádek na postavu (`long red hair, green eyes,
 pale skin`), a **jdou všem rodinám stejně** — jsou to krátké výčty, které čte
