@@ -14,6 +14,8 @@
 /// dvakrát.
 library;
 
+import 'style_quiet.dart';
+
 part 'style_presets_artists.dart';
 part 'style_presets_cultures.dart';
 part 'style_presets_media.dart';
@@ -209,6 +211,40 @@ String applyStylePreset(
 }) {
   if (style == null || prompt.trim().isEmpty) return prompt;
   return '$prompt, ${style.blockFor(dialect)}';
+}
+
+/// True when the lab saw [modelId] paint the same picture with [styleId] as
+/// without it ([kStyleQuietOn], `tools/lab/reactions.py`). A pair that was
+/// never measured is not quiet: an unmeasured style is shown as usual, the
+/// same rule as a LoRA of unknown family.
+bool styleQuietOn(String? styleId, String modelId) =>
+    styleId != null && (kStyleQuietOn[modelId]?.contains(styleId) ?? false);
+
+/// Models to suggest when a style is quiet on the current one, in the order
+/// the matrix ranked their willingness to take a style (`docs/style-matrix.md`:
+/// sdxl-base repaints the whole picture even for a medium, Juggernaut has the
+/// widest range, schnell holds styles well).
+const kStyleFallbackModels = [
+  'sdxl-base',
+  'juggernaut-xl',
+  'juggernaut-xl-lightning',
+  'flux-schnell',
+];
+
+/// The first fallback that is available, is not [modelId] and is not quiet on
+/// [styleId] itself; null when none qualifies.
+String? styleAlternativeModel(
+  String styleId,
+  String modelId,
+  Iterable<String> availableIds,
+) {
+  final available = availableIds.toSet();
+  for (final id in kStyleFallbackModels) {
+    if (id != modelId && available.contains(id) && !styleQuietOn(styleId, id)) {
+      return id;
+    }
+  }
+  return null;
 }
 
 /// Hledání v pickeru: [query] proti labelu, autorovi a období, bez ohledu na
