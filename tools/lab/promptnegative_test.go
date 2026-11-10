@@ -115,4 +115,17 @@ func TestEstimateWarnsWhenANegativeMeetsFlux(t *testing.T) {
 	if w := warned(sdxl); w != "" {
 		t.Fatalf("SDXL modely negativ čtou: %q", w)
 	}
+
+	// Qwen-Image reads the FLUX column and still takes a negative: the dump
+	// says so per model, and the warning follows that, not the family.
+	yes := true
+	man.Models = append(man.Models, ManifestModel{
+		ID: "qwen", Label: "Qwen-Image", Backend: BackendComfy, PromptFamily: FamilyFlux,
+		ReadsNegative: &yes,
+	})
+	qwen := typed
+	qwen.BaseModel = "qwen"
+	if w := warned(qwen); w != "" {
+		t.Fatalf("Qwen-Image negativ čte: %q", w)
+	}
 }

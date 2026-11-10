@@ -383,6 +383,33 @@ void main() {
       expect(promptFamilyFor(imageModelById('flux-schnell')), PromptFamily.flux);
     });
 
+    test('Qwen-Image is a lab-only position model', () {
+      final qwen = kLabOnlyModels.single;
+      // Not in the app's picker: the app would offer it on a server without
+      // the weights.
+      expect(kImageModels.where((m) => m.id == qwen.id), isEmpty);
+      // It reads a sentence, so the flux column — and still a negative.
+      expect(promptFamilyFor(qwen), PromptFamily.flux);
+      expect(readsNegative(qwen), isTrue);
+      expect(readsNegative(imageModelById('flux-manga')), isFalse);
+      expect(readsNegative(imageModelById('flux-schnell')), isFalse);
+      expect(readsNegative(imageModelById('juggernaut-xl')), isTrue);
+
+      // Shown while the weights are unknown, hidden when the server lacks them.
+      expect(labModelsFor(const [], const []).map((m) => m.id),
+          contains(qwen.id));
+      expect(labModelsFor(const [], const ['flux1-dev.safetensors'])
+          .map((m) => m.id), isNot(contains(qwen.id)));
+      expect(labModelsFor(const [], const [kQwenImageUnet]).map((m) => m.id),
+          contains(qwen.id));
+
+      // The graph carries the sentinels the service fills in.
+      final graph = File(kQwenImageTxt2img).readAsStringSync();
+      expect(graph, contains('__PROMPT__'));
+      expect(graph, contains('__NEGATIVE__'));
+      expect(graph, contains(kQwenImageUnet));
+    });
+
     test('a model reads its own text, and a missing one is never borrowed', () {
       final body = two().first;
       expect(body.textFor(PromptFamily.danbooru), '1girl, solo');

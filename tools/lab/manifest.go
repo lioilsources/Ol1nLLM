@@ -97,10 +97,13 @@ type ManifestModel struct {
 	// PromptFamily is which text of a prompt file the model reads: "danbooru",
 	// "juggernaut" or "flux". Empty in manifests written before prompt files
 	// existed — promptFamilyOf derives it then.
-	PromptFamily string         `json:"promptFamily"`
-	StyleNote    *string        `json:"styleNote"`
-	CkptName     *string        `json:"ckptName"`
-	Preset       map[string]any `json:"preset"`
+	PromptFamily string `json:"promptFamily"`
+	// ReadsNegative says whether the model's graph takes a negative prompt.
+	// Nil in manifests written before Qwen-Image; readsNegative derives it.
+	ReadsNegative *bool          `json:"readsNegative,omitempty"`
+	StyleNote     *string        `json:"styleNote"`
+	CkptName      *string        `json:"ckptName"`
+	Preset        map[string]any `json:"preset"`
 }
 
 type ManifestStyle struct {

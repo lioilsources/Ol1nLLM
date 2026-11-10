@@ -1103,7 +1103,9 @@ buňka `promptBody` a v `prompt` text přečtený zpátky z grafu. Ukázka:
 
 **Pozice → restyle (flow `restyle`)**: běh se dvěma modely — `--base-model`
 (v UI „model pozice“) nakreslí z textu fotku, `--models` ji přemalují do stylu
-přes ControlNet nad txt2img šablonou (graf „zachovej pózu“). Prompt má tři
+přes ControlNet nad txt2img šablonou (graf „zachovej pózu“). Model pozice
+může být i `qwen-image` — jen v labu (`kLabOnlyModels`), čte sloupec `flux`
+i negativ, podrobnosti v `tools/lab/README.md`. Prompt má tři
 vrstvy: pozice (`--prompts-yaml`, YAML i CSV `id,juggernaut,pony,flux,negative` — negativ pozice se připojí za negativ běhu, v obou krocích),
 postava (`--characters`, řádek = postava) a styl; první krok dostane pozici
 + postavu, druhý všechny tři. Fotka vzniká jednou na pozici × postavu, buňka

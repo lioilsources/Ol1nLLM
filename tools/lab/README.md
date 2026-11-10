@@ -140,6 +140,22 @@ lab run --flows restyle --base-model flux-manga --models illustrious-xl \
 V UI je to blok „pozice → restyle“: vybráním modelu pozice se flow přepne na
 `restyle`, modely zaškrtnuté v seznamu jsou ty, které přemalovávají.
 
+**Qwen-Image jako model pozice** (`--base-model qwen-image`): jednoprůchodová
+náhrada za FLUX v prvním kroku, licence Apache 2.0 (FLUX.1-dev je
+nekomerční). Graf `assets/comfyui/qwen_image_txt2img.api.json` je
+referenční nastavení ComfyUI: `qwen_image_fp8_e4m3fn` + Qwen2.5-VL 7B fp8
+(typ `qwen_image`), AuraFlow shift 3.1, 1328², 20 kroků, cfg 2.5. Na SPARKu
+(2026-11-10, vedle běžícího labu s Illustrious) **131–167 s na obrázek**,
+na L40S 20–35 s; restyl Illustrious nad fotkou pak 34 s. Volná paměť SPARKu
+klesla se Qwen + Illustrious v ComfyUI ze 47 na 31 GiB, profil `comfy`
+ho tedy unese. Fotka se dělá jednou na pozici × postavu, takže u běhu
+s desítkami stylů na fotku je to malá část času. Čte větu, tedy sloupec `flux`, ale na rozdíl od FLUXu
+**čte i negativ** (cfg 2.5), takže negativ běhu i sloupec `negative` u něj
+platí. Je **jen v labu** (`kLabOnlyModels` v `dump_spec.dart`), ne v appce,
+a nabízí se, jen když ComfyUI hlásí jeho váhy v `UNETLoader` (seznam vah
+neznámý = ukáže se). Jako model restylu se přeskočí (ControlNet v grafu
+nemá) a styly umí hůř než Illustrious.
+
 **Prompt má tři vrstvy** a každý krok dostane jen ty, které mu patří:
 
 | vrstva | odkud | 1. krok (pozice) | 2. krok (restyle) |

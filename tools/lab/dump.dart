@@ -133,8 +133,14 @@ void main() {
         : File(
             env['CKPTS']!,
           ).readAsLinesSync().where((l) => l.trim().isNotEmpty).toList();
+    // Diffusion weights of the UNETLoader graphs, for the lab-only models.
+    final unets = env['UNETS'] == null
+        ? const <String>[]
+        : File(
+            env['UNETS']!,
+          ).readAsLinesSync().where((l) => l.trim().isNotEmpty).toList();
     final wantedModels = _csv(env['MODELS']);
-    final wanted = imageModelsFor(installed)
+    final wanted = labModelsFor(installed, unets)
         .where((m) => wantedModels.isEmpty || wantedModels.contains(m.id))
         .toList();
     final models = wanted
@@ -154,7 +160,9 @@ void main() {
     final baseId = env['BASE_MODEL'] ?? '';
     ImageModelSpec? base;
     if (flows.contains('restyle') && baseId.isNotEmpty) {
-      base = imageModelsFor(installed).where((m) => m.id == baseId).firstOrNull;
+      base = labModelsFor(installed, unets)
+          .where((m) => m.id == baseId)
+          .firstOrNull;
       if (base == null) {
         fail('model pozice "$baseId" není v registru nebo na serveru chybí '
             'jeho checkpoint');
@@ -981,6 +989,9 @@ void main() {
                 // the plan can check a file against the picked models without
                 // keeping a second opinion about the registry.
                 'promptFamily': promptFamilyFor(m).name,
+                // Whether the graph takes a negative — the plan warns where
+                // the negative box would go nowhere.
+                'readsNegative': readsNegative(m),
                 'styleNote': m.styleNote,
                 'ckptName': m.preset?.ckptName,
                 'preset': m.preset == null
