@@ -225,7 +225,7 @@ void main() {
           batch: 1,
           seed: seed,
           latentSize: asked,
-          userNegative: negative,
+          userNegative: prompts[pi].negativeWith(negative),
         );
         prompt = _encodedText(payload, positive: true) ?? subject;
         sentNegative = _encodedText(payload, positive: false);
@@ -442,7 +442,7 @@ void main() {
                     seed: cellSeed,
                     depthImageName: refName,
                     latentSize: latent,
-                    userNegative: negative,
+                    userNegative: prompts[pi].negativeWith(negative),
                     faceIdentity: cellFace,
                     faceDetail: cellFaceDetail,
                     positivePrefix: composed.builderPrefix,
@@ -484,7 +484,7 @@ void main() {
                     seed: cellSeed,
                     depthImageName: hintImage,
                     latentSize: latent,
-                    userNegative: negative,
+                    userNegative: prompts[pi].negativeWith(negative),
                     faceIdentity: cellFace,
                     faceDetail: cellFaceDetail,
                     positivePrefix: composed.builderPrefix,
@@ -513,7 +513,7 @@ void main() {
                     sourceDepth:
                         poseImage == null && poseMode != 'depth' && autoDepth,
                     depthImageName: poseMode == 'depth' ? refName : null,
-                    userNegative: negative,
+                    userNegative: prompts[pi].negativeWith(negative),
                     editDenoise: editDenoise,
                     faceIdentity: cellFace,
                     faceDetail: cellFaceDetail,
@@ -528,7 +528,7 @@ void main() {
                     poseImageName: poseImage,
                     depthImageName: poseMode == 'depth' ? refName : null,
                     latentSize: latent,
-                    userNegative: negative,
+                    userNegative: prompts[pi].negativeWith(negative),
                     faceIdentity: cellFace,
                     faceDetail: cellFaceDetail,
                     positivePrefix: composed.builderPrefix,

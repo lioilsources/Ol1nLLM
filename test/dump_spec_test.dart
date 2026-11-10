@@ -473,6 +473,49 @@ void main() {
           ['a dancer, red hair', 'a dancer, black hair']);
     });
 
+    test('the run negative and the prompt negative are sent together', () {
+      final bodies = parsePromptBodies([
+        {
+          'id': 'standing',
+          'texts': {'juggernaut': 'a woman standing'},
+          'negative': ' sitting, chair ',
+        },
+        {
+          'id': 'sitting',
+          'texts': {'juggernaut': 'a woman sitting'},
+        },
+      ]);
+      expect(bodies.map((b) => b.negative), ['sitting, chair', '']);
+
+      final axis = buildPromptAxis(prefixes: const [''], bodies: bodies);
+      // Run-wide first, then what this one prompt adds.
+      expect(axis[0].negativeWith('blurry'), 'blurry, sitting, chair');
+      expect(axis[0].negativeWith(null), 'sitting, chair');
+      expect(axis[1].negativeWith('blurry'), 'blurry');
+      // Nothing asked anywhere: the service must get null, not '', so the
+      // graph is the one a run without negatives always sent.
+      expect(axis[1].negativeWith(null), isNull);
+      expect(axis[1].negativeWith('  '), isNull);
+      // A tag both name goes once, where it stood first.
+      expect(axis[0].negativeWith('Chair, blurry'), 'Chair, blurry, sitting');
+      // A typed prompt has no file behind it.
+      expect(const PromptAxisEntry(prefix: 'a dancer').negativeWith('blurry'),
+          'blurry');
+    });
+
+    test('a negative that is not text is rejected', () {
+      expect(
+        () => parsePromptBodies([
+          {
+            'id': 'x',
+            'texts': {'flux': 'a'},
+            'negative': ['blurry'],
+          },
+        ]),
+        throwsFormatException,
+      );
+    });
+
     test('a body that would render as something else is rejected', () {
       expect(() => parsePromptBodies(['x']), throwsFormatException);
       expect(

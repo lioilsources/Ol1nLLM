@@ -33,6 +33,10 @@ import (
 // `pony` is the column name people use for the tag family; it means danbooru.
 // An empty cell is "no text for this family", the same as a missing YAML key.
 //
+// A `negative` column (a `negative:` key in YAML) is what this one prompt must
+// not show — "sitting" next to a standing pose. One text for every family: it
+// is a tag list either way, and FLUX takes no negative at all.
+//
 // Go owns the parse — the estimate needs the count on every keystroke, long
 // before the dump could be asked — and writes the normalised JSON into the run
 // directory for dump.dart. One parser, and the run keeps the file it ran on.
@@ -45,12 +49,17 @@ const (
 // promptFamilies is also the order every message lists them in.
 var promptFamilies = []string{FamilyDanbooru, FamilyJuggernaut, FamilyFlux}
 
-// PromptBody is one entry of the file: an id and its text per family. The JSON
-// tags are the contract with dump_spec.dart's parsePromptBodies.
+// PromptBody is one entry of the file: an id, its text per family and the
+// negative that goes with it. The JSON tags are the contract with
+// dump_spec.dart's parsePromptBodies.
 type PromptBody struct {
-	ID    string            `json:"id"`
-	Texts map[string]string `json:"texts"`
+	ID       string            `json:"id"`
+	Texts    map[string]string `json:"texts"`
+	Negative string            `json:"negative,omitempty"`
 }
+
+// negativeKey is the one column that is not a family.
+const negativeKey = "negative"
 
 // promptFamilyOf is the model's family as dump.dart computed it. Derived there,
 // from the app registry, and carried on the manifest so the plan does not keep
@@ -118,13 +127,22 @@ func parsePromptBodies(data []byte, name string) ([]PromptBody, error) {
 				name, val.Line, id, strings.Join(promptFamilies, ", "))
 		}
 		texts := map[string]string{}
+		negative := ""
 		for j := 0; j+1 < len(val.Content); j += 2 {
 			fk, fv := val.Content[j], val.Content[j+1]
+			if fk.Value == negativeKey {
+				if fv.Kind != yaml.ScalarNode {
+					return nil, fmt.Errorf("%s řádek %d: negativ promptu %q musí být text",
+						name, fv.Line, id)
+				}
+				negative = strings.TrimSpace(fv.Value)
+				continue
+			}
 			// A typo here would otherwise drop a text silently, and the run
 			// would look like a measurement of a prompt nobody wrote.
 			if !knownPromptFamily(fk.Value) {
-				return nil, fmt.Errorf("%s řádek %d: prompt %q má neznámou rodinu %q — čekám %s",
-					name, fk.Line, id, fk.Value, strings.Join(promptFamilies, ", "))
+				return nil, fmt.Errorf("%s řádek %d: prompt %q má neznámou rodinu %q — čekám %s, %s",
+					name, fk.Line, id, fk.Value, strings.Join(promptFamilies, ", "), negativeKey)
 			}
 			if fv.Kind != yaml.ScalarNode || strings.TrimSpace(fv.Value) == "" {
 				return nil, fmt.Errorf("%s řádek %d: prompt %q má prázdný text pro %s",
@@ -135,7 +153,7 @@ func parsePromptBodies(data []byte, name string) ([]PromptBody, error) {
 		if len(texts) == 0 {
 			return nil, fmt.Errorf("%s řádek %d: prompt %q nemá žádný text", name, key.Line, id)
 		}
-		out = append(out, PromptBody{ID: id, Texts: texts})
+		out = append(out, PromptBody{ID: id, Texts: texts, Negative: negative})
 	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("%s: žádné prompty", name)
@@ -202,8 +220,8 @@ func parsePromptCSV(data []byte, name string) ([]PromptBody, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", name, err)
 	}
-	columns := make([]string, len(header)) // family per column; "" for id
-	idCol := -1
+	columns := make([]string, len(header)) // family per column; "" for id and negative
+	idCol, negCol := -1, -1
 	for i, h := range header {
 		h = strings.ToLower(strings.TrimSpace(h))
 		if h == "id" {
@@ -213,10 +231,17 @@ func parsePromptCSV(data []byte, name string) ([]PromptBody, error) {
 			idCol = i
 			continue
 		}
+		if h == negativeKey {
+			if negCol >= 0 {
+				return nil, fmt.Errorf("%s: sloupec %s je v hlavičce dvakrát", name, negativeKey)
+			}
+			negCol = i
+			continue
+		}
 		fam, ok := csvFamilyColumns[h]
 		if !ok {
-			return nil, fmt.Errorf("%s: neznámý sloupec %q — čekám id, juggernaut, pony, flux",
-				name, header[i])
+			return nil, fmt.Errorf("%s: neznámý sloupec %q — čekám id, juggernaut, pony, flux, %s",
+				name, header[i], negativeKey)
 		}
 		for _, other := range columns[:i] {
 			if other == fam {
@@ -268,7 +293,11 @@ func parsePromptCSV(data []byte, name string) ([]PromptBody, error) {
 		if len(texts) == 0 {
 			return nil, fmt.Errorf("%s řádek %d: prompt %q nemá žádný text", name, line, id)
 		}
-		out = append(out, PromptBody{ID: id, Texts: texts})
+		body := PromptBody{ID: id, Texts: texts}
+		if negCol >= 0 {
+			body.Negative = strings.TrimSpace(row[negCol])
+		}
+		out = append(out, body)
 	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("%s: žádné prompty", name)
@@ -324,4 +353,14 @@ func missingPromptTexts(bodies []PromptBody, families map[string][]string) []str
 			strings.Join(lacking, ", "), f, strings.Join(readers, ", ")))
 	}
 	return out
+}
+
+// hasNegative says whether any entry of the file brings its own negative.
+func hasNegative(bodies []PromptBody) bool {
+	for _, b := range bodies {
+		if b.Negative != "" {
+			return true
+		}
+	}
+	return false
 }

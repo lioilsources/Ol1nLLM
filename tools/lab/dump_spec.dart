@@ -42,10 +42,18 @@ PromptFamily promptFamilyFor(ImageModelSpec m) {
 /// One entry of the prompt file: the same subject written out per family,
 /// under a shared id.
 class PromptBody {
-  const PromptBody({required this.id, required this.texts});
+  const PromptBody({
+    required this.id,
+    required this.texts,
+    this.negative = '',
+  });
 
   final String id;
   final Map<PromptFamily, String> texts;
+
+  /// What this one prompt must not show ("sitting" next to a standing pose).
+  /// One text for every family, unlike [texts]: it is a tag list either way.
+  final String negative;
 
   /// The text this family reads.
   ///
@@ -66,7 +74,7 @@ class PromptBody {
 }
 
 /// Prompt bodies as the plan normalises them out of the YAML file:
-/// `[{id, texts: {danbooru, juggernaut, flux}}]`.
+/// `[{id, texts: {danbooru, juggernaut, flux}, negative?}]`.
 ///
 /// Go owns the YAML parse (one parser in the system, and the run directory
 /// keeps the JSON it produced), so anything malformed has been rejected with a
@@ -99,7 +107,15 @@ PromptBody _promptBody(int i, Object? raw) {
     byFamily[family] = text;
   }
   if (byFamily.isEmpty) throw FormatException('prompt "$id" nemá žádný text');
-  return PromptBody(id: id, texts: byFamily);
+  final negative = raw['negative'];
+  if (negative != null && negative is! String) {
+    throw FormatException('prompt "$id": negativ musí být text');
+  }
+  return PromptBody(
+    id: id,
+    texts: byFamily,
+    negative: (negative as String?)?.trim() ?? '',
+  );
 }
 
 /// One column of the prompt axis: a line from the prompt box, the body it
@@ -136,6 +152,25 @@ class PromptAxisEntry {
       text = text.substring(0, text.length - 1);
     }
     return [prefix, text, character].where((s) => s.isNotEmpty).join(', ');
+  }
+
+  /// The user negative of this column: the run's negative box, then what the
+  /// prompt file adds for this one prompt. Null when neither says anything, so
+  /// a run without negatives sends exactly what it sent before the file could
+  /// carry one.
+  ///
+  /// The model's own negative is not here — the service puts it in front, as
+  /// it does for the app's ALL-CAPS words. A tag both sources name is sent
+  /// once, at its first place.
+  String? negativeWith(String? runNegative) {
+    final seen = <String>{};
+    final tags = [
+      for (final part in [runNegative ?? '', body?.negative ?? ''])
+        for (final tag in part.split(','))
+          if (tag.trim().isNotEmpty && seen.add(tag.trim().toLowerCase()))
+            tag.trim(),
+    ];
+    return tags.isEmpty ? null : tags.join(', ');
   }
 }
 
