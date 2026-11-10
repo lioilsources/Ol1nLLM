@@ -235,7 +235,16 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 	// and has no negative input, and the NIM request has no such field. Worth
 	// saying before the run — in a restyle the position model is often FLUX,
 	// and the photo is then drawn without the negative the box promised.
-	if deaf := families[FamilyFlux]; len(deaf) > 0 && (strings.TrimSpace(s.Negative) != "" || hasNegative(bodies)) {
+	// Per model, not per family: Qwen-Image reads the FLUX column and still
+	// takes a negative.
+	var deaf []string
+	for _, m := range models {
+		inRun := len(picked) == 0 || picked[m.ID] || (base != nil && m.ID == base.ID)
+		if inRun && !readsNegative(m) {
+			deaf = append(deaf, m.Label)
+		}
+	}
+	if len(deaf) > 0 && (strings.TrimSpace(s.Negative) != "" || hasNegative(bodies)) {
 		sort.Strings(deaf)
 		e.Warnings = append(e.Warnings, fmt.Sprintf(
 			"negativ: %s ho nečte (FLUX negativ nemá) — u těch buněk se neuplatní",

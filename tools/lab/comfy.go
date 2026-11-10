@@ -137,6 +137,16 @@ func (c *Comfy) Checkpoints() ([]string, error) {
 	return comboOptions(info, "CheckpointLoaderSimple", "ckpt_name"), nil
 }
 
+// Unets lists the diffusion weights a UNETLoader graph can load — what the
+// lab-only models (Qwen-Image) are pruned by, as checkpoints prune the rest.
+func (c *Comfy) Unets() ([]string, error) {
+	info, err := c.ObjectInfo("UNETLoader")
+	if err != nil {
+		return nil, err
+	}
+	return comboOptions(info, "UNETLoader", "unet_name"), nil
+}
+
 func (c *Comfy) Loras() ([]string, error) {
 	info, err := c.ObjectInfo("LoraLoader")
 	if err != nil {

@@ -82,6 +82,15 @@ func promptFamilyOf(m ManifestModel) string {
 	return FamilyJuggernaut
 }
 
+// readsNegative says whether a negative reaches the model. Old manifests
+// lack the field; there the FLUX family was exactly the set that ignores it.
+func readsNegative(m ManifestModel) bool {
+	if m.ReadsNegative != nil {
+		return *m.ReadsNegative
+	}
+	return promptFamilyOf(m) != FamilyFlux
+}
+
 // ParsePromptBodies reads the prompt YAML in document order — the index of an
 // entry becomes a column of the run, so the order on disk has to survive.
 func ParsePromptBodies(path string) ([]PromptBody, error) {
