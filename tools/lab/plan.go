@@ -36,6 +36,15 @@ type Spec struct {
 	// be said out loud — the reference generator needs one image, not 83.
 	NoStyles bool `json:"noStyles,omitempty"`
 
+	// Two-stage run (flow "restyle"): BaseModel renders one photo per prompt
+	// column from text, and every picked model then repaints it per style, held
+	// to the photo by a ControlNet hint — depth (the default) or canny edges.
+	BaseModel string `json:"baseModel,omitempty"`
+	Hint      string `json:"hint,omitempty"`
+	// Characters is the second prompt layer (hair, eyes, ethnicity): one line
+	// is one character, multiplied with the prompt axis and sent to both stages.
+	Characters []string `json:"characters,omitempty"`
+
 	// Kadeřník flow: hairstyle candidates and the directory `lab hairmasks`
 	// prepared for the reference (masks.json + uploaded mask names).
 	HairFile   string   `json:"hairFile"`
@@ -152,13 +161,23 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 			prompts *= len(bodies)
 		}
 	}
+	// Characters multiply the axis the same way: every position × every
+	// character is its own column.
+	characters := s.characterLines()
+	if len(characters) > 0 {
+		prompts *= len(characters)
+	}
 	flows := 0
 	hairFlow := false
+	restyle := false
 	for _, f := range s.Flows {
 		if f == "hair" {
 			hairFlow = true
 		} else {
 			flows++
+		}
+		if f == "restyle" {
+			restyle = true
 		}
 	}
 	if flows == 0 && !hairFlow {
@@ -184,26 +203,51 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 	// A body that has no text for a family in the run would crash the dump.
 	// The dump is the backstop; the file is the slow thing to fix, so it is
 	// worth saying here, before anything is started.
-	for _, msg := range missingPromptTexts(bodies, promptFamiliesInRun(models, picked)) {
+	families := promptFamiliesInRun(models, picked)
+	// The position model reads the file too, in its own family — and it need
+	// not be one of the picked models.
+	var base *ManifestModel
+	if restyle && s.BaseModel != "" {
+		for i := range models {
+			if models[i].ID == s.BaseModel {
+				base = &models[i]
+			}
+		}
+		if base == nil {
+			e.Blockers = append(e.Blockers,
+				fmt.Sprintf("model pozice %q není v registru", s.BaseModel))
+		} else {
+			if base.Txt2img != nil && !*base.Txt2img {
+				e.Blockers = append(e.Blockers, fmt.Sprintf(
+					"%s neumí txt2img — fotku pozice z textu nevyrobí", base.Label))
+			}
+			if !picked[base.ID] {
+				fam := promptFamilyOf(*base)
+				families[fam] = append(families[fam], base.Label)
+			}
+		}
+	}
+	for _, msg := range missingPromptTexts(bodies, families) {
 		e.Blockers = append(e.Blockers, "prompty: "+msg)
 	}
 	var est float64
+	// Stage 1: one photo per prompt column, not per style and not per sweep
+	// value — that is the whole economy of the technique.
+	if base != nil {
+		per := secondsPerCell[base.ID]
+		if per == 0 {
+			per = defaultSecondsPerCell(*base)
+		}
+		e.Cells += prompts
+		est += float64(prompts) * per
+	}
 	for _, m := range models {
 		if len(picked) > 0 && !picked[m.ID] {
 			continue
 		}
 		per := secondsPerCell[m.ID]
 		if per == 0 {
-			per = 30 // conservative default; refined from real timings
-			if steps, ok := m.Preset["steps"].(float64); ok && steps <= 8 {
-				per = 12
-			}
-			// A NIM model has no preset to read the step count from, and the
-			// default would over-report it threefold: Schnell is four steps
-			// behind a queue that usually has nothing in it.
-			if m.Backend == BackendNim {
-				per = 10
-			}
+			per = defaultSecondsPerCell(m)
 		}
 		modelFlows, modelHair := flows, hairCount
 		if m.Backend == BackendNim {
@@ -231,11 +275,47 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 	// above pretends one. A run that says "0 ok, 0 chyb" after a GPU-less
 	// minute is the wrong way to find out the textarea was empty. A prompt file
 	// is prompts too: with one the box is allowed to be empty.
-	if len(s.Prompts) == 0 && s.PromptsYAML == "" {
+	// A character line is a prompt as well — "a redhead with green eyes" alone
+	// is a legal column.
+	if len(s.Prompts) == 0 && s.PromptsYAML == "" && len(characters) == 0 {
 		e.Blockers = append(e.Blockers, "napiš aspoň jeden prompt")
 	}
 	if len(s.Flows) == 0 {
 		e.Blockers = append(e.Blockers, "vyber aspoň jednu flow")
+	}
+	if restyle && s.BaseModel == "" {
+		e.Blockers = append(e.Blockers,
+			"flow restyle potřebuje model pozice — ten vyrobí fotku, kterou ostatní přemalují")
+	}
+	if s.Hint != "" && s.Hint != "depth" && s.Hint != "canny" {
+		e.Blockers = append(e.Blockers, fmt.Sprintf("hint musí být depth nebo canny, ne %q", s.Hint))
+	}
+	if restyle {
+		// Edges ride the SDXL union ControlNet; the FLUX hint net is depth-only,
+		// so the dump skips those cells. Said here, before the stage-1 photos
+		// are paid for.
+		canny := s.Hint == "canny" || strings.Contains(s.Sweep, "canny")
+		var noHint, depthOnly []string
+		for _, m := range models {
+			if !picked[m.ID] || m.Backend == BackendNim {
+				continue
+			}
+			switch {
+			case !m.SupportsPose && m.CkptName != nil:
+				noHint = append(noHint, m.Label)
+			case canny && m.CkptName == nil:
+				depthOnly = append(depthOnly, m.Label)
+			}
+		}
+		if len(noHint) > 0 {
+			e.Warnings = append(e.Warnings, fmt.Sprintf(
+				"%s nemá ControlNet — restyle se u něj přeskočí", strings.Join(noHint, ", ")))
+		}
+		if len(depthOnly) > 0 {
+			e.Warnings = append(e.Warnings, fmt.Sprintf(
+				"%s umí jen hloubkový hint — buňky s hranami (canny) se u něj přeskočí",
+				strings.Join(depthOnly, ", ")))
+		}
 	}
 	if s.needsRef() && s.RefName == "" {
 		e.Blockers = append(e.Blockers,
@@ -399,8 +479,10 @@ func (s *Spec) hasDepthSource(man *Manifest, picked map[string]bool) bool {
 	var img2img bool
 	for _, f := range s.Flows {
 		switch f {
-		case "repose":
-			return true // the reference *is* the depth hint
+		case "repose", "restyle":
+			// The reference — or the position photo — *is* the hint, and the
+			// LoadImage the face is read from is there for depth and canny alike.
+			return true
 		case "img2img":
 			img2img = true
 		}
@@ -582,6 +664,18 @@ func (s *Spec) DumpEnv(dir string) ([]string, error) {
 		}
 		set("PROMPT_BODIES", bodiesPath)
 	}
+	// Same reasoning for the characters: the run directory keeps the lines it
+	// ran on.
+	if chars := s.characterLines(); len(chars) > 0 {
+		charsPath := filepath.Join(dir, "characters.txt")
+		if err := os.WriteFile(charsPath,
+			[]byte(strings.Join(chars, "\n")+"\n"), 0o644); err != nil {
+			return nil, err
+		}
+		set("CHARACTERS_FILE", charsPath)
+	}
+	set("BASE_MODEL", s.BaseModel)
+	set("HINT", s.Hint)
 	set("OUT_DIR", filepath.Join(dir, "wf"))
 	set("MANIFEST", "1")
 	set("PROMPTS_FILE", promptsPath)
@@ -628,6 +722,33 @@ func (s *Spec) DumpEnv(dir string) ([]string, error) {
 		set("EDIT_DENOISE", strconv.FormatFloat(s.EditDenoise, 'f', -1, 64))
 	}
 	return env, nil
+}
+
+// characterLines is Characters without blanks — a trailing newline in the
+// textarea must not become an empty character that doubles the axis.
+func (s *Spec) characterLines() []string {
+	var out []string
+	for _, c := range s.Characters {
+		if c = strings.TrimSpace(c); c != "" {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// defaultSecondsPerCell is the guess used until a model has real timings.
+func defaultSecondsPerCell(m ManifestModel) float64 {
+	per := 30.0 // conservative default; refined from real timings
+	if steps, ok := m.Preset["steps"].(float64); ok && steps <= 8 {
+		per = 12
+	}
+	// A NIM model has no preset to read the step count from, and the default
+	// would over-report it threefold: Schnell is four steps behind a queue
+	// that usually has nothing in it.
+	if m.Backend == BackendNim {
+		per = 10
+	}
+	return per
 }
 
 func firstOr(list []string, def string) string {

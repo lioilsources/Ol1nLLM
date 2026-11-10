@@ -63,7 +63,11 @@ const FLOW_LABEL = {
   txt2img: 'txt2img',
   img2img: 'img2img',
   repose: 'zachovej pózu',
+  restyle: 'pozice → restyle',
 };
+// Bands of the run table. `position` is never picked — the restyle flow makes
+// those cells itself, one photo per prompt column.
+const BAND_LABEL = { ...FLOW_LABEL, position: 'fotka pozice (1. krok)' };
 
 async function api(path, opts = {}) {
   let res;
@@ -124,6 +128,13 @@ async function loadConfig() {
       ${esc(m.label)}<small>${esc(m.styleNote || '')}</small>
     </button>`).join('');
   $('models').onclick = (e) => toggle(e, 'model', state.models);
+
+  // Any model that draws from text can make the position photo; the ones that
+  // only edit (flux-fill) have nothing to start from.
+  $('baseModel').insertAdjacentHTML('beforeend', cfg.models
+    .filter((m) => m.txt2img !== false)
+    .map((m) => `<option value="${esc(m.id)}">${esc(m.label)}</option>`).join(''));
+  updateRestyleHint();
 
   // Two rows, not one: with the artists the registry is ~90 chips, and a single
   // wrap of them is unusable. Cultures and epochs are the styles without an
@@ -396,6 +407,32 @@ function updateFaceHint() {
   $('facehint').textContent = parts.join(' ');
 }
 
+// Picking a position model is picking the two-stage run: the flow follows the
+// choice, so there is one control to set and not two to keep in step.
+$('baseModel').onchange = () => {
+  if ($('baseModel').value) {
+    state.flows.clear();
+    state.flows.add('restyle');
+  } else {
+    state.flows.delete('restyle');
+    if (!state.flows.size) state.flows.add('repose');
+  }
+  $('flows').querySelectorAll('[data-flowsel]').forEach((b) =>
+    b.setAttribute('aria-pressed', state.flows.has(b.dataset.flowsel)));
+  updateRestyleHint();
+  estimate();
+};
+$('hint').onchange = () => estimate();
+
+function updateRestyleHint() {
+  const base = (state.config?.models || []).find((m) => m.id === $('baseModel').value);
+  $('restylehint').textContent = base
+    ? `${base.label} vyrobí z každé pozice a postavy jednu fotku bez stylu. Modely vybrané níž ji `
+      + 'pak přemalují v každém stylu — tatáž fotka pro všechny styly i modely.'
+    : 'S modelem pozice má běh dva kroky: první model vyrobí fotku (pozice + postava), '
+      + 'ostatní ji přemalují do stylu. Bez něj jsou postavy jen další část promptu.';
+}
+
 $('sweepTarget').onchange = () => {
   const opt = $('sweepTarget').selectedOptions[0];
   $('sweephint').innerHTML = opt.dataset.preset
@@ -477,6 +514,9 @@ function spec() {
     models: [...state.models],
     prompts: $('prompts').value.split('\n').map((s) => s.trim()).filter(Boolean),
     promptsYaml: state.promptsYaml || '',
+    baseModel: $('baseModel').value,
+    characters: $('characters').value.split('\n').map((s) => s.trim()).filter(Boolean),
+    hint: $('hint').value,
     styles: [...state.styles],
     flows: [...state.flows],
     refName: state.ref?.refName || '',
@@ -514,7 +554,7 @@ function estimate() {
     }
   }, 220);
 }
-['prompts', 'seed', 'batch', 'negative', 'editDenoise', 'sweepValues', 'mode'].forEach((id) =>
+['prompts', 'characters', 'seed', 'batch', 'negative', 'editDenoise', 'sweepValues', 'mode'].forEach((id) =>
   $(id).addEventListener('input', estimate));
 
 $('startbtn').onclick = async () => {
@@ -754,7 +794,7 @@ function renderInner() {
   const body = shown.map((r) => {
     if (r.band) {
       return `<tr class="band"><th colspan="${span}">
-        <span class="flowtag" data-flow="${esc(r.band)}">${esc(FLOW_LABEL[r.band] || r.band)}</span></th></tr>`;
+        <span class="flowtag" data-flow="${esc(r.band)}">${esc(BAND_LABEL[r.band] || r.band)}</span></th></tr>`;
     }
     if (r.group) {
       return `<tr class="sub"><th colspan="${span}">${esc(r.group)}</th></tr>`;
@@ -767,6 +807,13 @@ function renderInner() {
     const primaryTxt = byStyle && !showBoth ? promptTxt : styleTxt;
     const secondTxt = byStyle && !showBoth ? '' : (man.prompts.length > 1 ? promptTxt : '');
     const label = `<span class="styleid">${esc(primaryTxt)}</span>`;
+    // A restyle row shows what it was drawn over. Every cell of the row shares
+    // the photo, so the first one that names it will do.
+    const source = models.flatMap((m) => byKey.get(cellKey(r.flow, m.id, r.prompt, r.style)) || [])
+      .find((c) => c.dependsOn)?.dependsOn;
+    const sourceImg = source && ((run.cells || {})[source] || {}).status === 'done'
+      ? `<img class="sourcethumb" loading="lazy" alt="fotka pozice" title="${esc(source)}"
+           src="/media/${state.runId}/thumb/${encodeURIComponent(source)}.jpg">` : '';
     const promptLine = secondTxt ? `<div class="promptline">${esc(secondTxt)}</div>` : '';
     const cols = runModels.map((m) => {
       if (!shownCol.has(m.id)) return '<td class="collapsed"></td>';
@@ -781,7 +828,7 @@ function renderInner() {
         return h;
       }).join('')}</div></td>`;
     }).join('');
-    return `<tr><th class="rowhead">${label}${promptLine}</th>${cols}</tr>`;
+    return `<tr><th class="rowhead">${sourceImg}${label}${promptLine}</th>${cols}</tr>`;
   }).join('');
 
   const skipped = (man.skipped || []).length
@@ -821,10 +868,14 @@ function renderInner() {
   // Order and hiding both count: moving a hidden column, or a shown one past a
   // hidden strip, leaves the shown ids in the same order.
   const cols = runModels.map((m) => `${m.id}:${shownCol.has(m.id)}`).join();
+  // Row heads of a restyle carry the position photo, which the per-cell swap
+  // below does not reach — a newly finished photo is a full redraw. There is
+  // one per prompt column, so that is a handful of redraws per run.
+  const staged = man.cells.filter((c) => c.flow === 'position' && statusOf(c) === 'done').length;
   const layout = state.drawn;
   if (layout && layout.runId === state.runId && layout.page === state.page
       && layout.order === state.rowOrder && layout.manifest === man
-      && layout.cols === cols
+      && layout.cols === cols && layout.staged === staged
       && layout.pages === pages.length && $('runhead')) {
     if (layout.runhead !== runhead) { $('runhead').innerHTML = runhead; layout.runhead = runhead; }
     for (const sel of $('content').querySelectorAll('[data-pagesel]')) {
@@ -853,7 +904,7 @@ function renderInner() {
   state.drawn = {
     runId: state.runId, page: state.page, order: state.rowOrder, manifest: man,
     cols,
-    pages: pages.length, runhead, cells: htmlById,
+    pages: pages.length, runhead, cells: htmlById, staged,
   };
 
   $('content').innerHTML =

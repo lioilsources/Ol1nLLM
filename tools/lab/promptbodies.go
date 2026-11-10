@@ -1,7 +1,11 @@
 package main
 
 import (
+	"bytes"
+	"encoding/csv"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -19,6 +23,15 @@ import (
 //	  danbooru: "1girl, solo, looking at viewer"
 //	  juggernaut: "a portrait of a young woman, looking at the camera"
 //	  flux: "A portrait photograph of a young woman looking at the camera."
+//
+// The same table is accepted as CSV, which is how a spreadsheet of positions
+// leaves the editor — one row per prompt, one column per family:
+//
+//	id,juggernaut,pony,flux
+//	arabesque,"a ballerina in arabesque","1girl, ballerina, arabesque","A ballerina holds an arabesque."
+//
+// `pony` is the column name people use for the tag family; it means danbooru.
+// An empty cell is "no text for this family", the same as a missing YAML key.
 //
 // Go owns the parse — the estimate needs the count on every keystroke, long
 // before the dump could be asked — and writes the normalised JSON into the run
@@ -71,6 +84,10 @@ func ParsePromptBodies(path string) ([]PromptBody, error) {
 }
 
 func parsePromptBodies(data []byte, name string) ([]PromptBody, error) {
+	data = bytes.TrimPrefix(data, []byte("\xef\xbb\xbf")) // Excel's BOM
+	if looksLikePromptCSV(data, name) {
+		return parsePromptCSV(data, name)
+	}
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {
 		return nil, fmt.Errorf("%s: %w", name, err)
@@ -117,6 +134,139 @@ func parsePromptBodies(data []byte, name string) ([]PromptBody, error) {
 		}
 		if len(texts) == 0 {
 			return nil, fmt.Errorf("%s řádek %d: prompt %q nemá žádný text", name, key.Line, id)
+		}
+		out = append(out, PromptBody{ID: id, Texts: texts})
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("%s: žádné prompty", name)
+	}
+	return out, nil
+}
+
+// csvFamilyColumns maps a CSV header to the family it fills. `pony` is an
+// alias: the spreadsheet names the column after the checkpoint people think
+// of, the lab after the tag vocabulary.
+var csvFamilyColumns = map[string]string{
+	"danbooru":   FamilyDanbooru,
+	"pony":       FamilyDanbooru,
+	"juggernaut": FamilyJuggernaut,
+	"flux":       FamilyFlux,
+}
+
+// looksLikePromptCSV decides by content as well as by name: the upload handler
+// stores whatever arrives under one extension, and a header row starting with
+// `id` and a separator is not a YAML mapping anyone would write.
+func looksLikePromptCSV(data []byte, name string) bool {
+	if strings.EqualFold(filepath.Ext(name), ".csv") {
+		return true
+	}
+	head := strings.ToLower(strings.TrimSpace(firstLine(data)))
+	for _, sep := range []string{",", ";", "\t"} {
+		if strings.HasPrefix(head, "id"+sep) || strings.HasPrefix(head, `"id"`+sep) {
+			return true
+		}
+	}
+	return false
+}
+
+func firstLine(data []byte) string {
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.TrimSpace(line) != "" {
+			return line
+		}
+	}
+	return ""
+}
+
+// csvDelimiter picks the separator the header was written with. A Czech Excel
+// exports semicolons, and a tag prompt is full of commas — so the header, which
+// has no prose in it, is the only line worth counting on.
+func csvDelimiter(header string) rune {
+	best, count := ',', strings.Count(header, ",")
+	for _, r := range []rune{';', '\t'} {
+		if n := strings.Count(header, string(r)); n > count {
+			best, count = r, n
+		}
+	}
+	return best
+}
+
+func parsePromptCSV(data []byte, name string) ([]PromptBody, error) {
+	r := csv.NewReader(bytes.NewReader(data))
+	r.Comma = csvDelimiter(firstLine(data))
+	r.TrimLeadingSpace = true
+	header, err := r.Read()
+	if errors.Is(err, io.EOF) {
+		return nil, fmt.Errorf("%s: prázdný soubor", name)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", name, err)
+	}
+	columns := make([]string, len(header)) // family per column; "" for id
+	idCol := -1
+	for i, h := range header {
+		h = strings.ToLower(strings.TrimSpace(h))
+		if h == "id" {
+			if idCol >= 0 {
+				return nil, fmt.Errorf("%s: sloupec id je v hlavičce dvakrát", name)
+			}
+			idCol = i
+			continue
+		}
+		fam, ok := csvFamilyColumns[h]
+		if !ok {
+			return nil, fmt.Errorf("%s: neznámý sloupec %q — čekám id, juggernaut, pony, flux",
+				name, header[i])
+		}
+		for _, other := range columns[:i] {
+			if other == fam {
+				return nil, fmt.Errorf("%s: rodina %s je v hlavičce dvakrát (pony = danbooru)",
+					name, fam)
+			}
+		}
+		columns[i] = fam
+	}
+	if idCol < 0 {
+		return nil, fmt.Errorf("%s: v hlavičce chybí sloupec id", name)
+	}
+	// A fixed column count on purpose: an unquoted tag prompt spills its commas
+	// into the neighbouring families, and a run on those texts would look like
+	// a measurement of prompts nobody wrote.
+	r.FieldsPerRecord = len(header)
+	var out []PromptBody
+	seen := map[string]bool{}
+	for {
+		row, err := r.Read()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		line, _ := r.FieldPos(0)
+		if err != nil {
+			if errors.Is(err, csv.ErrFieldCount) {
+				return nil, fmt.Errorf("%s řádek %d: čekám %d sloupců — text s oddělovačem patří do uvozovek",
+					name, line, len(header))
+			}
+			return nil, fmt.Errorf("%s: %w", name, err)
+		}
+		id := strings.TrimSpace(row[idCol])
+		if id == "" {
+			return nil, fmt.Errorf("%s řádek %d: prompt bez jména", name, line)
+		}
+		if seen[id] {
+			return nil, fmt.Errorf("%s řádek %d: prompt %q je v souboru dvakrát", name, line, id)
+		}
+		seen[id] = true
+		texts := map[string]string{}
+		for i, fam := range columns {
+			if fam == "" {
+				continue
+			}
+			if text := strings.TrimSpace(row[i]); text != "" {
+				texts[fam] = text
+			}
+		}
+		if len(texts) == 0 {
+			return nil, fmt.Errorf("%s řádek %d: prompt %q nemá žádný text", name, line, id)
 		}
 		out = append(out, PromptBody{ID: id, Texts: texts})
 	}

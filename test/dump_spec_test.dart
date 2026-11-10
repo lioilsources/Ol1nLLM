@@ -429,6 +429,50 @@ void main() {
       }
     });
 
+    test('characters are the innermost layer of the axis', () {
+      // Position × character: one position's characters sit side by side, and
+      // the text reads prefix, position, character — the style comes after,
+      // from the cell.
+      final axis = buildPromptAxis(
+        prefixes: const [],
+        bodies: two(),
+        characters: const ['red hair, green eyes', 'black hair, brown eyes'],
+      );
+      expect(axis.map((e) => e.label), [
+        'portrait · red hair, green eyes',
+        'portrait · black hair, brown eyes',
+        'street · red hair, green eyes',
+        'street · black hair, brown eyes',
+      ]);
+      expect(axis.first.subjectFor(PromptFamily.danbooru),
+          '1girl, solo, red hair, green eyes');
+      // One text per character: every family reads it as written. A sentence
+      // loses its full stop so the character continues it.
+      expect(axis.first.subjectFor(PromptFamily.flux),
+          'A portrait photograph of a young woman, red hair, green eyes');
+      // Without a character the body is sent as written.
+      expect(
+          buildPromptAxis(prefixes: const [], bodies: two())
+              .first
+              .subjectFor(PromptFamily.flux),
+          'A portrait photograph of a young woman.');
+    });
+
+    test('a character alone is a prompt; with a box the box is a prefix', () {
+      final alone = buildPromptAxis(
+          prefixes: const [], bodies: const [], characters: const ['a redhead']);
+      expect(alone.single.label, 'a redhead');
+      expect(alone.single.subjectFor(PromptFamily.juggernaut), 'a redhead');
+
+      final boxed = buildPromptAxis(
+        prefixes: const ['a dancer'],
+        bodies: const [],
+        characters: const ['red hair', 'black hair'],
+      );
+      expect(boxed.map((e) => e.subjectFor(PromptFamily.danbooru)),
+          ['a dancer, red hair', 'a dancer, black hair']);
+    });
+
     test('a body that would render as something else is rejected', () {
       expect(() => parsePromptBodies(['x']), throwsFormatException);
       expect(
@@ -464,6 +508,26 @@ void main() {
         ]),
         throwsFormatException,
       );
+    });
+  });
+
+  group('two-stage restyle', () {
+    test('the hint defaults to depth and a typo is an error', () {
+      expect(structureHintFor(null), StructureHint.depth);
+      expect(structureHintFor(''), StructureHint.depth);
+      expect(structureHintFor('canny'), StructureHint.canny);
+      // A sweep value that quietly rendered the default would put a depth
+      // picture under a "lineart" label.
+      expect(() => structureHintFor('lineart'), throwsFormatException);
+    });
+
+    test('the placeholder is derived from the photo cell, nothing else', () {
+      // The runner finds the LoadImage to patch by this exact name; two
+      // photos must never share one.
+      final a = stage1Placeholder('position__juggernaut-xl____baseline__p00');
+      final b = stage1Placeholder('position__juggernaut-xl____baseline__p01');
+      expect(a, 'lab_stage1__position__juggernaut-xl____baseline__p00.png');
+      expect(a, isNot(b));
     });
   });
 

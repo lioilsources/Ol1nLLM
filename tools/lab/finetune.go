@@ -283,6 +283,9 @@ func (r *Run) BuildExport() (*ExportPlan, error) {
 		}
 	}
 
+	// Position cells come first in the manifest, so by the time a restyle is
+	// reached it is known whether its photo made it into the export.
+	exported := map[string]bool{}
 	for _, c := range man.Cells {
 		cs, ok := st.Cells[c.ID]
 		if !ok || cs.Status != CellDone || cs.Placeholder {
@@ -334,10 +337,17 @@ func (r *Run) BuildExport() (*ExportPlan, error) {
 		if c.Flow == "repose" {
 			node["isRepose"] = true
 		}
-		if c.Flow != "txt2img" && refNodeID != "" {
+		switch {
+		case c.DependsOn != "" && exported[c.DependsOn]:
+			// A restyle hangs off the position photo it was drawn over, the
+			// way a refine hangs off its source in the app.
+			node["parentId"] = uuid5("cell:" + runID + "/" + c.DependsOn)
+			node["sourceImageId"] = uuid5("img:" + runID + "/" + c.DependsOn)
+		case c.Flow != "txt2img" && c.Flow != "position" && c.DependsOn == "" && refNodeID != "":
 			node["parentId"] = refNodeID
 			node["sourceImageId"] = refImageID
 		}
+		exported[c.ID] = true
 		// Sampler settings are read back out of the graph that was sent, not
 		// from the model preset: a sweep or an override changes them, and the
 		// point of exporting is that the numbers match the picture.
