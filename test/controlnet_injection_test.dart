@@ -164,6 +164,49 @@ void main() {
       );
     });
 
+    test('the lab can ask for edges instead of depth, same splice', () {
+      // The two-stage restyle holds a silhouette by its edges. Everything
+      // around the preprocessor stays where it was, so strength sweeps and the
+      // letterbox keep working without knowing which hint is in.
+      final wf = (ComfyUIService()..setPreset(pony)).prepareForTest(
+        _txt2img(),
+        prompt: 'x',
+        batch: 1,
+        seed: 1,
+        depthImageName: 'photo.png',
+        latentSize: (w: 832, h: 1216),
+        structureHint: StructureHint.canny,
+      );
+      final pre = wf['__depth_pre__'] as Map;
+      expect(pre['class_type'], 'Canny');
+      expect(pre['inputs']['image'], ['__depth_fit__', 0]);
+      expect(_byClass(wf, 'DepthAnythingV2Preprocessor'), isEmpty);
+      final type = _byClass(wf, 'SetUnionControlNetType').single;
+      expect(type['inputs']['type'], contains('canny'));
+      final apply = _byClass(wf, 'ControlNetApplyAdvanced').single;
+      expect(apply['inputs']['image'], ['__depth_pre__', 0]);
+      expect(apply['inputs']['control_net'], ['__depth_type__', 0]);
+      expect(_sampler(wf)['positive'], ['__cn_apply__', 0]);
+    });
+
+    test('FLUX has no edge net: canny falls back to its depth hint', () {
+      // The InstantX net is depth-only. The lab skips such cells with a reason;
+      // this is the backstop that a stray request cannot wire a Canny map into
+      // a net trained on depth.
+      final manga = imageModelById('flux-manga').preset!;
+      final wf = (ComfyUIService()..setPreset(manga)).prepareForTest(
+        _fluxTxt2img(),
+        prompt: 'x',
+        batch: 1,
+        seed: 1,
+        depthImageName: 'photo.png',
+        latentSize: (w: 832, h: 1216),
+        structureHint: StructureHint.canny,
+      );
+      expect(_byClass(wf, 'Canny'), isEmpty);
+      expect(_byClass(wf, 'DepthAnythingV2Preprocessor'), hasLength(1));
+    });
+
     test('applies repose strength/schedule and rewires the sampler', () {
       final wf = repose(ComfyUIService()..setPreset(pony));
       final apply = _byClass(wf, 'ControlNetApplyAdvanced').single;

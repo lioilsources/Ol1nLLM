@@ -1101,6 +1101,18 @@ v adresáři běhu, takže parser je v systému jediný a resume hraje tytéž p
 buňka `promptBody` a v `prompt` text přečtený zpátky z grafu. Ukázka:
 `candidates/prompts-example.yaml`.
 
+**Pozice → restyle (flow `restyle`)**: běh se dvěma modely — `--base-model`
+(v UI „model pozice“) nakreslí z textu fotku, `--models` ji přemalují do stylu
+přes ControlNet nad txt2img šablonou (graf „zachovej pózu“). Prompt má tři
+vrstvy: pozice (`--prompts-yaml`, YAML i CSV `id,juggernaut,pony,flux`),
+postava (`--characters`, řádek = postava) a styl; první krok dostane pozici
++ postavu, druhý všechny tři. Fotka vzniká jednou na pozici × postavu, buňka
+restylu ji nese jako `dependsOn` / `hintImage` a runner jede nadvakrát
+(nejdřív `position`, pak upload a přepsání `LoadImage`). `--hint depth|canny`
+(osa `param.hint`): hrany jsou **jen laboratorní** cesta přes
+`StructureHint` v `comfyui_service.dart`, appka posílá vždy hloubku.
+Podrobnosti a co se přeskakuje: `tools/lab/README.md`.
+
 **Kandidáti stylů**: `--styles-file` čte `id/label/block` a volitelně
 `booru/artist/period`, ostatní klíče toleruje. Id, které v souboru chybí, se
 vezme z registru — kandidát tak stojí ve stejné tabulce jako styl, se kterým

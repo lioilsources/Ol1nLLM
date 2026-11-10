@@ -5,6 +5,7 @@ library;
 
 import 'package:ol1n_llm/models/image_model.dart';
 import 'package:ol1n_llm/models/style_preset.dart';
+import 'package:ol1n_llm/services/comfyui_service.dart' show StructureHint;
 
 /// Which of a prompt file's texts a model reads.
 ///
@@ -101,45 +102,68 @@ PromptBody _promptBody(int i, Object? raw) {
   return PromptBody(id: id, texts: byFamily);
 }
 
-/// One column of the prompt axis: a line from the prompt box and, when a
-/// prompt file is in play, the body it prefixes.
+/// One column of the prompt axis: a line from the prompt box, the body it
+/// prefixes when a prompt file is in play, and the character standing in it.
+///
+/// The three are the lab's first two prompt layers — *what happens* (prefix +
+/// body, the body written per family) and *who it happens to* (hair, eyes,
+/// ethnicity). The third layer, the style, is its own axis: it is the thing a
+/// run compares, so it must not multiply the columns.
 class PromptAxisEntry {
-  const PromptAxisEntry({required this.prefix, this.body});
+  const PromptAxisEntry({required this.prefix, this.body, this.character = ''});
 
   final String prefix;
   final PromptBody? body;
 
+  /// One line of the character box. Sent to every family as written: there is
+  /// one text per character, not one per family like the bodies have.
+  final String character;
+
   /// What the manifest lists for this column. With per-family bodies there is
   /// no single text to show, so the id names the column and the cell keeps the
   /// text that was really sent (read back out of the graph).
-  String get label => body == null
-      ? prefix
-      : (prefix.isEmpty ? body!.id : '$prefix · ${body!.id}');
+  String get label => [
+        prefix,
+        if (body != null) body!.id,
+        character,
+      ].where((s) => s.isNotEmpty).join(' · ');
 
   String subjectFor(PromptFamily family) {
-    if (body == null) return prefix;
-    final text = body!.textFor(family);
-    return prefix.isEmpty ? text : '$prefix, $text';
+    var text = body?.textFor(family) ?? '';
+    // A FLUX body is a sentence; the character follows it as a clause, and
+    // "full body., long red hair" would read as two prompts glued together.
+    if (character.isNotEmpty && text.endsWith('.')) {
+      text = text.substring(0, text.length - 1);
+    }
+    return [prefix, text, character].where((s) => s.isNotEmpty).join(', ');
   }
 }
 
-/// The prompt axis: every line of the prompt box × every body from the file.
+/// The prompt axis: every line of the prompt box × every body from the file
+/// × every character.
 ///
-/// Without a file the box is the axis, exactly as before. With one, its lines
-/// become prefixes — a shared instruction tried against each body — so the
-/// axis is the product, and an empty box means one empty prefix rather than no
-/// cells at all, because the file already carries the prompts.
+/// Without a file or characters the box is the axis, exactly as before. With
+/// either, its lines become prefixes — a shared instruction tried against each
+/// body — so the axis is the product, and an empty box means one empty prefix
+/// rather than no cells at all, because the other layers already carry the
+/// prompt. Characters vary innermost, so one position's characters sit side
+/// by side.
 List<PromptAxisEntry> buildPromptAxis({
   required List<String> prefixes,
   required List<PromptBody> bodies,
+  List<String> characters = const [],
 }) {
-  if (bodies.isEmpty) {
+  if (bodies.isEmpty && characters.isEmpty) {
     return [for (final p in prefixes) PromptAxisEntry(prefix: p)];
   }
   final heads = prefixes.isEmpty ? const [''] : prefixes;
+  final List<PromptBody?> middles = bodies.isEmpty ? const [null] : bodies;
+  final tails = characters.isEmpty ? const [''] : characters;
   return [
     for (final prefix in heads)
-      for (final body in bodies) PromptAxisEntry(prefix: prefix, body: body),
+      for (final body in middles)
+        for (final character in tails)
+          PromptAxisEntry(prefix: prefix, body: body, character: character),
   ];
 }
 
@@ -219,6 +243,24 @@ bool qualityPrefixFor(Object? param) => switch (param) {
       _ => throw FormatException(
           'param.qualityPrefix musí být on|off, ne "$param"'),
     };
+
+/// `param.hint=depth|canny` — what the restyle ControlNet reads off the
+/// stage-1 picture. Unlike [StructureHint.parse] this one throws: a typo in a
+/// sweep value would otherwise quietly render the default under a wrong label.
+StructureHint structureHintFor(Object? param) {
+  if (param == null || param == '') return StructureHint.depth;
+  for (final h in StructureHint.values) {
+    if (h.name == param) return h;
+  }
+  throw FormatException('param.hint musí být '
+      '${StructureHint.values.map((h) => h.name).join('|')}, ne "$param"');
+}
+
+/// Server-side name a restyle graph is dumped with in place of the stage-1
+/// picture. The dump cannot know the real one — the picture does not exist
+/// yet and ComfyUI names uploads itself — so the runner swaps this for the
+/// name the upload returned, once stage 1 has produced the file.
+String stage1Placeholder(String stage1CellId) => 'lab_stage1__$stage1CellId.png';
 
 /// The prompt a cell hands to the builder, and whether the builder should
 /// still put the quality prefix in front of it.

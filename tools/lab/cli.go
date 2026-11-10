@@ -18,10 +18,15 @@ func runCLI(env *Env, args []string) error {
 	promptsFile := fs.String("prompts", "", "soubor s prompty, jeden na řádek")
 	subject := fs.String("subject", "", "jeden prompt (alternativa k --prompts)")
 	promptsYAML := fs.String("prompts-yaml", "",
-		"YAML s prompty po rodinách (danbooru/juggernaut/flux); --prompts jsou pak prefixy")
+		"YAML nebo CSV (id,juggernaut,pony,flux) s prompty po rodinách; --prompts jsou pak prefixy")
 	styles := fs.String("styles", "", "id stylů oddělená čárkou")
 	stylesFile := fs.String("styles-file", "", "JSON s kandidáty stylů [{id,label,block}]")
-	flows := fs.String("flows", "repose,img2img", "txt2img,img2img,repose,hair")
+	flows := fs.String("flows", "repose,img2img", "txt2img,img2img,repose,hair,restyle")
+	baseModel := fs.String("base-model", "",
+		"model pozice (flow restyle): vyrobí fotku, kterou --models přemalují")
+	charactersFile := fs.String("characters", "",
+		"soubor s postavami, jedna na řádek (vlasy, oči, etnikum) — násobí prompty")
+	hint := fs.String("hint", "", "čím restyle drží fotku pozice: depth (výchozí) | canny")
 	hairFile := fs.String("hair-file", filepath.Join("tools", "lab", "candidates", "hairstyles.json"), "kandidáti účesů (flow hair)")
 	hairMasks := fs.String("hair-masks", "", "adresář z lab hairmasks (flow hair)")
 	hairstyles := fs.String("hairstyles", "", "id účesů oddělená čárkou (výchozí: všechny)")
@@ -60,6 +65,7 @@ func runCLI(env *Env, args []string) error {
 		Models: splitCSV(*models), Styles: splitCSV(*styles), StylesFile: *stylesFile,
 		PromptsYAML: *promptsYAML,
 		Flows:       splitCSV(*flows), NoBaseline: *noBaseline, NoStyles: *noStyles,
+		BaseModel: *baseModel, Hint: *hint,
 		HairFile: *hairFile, HairMasks: *hairMasks, Hairstyles: splitCSV(*hairstyles),
 		PoseMode: *pose, PoseID: *poseID,
 		FaceIdentity: *faceIdentity, FaceDetail: *faceDetail,
@@ -67,6 +73,16 @@ func runCLI(env *Env, args []string) error {
 		Lora:  *lora,
 		Sweep: *sweep, Overrides: splitCSV(*overrides), Dry: *dry,
 		LoraStrength: strength,
+	}
+	if *charactersFile != "" {
+		data, err := os.ReadFile(*charactersFile)
+		if err != nil {
+			return err
+		}
+		spec.Characters = strings.Split(string(data), "\n")
+		if len(spec.characterLines()) == 0 {
+			return fmt.Errorf("%s: žádná postava", *charactersFile)
+		}
 	}
 	switch {
 	case *promptsFile != "":
@@ -84,10 +100,17 @@ func runCLI(env *Env, args []string) error {
 	case *promptsYAML != "":
 		// The file carries the prompts; without --prompts there is simply no
 		// prefix to put in front of them.
+	case *charactersFile != "":
+		// A character is a whole prompt on its own when there is no position
+		// to put it in.
 	default:
-		return fmt.Errorf("chybí --prompts, --subject nebo --prompts-yaml")
+		return fmt.Errorf("chybí --prompts, --subject, --prompts-yaml nebo --characters")
 	}
-	spec.Title = firstOr(spec.Prompts, filepath.Base(*promptsYAML))
+	titleFile := *promptsYAML
+	if titleFile == "" {
+		titleFile = *charactersFile
+	}
+	spec.Title = firstOr(spec.Prompts, filepath.Base(titleFile))
 
 	dir := *out
 	if dir == "" {
