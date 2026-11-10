@@ -146,12 +146,21 @@ V UI je to blok „pozice → restyle“: vybráním modelu pozice se flow přep
 |---|---|---|---|
 | pozice | `--prompts-yaml` (YAML nebo CSV), text podle rodiny modelu | ano | ano, v textu pro *svou* rodinu |
 | postava (vlasy, oči, etnikum) | `--characters`, jeden řádek = jedna postava | ano | ano |
-| styl (epocha, malíř, materiál) | `--styles` / `--styles-file`, dialekt podle modelu | ne | ano, na konci jako v appce |
+| styl (epocha, malíř, materiál) | `--styles` / `--styles-file`, dialekt podle modelu | ne | ano, **vpředu** (za quality prefixem) |
 
 Fotka pozice se dělá **jednou na dvojici pozice × postava** a každý další
 styl, model restylu nebo hodnota sweepu je jen druhý krok nad stejnou fotkou.
 Dvě pozice × dvě postavy × pět stylů × dva modely restylu = 4 fotky a 40
 restylů (+ baseline bez stylu ke každému modelu).
+
+**Styl jde v restylu dopředu** (`param.stylePosition=front` jako výchozí,
+jinde zůstává `end` jako v appce). Prompt restylu nese i pozici a postavu,
+často 150–200 tokenů s váženými tagy, a styl na konci padne do posledního
+77tokenového bloku CLIPu s nejmenší vahou — obrázky pak vycházely skoro
+stejné. Změřeno na Illustrious nad fotkou z Hassaku (2026-11-10): `front`
+pohnul obrázkem 2–4× víc než `end` (průměrná vzdálenost od baseline 39–60
+proti 12–20) a póza z hloubkové mapy zůstala. Appkové pořadí jde vrátit
+overridem nebo sweepem `param.stylePosition=end`.
 
 Pozice jako tabulka — sloupec `pony` je rodina `danbooru`, oddělovač může být
 čárka, středník i tabulátor (český Excel), BOM nevadí:
@@ -375,7 +384,7 @@ a přitom čte tagy.
 | metoda tváře | `param.faceIdentity` | `none` | SDXL: tři různé mechanismy; flux: každá hodnota je PuLID (manifest píše, co doopravdy běželo) |
 | text stylu | `param.styleDialect` | jazyk modelu | jen s vybraným stylem; rozdíl dává jen styl s `booru` textem (umělci), kulturní styly posílají obě hodnoty stejně |
 | síla dotažení tváře | `__face_detail__.denoise` | 0.4 | jen se zapnutou identitou **a** dotažením; SDXL i flux |
-| pozice stylu | `param.stylePosition` | `end` (appka) | jen s vybraným stylem: `end` = prefix, námět, styl; `front` = prefix, styl, námět; `first` = styl, prefix, námět. Bez prefixu (Juggernaut, flux, nebo `qualityPrefix=off`) je `front` totéž co `first` |
+| pozice stylu | `param.stylePosition` | `end` (appka), ve flow `restyle` `front` | jen s vybraným stylem: `end` = prefix, námět, styl; `front` = prefix, styl, námět; `first` = styl, prefix, námět. Bez prefixu (Juggernaut, flux, nebo `qualityPrefix=off`) je `front` totéž co `first` |
 | kvalitativní prefix | `param.qualityPrefix` | `on` (appka) | modely s `positivePrefix`: anime SDXL (`masterpiece, best quality…`, u NoobAI `very awa`) a pony score tagy. Juggernaut a flux žádný nemají, buňky vyjdou stejné |
 | čím se drží fotka pozice | `param.hint` | `depth` | jen flow `restyle`: `depth` nebo `canny`; FLUX jako model restylu má jen `depth`, buňky s `canny` se přeskočí |
 

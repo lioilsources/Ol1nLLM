@@ -1128,7 +1128,8 @@ běh. UI u doběhlého běhu s chybami nabízí *Doplnit selhané*.
 
 **Proč anime modely styl nepřevezmou** — dvě laboratorní osy a jeden soubor:
 `param.stylePosition=end|front|first` (appka posílá `end` = prefix, námět,
-styl) a `param.qualityPrefix=on|off` (tagy estetického hodnocení z
+styl; flow `restyle` má výchozí `front`, jinak styl za dlouhou pozicí
+a postavou skoro nepůsobí — měření v `tools/lab/README.md`) a `param.qualityPrefix=on|off` (tagy estetického hodnocení z
 `positivePrefix`, u NoobAI `very awa`, jdou první a CLIP je váží nejvíc).
 Skládá je `composeCellPrompt()` v `dump_spec.dart`; builder má kvůli tomu
 `positivePrefix: false`, výchozí `true` appku nemění. A

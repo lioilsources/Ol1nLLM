@@ -227,8 +227,19 @@ enum StylePosition {
   first,
 }
 
-StylePosition stylePositionFor(Object? param) {
-  if (param == null) return StylePosition.end;
+/// The position a cell gets when `param.stylePosition` is not set.
+///
+/// The restyle step puts the style in front. Its prompt carries the position
+/// and the character too, often 150–200 tokens with weighted tags, and a style
+/// at the end lands in the last CLIP chunk with the least weight: measured on
+/// Illustrious over a Hassaku photo, `front` moved the picture 2–4× more than
+/// `end` (mean pixel distance from the baseline 39–60 against 12–20), while the
+/// depth hint kept the pose. Every other flow stays on the app's `end`.
+StylePosition defaultStylePosition(String flow) =>
+    flow == 'restyle' ? StylePosition.front : StylePosition.end;
+
+StylePosition stylePositionFor(Object? param, {String flow = ''}) {
+  if (param == null) return defaultStylePosition(flow);
   for (final p in StylePosition.values) {
     if (p.name == param) return p;
   }
