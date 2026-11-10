@@ -368,7 +368,10 @@ void main() {
               );
               // Style position and the quality prefix are lab-only axes; with
               // neither set this is exactly the app's applyStylePreset.
-              final stylePosition = stylePositionFor(params['stylePosition']);
+              final stylePosition = stylePositionFor(
+                params['stylePosition'],
+                flow: flow,
+              );
               final qualityPrefix = qualityPrefixFor(params['qualityPrefix']);
               final composed = composeCellPrompt(
                 subject: prompts[pi].subjectFor(promptFamilyFor(m)),
@@ -739,7 +742,10 @@ void main() {
                 params['styleDialect'],
                 m.promptDialect,
               );
-              final stylePosition = stylePositionFor(params['stylePosition']);
+              final stylePosition = stylePositionFor(
+                params['stylePosition'],
+                flow: flow,
+              );
               final qualityPrefix = qualityPrefixFor(params['qualityPrefix']);
               // No preset, so no quality prefix to place: the score tags belong
               // to the booru checkpoints, and FLUX reads a sentence.

@@ -237,6 +237,11 @@ void main() {
       expect(composeCellPrompt(subject: ' ', styleText: 'x', prefix: 'p').prompt, ' ');
 
       expect(stylePositionFor(null), StylePosition.end);
+      expect(stylePositionFor(null, flow: 'txt2img'), StylePosition.end);
+      // The restyle step defaults to the style in front; an explicit value
+      // still wins, so `end` remains measurable there.
+      expect(stylePositionFor(null, flow: 'restyle'), StylePosition.front);
+      expect(stylePositionFor('end', flow: 'restyle'), StylePosition.end);
       expect(qualityPrefixFor(null), isTrue);
       expect(qualityPrefixFor('off'), isFalse);
       expect(() => stylePositionFor('start'), throwsFormatException);
