@@ -1107,8 +1107,9 @@ přes ControlNet nad txt2img šablonou (graf „zachovej pózu“). Prompt má t
 vrstvy: pozice (`--prompts-yaml`, YAML i CSV `id,juggernaut,pony,flux`),
 postava (`--characters`, řádek = postava) a styl; první krok dostane pozici
 + postavu, druhý všechny tři. Fotka vzniká jednou na pozici × postavu, buňka
-restylu ji nese jako `dependsOn` / `hintImage` a runner jede nadvakrát
-(nejdřív `position`, pak upload a přepsání `LoadImage`). `--hint depth|canny`
+restylu ji nese jako `dependsOn` / `hintImage` a runner jede fotku po fotce
+(`position`, upload a přepsání `LoadImage`, hned její restyly; staré pořadí
+„nejdřív všechny fotky“ vrací `LAB_STAGE_ORDER=photos-first`). `--hint depth|canny`
 (osa `param.hint`): hrany jsou **jen laboratorní** cesta přes
 `StructureHint` v `comfyui_service.dart`, appka posílá vždy hloubku.
 Podrobnosti a co se přeskakuje: `tools/lab/README.md`.

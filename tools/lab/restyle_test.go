@@ -235,31 +235,77 @@ func TestDumpEnvCarriesTheTwoStageContract(t *testing.T) {
 	}
 }
 
-func TestSplitByDependencyPutsPhotosFirst(t *testing.T) {
-	cells := []ManifestCell{
-		{ID: "restyle__illu__ukiyoe", DependsOn: "position__jug____baseline"},
-		{ID: "txt2img__illu__ukiyoe"},
-		{ID: "position__jug____baseline"},
-		{ID: "restyle__illu____baseline", DependsOn: "position__jug____baseline"},
+func batchIDs(batches [][]ManifestCell) string {
+	var parts []string
+	for _, b := range batches {
+		var ids []string
+		for _, c := range b {
+			ids = append(ids, c.ID)
+		}
+		parts = append(parts, strings.Join(ids, ","))
 	}
-	first, rest := splitByDependency(cells)
-	if len(first) != 1 || first[0].ID != "position__jug____baseline" {
-		t.Fatalf("první průchod: %+v", first)
+	return strings.Join(parts, " | ")
+}
+
+// The order Generate walks: sorted by model, as it sorts them.
+func dependencyCells() []ManifestCell {
+	return []ManifestCell{
+		{ID: "r-illu-p1-a", Model: "illu", DependsOn: "pos-p1"},
+		{ID: "r-illu-p2-a", Model: "illu", DependsOn: "pos-p2"},
+		{ID: "txt-illu", Model: "illu"},
+		{ID: "pos-p1", Model: "jug"},
+		{ID: "pos-p2", Model: "jug"},
+		{ID: "r-sdxl-p1-a", Model: "sdxl", DependsOn: "pos-p1"},
+		{ID: "r-sdxl-p2-a", Model: "sdxl", DependsOn: "pos-p2"},
+		{ID: "r-sdxl-lost", Model: "sdxl", DependsOn: "pos-missing"},
 	}
-	// Everything else keeps the order it came in — the model grouping.
-	want := []string{"restyle__illu__ukiyoe", "txt2img__illu__ukiyoe", "restyle__illu____baseline"}
-	if len(rest) != len(want) {
-		t.Fatalf("druhý průchod: %+v", rest)
+}
+
+func TestBatchesWalkPhotoByPhoto(t *testing.T) {
+	got := batchIDs(batchesByDependency(dependencyCells(), false))
+	// Each photo, then every restyle of it across the models, then the next;
+	// cells nobody depends on — and the one whose photo is not in the run —
+	// come last.
+	want := "pos-p1 | r-illu-p1-a,r-sdxl-p1-a | pos-p2 | r-illu-p2-a,r-sdxl-p2-a | txt-illu,r-sdxl-lost"
+	if got != want {
+		t.Fatalf("pořadí:\n got %s\nwant %s", got, want)
 	}
-	for i, id := range want {
-		if rest[i].ID != id {
-			t.Errorf("rest[%d] = %s, want %s", i, rest[i].ID, id)
+}
+
+func TestBatchesPhotosFirstKeepsModelGrouping(t *testing.T) {
+	got := batchIDs(batchesByDependency(dependencyCells(), true))
+	want := "pos-p1,pos-p2 | r-illu-p1-a,r-illu-p2-a,txt-illu,r-sdxl-p1-a,r-sdxl-p2-a,r-sdxl-lost"
+	if got != want {
+		t.Fatalf("pořadí:\n got %s\nwant %s", got, want)
+	}
+}
+
+func TestBatchesWithoutDependenciesAreOnePass(t *testing.T) {
+	cells := []ManifestCell{{ID: "a", Model: "x"}, {ID: "b", Model: "y"}}
+	for _, first := range []bool{false, true} {
+		if got := batchIDs(batchesByDependency(cells, first)); got != "a,b" {
+			t.Errorf("photosFirst=%v: %s", first, got)
 		}
 	}
-	// A run without dependencies is one pass, untouched.
-	first, rest = splitByDependency(cells[1:3])
-	if len(first) != 0 || len(rest) != 2 {
-		t.Fatalf("bez závislostí: first=%d rest=%d", len(first), len(rest))
+	if got := batchesByDependency(nil, false); len(got) != 0 {
+		t.Errorf("prázdný běh: %+v", got)
+	}
+}
+
+func TestBatchesLoseNoCell(t *testing.T) {
+	cells := dependencyCells()
+	for _, first := range []bool{false, true} {
+		seen := map[string]int{}
+		for _, b := range batchesByDependency(cells, first) {
+			for _, c := range b {
+				seen[c.ID]++
+			}
+		}
+		for _, c := range cells {
+			if seen[c.ID] != 1 {
+				t.Errorf("photosFirst=%v: %s je v plánu %d×", first, c.ID, seen[c.ID])
+			}
+		}
 	}
 }
 

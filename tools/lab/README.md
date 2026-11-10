@@ -167,9 +167,14 @@ pale skin`), a **jdou všem rodinám stejně** — jsou to krátké výčty, kte
 tagový model i FLUX. U věty pro FLUX se postava připojí za čárku místo tečky.
 
 **Předání fotky.** Buňka restylu nese v manifestu `dependsOn` (id buňky
-pozice) a `hintImage` (zástupné jméno v grafu). Runner jede nadvakrát: nejdřív
-všechny buňky `position`, pak jejich fotky nahraje do ComfyUI a zástupné
-jméno v `LoadImage` přepíše. Když se fotka nevygeneruje, závislé buňky selžou
+pozice) a `hintImage` (zástupné jméno v grafu). Runner jede **fotku po fotce**: nakreslí
+fotku pozice, nahraje ji do ComfyUI, přepíše zástupné jméno v `LoadImage`
+a hned pustí všechny její restyly; teprve pak další fotku. Výsledky tak
+přibývají po celých řádcích a přerušený běh má hotové pozice kompletní.
+Cena: modely se střídají u každé fotky — zadarmo, dokud je ComfyUI udrží
+v paměti všechny, jinak je to nahrání checkpointu na každé přepnutí. Pak
+pomůže `LAB_STAGE_ORDER=photos-first` (nejdřív všechny fotky, potom restyly
+model po modelu). Když se fotka nevygeneruje, závislé buňky selžou
 s důvodem („fotka pozice … se nevygenerovala“) a `lab resume` je doplní.
 V tabulce je fotka pozice vlastní pás nahoře a její náhled je v hlavičce
 každého řádku restylu.
