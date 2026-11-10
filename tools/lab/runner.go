@@ -282,10 +282,9 @@ func (r *Run) Generate() {
 	var aborted atomic.Bool
 	polite := politeFromEnv()
 	lastModel := ""
-	// Two passes when cells depend on each other: a restyle is drawn over the
-	// picture its position cell makes, so every such picture has to be on disk
-	// before the first restyle is queued. Each pass keeps the model grouping.
-	first, rest := splitByDependency(cells)
+	// A restyle is drawn over the picture its position cell makes, so that
+	// picture has to be on disk before the restyle is queued — hence batches,
+	// each one waited for before the next starts.
 	pass := func(cells []ManifestCell) {
 	loop:
 		for _, c := range cells {
@@ -371,8 +370,9 @@ func (r *Run) Generate() {
 		}
 		wg.Wait()
 	}
-	pass(first)
-	pass(rest)
+	for _, batch := range batchesByDependency(cells, photosFirst()) {
+		pass(batch)
+	}
 	if aborted.Load() {
 		return
 	}
@@ -584,24 +584,73 @@ func (r *Run) generateCell(ctx context.Context, c ManifestCell) error {
 	}
 }
 
-// splitByDependency separates the cells other cells are drawn over from the
-// rest, keeping the order within each half. A run without dependencies comes
-// back as one pass.
-func splitByDependency(cells []ManifestCell) (first, rest []ManifestCell) {
-	needed := map[string]bool{}
+// batchesByDependency orders a run whose cells are drawn over each other's
+// pictures. Each batch has to finish before the next is queued.
+//
+// The default walks photo by photo: one position picture, then every restyle
+// of it, then the next. A long run shows finished rows from the first minutes
+// instead of thousands of photos and no restyle until they are all done, and
+// stopping it halfway leaves complete rows rather than a pile of photos.
+//
+// photosFirst is the other order — all pictures, then everything else, model
+// by model. It loads each checkpoint once; the default switches models at
+// every photo, which is free while ComfyUI can keep them all in memory and
+// costs a reload per switch when it cannot.
+//
+// One level of dependency, which is all the dump writes. A cell whose photo is
+// not in the list goes last with the independent cells, where generateCell
+// fails it with the reason. A run without dependencies is a single batch.
+func batchesByDependency(cells []ManifestCell, photosFirst bool) [][]ManifestCell {
+	dependents := map[string][]ManifestCell{}
 	for _, c := range cells {
 		if c.DependsOn != "" {
-			needed[c.DependsOn] = true
+			dependents[c.DependsOn] = append(dependents[c.DependsOn], c)
+		}
+	}
+	isPhoto := func(c ManifestCell) bool {
+		return c.DependsOn == "" && len(dependents[c.ID]) > 0
+	}
+	photoIDs := map[string]bool{}
+	var photos, rest, free []ManifestCell
+	for _, c := range cells {
+		if isPhoto(c) {
+			photos = append(photos, c)
+			photoIDs[c.ID] = true
 		}
 	}
 	for _, c := range cells {
-		if needed[c.ID] {
-			first = append(first, c)
-		} else {
+		switch {
+		case isPhoto(c):
+		case photoIDs[c.DependsOn]:
 			rest = append(rest, c)
+		default:
+			rest = append(rest, c)
+			free = append(free, c)
 		}
 	}
-	return first, rest
+	var out [][]ManifestCell
+	add := func(batch []ManifestCell) {
+		if len(batch) > 0 {
+			out = append(out, batch)
+		}
+	}
+	if photosFirst {
+		add(photos)
+		add(rest)
+		return out
+	}
+	for _, p := range photos {
+		add([]ManifestCell{p})
+		add(dependents[p.ID])
+	}
+	add(free)
+	return out
+}
+
+// photosFirst reads LAB_STAGE_ORDER. Anything but "photos-first" is the
+// default, photo by photo.
+func photosFirst() bool {
+	return os.Getenv("LAB_STAGE_ORDER") == "photos-first"
 }
 
 // stagedImageName is the name a position photo gets on the ComfyUI server:
