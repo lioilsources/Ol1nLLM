@@ -16,7 +16,8 @@ const state = {
   ref: null,
   promptsYaml: null,
   promptsYamlName: '',
-  rowOrder: localStorage.getItem('labRowOrder') || 'style',
+  // null = never picked: the run decides (see rowOrderFor).
+  rowOrder: localStorage.getItem('labRowOrder'),
   page: 0,
   pageAnchor: null,
   hiddenModels: new Set(loadHiddenModels()),
@@ -679,7 +680,7 @@ function renderInner() {
   // order, and that is the reader's call: grouping by style puts the same style
   // with different prompts under each other, grouping by prompt does the
   // opposite.
-  const byStyle = state.rowOrder === 'style';
+  const byStyle = rowOrderFor(man) === 'style';
   // Every SSE tick redraws the table, so cells are looked up by key rather
   // than filtered per row × model — at 4000 cells the filter was quadratic.
   const cellKey = (flow, model, prompt, style) => `${flow}\u0000${model}\u0000${prompt}\u0000${style}`;
@@ -691,10 +692,24 @@ function renderInner() {
   }
   const rowCells = (r) => models.reduce(
     (n, m) => n + (byKey.get(cellKey(r.flow, m.id, r.prompt, r.style)) || []).length, 0);
+  // A two-stage run goes photo by photo, so its table does too: the position
+  // photo is the first row of its own restyles instead of a band of every
+  // photo in front of them. With thousands of positions that band was pages
+  // long, and the first page showed one finished photo while its restyles
+  // piled up out of sight. Ordered by style there is no "its own" row to sit
+  // above, so the band stays whole and goes last.
+  const staged = isStagedRun(man);
+  const flowOrder = [...new Set(man.cells.map((c) => c.flow))];
+  if (staged) flowOrder.push(...flowOrder.splice(flowOrder.indexOf('position'), 1));
+  const photoPrompts = new Set(
+    man.cells.filter((c) => c.flow === 'position').map((c) => c.promptIndex));
+  const placedPhotos = new Set();
   const rows = [];
-  for (const flow of [...new Set(man.cells.map((c) => c.flow))]) {
-    const inFlow = man.cells.filter((c) => c.flow === flow && outStyleVisible(c.style));
+  for (const flow of flowOrder) {
+    const inFlow = man.cells.filter((c) => c.flow === flow && outStyleVisible(c.style)
+      && !(flow === 'position' && placedPhotos.has(c.promptIndex)));
     if (!inFlow.length) continue;
+    const hostsPhotos = staged && !byStyle && inFlow.some((c) => c.dependsOn);
     const primaryOf = (c) => (byStyle ? c.style : String(c.promptIndex));
     const secondaryOf = (c) => (byStyle ? String(c.promptIndex) : c.style);
     const primaries = [...new Set(inFlow.map(primaryOf))];
@@ -709,6 +724,15 @@ function renderInner() {
         ? `${flow}|${primary}` : null;
       const groupLabel = groupKey
         ? (byStyle ? styleRowLabel(primary) : promptRowLabel(man, Number(primary))) : '';
+      const prompt = Number(primary);
+      if (hostsPhotos && photoPrompts.has(prompt) && !placedPhotos.has(prompt)) {
+        const photo = {
+          flow: 'position', bandFlow: flow, groupKey, groupLabel,
+          style: '__baseline', prompt, single: false,
+        };
+        photo.n = rowCells(photo);
+        if (photo.n) { rows.push(photo); placedPhotos.add(prompt); }
+      }
       for (const secondary of secondaries) {
         const r = {
           flow,
@@ -772,7 +796,8 @@ function renderInner() {
   const shown = [];
   let lastFlow = null, lastGroup = null;
   for (const r of pageRows) {
-    if (r.flow !== lastFlow) { shown.push({ band: r.flow }); lastFlow = r.flow; lastGroup = null; }
+    const band = r.bandFlow || r.flow;
+    if (band !== lastFlow) { shown.push({ band }); lastFlow = band; lastGroup = null; }
     if (r.groupKey && r.groupKey !== lastGroup) shown.push({ group: r.groupLabel });
     lastGroup = r.groupKey;
     shown.push(r);
@@ -801,7 +826,8 @@ function renderInner() {
     }
     // Inside a group the row head names the axis that varies; when a group has
     // a single row it names both, so nothing is left implicit.
-    const styleTxt = r.style === '__baseline' ? 'bez stylu (baseline)' : styleLabel(r.style);
+    const styleTxt = r.flow === 'position' ? 'fotka pozice (1. krok)'
+      : r.style === '__baseline' ? 'bez stylu (baseline)' : styleLabel(r.style);
     const promptTxt = (man.prompts[r.prompt] || '').slice(0, 70);
     const showBoth = r.single || man.prompts.length <= 1;
     const primaryTxt = byStyle && !showBoth ? promptTxt : styleTxt;
@@ -871,11 +897,11 @@ function renderInner() {
   // Row heads of a restyle carry the position photo, which the per-cell swap
   // below does not reach — a newly finished photo is a full redraw. There is
   // one per prompt column, so that is a handful of redraws per run.
-  const staged = man.cells.filter((c) => c.flow === 'position' && statusOf(c) === 'done').length;
+  const photosDone = man.cells.filter((c) => c.flow === 'position' && statusOf(c) === 'done').length;
   const layout = state.drawn;
   if (layout && layout.runId === state.runId && layout.page === state.page
-      && layout.order === state.rowOrder && layout.manifest === man
-      && layout.cols === cols && layout.staged === staged
+      && layout.order === rowOrderFor(man) && layout.manifest === man
+      && layout.cols === cols && layout.photosDone === photosDone
       && layout.pages === pages.length && $('runhead')) {
     if (layout.runhead !== runhead) { $('runhead').innerHTML = runhead; layout.runhead = runhead; }
     for (const sel of $('content').querySelectorAll('[data-pagesel]')) {
@@ -902,9 +928,9 @@ function renderInner() {
     return;
   }
   state.drawn = {
-    runId: state.runId, page: state.page, order: state.rowOrder, manifest: man,
+    runId: state.runId, page: state.page, order: rowOrderFor(man), manifest: man,
     cols,
-    pages: pages.length, runhead, cells: htmlById, staged,
+    pages: pages.length, runhead, cells: htmlById, photosDone,
   };
 
   $('content').innerHTML =
@@ -1028,6 +1054,18 @@ function renderInner() {
 
 function rowId(r) {
   return `${r.flow}|${r.prompt}|${r.style}`;
+}
+
+// A run whose cells are drawn over another cell's picture (position → restyle).
+function isStagedRun(man) {
+  return man.cells.some((c) => c.dependsOn) && man.cells.some((c) => c.flow === 'position');
+}
+
+// The order picked by hand wins. Until one is, a two-stage run reads by
+// prompt — a photo with its restyles under it, which is also the order it is
+// generated in — and every other run by style, as before.
+function rowOrderFor(man) {
+  return state.rowOrder || (isStagedRun(man) ? 'prompt' : 'style');
 }
 
 // ── output filter ──────────────────────────────────────────
