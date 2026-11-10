@@ -2198,10 +2198,37 @@ class _ReposePill extends StatelessWidget {
 
 /// Art style appended to every prompt in the session.
 class _StyleChip extends StatelessWidget {
-  const _StyleChip({required this.selected, required this.onChanged});
+  const _StyleChip({
+    required this.selected,
+    required this.model,
+    required this.models,
+    required this.onChanged,
+  });
 
   final String? selected;
+
+  /// The model the next request runs on: a style the lab found quiet on it
+  /// is dimmed in the list and the chip warns when it is the selected one.
+  final ImageModelSpec model;
+  final List<ImageModelSpec> models;
   final ValueChanged<String?> onChanged;
+
+  /// „Na Pony skoro bez reakce, zkus SDXL base“ — null when the style is not
+  /// quiet on [model].
+  String? _quietNote(String styleId) {
+    if (!styleQuietOn(styleId, model.id)) return null;
+    final alt = styleAlternativeModel(
+      styleId,
+      model.id,
+      models.map((m) => m.id),
+    );
+    final altLabel = alt == null
+        ? null
+        : models.firstWhere((m) => m.id == alt).label;
+    return altLabel == null
+        ? 'Na ${model.label} skoro bez reakce'
+        : 'Na ${model.label} skoro bez reakce, zkus $altLabel';
+  }
 
   void _pick(BuildContext context) {
     _dismissKeyboard();
@@ -2392,41 +2419,50 @@ class _StyleChip extends StatelessWidget {
                                 }
                                 final st = item as StylePreset;
                                 final isSel = st.id == selected;
-                                return ListTile(
-                                  leading: Icon(
-                                    isSel
-                                        ? Icons.radio_button_checked
-                                        : Icons.radio_button_unchecked,
-                                    color: isSel
-                                        ? AppTheme.accent
-                                        : AppTheme.textSecondary,
-                                    size: 20,
-                                  ),
-                                  title: Text(
-                                    st.labelWithYear,
-                                    style: TextStyle(
+                                // A quiet style stays pickable — the metric
+                                // sees colour only — it is just dimmed and
+                                // says where it did react.
+                                final quiet = _quietNote(st.id);
+                                return Opacity(
+                                  opacity: quiet == null ? 1.0 : 0.5,
+                                  child: ListTile(
+                                    leading: Icon(
+                                      isSel
+                                          ? Icons.radio_button_checked
+                                          : Icons.radio_button_unchecked,
                                       color: isSel
                                           ? AppTheme.accent
-                                          : AppTheme.textPrimary,
+                                          : AppTheme.textSecondary,
+                                      size: 20,
                                     ),
-                                  ),
-                                  // An artist's label names the manner; the
-                                  // period says which of their years it is.
-                                  subtitle: Text(
-                                    st.period == null
-                                        ? st.block
-                                        : '${st.period} · ${st.block}',
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: AppTheme.textSecondary,
-                                      fontSize: 11,
+                                    title: Text(
+                                      st.labelWithYear,
+                                      style: TextStyle(
+                                        color: isSel
+                                            ? AppTheme.accent
+                                            : AppTheme.textPrimary,
+                                      ),
                                     ),
+                                    // An artist's label names the manner; the
+                                    // period says which of their years it is.
+                                    subtitle: Text(
+                                      [
+                                        ?quiet,
+                                        ?st.period,
+                                        st.block,
+                                      ].join(' · '),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: AppTheme.textSecondary,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                    onTap: () {
+                                      onChanged(st.id);
+                                      Navigator.of(ctx).pop();
+                                    },
                                   ),
-                                  onTap: () {
-                                    onChanged(st.id);
-                                    Navigator.of(ctx).pop();
-                                  },
                                 );
                               },
                             ),
@@ -2444,9 +2480,10 @@ class _StyleChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = styleById(selected);
+    final quiet = style != null && styleQuietOn(style.id, model.id);
     return _ChipShell(
       active: style != null,
-      icon: Icons.palette_outlined,
+      icon: quiet ? Icons.warning_amber_rounded : Icons.palette_outlined,
       label: style?.label ?? 'Styl',
       onTap: () => _pick(context),
     );
@@ -2967,6 +3004,8 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                     const SizedBox(width: 8),
                     _StyleChip(
                       selected: widget.state.selectedStyleId,
+                      model: widget.state.model,
+                      models: widget.state.availableModels,
                       onChanged: (v) =>
                           ref.read(imageStudioProvider.notifier).setStyle(v),
                     ),

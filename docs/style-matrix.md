@@ -341,3 +341,24 @@ celkem 310.
 Restyler a Tsumiki styly zatím nedostaly: tam se styluje fotka s držením
 tváře (InstantID / PuLID) a txt2img měření o tom nic neříká. Přijdou až po
 vlastním měření s portréty.
+
+## Sedmá vlna — ticho podle modelu (2026-11-10)
+
+Tytéž běhy (35 txt2img běhů bez sweepu: 7b/7c/7d, 7f-*, sc-*, fm-*, cal-*),
+4 696 dvojic (model, styl), reakce zprůměrovaná přes oba náměty.
+`tools/lab/reactions.py` z nich generuje `lib/models/style_quiet.dart`:
+dvojice pod **0.15** = model namaloval s blokem totéž co bez něj. 81 dvojic
+na 9 modelech: lustify-zenith 26, hassaku-illustrious 19, realvis-xl 13,
+cyberrealistic-xl 8, sd15 7, sdxl-base 4, juggernaut-xl 3, autismmix-pony 2,
+flux-manga a noobai-xl po 1. Fotoreal finetuny mlčí hlavně u médií (uhel,
+tužka, akvarel, kvaš), Hassaku i u fotografických technik (polaroid, pinhole).
+
+Proč jen „ticho“ a ne gate na přijetí: medián reakce illustrious-xl je 0.85
+a flux-schnell 0.83, ale u Illustrious to je z velké části rozpad postavy
+v texturu média, u Pony (0.49) kostým. Barevná metrika odliší „nic“ od
+„něco“, ne „něco“ od „styl“. Per-model verdikt o přijetí stylu chce jiného
+soudce (VLM nad archy, nebo kurátorský průchod po modelech); do té doby
+picker ztlumí jen ticho a nic neskrývá. Práh 0.15 je nad rozptylem seedu
+(7a: escapovaná × neescapovaná varianta 0.05–0.06), ale `egyptian` ve vlně 4
+ukázal, že lokální detail (hieroglyfy na lemu) pod ním projde — proto
+ztlumení, ne zákaz.

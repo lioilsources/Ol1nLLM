@@ -211,6 +211,16 @@ kvůli šířce jen `label`. Vyhledávací pole se samo nefokusuje a seznam scho
 klávesnici při tažení. Podtitulek je vždy `block`, i u anime modelu — tagy by
 se četly hůř.
 
+**Ticho podle modelu (`lib/models/style_quiet.dart`, generuje
+`tools/lab/reactions.py` z běhů vlny 7)**: dvojice (model, styl), u kterých
+model namaloval s blokem totéž co bez něj (barevná vzdálenost od vlastního
+baseline pod 0.15). Řádek pickeru se na vybraném modelu ztlumí a řekne, kde
+styl reagoval (`styleAlternativeModel`: sdxl-base → juggernaut → lightning →
+schnell, první dostupný a sám netichý); chip ukáže výstrahu. **Nikdy se
+neskrývá**: metrika vidí jen barvu — Illustrious má u médií reakci 0.85 tím,
+že postavu rozpustí v čmáranice, Pony u malířů 0.49 kostýmem — takže „změnilo
+se“ neznamená „styl prošel“ a nezměřená dvojice se ukazuje normálně.
+
 **Síla úpravy (`_EditStrengthChip`)**: `ComfyUIService.setEditDenoise()`
 přebíjí presetový `img2imgDenoise`. Měření ukázalo, že při presetových ~0.72 je
 img2img stylově skoro slepý (rozptyl 5–50× nižší než repose, u pony 0.011),
