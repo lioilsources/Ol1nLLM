@@ -176,8 +176,12 @@ v paměti všechny, jinak je to nahrání checkpointu na každé přepnutí. Pak
 pomůže `LAB_STAGE_ORDER=photos-first` (nejdřív všechny fotky, potom restyly
 model po modelu). Když se fotka nevygeneruje, závislé buňky selžou
 s důvodem („fotka pozice … se nevygenerovala“) a `lab resume` je doplní.
-V tabulce je fotka pozice vlastní pás nahoře a její náhled je v hlavičce
-každého řádku restylu.
+V tabulce jde fotka pozice **hned nad své restyly** (řazení „prompt → styly
+pod sebou“, u dvoufázového běhu výchozí, dokud si řazení nevybereš sám) a její
+náhled je v hlavičce každého řádku restylu. Při řazení podle stylu fotka
+„svůj“ řádek nemá, takže pás fotek zůstává vcelku a je až za restyly — dřív
+byl první a u tisíců pozic zabral celé první strany, kde byla hotová jediná
+fotka.
 
 **Čím restyle fotku drží** (`--hint`, v UI „čím restyle drží fotku“, osa sweepu
 `param.hint=depth|canny`):
