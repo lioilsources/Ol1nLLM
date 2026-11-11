@@ -199,18 +199,30 @@ String applyStyle(
   String prompt,
   String? styleId, {
   PromptDialect dialect = PromptDialect.natural,
-}) => applyStylePreset(prompt, styleById(styleId), dialect: dialect);
+  bool front = false,
+}) => applyStylePreset(
+  prompt,
+  styleById(styleId),
+  dialect: dialect,
+  front: front,
+);
 
 /// Same rule, but for a preset the caller already holds — the lab vets style
 /// candidates that are not (yet) in [kStylePresets], and looking them up by id
 /// would silently drop their text.
+///
+/// [front] puts the block ahead of the prompt. Repose does that: the lab's
+/// restyle runs moved the picture 2–4× more with the style in front, because
+/// a style at the end lands in the CLIP chunk with the least weight.
 String applyStylePreset(
   String prompt,
   StylePreset? style, {
   PromptDialect dialect = PromptDialect.natural,
+  bool front = false,
 }) {
   if (style == null || prompt.trim().isEmpty) return prompt;
-  return '$prompt, ${style.blockFor(dialect)}';
+  final block = style.blockFor(dialect);
+  return front ? '$block, $prompt' : '$prompt, $block';
 }
 
 /// True when the lab saw [modelId] paint the same picture with [styleId] as

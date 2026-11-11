@@ -380,7 +380,14 @@ void main() {
                 params['stylePosition'],
                 flow: flow,
               );
-              final qualityPrefix = qualityPrefixFor(params['qualityPrefix']);
+              final qualityPrefix = qualityPrefixFor(
+                params['qualityPrefix'],
+                fallback: defaultQualityPrefix(
+                  m,
+                  flow: flow,
+                  styled: style != null,
+                ),
+              );
               final composed = composeCellPrompt(
                 subject: prompts[pi].subjectFor(promptFamilyFor(m)),
                 styleText: style?.blockFor(dialect),
@@ -993,6 +1000,7 @@ void main() {
                 // the negative box would go nowhere.
                 'readsNegative': readsNegative(m),
                 'styleNote': m.styleNote,
+                'restyleNote': m.restyleNote,
                 'ckptName': m.preset?.ckptName,
                 'preset': m.preset == null
                     ? null

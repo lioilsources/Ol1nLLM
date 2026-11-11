@@ -505,8 +505,19 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   /// [prompt] with [styleId]'s text in the dialect of the model the request
   /// runs on. The one place that decides: an anime model never gets the phrase
   /// block, and a retry on another model re-derives the text for that model.
-  String _styled(String prompt, String? styleId) =>
-      applyStyle(prompt, styleId, dialect: state.model.promptDialect);
+  String _styled(String prompt, String? styleId, {bool front = false}) =>
+      applyStyle(
+        prompt,
+        styleId,
+        dialect: state.model.promptDialect,
+        front: front,
+      );
+
+  /// Whether a repose with [styleId] keeps the preset's quality prefix: off
+  /// only with a style on, and only where the lab measured that it holds the
+  /// style back ([ImageModelSpec.restyleQualityPrefix]).
+  bool _reposePrefix(String? styleId) =>
+      styleById(styleId) == null || state.model.restyleQualityPrefix;
 
   /// Arms the service with the denoise this round runs at — decided at
   /// request time, because „automaticky" depends on whether a style is on.
@@ -1011,7 +1022,11 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       faceIdentity: faceRan ? state.faceIdentity.name : null,
       seed: seed,
       negativePrompt: negative.isNotEmpty ? negative : null,
-      positivePrefix: preset != null && preset.positivePrefix.isNotEmpty
+      // Only a prefix that went out: a styled repose can drop it.
+      positivePrefix:
+          preset != null &&
+              preset.positivePrefix.isNotEmpty &&
+              (!isRepose || _reposePrefix(styleId))
           ? preset.positivePrefix
           : null,
       // img2img latents come from VAEEncode of the source image, so recorded
@@ -1510,11 +1525,12 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       node.id,
       () => _comfyui.repose(
         image: base.bytes,
-        prompt: _styled(parts.positive, state.selectedStyleId),
+        prompt: _styled(parts.positive, state.selectedStyleId, front: true),
         n: _comfyui.variantCount,
         seed: seed,
         negativePrompt: parts.negative.isEmpty ? null : parts.negative,
         latentSize: latent,
+        positivePrefix: _reposePrefix(state.selectedStyleId),
       ),
     );
   }
@@ -1745,11 +1761,12 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         nodeId,
         () => _comfyui.repose(
           image: base.bytes,
-          prompt: _styled(parts.positive, node.styleId),
+          prompt: _styled(parts.positive, node.styleId, front: true),
           n: _comfyui.variantCount,
           seed: seed,
           negativePrompt: parts.negative.isEmpty ? null : parts.negative,
           latentSize: latent,
+          positivePrefix: _reposePrefix(node.styleId),
         ),
       );
       return;

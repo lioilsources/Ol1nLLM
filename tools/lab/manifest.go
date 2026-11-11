@@ -100,10 +100,12 @@ type ManifestModel struct {
 	PromptFamily string `json:"promptFamily"`
 	// ReadsNegative says whether the model's graph takes a negative prompt.
 	// Nil in manifests written before Qwen-Image; readsNegative derives it.
-	ReadsNegative *bool          `json:"readsNegative,omitempty"`
-	StyleNote     *string        `json:"styleNote"`
-	CkptName      *string        `json:"ckptName"`
-	Preset        map[string]any `json:"preset"`
+	ReadsNegative *bool   `json:"readsNegative,omitempty"`
+	StyleNote     *string `json:"styleNote"`
+	// RestyleNote is the restyle verdict; nil where it was not measured.
+	RestyleNote *string        `json:"restyleNote,omitempty"`
+	CkptName    *string        `json:"ckptName"`
+	Preset      map[string]any `json:"preset"`
 }
 
 type ManifestStyle struct {

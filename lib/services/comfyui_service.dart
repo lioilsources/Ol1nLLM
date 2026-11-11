@@ -754,6 +754,9 @@ class ComfyUIService implements ImageBackend {
     // passes it explicitly per cell.
     FaceIdentity? faceIdentity,
     bool faceDetail = false,
+    // False drops the preset's quality tags (see
+    // [ImageModelSpec.restyleQualityPrefix]); the provider decides per round.
+    bool positivePrefix = true,
   }) async* {
     if (!_reposeSupported) {
       yield const GenFailed('[ComfyUI] „Zachovej pózu“ tenhle model neumí.');
@@ -778,6 +781,7 @@ class ComfyUIService implements ImageBackend {
       userNegative: negativePrompt,
       faceIdentity: faceIdentity ?? _faceIdentity,
       faceDetail: faceDetail,
+      positivePrefix: positivePrefix,
     );
     yield* _run(wf);
   }
@@ -1516,9 +1520,9 @@ class ComfyUIService implements ImageBackend {
     // Second, cropped pass over the detected face. Only with an identity
     // active: detailing a face nothing pins just re-rolls it.
     bool faceDetail = false,
-    // The preset's quality tags in front of the prompt. Always on in the app;
-    // the lab turns it off to measure how much those tags hold a model in its
-    // house style (`param.qualityPrefix`).
+    // The preset's quality tags in front of the prompt. Off in the app only
+    // for a styled repose on a model whose [ImageModelSpec.restyleQualityPrefix]
+    // says so; the lab sweeps it (`param.qualityPrefix`).
     bool positivePrefix = true,
     // What the reference ControlNet reads off [depthImageName]. Always depth
     // in the app; the lab's restyle flow can ask for edges (`param.hint`).

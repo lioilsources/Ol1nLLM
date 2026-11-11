@@ -334,9 +334,12 @@ enum StylePosition {
 /// at the end lands in the last CLIP chunk with the least weight: measured on
 /// Illustrious over a Hassaku photo, `front` moved the picture 2–4× more than
 /// `end` (mean pixel distance from the baseline 39–60 against 12–20), while the
-/// depth hint kept the pose. Every other flow stays on the app's `end`.
+/// depth hint kept the pose. The app's repose ("Zachovej pózu") does the
+/// same since, so the repose flow follows it; every other flow stays on `end`.
 StylePosition defaultStylePosition(String flow) =>
-    flow == 'restyle' ? StylePosition.front : StylePosition.end;
+    flow == 'restyle' || flow == 'repose'
+        ? StylePosition.front
+        : StylePosition.end;
 
 StylePosition stylePositionFor(Object? param, {String flow = ''}) {
   if (param == null) return defaultStylePosition(flow);
@@ -347,9 +350,25 @@ StylePosition stylePositionFor(Object? param, {String flow = ''}) {
       '${StylePosition.values.map((p) => p.name).join('|')}, ne "$param"');
 }
 
-/// `param.qualityPrefix=on|off` — whether the preset's quality tags go in.
-bool qualityPrefixFor(Object? param) => switch (param) {
-      null || true || 'on' => true,
+/// Whether a cell keeps the preset's quality tags when `param.qualityPrefix`
+/// is not set: what the app does. A styled restyle or repose drops them on the
+/// models where they held the style back ([ImageModelSpec.restyleQualityPrefix],
+/// measured on L40S, `README.md` „Restyl z fotky“); everything else keeps them.
+bool defaultQualityPrefix(
+  ImageModelSpec m, {
+  required String flow,
+  required bool styled,
+}) =>
+    !styled ||
+    (flow != 'restyle' && flow != 'repose') ||
+    m.restyleQualityPrefix;
+
+/// `param.qualityPrefix=on|off` — whether the preset's quality tags go in;
+/// unset is [fallback].
+bool qualityPrefixFor(Object? param, {bool fallback = true}) =>
+    switch (param) {
+      null => fallback,
+      true || 'on' => true,
       false || 'off' => false,
       _ => throw FormatException(
           'param.qualityPrefix musí být on|off, ne "$param"'),

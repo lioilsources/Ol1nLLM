@@ -242,10 +242,28 @@ void main() {
       // still wins, so `end` remains measurable there.
       expect(stylePositionFor(null, flow: 'restyle'), StylePosition.front);
       expect(stylePositionFor('end', flow: 'restyle'), StylePosition.end);
+      // The app's repose puts the style in front too, so the lab follows it.
+      expect(stylePositionFor(null, flow: 'repose'), StylePosition.front);
       expect(qualityPrefixFor(null), isTrue);
+      expect(qualityPrefixFor(null, fallback: false), isFalse);
+      expect(qualityPrefixFor('on', fallback: false), isTrue);
       expect(qualityPrefixFor('off'), isFalse);
       expect(() => stylePositionFor('start'), throwsFormatException);
       expect(() => qualityPrefixFor('no'), throwsFormatException);
+    });
+
+    test('a styled restyle drops the prefix only where it was measured to', () {
+      bool dflt(String id, String flow, {bool styled = true}) =>
+          defaultQualityPrefix(imageModelById(id), flow: flow, styled: styled);
+      expect(dflt('noobai-xl', 'restyle'), isFalse);
+      expect(dflt('illustrious-xl', 'repose'), isFalse);
+      // Pony's score tags are its quality control: without them it fades.
+      expect(dflt('pony', 'restyle'), isTrue);
+      expect(dflt('autismmix-pony', 'restyle'), isTrue);
+      // A baseline and every other flow stay on the app's prefix.
+      expect(dflt('noobai-xl', 'restyle', styled: false), isTrue);
+      expect(dflt('noobai-xl', 'txt2img'), isTrue);
+      expect(dflt('noobai-xl', 'img2img'), isTrue);
     });
 
     test('the builder drops the preset prefix only when asked', () {

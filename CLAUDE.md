@@ -186,7 +186,12 @@ připojuje **za** prompt (`applyStyle()`) — vlastní zadání má přednost; p
 prompt (foto root) zůstane prázdný, aby se styl nestal jediným obsahem. Na uzlu
 se persistuje jen `GenNode.styleId`, text je z něj odvoditelný (stejný princip
 jako u póz). Platí pro generate/refine/repose, **ne pro inpaint** (ten popisuje
-jen zamalovanou oblast, celoobrazový styl by se s ním pral).
+jen zamalovanou oblast, celoobrazový styl by se s ním pral). **Repose je
+výjimka z pořadí**: styl jde **před** prompt a u modelů s
+`restyleQualityPrefix: false` (NoobAI, Illustrious) se se stylem vynechá
+prefix kvality — obojí změřené v restylu labu (`tools/lab/README.md`,
+„Restyl z fotky“); `GenNode.positivePrefix` pak zůstane null. Picker v režimu
+repose ukazuje `restyleNote` místo `styleNote`.
 
 **Dialekty stylu (`PromptDialect`)**: styl má dva texty — `block` (volná
 fráze, čte ji CLIP i T5) a volitelně `booru` (danbooru tagy **bez jména

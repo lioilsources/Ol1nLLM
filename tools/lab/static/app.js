@@ -126,7 +126,8 @@ async function loadConfig() {
 
   $('models').innerHTML = cfg.models.map((m) => `
     <button class="chip" data-model="${esc(m.id)}" aria-pressed="false">
-      ${esc(m.label)}<small>${esc(m.styleNote || '')}</small>
+      ${esc(m.label)}<small>${esc(m.styleNote || '')}</small>${m.restyleNote
+        ? `<small class="restylenote">restyl: ${esc(m.restyleNote)}</small>` : ''}
     </button>`).join('');
   $('models').onclick = (e) => toggle(e, 'model', state.models);
 
@@ -429,7 +430,9 @@ function updateRestyleHint() {
   const base = (state.config?.models || []).find((m) => m.id === $('baseModel').value);
   $('restylehint').textContent = base
     ? `${base.label} vyrobí z každé pozice a postavy jednu fotku bez stylu. Modely vybrané níž ji `
-      + 'pak přemalují v každém stylu — tatáž fotka pro všechny styly i modely.'
+      + 'pak přemalují v každém stylu — tatáž fotka pro všechny styly i modely. '
+      + 'Změřeno: z fotoreálné fotky (Lustify, CyberRealistic, RealVis) se styl přenáší silněji než '
+      + 'z anime obrázku; nejsilněji přemalují NoobAI a Illustrious, ty jedou bez prefixu kvality.'
     : 'S modelem pozice má běh dva kroky: první model vyrobí fotku (pozice + postava), '
       + 'ostatní ji přemalují do stylu. Bez něj jsou postavy jen další část promptu.';
 }
