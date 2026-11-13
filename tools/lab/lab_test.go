@@ -1069,6 +1069,40 @@ func TestExportMapsCellsOntoGalleryNodes(t *testing.T) {
 	}
 }
 
+// A run planned from a prompt file sends the row id and the text that row gave
+// the cell's model family, so the gallery can show the CSV prompt on its own.
+func TestExportCarriesThePromptFileRow(t *testing.T) {
+	run := fakeRun(t, false)
+	run.man.Models[0].PromptFamily = FamilyDanbooru
+	run.man.Cells[0].PromptBody = "arabesque"
+	if err := os.WriteFile(filepath.Join(run.Dir, "prompt-bodies.json"), []byte(
+		`[{"id":"arabesque","texts":{"danbooru":"1girl, arabesque","flux":"A ballerina."}}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := run.BuildExport()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body struct {
+		Nodes []map[string]any `json:"nodes"`
+	}
+	if err := json.Unmarshal(plan.Body, &body); err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range body.Nodes {
+		switch n["prompt"] {
+		case "a ballerina, ukiyo-e":
+			if n["promptBody"] != "arabesque" || n["promptBodyText"] != "1girl, arabesque" {
+				t.Errorf("řádek promptu = %v / %v", n["promptBody"], n["promptBodyText"])
+			}
+		default:
+			if _, ok := n["promptBody"]; ok {
+				t.Errorf("buňka bez souboru promptů dostala promptBody %v", n["promptBody"])
+			}
+		}
+	}
+}
+
 // A cell that ran without the quality prefix (a styled restyle on NoobAI or
 // Illustrious) must not claim it in the gallery.
 func TestExportDropsAPrefixTheCellDidNotSend(t *testing.T) {

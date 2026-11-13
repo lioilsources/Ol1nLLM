@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"io"
@@ -256,8 +257,17 @@ func (r *Run) BuildExport() (*ExportPlan, error) {
 	nodes := make([]map[string]any, 0, len(man.Cells)+1)
 	modelCount := map[string]int{}
 	preset := map[string]map[string]any{}
+	family := map[string]string{}
 	for _, m := range man.Models {
 		preset[m.ID] = m.Preset
+		family[m.ID] = promptFamilyOf(m)
+	}
+	// The prompt file the run was planned from (YAML or CSV, normalised), so
+	// the gallery can show which row a picture came from and the text that row
+	// gave this model, apart from the prefix and style glued around it.
+	bodies, err := r.promptBodies()
+	if err != nil {
+		return nil, err
 	}
 
 	// The reference, if this run had one: a root node the cells point back to.
@@ -316,6 +326,12 @@ func (r *Run) BuildExport() (*ExportPlan, error) {
 		}
 		if c.Negative != nil && *c.Negative != "" {
 			node["negativePrompt"] = *c.Negative
+		}
+		if c.PromptBody != "" {
+			node["promptBody"] = c.PromptBody
+			if t := bodies[c.PromptBody].Texts[family[c.Model]]; t != "" {
+				node["promptBodyText"] = t
+			}
 		}
 		// __baseline is the lab's own marker for "no style block", not a
 		// style the app knows — sending it would invent a preset id.
@@ -518,4 +534,25 @@ func dominant(counts map[string]int) string {
 		}
 	}
 	return best
+}
+
+// promptBodies reads prompt-bodies.json from the run directory; a run planned
+// without a prompt file has none, which is not an error.
+func (r *Run) promptBodies() (map[string]PromptBody, error) {
+	out := map[string]PromptBody{}
+	data, err := os.ReadFile(filepath.Join(r.Dir, "prompt-bodies.json"))
+	if errors.Is(err, os.ErrNotExist) {
+		return out, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("prompt-bodies.json: %w", err)
+	}
+	var list []PromptBody
+	if err := json.Unmarshal(data, &list); err != nil {
+		return nil, fmt.Errorf("prompt-bodies.json: %w", err)
+	}
+	for _, b := range list {
+		out[b.ID] = b
+	}
+	return out, nil
 }
