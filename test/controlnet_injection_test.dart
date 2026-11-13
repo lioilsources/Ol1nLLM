@@ -581,12 +581,17 @@ void main() {
       expect(cn['positive'], ['2', 0]);
     });
 
-    test('both: FaceID first, InstantID last on the model edge', () {
+    // FaceID first let every new prompt add one more InstantID attention
+    // patch to FaceID's cached model — see _injectFaceIdentity.
+    test('both: InstantID first, FaceID last on the model edge', () {
       final wf = repose(sdxlSvc(), face: FaceIdentity.both);
-      expect((wf['__faceid_loader__'] as Map)['inputs']['model'], ['1', 0]);
-      expect((wf['__face_apply__'] as Map)['inputs']['model'],
-          ['__faceid_apply__', 0]);
-      expect(_sampler(wf)['model'], ['__face_apply__', 0]);
+      expect((wf['__face_apply__'] as Map)['inputs']['model'], ['1', 0]);
+      expect((wf['__faceid_loader__'] as Map)['inputs']['model'],
+          ['__face_apply__', 0]);
+      expect(_sampler(wf)['model'], ['__faceid_apply__', 0]);
+      // InstantID still hands its conditioning to the depth apply.
+      final cn = (wf['__cn_apply__'] as Map)['inputs'] as Map;
+      expect(cn['positive'], ['__face_apply__', 1]);
     });
 
     test('composes with a LoRA, which stays first in the chain', () {
@@ -595,7 +600,7 @@ void main() {
         face: FaceIdentity.both,
         detail: true,
       );
-      expect((wf['__faceid_loader__'] as Map)['inputs']['model'],
+      expect((wf['__face_apply__'] as Map)['inputs']['model'],
           ['__lora__', 0]);
       for (final e in _allEdges(wf)) {
         expect(wf.containsKey(e[0]), isTrue, reason: 'dangling edge $e');

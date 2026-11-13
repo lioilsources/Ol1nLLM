@@ -1930,13 +1930,26 @@ class ComfyUIService implements ImageBackend {
       _injectPulid(wf);
       return;
     }
-    // FaceID first, so InstantID ends up last on the model edge:
-    // loader → [__lora__] → [__faceid_apply__] → __face_apply__ → sampler.
-    if (mode == FaceIdentity.faceid || mode == FaceIdentity.both) {
-      _injectFaceIdV2(wf);
-    }
+    // InstantID first, FaceID last on the model edge:
+    // loader → [__lora__] → [__face_apply__] → [__faceid_loader__ →
+    // __faceid_apply__] → sampler.
+    //
+    // The order is not cosmetic. Both nodes patch attention through the same
+    // `Attn2Replace` object, and when the key is already there the second one
+    // calls `.add()` on the object it got from upstream instead of copying
+    // it. FaceID first made that upstream object FaceID's output, which
+    // ComfyUI caches (nothing in it depends on the prompt), while InstantID
+    // re-runs on every prompt (it takes the conditioning) — so each queued
+    // prompt appended one more InstantID callback to the cached model. A
+    // restyle row of one photo then drifted into mush cell by cell (lab run
+    // 20261111-144619: image stddev 105 → 48 over 60 styles, reset at the
+    // next photo, none/instantid runs flat). This way round the shared
+    // object is born in InstantID on every run, so nothing accumulates.
     if (mode == FaceIdentity.instantid || mode == FaceIdentity.both) {
       _injectInstantId(wf);
+    }
+    if (mode == FaceIdentity.faceid || mode == FaceIdentity.both) {
+      _injectFaceIdV2(wf);
     }
   }
 
