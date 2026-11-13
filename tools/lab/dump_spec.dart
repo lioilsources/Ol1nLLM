@@ -312,12 +312,13 @@ PromptDialect styleDialectFor(Object? param, PromptDialect model) {
       '${PromptDialect.values.map((d) => d.name).join('|')}, ne "$param"');
 }
 
-/// Where a cell's style text sits in the prompt. The app always sends
-/// `end` (prefix, subject, style — [applyStylePreset]); the other two exist
-/// for the lab, because CLIP weights early tokens more and the quality prefix
-/// of the anime lineages comes first.
+/// Where a cell's style text sits in the prompt. The app sends `end`
+/// (prefix, subject, style — [applyStylePreset]) everywhere but repose, which
+/// sends `front` ([kRestyleStyleInFront]); `first` exists for the lab, because
+/// CLIP weights early tokens more and the quality prefix of the anime lineages
+/// comes first.
 enum StylePosition {
-  /// `prefix, subject, style` — what the app sends.
+  /// `prefix, subject, style` — what the app sends outside repose.
   end,
 
   /// `prefix, style, subject` — style ahead of the subject, prefix still first.
@@ -334,9 +335,18 @@ enum StylePosition {
 /// at the end lands in the last CLIP chunk with the least weight: measured on
 /// Illustrious over a Hassaku photo, `front` moved the picture 2–4× more than
 /// `end` (mean pixel distance from the baseline 39–60 against 12–20), while the
-/// depth hint kept the pose. Every other flow stays on the app's `end`.
+/// depth hint kept the pose. The app's repose ("Zachovej pózu") does the
+/// same ([kRestyleStyleInFront]), so both restyle flows follow it; every other
+/// flow stays on `end`.
 StylePosition defaultStylePosition(String flow) =>
-    flow == 'restyle' ? StylePosition.front : StylePosition.end;
+    isRestyleFlow(flow) && kRestyleStyleInFront
+        ? StylePosition.front
+        : StylePosition.end;
+
+/// The flows that run the app's repose prompt rules: `restyle` (two steps) and
+/// `repose` (over a reference). A txt2img on `POSE_MODE=depth` builds the same
+/// graph but keeps txt2img's prompt — the app never sends that combination.
+bool isRestyleFlow(String flow) => flow == 'restyle' || flow == 'repose';
 
 StylePosition stylePositionFor(Object? param, {String flow = ''}) {
   if (param == null) return defaultStylePosition(flow);
@@ -347,9 +357,29 @@ StylePosition stylePositionFor(Object? param, {String flow = ''}) {
       '${StylePosition.values.map((p) => p.name).join('|')}, ne "$param"');
 }
 
-/// `param.qualityPrefix=on|off` — whether the preset's quality tags go in.
-bool qualityPrefixFor(Object? param) => switch (param) {
-      null || true || 'on' => true,
+/// Whether a cell keeps the preset's quality tags when `param.qualityPrefix`
+/// is not set: the app's rule ([restyleKeepsPrefix]) — a styled restyle drops
+/// them on the models where they held the style back (measured on L40S,
+/// `README.md` „Restyl z fotky“); everything else keeps them.
+///
+/// The baseline of a restyle flow follows its styled cells: it is what their
+/// reaction is measured against, so it may differ from them by the style block
+/// only. Hence [subject], not the style — a style goes out wherever the
+/// subject is not empty ([styleApplies]), and the baseline mirrors that.
+bool defaultQualityPrefix(
+  ImageModelSpec m, {
+  required String flow,
+  required String subject,
+}) =>
+    !isRestyleFlow(flow) ||
+    restyleKeepsPrefix(m, styled: subject.trim().isNotEmpty);
+
+/// `param.qualityPrefix=on|off` — whether the preset's quality tags go in;
+/// unset is [fallback].
+bool qualityPrefixFor(Object? param, {bool fallback = true}) =>
+    switch (param) {
+      null => fallback,
+      true || 'on' => true,
       false || 'off' => false,
       _ => throw FormatException(
           'param.qualityPrefix musí být on|off, ne "$param"'),

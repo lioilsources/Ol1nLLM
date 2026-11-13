@@ -101,6 +101,20 @@ void main() {
       expect(out, contains('japanese woodblock print aesthetic'));
     });
 
+    test('front puts the block ahead of the prompt', () {
+      final out = applyStyle('a ballerina', 'ukiyoe', front: true);
+      expect(out, endsWith(', a ballerina'));
+      expect(out, contains('japanese woodblock print aesthetic'));
+      expect(applyStyle('', 'ukiyoe', front: true), '');
+    });
+
+    test('styleApplies matches what applyStyle actually adds', () {
+      final ukiyoe = styleById('ukiyoe');
+      expect(styleApplies('a ballerina', ukiyoe), isTrue);
+      expect(styleApplies('  ', ukiyoe), isFalse);
+      expect(styleApplies('a ballerina', null), isFalse);
+    });
+
     test('no style leaves the prompt untouched', () {
       expect(applyStyle('a ballerina', null), 'a ballerina');
       expect(applyStyle('a ballerina', 'nope'), 'a ballerina');

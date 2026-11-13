@@ -2047,7 +2047,10 @@ class _ModelChip extends StatelessWidget {
                       : spec.img2img
                       ? '${spec.capabilityLabel} — vyžaduje obrázek'
                       : '${spec.capabilityLabel} — jen nové generování';
-                  final note = spec.styleNote;
+                  // In repose the restyle verdict is the one that matters.
+                  final note = needsPose
+                      ? spec.restyleNote ?? spec.styleNote
+                      : spec.styleNote;
                   return Opacity(
                     opacity: usable ? 1.0 : 0.38,
                     child: ListTile(

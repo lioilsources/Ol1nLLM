@@ -374,15 +374,43 @@ void main() {
                 params['styleDialect'],
                 m.promptDialect,
               );
-              // Style position and the quality prefix are lab-only axes; with
-              // neither set this is exactly the app's applyStylePreset.
+              // Style position and the quality prefix are lab axes; unset,
+              // they follow the app (applyStylePreset, restyleKeepsPrefix).
               final stylePosition = stylePositionFor(
                 params['stylePosition'],
                 flow: flow,
               );
-              final qualityPrefix = qualityPrefixFor(params['qualityPrefix']);
+              final subject = prompts[pi].subjectFor(promptFamilyFor(m));
+              final qualityPrefix = qualityPrefixFor(
+                params['qualityPrefix'],
+                fallback: defaultQualityPrefix(
+                  m,
+                  flow: flow,
+                  subject: subject,
+                ),
+              );
+              // Without a prefix to jump ahead of, `first` is `front` word for
+              // word — two labels on one picture would read as „first adds
+              // nothing“.
+              if (style != null &&
+                  params['stylePosition'] == StylePosition.first.name &&
+                  (!qualityPrefix || preset.positivePrefix.isEmpty)) {
+                skipped.add({
+                  'cell': cellId(
+                    flow: flow,
+                    model: m.id,
+                    style: styleId,
+                    variantLabel: variantValue == null ? null : sweep.label,
+                    variantValue: variantValue,
+                    promptIndex: indexPrompts ? pi : null,
+                  ),
+                  'reason': 'bez prefixu kvality je stylePosition=first '
+                      'totéž co front (${m.id})',
+                });
+                return;
+              }
               final composed = composeCellPrompt(
-                subject: prompts[pi].subjectFor(promptFamilyFor(m)),
+                subject: subject,
                 styleText: style?.blockFor(dialect),
                 prefix: preset.positivePrefix,
                 position: stylePosition,
@@ -993,6 +1021,11 @@ void main() {
                 // the negative box would go nowhere.
                 'readsNegative': readsNegative(m),
                 'styleNote': m.styleNote,
+                'restyleNote': m.restyleNote,
+                'positionNote': m.positionNote,
+                // Whether a styled restyle keeps the quality prefix — the UI
+                // builds its hint from this instead of naming models.
+                'restyleQualityPrefix': m.restyleQualityPrefix,
                 'ckptName': m.preset?.ckptName,
                 'preset': m.preset == null
                     ? null

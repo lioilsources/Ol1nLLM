@@ -186,7 +186,9 @@ připojuje **za** prompt (`applyStyle()`) — vlastní zadání má přednost; p
 prompt (foto root) zůstane prázdný, aby se styl nestal jediným obsahem. Na uzlu
 se persistuje jen `GenNode.styleId`, text je z něj odvoditelný (stejný princip
 jako u póz). Platí pro generate/refine/repose, **ne pro inpaint** (ten popisuje
-jen zamalovanou oblast, celoobrazový styl by se s ním pral).
+jen zamalovanou oblast, celoobrazový styl by se s ním pral). **Repose je
+výjimka** (styl vpředu, prefix podle `restyleKeepsPrefix()`, repose uzly před
+v1.39 mají styl na konci): `tools/lab/README.md`, „Restyl z fotky“.
 
 **Dialekty stylu (`PromptDialect`)**: styl má dva texty — `block` (volná
 fráze, čte ji CLIP i T5) a volitelně `booru` (danbooru tagy **bez jména
@@ -421,7 +423,7 @@ InstantID má **dvě síly**, proto `ApplyInstantIDAdvanced` a ne základní uze
 (kde tvář je), `ip_weight` 0.6 je IP-Adapter embedding předlohy (čí tvář to
 je). Embedding je obrazový embedding *fotografie* vstříknutý do
 cross-attention vedle textových tokenů, takže při 0.8 přes celý rozvrh
-přebíjí blok stylu (ten je na konci promptu, s nejnižší vahou). V img2img se
+přebíjí blok stylu (ten je mimo repose na konci promptu, s nejnižší vahou). V img2img se
 to skládá se zdrojovým latentem (denoise 0.72) a auto-depth hintem (0.7) —
 tři kotvy k fotce proti jednomu stylu — a styl přežil jen na Juggernautu
 (fotoreal SDXL-base finetune, doména, na které je adaptér natrénovaný;
@@ -1130,11 +1132,11 @@ běh. UI u doběhlého běhu s chybami nabízí *Doplnit selhané*.
 
 **Proč anime modely styl nepřevezmou** — dvě laboratorní osy a jeden soubor:
 `param.stylePosition=end|front|first` (appka posílá `end` = prefix, námět,
-styl; flow `restyle` má výchozí `front`, jinak styl za dlouhou pozicí
-a postavou skoro nepůsobí — měření v `tools/lab/README.md`) a `param.qualityPrefix=on|off` (tagy estetického hodnocení z
+styl, v repose `front`; flow `restyle` a `repose` mají výchozí `front` —
+měření v `tools/lab/README.md`) a `param.qualityPrefix=on|off` (tagy estetického hodnocení z
 `positivePrefix`, u NoobAI `very awa`, jdou první a CLIP je váží nejvíc).
 Skládá je `composeCellPrompt()` v `dump_spec.dart`; builder má kvůli tomu
-`positivePrefix: false`, výchozí `true` appku nemění. A
+`positivePrefix: false`, výchozí `true` appku mimo repose nemění. A
 `tools/lab/candidates/cultural-booru.json`: booru tagy pro 39 kulturních stylů,
 které je v registru nemají (booru text měli jen umělci), s bloky převzatými
 z registru — sweep `param.styleDialect=natural|booru` nad tímto souborem je

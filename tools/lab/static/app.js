@@ -126,7 +126,9 @@ async function loadConfig() {
 
   $('models').innerHTML = cfg.models.map((m) => `
     <button class="chip" data-model="${esc(m.id)}" aria-pressed="false">
-      ${esc(m.label)}<small>${esc(m.styleNote || '')}</small>
+      ${esc(m.label)}<small>${esc(m.styleNote || '')}</small>${m.restyleNote
+        ? `<small class="restylenote">restyl: ${esc(m.restyleNote)}</small>` : ''}${m.positionNote
+        ? `<small class="restylenote">pozice: ${esc(m.positionNote)}</small>` : ''}
     </button>`).join('');
   $('models').onclick = (e) => toggle(e, 'model', state.models);
 
@@ -134,7 +136,7 @@ async function loadConfig() {
   // only edit (flux-fill) have nothing to start from.
   $('baseModel').insertAdjacentHTML('beforeend', cfg.models
     .filter((m) => m.txt2img !== false)
-    .map((m) => `<option value="${esc(m.id)}">${esc(m.label)}</option>`).join(''));
+    .map((m) => `<option value="${esc(m.id)}">${esc(m.label)}${m.positionNote ? ' — změřeno' : ''}</option>`).join(''));
   updateRestyleHint();
 
   // Two rows, not one: with the artists the registry is ~90 chips, and a single
@@ -427,9 +429,16 @@ $('hint').onchange = () => estimate();
 
 function updateRestyleHint() {
   const base = (state.config?.models || []).find((m) => m.id === $('baseModel').value);
+  // Recommendations come from the registry (positionNote, restyleQualityPrefix),
+  // so a new measurement changes the hint without touching this file.
+  const models = state.config?.models || [];
+  const names = (pick) => models.filter(pick).map((m) => m.label).join(', ');
+  const noPrefix = names((m) => m.restyleQualityPrefix === false);
   $('restylehint').textContent = base
     ? `${base.label} vyrobí z každé pozice a postavy jednu fotku bez stylu. Modely vybrané níž ji `
       + 'pak přemalují v každém stylu — tatáž fotka pro všechny styly i modely.'
+      + (base.positionNote ? ` Jako model pozice: ${base.positionNote}.` : '')
+      + (noPrefix ? ` Bez prefixu kvality (se stylem) jedou: ${noPrefix}.` : '')
     : 'S modelem pozice má běh dva kroky: první model vyrobí fotku (pozice + postava), '
       + 'ostatní ji přemalují do stylu. Bez něj jsou postavy jen další část promptu.';
 }

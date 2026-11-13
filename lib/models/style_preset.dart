@@ -199,19 +199,43 @@ String applyStyle(
   String prompt,
   String? styleId, {
   PromptDialect dialect = PromptDialect.natural,
-}) => applyStylePreset(prompt, styleById(styleId), dialect: dialect);
+  bool front = false,
+}) => applyStylePreset(
+  prompt,
+  styleById(styleId),
+  dialect: dialect,
+  front: front,
+);
 
 /// Same rule, but for a preset the caller already holds — the lab vets style
 /// candidates that are not (yet) in [kStylePresets], and looking them up by id
 /// would silently drop their text.
+///
+/// [front] puts the block ahead of the prompt. Repose does that: the lab's
+/// restyle runs moved the picture 2–4× more with the style in front, because
+/// a style at the end lands in the CLIP chunk with the least weight.
 String applyStylePreset(
   String prompt,
   StylePreset? style, {
   PromptDialect dialect = PromptDialect.natural,
+  bool front = false,
 }) {
-  if (style == null || prompt.trim().isEmpty) return prompt;
-  return '$prompt, ${style.blockFor(dialect)}';
+  if (style == null || !styleApplies(prompt, style)) return prompt;
+  final block = style.blockFor(dialect);
+  return front ? '$block, $prompt' : '$prompt, $block';
 }
+
+/// Whether [applyStylePreset] adds [style] to [prompt] at all — not on an
+/// empty prompt. Anything that depends on a style going out asks this, not
+/// whether one is selected.
+bool styleApplies(String prompt, StylePreset? style) =>
+    style != null && prompt.trim().isNotEmpty;
+
+/// Restyle (the app's repose, the lab's restyle flow) puts the style in front
+/// of the prompt: in the lab's runs it moved the picture 2–4× more there,
+/// because a style at the end lands in the CLIP chunk with the least weight.
+/// Every other flow appends it.
+const bool kRestyleStyleInFront = true;
 
 /// True when the lab saw [modelId] paint the same picture with [styleId] as
 /// without it ([kStyleQuietOn], `tools/lab/reactions.py`). A pair that was

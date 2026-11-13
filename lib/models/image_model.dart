@@ -76,6 +76,9 @@ class ImageModelSpec {
     this.inpaint = false,
     this.loraFamily = LoraFamily.none,
     this.styleNote,
+    this.restyleNote,
+    this.positionNote,
+    this.restyleQualityPrefix = true,
     this.supportsPose = false,
     this.preset,
   });
@@ -116,6 +119,28 @@ class ImageModelSpec {
   /// the picker, because the model's *default scene* — what it falls back to
   /// when the style doesn't land — matters more than its capability list.
   final String? styleNote;
+
+  /// One line on how this checkpoint does in the two-step restyle — a
+  /// photo-real position picture repainted over a depth hint ("Zachovej pózu"
+  /// in the app, flow `restyle` in the lab). Measured on L40S on 2026-11-11
+  /// (`tools/lab/README.md`, „Restyl z fotky“); null = not measured. Shown
+  /// in the picker in repose mode, in place of [styleNote]. Only the
+  /// restyler's role: the app's repose repaints a picture the user already
+  /// has, it never draws the position picture — that verdict is
+  /// [positionNote], which only the lab shows.
+  final String? restyleNote;
+
+  /// One line on how this checkpoint does as the lab's position model — the
+  /// first step of the restyle that draws the photo the others repaint.
+  /// Lab-only: the app has no such role. Same run as [restyleNote].
+  final String? positionNote;
+
+  /// Whether a styled repose keeps the preset's quality prefix. The prefix
+  /// goes first and takes CLIP weight from the style: off, the style moved the
+  /// picture 0.08–0.12 more on NoobAI and Illustrious. Pony's score tags are
+  /// its quality control instead — without them the unstyled picture fades to
+  /// sepia — so it stays on wherever the off side was not measured.
+  final bool restyleQualityPrefix;
 
   /// OpenPose ControlNet pose templates apply to this model. Explicit flag,
   /// not derived from ckptName: the installed ControlNet is SDXL-only, so
@@ -248,6 +273,7 @@ const kImageModels = <ImageModelSpec>[
     loraFamily: LoraFamily.pony,
     supportsPose: true,
     styleNote: 'vlastní malovaná estetika, historické styly skoro nepřejímá',
+    restyleNote: 'restyl střední; bez score tagů vybledne do sépie, olej skoro nepřejme',
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
@@ -271,6 +297,7 @@ const kImageModels = <ImageModelSpec>[
     loraFamily: LoraFamily.sdxl,
     supportsPose: true,
     styleNote: 'nejširší stylový rozsah; styl inscenuje jako kostým a kulisu',
+    restyleNote: 'jako restyler drží fotku, styl jen nádechem (měřeno s fotografickými slovy v promptu pozice)',
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
@@ -325,6 +352,7 @@ const kImageModels = <ImageModelSpec>[
     loraFamily: LoraFamily.sdxl,
     supportsPose: true,
     styleNote: 'malíře a epochy bere, médium spíš jako předmět na stole',
+    positionNote: 'drží dvojici i pózu; restyl z jeho fotky bere styl silně',
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
@@ -352,6 +380,7 @@ const kImageModels = <ImageModelSpec>[
     loraFamily: LoraFamily.sdxl,
     supportsPose: true,
     styleNote: 'malíře a epochy bere ochotně, médium často jen jako rekvizita',
+    positionNote: 'drží dvojici i pózu; restyl z jeho fotky bere styl silně',
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
@@ -384,6 +413,7 @@ const kImageModels = <ImageModelSpec>[
     loraFamily: LoraFamily.sdxl,
     supportsPose: true,
     styleNote: 'drží fotku; styl často jen jako obraz na zdi nebo rekvizita',
+    positionNote: 'drží dvojici i pózu; restyl z jeho fotky bere styl silně',
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
@@ -412,6 +442,8 @@ const kImageModels = <ImageModelSpec>[
     loraFamily: LoraFamily.illustrious,
     supportsPose: true,
     styleNote: 'styl řeší dekorativním rámem, postava zůstane ilustrací',
+    restyleNote: 'silný restyler z fotky, bez prefixu kvality ještě silnější; baroko jen ztmaví',
+    restyleQualityPrefix: false,
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
@@ -444,6 +476,8 @@ const kImageModels = <ImageModelSpec>[
     loraFamily: LoraFamily.illustrious,
     supportsPose: true,
     styleNote: 'pastelové jeviště; spolehlivě jen ukiyo-e, tuš, Art Nouveau',
+    restyleNote: 'nejsilnější restyler; bez prefixu kvality a s booru tagy přidá nejvíc stylu',
+    restyleQualityPrefix: false,
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
@@ -502,6 +536,8 @@ const kImageModels = <ImageModelSpec>[
     supportsPose: true,
     styleNote:
         'anime; styl často přebije námět, spolehlivě ukiyo-e, tuš, Art Nouveau',
+    restyleNote: 'jako restyler nejslabší',
+    positionNote: 'dá anime obrázek, ze kterého se styl v restylu mění málo',
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
@@ -595,6 +631,7 @@ const kImageModels = <ImageModelSpec>[
     supportsPose: true,
     styleNote:
         'měkké anime, styl jen přes kostým a paletu; Art Nouveau a zlatý rám',
+    restyleNote: 'restyl střední; bez score tagů vybledne do sépie',
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
@@ -632,6 +669,7 @@ const kImageModels = <ImageModelSpec>[
     loraFamily: LoraFamily.sdxl,
     supportsPose: true,
     styleNote: 'nejochotnější ke stylu — i médium přetvoří celý obraz',
+    restyleNote: 'olej a linoryt maluje nejvěrněji, ale mění tváře (přidá věk, vousy)',
     preset: ComfyPreset(
       txt2imgAsset: _sdxlTxt2img,
       img2imgAsset: _sdxlImg2img,
@@ -704,3 +742,10 @@ List<ImageModelSpec> imageModelsFor(
         m,
   ];
 }
+
+/// Whether a restyle keeps [model]'s quality prefix — the one rule the app's
+/// repose and the lab's restyle flow both call. Off only when a style really
+/// goes out ([styleApplies]) and only on the models where the lab measured
+/// that the prefix holds it back ([ImageModelSpec.restyleQualityPrefix]).
+bool restyleKeepsPrefix(ImageModelSpec model, {required bool styled}) =>
+    !styled || model.restyleQualityPrefix;
