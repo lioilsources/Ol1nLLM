@@ -66,19 +66,9 @@ jobs:
           echo "=== APK signing certificate ==="
           $ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | sort -V | tail -1)/apksigner verify --print-certs "$APK" | head -20
 
-      - name: Upload to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
-        continue-on-error: true
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            ./build/app/outputs/bundle/release/app-release.aab
-            ./build/app/outputs/flutter-apk/app-release.apk
-          name: Ol1nLLM ${{ github.ref_name }}
-          tag_name: ${{ github.ref_name }}
-          draft: false
-          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
-
+      # No GitHub Release upload: the APK/AAB carry the Cloudflare Access
+      # service token and this repo is public. Firebase App Distribution is
+      # the channel.
       - name: Upload to Firebase App Distribution
         uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
