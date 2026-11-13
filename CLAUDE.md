@@ -774,7 +774,7 @@ v `AiStack/services/audio/NOTES.md`.
   Server předlohu nezná (404) → appka ji nahraje znovu z lokální kopie.
 - **Přehrávání** přes `video_player` (AVPlayer/ExoPlayer umí mp3), jedna
   sdílená instance `MusicPlayback` — druhá nativní audio knihovna by byla
-  navíc. Výběr souboru `file_picker` ⇒ **iOS target 14.0**.
+  navíc. Výběr souboru `file_picker` chce iOS 14+; target je **15.0** (App Store od dubna 2027, ITMS-90068).
 - **Nahrát z okolí** (`SampleRecorderSheet`, balíček `record`): místo
   souboru nahraje mikrofonem, co hraje kolem (rádio, repro), a pošle to
   stejnou cestou jako vybraný soubor (`addSample`, `.m4a` AAC 192k mono).
