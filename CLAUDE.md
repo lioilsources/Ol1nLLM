@@ -403,15 +403,23 @@ masky) — stejně jako `loraStrength` jen s LoRA. Dotažení tváře
 |---|---|---|
 | `instantid` | `ApplyInstantIDAdvanced` (embedding + vlastní keypoint CN, zvlášť síly) | PuLID |
 | `faceid` | `IPAdapterFaceID` PlusV2 (jen model hrana) | PuLID |
-| `both` | obě, FaceID první na model hraně | PuLID |
+| `both` | obě, InstantID první na model hraně | PuLID |
 
 Rodina se pozná z grafu (`_isFluxGraph` = obsahuje `UNETLoader`), ne z
 presetu — patchuje se graf. FLUX má jediný mechanismus, takže se na něj
 mapuje každý režim; lab si proto **skutečnou** metodu čte zpátky z grafu
 (`_effectiveFaceIdentity`), ne z toho, co se objednalo.
 
-Model hrana se řetězí `loader → [__lora__] → [__faceid_apply__] →
-__face_apply__ → KSampler`; InstantID navíc vrací podmínění, takže sedí
+Model hrana se řetězí `loader → [__lora__] → [__face_apply__] →
+[__faceid_apply__] → KSampler`. **Pořadí není kosmetické**: oba uzly patchují
+attention přes sdílený `Attn2Replace` a druhý v řadě volá `.add()` na objekt
+z předchozího uzlu, místo aby ho zkopíroval. Dřív byl FaceID první — jeho
+výstup ComfyUI cachuje (na promptu nezávisí), InstantID se přepočítá s každým
+promptem, takže každý další prompt přidal do cachovaného modelu další
+InstantID patch. Restyle řada jedné fotky se tím buňku po buňce rozpouštěla
+do šumu (běh `20261111-144619`: stddev obrázku 105 → 48 za 60 stylů, reset
+u další fotky; běhy `none`/`instantid` rovné). V telefonu totéž při
+opakovaném generování se stejnou předlohou. InstantID navíc vrací podmínění, takže sedí
 **před** `__cn_apply__` (`__cn_apply__.positive == ['__face_apply__', 1]`) a
 oba ControlNety se skládají — klíčové body obličeje uvnitř hloubkové siluety.
 `end_at` **1.0**: hloubka se pouští na 90 %, aby dosedly textury,
