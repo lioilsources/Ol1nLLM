@@ -353,8 +353,11 @@ func (r *Run) BuildExport() (*ExportPlan, error) {
 		// point of exporting is that the numbers match the picture.
 		addSamplerFields(node, r.cellGraph(c.ID))
 		// The score tags the app prepends are part of what produced the
-		// picture, so the gallery gets them too.
-		if p, ok := preset[c.Model]["positivePrefix"].(string); ok && p != "" {
+		// picture, so the gallery gets them too — unless the cell ran
+		// without them (a styled restyle on NoobAI or Illustrious, or the
+		// qualityPrefix sweep). Older manifests lack the param: prefix on.
+		ran, set := c.Params["qualityPrefix"].(bool)
+		if p, ok := preset[c.Model]["positivePrefix"].(string); ok && p != "" && (!set || ran) {
 			node["positivePrefix"] = p
 		}
 		nodes = append(nodes, node)

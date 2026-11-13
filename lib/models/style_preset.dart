@@ -220,10 +220,22 @@ String applyStylePreset(
   PromptDialect dialect = PromptDialect.natural,
   bool front = false,
 }) {
-  if (style == null || prompt.trim().isEmpty) return prompt;
+  if (style == null || !styleApplies(prompt, style)) return prompt;
   final block = style.blockFor(dialect);
   return front ? '$block, $prompt' : '$prompt, $block';
 }
+
+/// Whether [applyStylePreset] adds [style] to [prompt] at all — not on an
+/// empty prompt. Anything that depends on a style going out asks this, not
+/// whether one is selected.
+bool styleApplies(String prompt, StylePreset? style) =>
+    style != null && prompt.trim().isNotEmpty;
+
+/// Restyle (the app's repose, the lab's restyle flow) puts the style in front
+/// of the prompt: in the lab's runs it moved the picture 2–4× more there,
+/// because a style at the end lands in the CLIP chunk with the least weight.
+/// Every other flow appends it.
+const bool kRestyleStyleInFront = true;
 
 /// True when the lab saw [modelId] paint the same picture with [styleId] as
 /// without it ([kStyleQuietOn], `tools/lab/reactions.py`). A pair that was

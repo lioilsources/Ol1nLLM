@@ -108,6 +108,13 @@ void main() {
       expect(applyStyle('', 'ukiyoe', front: true), '');
     });
 
+    test('styleApplies matches what applyStyle actually adds', () {
+      final ukiyoe = styleById('ukiyoe');
+      expect(styleApplies('a ballerina', ukiyoe), isTrue);
+      expect(styleApplies('  ', ukiyoe), isFalse);
+      expect(styleApplies('a ballerina', null), isFalse);
+    });
+
     test('no style leaves the prompt untouched', () {
       expect(applyStyle('a ballerina', null), 'a ballerina');
       expect(applyStyle('a ballerina', 'nope'), 'a ballerina');

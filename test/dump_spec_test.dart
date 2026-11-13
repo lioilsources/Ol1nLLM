@@ -253,17 +253,31 @@ void main() {
     });
 
     test('a styled restyle drops the prefix only where it was measured to', () {
-      bool dflt(String id, String flow, {bool styled = true}) =>
-          defaultQualityPrefix(imageModelById(id), flow: flow, styled: styled);
+      bool dflt(String id, String flow, {String subject = 'a dancer'}) =>
+          defaultQualityPrefix(imageModelById(id), flow: flow, subject: subject);
       expect(dflt('noobai-xl', 'restyle'), isFalse);
       expect(dflt('illustrious-xl', 'repose'), isFalse);
       // Pony's score tags are its quality control: without them it fades.
       expect(dflt('pony', 'restyle'), isTrue);
       expect(dflt('autismmix-pony', 'restyle'), isTrue);
-      // A baseline and every other flow stay on the app's prefix.
-      expect(dflt('noobai-xl', 'restyle', styled: false), isTrue);
+      // Every other flow stays on the app's prefix.
       expect(dflt('noobai-xl', 'txt2img'), isTrue);
       expect(dflt('noobai-xl', 'img2img'), isTrue);
+      // An empty subject sends no style, so the prefix stays — as in the app.
+      expect(dflt('noobai-xl', 'restyle', subject: ' '), isTrue);
+    });
+
+    test('the lab default is the app rule, baseline included', () {
+      for (final m in kImageModels) {
+        // Styled cell = the app's styled repose.
+        expect(defaultQualityPrefix(m, flow: 'restyle', subject: 'a dancer'),
+            restyleKeepsPrefix(m, styled: true), reason: m.id);
+      }
+      // The baseline (no style) shares the styled cells' prefix — the
+      // function does not look at the style, so they can't differ.
+      expect(defaultStylePosition('restyle'),
+          kRestyleStyleInFront ? StylePosition.front : StylePosition.end);
+      expect(isRestyleFlow('txt2img'), isFalse);
     });
 
     test('the builder drops the preset prefix only when asked', () {

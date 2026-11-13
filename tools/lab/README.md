@@ -169,15 +169,16 @@ styl, model restylu nebo hodnota sweepu je jen druhý krok nad stejnou fotkou.
 Dvě pozice × dvě postavy × pět stylů × dva modely restylu = 4 fotky a 40
 restylů (+ baseline bez stylu ke každému modelu).
 
-**Styl jde v restylu dopředu** (`param.stylePosition=front` jako výchozí,
-jinde zůstává `end` jako v appce). Prompt restylu nese i pozici a postavu,
+**Styl jde v restylu dopředu** (`param.stylePosition=front` jako výchozí
+ve flow `restyle` i `repose`, stejně jako appka v „Zachovej pózu“; ostatní
+flow zůstávají na `end` jako appka jinde). Prompt restylu nese i pozici a postavu,
 často 150–200 tokenů s váženými tagy, a styl na konci padne do posledního
 77tokenového bloku CLIPu s nejmenší vahou — obrázky pak vycházely skoro
 stejné. Změřeno na Illustrious nad fotkou z Hassaku (2026-11-10): `front`
 pohnul obrázkem 2–4× víc než `end` (průměrná vzdálenost od baseline 39–60
 proti 12–20) a póza z hloubkové mapy zůstala. Appkové pořadí jde vrátit
-overridem nebo sweepem `param.stylePosition=end`. Appka „Zachovej pózu“
-dává styl dopředu taky, takže flow `repose` má výchozí `front` stejně.
+overridem nebo sweepem `param.stylePosition=end`. Pravidlo je jedno pro
+appku i lab (`kRestyleStyleInFront`).
 
 **Restyl z fotky** (L40S, 2026-11-11, dva běhy, seed 777, SFW pozice; čísla
 jsou průměrná reakce vůči baseline, tedy barva — rozhodl pohled na archy):
@@ -196,14 +197,31 @@ jsou průměrná reakce vůči baseline, tedy barva — rozhodl pohled na archy)
   fotkou o 0,08. Pony a AutismMix bez score tagů vyblednou do sépie — score
   tagy jsou jejich ovladač kvality. Proto `ImageModelSpec.restyleQualityPrefix`
   (false jen u NoobAI a Illustrious) a výchozí `param.qualityPrefix` ve flow
-  `restyle`/`repose` se stylem podle něj; appka v „Zachovej pózu“ dělá totéž.
+  `restyle`/`repose` podle něj — appka i lab volají tutéž funkci
+  `restyleKeepsPrefix()`. **Baseline restylu jede se stejným prefixem jako
+  stylované buňky**, tedy u NoobAI a Illustrious bez něj: reakce se měří
+  proti baseline a ta se smí lišit jen blokem stylu. Prázdný námět styl
+  nepošle (`styleApplies()`), a prefix pak zůstává.
 - **Dialekt**: booru tagy přenášejí styl silněji než věta (NoobAI +0,11 až
   +0,16) — to už výchozí dialekt podle modelu dělá.
 
 Doporučené nastavení: model pozice Lustify / CyberRealistic / RealVis, restyl
-NoobAI nebo Illustrious, zbytek výchozí. Verdikt ke každému modelu je
-v `ImageModelSpec.restyleNote` (UI labu ho ukazuje pod čipem modelu, appka
-v pickeru v režimu „Zachovej pózu“).
+NoobAI nebo Illustrious, zbytek výchozí. Verdikt ke každému modelu je ve dvou
+polích podle role: `ImageModelSpec.restyleNote` (restyler — UI labu pod čipem
+modelu, appka v pickeru v režimu „Zachovej pózu“) a `positionNote` (model
+pozice — jen lab, pod čipem a v nápovědě u modelu pozice; appka tu roli nemá).
+Nápověda skládá doporučení z registru, ne z natvrdo psaných jmen.
+
+Na uzlu appky se pořadí neukládá: repose uzel z verze před 1.39 má styl na
+konci promptu, novější vpředu — rozliší je `GenNode.createdAt`. „Prefix
+vynechán“ je na uzlu `positivePrefix: null`, stejně jako u modelu bez
+prefixu; galerie při re-exportu takový null zatím nepřepíše (FineTuneGallery,
+`COALESCE` v ingestu) — oprava patří tam.
+
+`txt2img` s `POSE_MODE=depth` staví stejný graf jako `repose`, ale prompt
+skládá jako txt2img (styl na konci, prefix podle presetu): appka tuhle
+kombinaci neposílá, tak lab nemá co napodobit. Rozdíl mezi takovými sloupci
+je tedy flow i pořadí v promptu.
 
 Pozice jako tabulka — sloupec `pony` je rodina `danbooru`, oddělovač může být
 čárka, středník i tabulátor (český Excel), BOM nevadí:
@@ -447,12 +465,14 @@ a přitom čte tagy.
 | metoda tváře | `param.faceIdentity` | `none` | SDXL: tři různé mechanismy; flux: každá hodnota je PuLID (manifest píše, co doopravdy běželo) |
 | text stylu | `param.styleDialect` | jazyk modelu | jen s vybraným stylem; rozdíl dává jen styl s `booru` textem (umělci), kulturní styly posílají obě hodnoty stejně |
 | síla dotažení tváře | `__face_detail__.denoise` | 0.4 | jen se zapnutou identitou **a** dotažením; SDXL i flux |
-| pozice stylu | `param.stylePosition` | `end` (appka), ve flow `restyle` a `repose` `front` | jen s vybraným stylem: `end` = prefix, námět, styl; `front` = prefix, styl, námět; `first` = styl, prefix, námět. Bez prefixu (Juggernaut, flux, nebo `qualityPrefix=off`) je `front` totéž co `first` |
+| pozice stylu | `param.stylePosition` | `end` (appka), ve flow `restyle` a `repose` `front` (appka v „Zachovej pózu“) | jen s vybraným stylem: `end` = prefix, námět, styl; `front` = prefix, styl, námět; `first` = styl, prefix, námět. Bez prefixu (Juggernaut, flux, `qualityPrefix=off` nebo restyl na NoobAI a Illustrious) je `first` totéž co `front` — taková buňka se přeskočí s důvodem |
 | kvalitativní prefix | `param.qualityPrefix` | `on` (appka); restyle/repose se stylem `off` u NoobAI a Illustrious | modely s `positivePrefix`: anime SDXL (`masterpiece, best quality…`, u NoobAI `very awa`) a pony score tagy. Juggernaut a flux žádný nemají, buňky vyjdou stejné |
 | čím se drží fotka pozice | `param.hint` | `depth` | jen flow `restyle`: `depth` nebo `canny`; FLUX jako model restylu má jen `depth`, buňky s `canny` se přeskočí |
 
-Pozice stylu a prefix jsou **jen laboratorní osy** — appka posílá vždy
-`prefix, námět, styl` (`applyStylePreset`, `_prepare`). Existují kvůli otázce,
+Pozice stylu a prefix jsou laboratorní osy, jejich výchozí hodnoty jsou
+appka: `prefix, námět, styl` všude kromě „Zachovej pózu“, kde jde styl
+dopředu a prefix podle `restyleKeepsPrefix()` (`applyStylePreset`,
+`_prepare`). Existují kvůli otázce,
 proč anime modely styl nepřevezmou: CLIP váží dřívější tokeny víc a tagy
 estetického hodnocení v prefixu jdou první. Skládání je v
 `composeCellPrompt()` (`dump_spec.dart`), builder dostane `positivePrefix:
