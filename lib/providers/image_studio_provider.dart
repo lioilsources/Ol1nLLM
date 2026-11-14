@@ -25,6 +25,7 @@ import '../models/video_scene.dart';
 import '../services/comfyui_service.dart';
 import '../services/figure_service.dart';
 import '../services/finetune_export_service.dart';
+import '../services/finetune_translate_service.dart';
 import '../services/flux_kontext_nim_service.dart';
 import '../services/flux_nim_service.dart';
 import '../services/image_backend.dart';
@@ -388,6 +389,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   final FluxNimService _fluxNim = FluxNimService();
   final FluxKontextNimService _fluxKontextNim = FluxKontextNimService();
   final FinetuneExportService _finetuneExport = FinetuneExportService();
+  final FinetuneTranslateService _translate = FinetuneTranslateService();
 
   final Map<String, StreamSubscription<GenEvent>> _activeSubs = {};
   final Map<String, Completer<void>> _activeCompleters = {};
@@ -520,6 +522,50 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     state.model,
     styled: styleApplies(positive, styleById(styleId)),
   );
+
+  /// The positive prompt that leaves for [nodeId], recorded on the node.
+  ///
+  /// [userText] is the user's own words, or the img2img chain of them. On a
+  /// model that reads Danbooru tags it is first translated by the FINETUNE
+  /// gallery; on any failure it goes out as written (fail open — a round never
+  /// waits on the translator for more than its timeout, never fails because of
+  /// it). The style block is added afterwards by [_styled]: it already has a
+  /// booru variant, so it never goes to the translator, and neither does the
+  /// model's quality prefix, which the backend prepends later still.
+  ///
+  /// The node records what was sent and by which translator (null = as
+  /// written), so the gallery rates the picture against its real input and the
+  /// eval can compare translated rounds with raw ones.
+  Future<String> _outgoing(
+    String nodeId,
+    String userText, {
+    String? styleId,
+    bool styled = true,
+    bool styleFront = false,
+    bool translate = true,
+  }) async {
+    var text = userText;
+    String? translator;
+    if (translate &&
+        state.model.promptDialect == PromptDialect.booru &&
+        userText.trim().isNotEmpty) {
+      final tr = await _translate.translate(userText);
+      if (tr != null) {
+        text = tr.text;
+        translator = tr.translator;
+      }
+    }
+    final sent = styled ? _styled(text, styleId, front: styleFront) : text;
+    _patch(
+      nodeId,
+      (n) => n.copyWith(
+        promptSent: sent,
+        translator: translator,
+        clearTranslator: translator == null,
+      ),
+    );
+    return sent;
+  }
 
   /// Arms the service with the denoise this round runs at — decided at
   /// request time, because „automaticky" depends on whether a style is on.
@@ -1085,10 +1131,15 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       clearSelected: true,
       clearError: true,
     );
+    final sent = await _outgoing(
+      node.id,
+      parts.positive,
+      styleId: state.selectedStyleId,
+    );
     await _runAsync(
       node.id,
       () => _backend.generate(
-        prompt: _styled(parts.positive, state.selectedStyleId),
+        prompt: sent,
         n: _backend.variantCount,
         seed: seed,
         negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -1171,12 +1222,17 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       clearSelected: true,
       clearError: true,
     );
+    final sent = await _outgoing(
+      node.id,
+      chained,
+      styleId: state.selectedStyleId,
+    );
     _armEditDenoise();
     await _runAsync(
       node.id,
       () => _backend.edit(
         image: base.bytes,
-        prompt: _styled(chained, state.selectedStyleId),
+        prompt: sent,
         n: _backend.variantCount,
         seed: seed,
         negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -1244,12 +1300,21 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       clearSelected: true,
       clearError: true,
     );
+    // Hair inpaint runs its own workflow, not necessarily the active
+    // checkpoint, so its prompt is never translated; masked edits are, and
+    // take no style block (the existing inpaint rule).
+    final sent = await _outgoing(
+      node.id,
+      parts.positive,
+      styled: false,
+      translate: hairstyleId == null,
+    );
     await _runAsync(
       node.id,
       () => hairstyleId != null
           ? _comfyui.hairInpaint(
               image: base.bytes,
-              prompt: parts.positive,
+              prompt: sent,
               n: _comfyui.variantCount,
               seed: seed,
               negativePrompt: _hairNegative(parts.negative),
@@ -1257,7 +1322,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
             )
           : _backend.edit(
               image: base.bytes,
-              prompt: parts.positive,
+              prompt: sent,
               n: _backend.variantCount,
               seed: seed,
               negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -1527,15 +1592,17 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       clearRepose: true,
       clearError: true,
     );
+    final sent = await _outgoing(
+      node.id,
+      parts.positive,
+      styleId: styleId,
+      styleFront: kRestyleStyleInFront,
+    );
     await _runAsync(
       node.id,
       () => _comfyui.repose(
         image: base.bytes,
-        prompt: _styled(
-          parts.positive,
-          styleId,
-          front: kRestyleStyleInFront,
-        ),
+        prompt: sent,
         n: _comfyui.variantCount,
         seed: seed,
         negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -1772,15 +1839,17 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         userNegative: parts.negative,
       ).copyWith(images: node.images);
       _patch(nodeId, (_) => refreshed);
+      final sent = await _outgoing(
+        nodeId,
+        parts.positive,
+        styleId: styleId,
+        styleFront: kRestyleStyleInFront,
+      );
       await _runAsync(
         nodeId,
         () => _comfyui.repose(
           image: base.bytes,
-          prompt: _styled(
-            parts.positive,
-            styleId,
-            front: kRestyleStyleInFront,
-          ),
+          prompt: sent,
           n: _comfyui.variantCount,
           seed: seed,
           negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -1807,12 +1876,17 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     ).copyWith(images: node.images);
     _patch(nodeId, (_) => refreshed);
     if (node.isRoot) {
+      // The style follows the *current* selection, like the model and
+      // LoRA above — the rebuilt snapshot records what actually ran.
+      final sent = await _outgoing(
+        nodeId,
+        parts.positive,
+        styleId: state.selectedStyleId,
+      );
       await _runAsync(
         nodeId,
         () => _backend.generate(
-          // The style follows the *current* selection, like the model and
-          // LoRA above — the rebuilt snapshot records what actually ran.
-          prompt: _styled(parts.positive, state.selectedStyleId),
+          prompt: sent,
           n: _backend.variantCount,
           seed: seed,
           negativePrompt: parts.negative.isEmpty ? null : parts.negative,
@@ -1835,13 +1909,11 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       Uint8List? refImage;
       if (node.maskFileName != null) {
         try {
-          mask = await File(
-            '${GenImage.baseDir}/${node.maskFileName}',
-          ).readAsBytes();
+          mask = await File('${GenImage.baseDir}/${node.maskFileName}')
+              .readAsBytes();
           if (node.refFileName != null) {
-            refImage = await File(
-              '${GenImage.baseDir}/${node.refFileName}',
-            ).readAsBytes();
+            refImage = await File('${GenImage.baseDir}/${node.refFileName}')
+                .readAsBytes();
           }
         } catch (_) {
           _patch(
@@ -1857,11 +1929,17 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           ? parts.positive
           : _chainedPrompt(node.parentId, node.prompt);
       if (node.hairstyleId != null && mask != null) {
+        final sent = await _outgoing(
+          nodeId,
+          parts.positive,
+          styled: false,
+          translate: false,
+        );
         await _runAsync(
           nodeId,
           () => _comfyui.hairInpaint(
             image: base.bytes,
-            prompt: parts.positive,
+            prompt: sent,
             n: _comfyui.variantCount,
             seed: seed,
             negativePrompt: _hairNegative(parts.negative),
@@ -1870,14 +1948,18 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         );
         return;
       }
+      final sent = await _outgoing(
+        nodeId,
+        chained,
+        styleId: state.selectedStyleId,
+        styled: mask == null,
+      );
       _armEditDenoise();
       await _runAsync(
         nodeId,
         () => _backend.edit(
           image: base.bytes,
-          prompt: mask != null
-              ? chained
-              : _styled(chained, state.selectedStyleId),
+          prompt: sent,
           n: _backend.variantCount,
           seed: seed,
           negativePrompt: parts.negative.isEmpty ? null : parts.negative,

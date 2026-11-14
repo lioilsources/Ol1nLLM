@@ -171,6 +171,19 @@ class GenNode {
   /// is derivable from it, like [styleId]. Null on every other node.
   final String? hairstyleId;
 
+  /// The positive prompt that actually reached the backend — after the
+  /// img2img chain, the style block and, on a model that reads Danbooru tags,
+  /// translation. [prompt] keeps the user's own words so the intent is never
+  /// lost; this keeps what was sent, so the FINETUNE gallery rates the picture
+  /// against its real input. Null on nodes older than this field.
+  final String? promptSent;
+
+  /// `alias@version` of the gallery translator that produced [promptSent];
+  /// null when the user's words went out as written (a prose model, or the
+  /// translator was unreachable and the round failed open). The gallery's
+  /// eval groups on it, so "does translation help" is a measured question.
+  final String? translator;
+
   /// Strength [loraName] was applied with (model + clip). Recorded only when
   /// a LoRA actually applies — the effect isn't reproducible from the name
   /// alone, and the strength is adjustable (including negative) since v1.4.0.
@@ -236,6 +249,8 @@ class GenNode {
     this.loraStrength,
     this.styleId,
     this.hairstyleId,
+    this.promptSent,
+    this.translator,
     this.poseId,
     this.faceIdentity,
     this.seed,
@@ -273,6 +288,8 @@ class GenNode {
     double? loraStrength,
     String? styleId,
     String? hairstyleId,
+    String? promptSent,
+    String? translator,
     String? poseId,
     String? faceIdentity,
     int? seed,
@@ -306,6 +323,8 @@ class GenNode {
     loraStrength: loraStrength,
     styleId: styleId,
     hairstyleId: hairstyleId,
+    promptSent: promptSent,
+    translator: translator,
     poseId: poseId,
     faceIdentity: faceIdentity,
     seed: seed,
@@ -350,6 +369,8 @@ class GenNode {
     if (loraStrength != null) 'loraStrength': loraStrength,
     if (styleId != null) 'styleId': styleId,
     if (hairstyleId != null) 'hairstyleId': hairstyleId,
+    if (promptSent != null) 'promptSent': promptSent,
+    if (translator != null) 'translator': translator,
     if (poseId != null) 'poseId': poseId,
     if (faceIdentity != null) 'faceIdentity': faceIdentity,
     if (seed != null) 'seed': seed,
@@ -406,6 +427,8 @@ class GenNode {
       loraStrength: (json['loraStrength'] as num?)?.toDouble(),
       styleId: json['styleId'] as String?,
       hairstyleId: json['hairstyleId'] as String?,
+      promptSent: json['promptSent'] as String?,
+      translator: json['translator'] as String?,
       poseId: json['poseId'] as String?,
       faceIdentity: json['faceIdentity'] as String?,
       seed: json['seed'] as int?,
@@ -440,6 +463,9 @@ class GenNode {
     bool clearProgress = false,
     String? jobId,
     bool clearJobId = false,
+    String? promptSent,
+    String? translator,
+    bool clearTranslator = false,
   }) => GenNode(
     id: id,
     parentId: parentId,
@@ -473,6 +499,8 @@ class GenNode {
     loraStrength: loraStrength,
     styleId: styleId,
     hairstyleId: hairstyleId,
+    promptSent: promptSent ?? this.promptSent,
+    translator: clearTranslator ? null : (translator ?? this.translator),
     poseId: poseId,
     faceIdentity: faceIdentity,
     seed: seed,
