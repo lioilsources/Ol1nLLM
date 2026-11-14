@@ -19,6 +19,7 @@ import 'image_studio_screen.dart';
 import 'music_studio_screen.dart';
 import 'story_studio_screen.dart';
 import 'voice_studio_screen.dart';
+import '../l10n/l10n.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
@@ -105,28 +106,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.auto_awesome_outlined),
-            tooltip: 'Image Studio',
+            tooltip: context.l10n.tooltipImageStudio,
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ImageStudioScreen()),
             ),
           ),
           IconButton(
             icon: const Icon(Icons.music_note_outlined),
-            tooltip: 'Music Studio',
+            tooltip: context.l10n.tooltipMusicStudio,
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const MusicStudioScreen()),
             ),
           ),
           IconButton(
             icon: const Icon(Icons.record_voice_over_outlined),
-            tooltip: 'Voice Studio',
+            tooltip: context.l10n.tooltipVoiceStudio,
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const VoiceStudioScreen()),
             ),
           ),
           IconButton(
             icon: const Icon(Icons.movie_filter_outlined),
-            tooltip: 'Story Studio',
+            tooltip: context.l10n.tooltipStoryStudio,
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const StoryStudioScreen()),
             ),
@@ -134,7 +135,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           if (state.conversations.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.add_comment_outlined),
-              tooltip: 'New chat',
+              tooltip: context.l10n.newChat,
               onPressed: () =>
                   ref.read(chatProvider.notifier).newConversation(),
             ),
@@ -234,7 +235,7 @@ class _BranchHint extends StatelessWidget {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              'Nová zpráva založí větev z „$label"',
+              context.l10n.branchHint(label),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: AppTheme.accent, fontSize: 12),

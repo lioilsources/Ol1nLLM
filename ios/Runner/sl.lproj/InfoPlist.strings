@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "Uporablja se za zajem fotografije, s katero začneš ali jo izpopolniš v Studiu slik.";
+"NSMicrophoneUsageDescription" = "Glasbeni studio posname glasbo, ki igra okoli tebe, kot vzorec za sestavljanje, Glasovni studio pa posname glas za kloniranje.";
+"NSPhotoLibraryAddUsageDescription" = "Uporablja se za shranjevanje ustvarjenih slik v tvojo knjižnico fotografij.";
+"NSPhotoLibraryUsageDescription" = "Uporablja se za izbiro slik za urejanje in OCR.";

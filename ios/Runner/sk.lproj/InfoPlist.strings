@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "Slúži na zhotovenie fotky, z ktorej v Obrázkovom štúdiu začneš alebo ktorú upravíš.";
+"NSMicrophoneUsageDescription" = "Hudobné štúdio nahrá hudbu hrajúcu okolo teba ako vzorku na skladanie a Hlasové štúdio nahrá hlas na klonovanie.";
+"NSPhotoLibraryAddUsageDescription" = "Slúži na uloženie vygenerovaných obrázkov do tvojej knižnice fotiek.";
+"NSPhotoLibraryUsageDescription" = "Slúži na výber obrázkov na úpravy a OCR.";

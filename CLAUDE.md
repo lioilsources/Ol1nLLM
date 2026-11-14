@@ -19,7 +19,7 @@ Volitelné URL overrides (`.env.local`, Makefile je propouští jen když jsou
 neprázdné): `COMFYUI_URL`, `FINETUNE_URL`, `FLUX_NIM_URL`, `VLLM_URL`,
 `LIBRARY_CHAT_URL`, `LAW_CHAT_URL`, `LEADS_CHAT_URL`, `UGC_FC_URL`, `AUDIO_URL`,
 `STYLEMAP_URL`. Pro vývoj knihovny proti SPARKu na LAN:
-`LIBRARY_CHAT_URL=http://192.168.88.66:8090` (Právník: `LAW_CHAT_URL=http://192.168.88.66:8098`; Leads: `LEADS_CHAT_URL=http://192.168.88.66:8099`,
+`LIBRARY_CHAT_URL=http://SPARK_HOST:8090` (Právník: `LAW_CHAT_URL=http://SPARK_HOST:8098`; Leads: `LEADS_CHAT_URL=http://SPARK_HOST:8099`,
 to je zároveň výchozí hodnota, tunel zatím není) — pak ale **jen `make debug`**
 (release Android manifest nemá `usesCleartextTraffic` a iOS nemá výjimku
 v `Info.plist`, takže čistý HTTP tam neprojde).
@@ -152,7 +152,7 @@ Pořadí v řadě je záměrné: model → styl → síla úpravy → póza → 
 jako poslední** (používá se nejmíň, a řada scrolluje, takže co je vpravo,
 je z palce nejdál).
 ComfyUI URL jde přepnout přes `--dart-define=COMFYUI_URL=...`
-(např. LAN `http://192.168.88.66:8188` pro testování bez CF).
+(např. LAN `http://SPARK_HOST:8188` pro testování bez CF).
 
 **Chipy sledují node**: `navigateTo()` po přesunu na node zavolá
 `_adoptNodeSettings()` — čistá funkce `adoptableSettings()` (testovatelná bez
@@ -797,7 +797,7 @@ v `AiStack/services/audio/NOTES.md`.
   appka u ní nabídne „Poslechnout znovu".
 
 `AUDIO_URL` přepne server (výchozí `https://llm.ol1n.com`; LAN
-`http://192.168.88.66:8093` jen s `make debug`, CF hlavičky jsou pak
+`http://SPARK_HOST:8093` jen s `make debug`, CF hlavičky jsou pak
 volitelné). Veřejně jde `llm.ol1n.com/v1/audio/*` přes AiStack Go gateway
 (`AUDIO_API_URL=http://audio:8093`), takže orchestrátor musí běžet z compose
 (`make up-audio`) — ručně spuštěný kontejner nemá DNS alias `audio`
@@ -1306,7 +1306,7 @@ z Registru smluv. Jiný serverový kód (LeadsRAG, unit `leadsd` na SPARKu :8099
 ale stejný SSE dialekt (navíc `: planning` / `: keepalive` komentáře, které
 `parseSseLine` zahodí), takže v appce zase jen instance
 `LibraryChatService.leads()` s `LEADS_CHAT_URL` (výchozí LAN
-`http://192.168.88.66:8099` — tunel zatím není, tedy jen `make debug`;
+`http://SPARK_HOST:8099` — tunel zatím není, tedy jen `make debug`;
 `top_k` 8, server vrací max 15 firem; chybové texty `[leads] …`). Zdroje jsou
 `LibrarySource`-kompatibilní: `work` = IČO, `name_cs` = firma, `title` =
 `IČO … · segment`, `group` = segment, `path` = číslo smlouvy, `excerpt` =

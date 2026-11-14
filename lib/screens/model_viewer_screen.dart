@@ -6,6 +6,7 @@ import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../core/constants/theme.dart';
+import '../l10n/l10n.dart';
 
 /// Fullscreen 360° viewer for a generated 3D model.
 ///
@@ -32,10 +33,10 @@ class ModelViewerScreen extends StatelessWidget {
       backgroundColor: AppTheme.background,
       appBar: AppBar(
         backgroundColor: AppTheme.background,
-        title: const Text('3D model'),
+        title: Text(context.l10n.model3d),
         actions: [
           IconButton(
-            tooltip: 'Sdílet STL (Prusa Slicer)',
+            tooltip: context.l10n.shareStl,
             icon: const Icon(Icons.ios_share),
             onPressed: () => SharePlus.instance.share(
               ShareParams(files: [XFile(stlPath, mimeType: 'model/stl')]),
@@ -49,7 +50,7 @@ class ModelViewerScreen extends StatelessWidget {
           if (snap.hasError) {
             return Center(
               child: Text(
-                'GLB se nepodařilo načíst: ${snap.error}',
+                context.l10n.glbLoadFailed('${snap.error}'),
                 style: const TextStyle(color: AppTheme.textSecondary),
               ),
             );
@@ -66,7 +67,7 @@ class ModelViewerScreen extends StatelessWidget {
             autoRotate: true,
             autoRotateDelay: 1500,
             disableZoom: false,
-            alt: '3D model',
+            alt: context.l10n.model3d,
           );
         },
       ),

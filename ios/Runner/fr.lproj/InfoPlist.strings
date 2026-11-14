@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "Sert à prendre une photo pour démarrer ou affiner une image dans le Studio d’images.";
+"NSMicrophoneUsageDescription" = "Le Studio musical enregistre la musique jouée autour de toi comme échantillon pour composer, et le Studio vocal enregistre une voix à cloner.";
+"NSPhotoLibraryAddUsageDescription" = "Sert à enregistrer les images générées dans ta photothèque.";
+"NSPhotoLibraryUsageDescription" = "Sert à choisir des images pour la retouche et l’OCR.";

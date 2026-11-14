@@ -38,24 +38,24 @@ import 'http_error.dart';
 ///    heartbeat comments.
 class LibraryChatService extends ChatBackend {
   /// Host only — no trailing slash, no `/v1`. Point it at the SPARK LAN
-  /// address (`http://192.168.88.66:8090`) to develop without the tunnel.
+  /// address (`http://SPARK_HOST:8090`) to develop without the tunnel.
   static const _libraryUrl = String.fromEnvironment(
     'LIBRARY_CHAT_URL',
     defaultValue: 'https://chat.ol1n.com',
   );
 
   /// Law instance of the same server (`law-chat`; LAN
-  /// `http://192.168.88.66:8091`).
+  /// `http://SPARK_HOST:8091`).
   static const _lawUrl = String.fromEnvironment(
     'LAW_CHAT_URL',
     defaultValue: 'https://pravnik.ol1n.com',
   );
 
   /// Leads server (LeadsRAG, unit `leadsd`). No tunnel yet, so the default
-  /// is the SPARK LAN address — cleartext, i.e. `make debug` only.
+  /// is localhost — set LEADS_CHAT_URL (cleartext, i.e. `make debug` only) to reach the server.
   static const _leadsUrl = String.fromEnvironment(
     'LEADS_CHAT_URL',
-    defaultValue: 'http://192.168.88.66:8099',
+    defaultValue: 'http://localhost:8099',
   );
   static const _cfId = String.fromEnvironment('CF_ACCESS_CLIENT_ID');
   static const _cfSecret = String.fromEnvironment('CF_ACCESS_CLIENT_SECRET');

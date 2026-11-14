@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "이미지 스튜디오에서 이미지를 시작하거나 다듬기 위한 사진을 촬영하는 데 사용됩니다.";
+"NSMicrophoneUsageDescription" = "뮤직 스튜디오는 작곡용 샘플로 주변에서 재생되는 음악을 녹음하고, 보이스 스튜디오는 복제할 목소리를 녹음합니다.";
+"NSPhotoLibraryAddUsageDescription" = "생성된 이미지를 사진 보관함에 저장하는 데 사용됩니다.";
+"NSPhotoLibraryUsageDescription" = "편집 및 OCR을 위한 이미지를 선택하는 데 사용됩니다.";

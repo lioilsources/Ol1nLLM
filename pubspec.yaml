@@ -30,6 +30,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: any
 
   cupertino_icons: ^1.0.8
   collection: ^1.18.0
@@ -84,6 +87,7 @@ flutter_launcher_icons:
 flutter:
 
   uses-material-design: true
+  generate: true
 
   assets:
     - assets/personas/

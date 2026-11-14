@@ -23,6 +23,7 @@ import base64
 import hashlib
 import io
 import json
+import os
 import time
 import urllib.error
 import urllib.request
@@ -149,7 +150,7 @@ def main() -> None:
     ap.add_argument("--set", type=Path, help="directory with items.json")
     ap.add_argument("--probe", action="store_true",
                     help="jen ověřit, že model obrázky opravdu vidí (kód 1, když ne)")
-    ap.add_argument("--url", default="http://192.168.88.66:8080/v1", help="OpenAI-compatible gateway")
+    ap.add_argument("--url", default=os.environ.get("LLM_GATEWAY_URL", "http://localhost:8080/v1"), help="OpenAI-compatible gateway")
     ap.add_argument("--model", default="openclaw-default")
     ap.add_argument("--key", default="dummy")
     ap.add_argument("--jobs", type=int, default=2)
