@@ -1249,6 +1249,7 @@ async function openCell(id) {
     ${m.faces != null && state.metrics?.identityNote ? `<p class="hint">${esc(state.metrics.identityNote)}</p>` : ''}
     ${c.presetOverridden ? `<p class="hint warnline">${esc(state.config.copy.preset_overridden.text)}</p>` : ''}
     <dl class="kv">
+      ${positionRows(c)}
       <dt>prompt</dt><dd>${esc(c.prompt || '—')}</dd>
       ${c.styleText ? `<dt>blok stylu</dt><dd>${esc(c.styleText)}</dd>` : ''}
       <dt>negativ</dt><dd>${esc(c.negative || '—')}</dd>
@@ -1259,6 +1260,19 @@ async function openCell(id) {
     <div class="chain">${(data.explain || []).map(chainNode).join('')}</div>
     <details class="raw"><summary>workflow JSON</summary>
       <pre>${esc(JSON.stringify(data.workflow, null, 1))}</pre></details>`;
+}
+
+// The entry of the prompt file (YAML/CSV) the cell was drawn from — the name
+// the user wrote ("Missionary"), which the composed prompt no longer shows.
+// With --characters the column label is "<entry> · <character>", so the
+// character comes back from there. Runs without a prompt file have no entry.
+function positionRows(c) {
+  if (!c.promptBody) return '';
+  const label = (state.manifest?.prompts || [])[c.promptIndex] || '';
+  const prefix = `${c.promptBody} · `;
+  const character = label.startsWith(prefix) ? label.slice(prefix.length) : '';
+  return `<dt>pozice</dt><dd>${esc(c.promptBody)}</dd>` +
+    (character ? `<dt>postava</dt><dd>${esc(character)}</dd>` : '');
 }
 
 function metric(value, label) {
