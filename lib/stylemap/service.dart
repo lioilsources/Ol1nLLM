@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
+import 'package:flutter/painting.dart' show ImageProvider, NetworkImage;
 import 'package:http/http.dart' as http;
 
 import 'model.dart';
@@ -28,8 +29,7 @@ class StyleMapService {
   final http.Client _client;
 
   /// CF Access is optional so a LAN build works without it; through
-  /// Cloudflare a missing token surfaces as a 403. Also handed to
-  /// `NetworkImage` for the previews.
+  /// Cloudflare a missing token surfaces as a 403.
   Map<String, String> get headers => {
     if (_cfId.isNotEmpty) 'CF-Access-Client-Id': _cfId,
     if (_cfSecret.isNotEmpty) 'CF-Access-Client-Secret': _cfSecret,
@@ -39,6 +39,10 @@ class StyleMapService {
 
   String thumbUrl(StyleMapPack pack, StyleMapImage im) =>
       url('${pack.id}/${pack.thumbPath(im)}');
+
+  /// The preview of one picture.
+  ImageProvider thumb(StyleMapPack pack, StyleMapImage im) =>
+      NetworkImage(thumbUrl(pack, im), headers: headers);
 
   Future<http.Response> _get(String path, {Duration? timeout}) async {
     final http.Response r;

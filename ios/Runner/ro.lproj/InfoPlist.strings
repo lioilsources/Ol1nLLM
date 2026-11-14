@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "Folosită pentru a face o fotografie de la care pornești sau pe care o rafinezi în Studioul de imagini.";
+"NSMicrophoneUsageDescription" = "Studioul muzical înregistrează muzica ce se aude în jurul tău ca eșantion pentru compoziție, iar Studioul vocal înregistrează o voce de clonat.";
+"NSPhotoLibraryAddUsageDescription" = "Folosită pentru a salva imaginile generate în biblioteca ta foto.";
+"NSPhotoLibraryUsageDescription" = "Folosită pentru a alege imagini pentru editare și OCR.";

@@ -3,8 +3,10 @@
 /// unit-tested without booting a dump (`test/dump_spec_test.dart`).
 library;
 
+import 'package:flutter/material.dart' show Color, Icons;
 import 'package:ol1n_llm/models/image_model.dart';
 import 'package:ol1n_llm/models/style_preset.dart';
+import 'package:ol1n_llm/services/comfyui_service.dart' show StructureHint;
 
 /// Which of a prompt file's texts a model reads.
 ///
@@ -38,13 +40,85 @@ PromptFamily promptFamilyFor(ImageModelSpec m) {
   return flux ? PromptFamily.flux : PromptFamily.juggernaut;
 }
 
+/// Qwen-Image's dedicated txt2img graph (UNETLoader + Qwen2.5-VL encoder,
+/// AuraFlow shift 3.1, 1328², 20 steps, cfg 2.5 — the ComfyUI reference
+/// setting; 131–167 s a picture on SPARK, 20–35 s on the L40S).
+const kQwenImageTxt2img = 'assets/comfyui/qwen_image_txt2img.api.json';
+
+/// The diffusion weights that graph loads, for pruning by the server's list.
+const kQwenImageUnet = 'qwen_image_fp8_e4m3fn.safetensors';
+
+/// Models the lab runs and the app does not offer.
+///
+/// Qwen-Image is a position model for the restyle flow: one pass, Apache 2.0
+/// where FLUX.1-dev is non-commercial, and it reads a sentence, so it takes
+/// the `flux` column of a prompt file. It is no restyle model — it knows
+/// styles worse than Illustrious and has no depth ControlNet in the graph —
+/// so the dump skips its restyle cells like any model that cannot repose.
+/// Kept out of [kImageModels] because the app would offer it in the picker
+/// on a server that does not have the weights.
+const kLabOnlyModels = [
+  ImageModelSpec(
+    id: 'qwen-image',
+    label: 'Qwen-Image',
+    promptDialect: PromptDialect.natural,
+    icon: Icons.translate,
+    color: Color(0xFF8C6BC8),
+    kind: ImageBackendKind.comfyUi,
+    txt2img: true,
+    img2img: false,
+    styleNote: 'jen jako model pozice; styly umí hůř než Illustrious',
+    preset: ComfyPreset(
+      txt2imgAsset: kQwenImageTxt2img,
+      img2imgAsset: kQwenImageTxt2img,
+    ),
+  ),
+];
+
+/// Diffusion weights each lab-only model needs on the server.
+const _labOnlyUnets = {'qwen-image': kQwenImageUnet};
+
+/// The models a lab run can pick: the app's registry pruned by the server's
+/// checkpoints, then the lab-only ones whose weights the server has.
+///
+/// An empty [unets] means "unknown" (offline, or an old lab without the
+/// list), as it does for checkpoints in [imageModelsFor]: everything shows.
+List<ImageModelSpec> labModelsFor(
+  List<String> installedCheckpoints,
+  List<String> unets,
+) =>
+    [
+      ...imageModelsFor(installedCheckpoints),
+      for (final m in kLabOnlyModels)
+        if (unets.isEmpty || unets.contains(_labOnlyUnets[m.id])) m,
+    ];
+
+/// Whether a model's graph takes a negative prompt at all.
+///
+/// The generic SDXL templates and Qwen-Image (cfg 2.5) do; the dedicated
+/// FLUX graphs run at cfg 1 with an empty negative, and the gen-queue
+/// request has no such field. The plan warns when a negative would go
+/// nowhere, so this has to be per model, not per prompt family — Qwen-Image
+/// reads the FLUX column and still reads a negative.
+bool readsNegative(ImageModelSpec m) =>
+    m.kind == ImageBackendKind.comfyUi &&
+    (m.preset?.ckptName != null || m.preset?.txt2imgAsset == kQwenImageTxt2img);
+
 /// One entry of the prompt file: the same subject written out per family,
 /// under a shared id.
 class PromptBody {
-  const PromptBody({required this.id, required this.texts});
+  const PromptBody({
+    required this.id,
+    required this.texts,
+    this.negative = '',
+  });
 
   final String id;
   final Map<PromptFamily, String> texts;
+
+  /// What this one prompt must not show ("sitting" next to a standing pose).
+  /// One text for every family, unlike [texts]: it is a tag list either way.
+  final String negative;
 
   /// The text this family reads.
   ///
@@ -65,7 +139,7 @@ class PromptBody {
 }
 
 /// Prompt bodies as the plan normalises them out of the YAML file:
-/// `[{id, texts: {danbooru, juggernaut, flux}}]`.
+/// `[{id, texts: {danbooru, juggernaut, flux}, negative?}]`.
 ///
 /// Go owns the YAML parse (one parser in the system, and the run directory
 /// keeps the JSON it produced), so anything malformed has been rejected with a
@@ -98,48 +172,98 @@ PromptBody _promptBody(int i, Object? raw) {
     byFamily[family] = text;
   }
   if (byFamily.isEmpty) throw FormatException('prompt "$id" nemá žádný text');
-  return PromptBody(id: id, texts: byFamily);
+  final negative = raw['negative'];
+  if (negative != null && negative is! String) {
+    throw FormatException('prompt "$id": negativ musí být text');
+  }
+  return PromptBody(
+    id: id,
+    texts: byFamily,
+    negative: (negative as String?)?.trim() ?? '',
+  );
 }
 
-/// One column of the prompt axis: a line from the prompt box and, when a
-/// prompt file is in play, the body it prefixes.
+/// One column of the prompt axis: a line from the prompt box, the body it
+/// prefixes when a prompt file is in play, and the character standing in it.
+///
+/// The three are the lab's first two prompt layers — *what happens* (prefix +
+/// body, the body written per family) and *who it happens to* (hair, eyes,
+/// ethnicity). The third layer, the style, is its own axis: it is the thing a
+/// run compares, so it must not multiply the columns.
 class PromptAxisEntry {
-  const PromptAxisEntry({required this.prefix, this.body});
+  const PromptAxisEntry({required this.prefix, this.body, this.character = ''});
 
   final String prefix;
   final PromptBody? body;
 
+  /// One line of the character box. Sent to every family as written: there is
+  /// one text per character, not one per family like the bodies have.
+  final String character;
+
   /// What the manifest lists for this column. With per-family bodies there is
   /// no single text to show, so the id names the column and the cell keeps the
   /// text that was really sent (read back out of the graph).
-  String get label => body == null
-      ? prefix
-      : (prefix.isEmpty ? body!.id : '$prefix · ${body!.id}');
+  String get label => [
+        prefix,
+        if (body != null) body!.id,
+        character,
+      ].where((s) => s.isNotEmpty).join(' · ');
 
   String subjectFor(PromptFamily family) {
-    if (body == null) return prefix;
-    final text = body!.textFor(family);
-    return prefix.isEmpty ? text : '$prefix, $text';
+    var text = body?.textFor(family) ?? '';
+    // A FLUX body is a sentence; the character follows it as a clause, and
+    // "full body., long red hair" would read as two prompts glued together.
+    if (character.isNotEmpty && text.endsWith('.')) {
+      text = text.substring(0, text.length - 1);
+    }
+    return [prefix, text, character].where((s) => s.isNotEmpty).join(', ');
+  }
+
+  /// The user negative of this column: the run's negative box, then what the
+  /// prompt file adds for this one prompt. Null when neither says anything, so
+  /// a run without negatives sends exactly what it sent before the file could
+  /// carry one.
+  ///
+  /// The model's own negative is not here — the service puts it in front, as
+  /// it does for the app's ALL-CAPS words. A tag both sources name is sent
+  /// once, at its first place.
+  String? negativeWith(String? runNegative) {
+    final seen = <String>{};
+    final tags = [
+      for (final part in [runNegative ?? '', body?.negative ?? ''])
+        for (final tag in part.split(','))
+          if (tag.trim().isNotEmpty && seen.add(tag.trim().toLowerCase()))
+            tag.trim(),
+    ];
+    return tags.isEmpty ? null : tags.join(', ');
   }
 }
 
-/// The prompt axis: every line of the prompt box × every body from the file.
+/// The prompt axis: every line of the prompt box × every body from the file
+/// × every character.
 ///
-/// Without a file the box is the axis, exactly as before. With one, its lines
-/// become prefixes — a shared instruction tried against each body — so the
-/// axis is the product, and an empty box means one empty prefix rather than no
-/// cells at all, because the file already carries the prompts.
+/// Without a file or characters the box is the axis, exactly as before. With
+/// either, its lines become prefixes — a shared instruction tried against each
+/// body — so the axis is the product, and an empty box means one empty prefix
+/// rather than no cells at all, because the other layers already carry the
+/// prompt. Characters vary innermost, so one position's characters sit side
+/// by side.
 List<PromptAxisEntry> buildPromptAxis({
   required List<String> prefixes,
   required List<PromptBody> bodies,
+  List<String> characters = const [],
 }) {
-  if (bodies.isEmpty) {
+  if (bodies.isEmpty && characters.isEmpty) {
     return [for (final p in prefixes) PromptAxisEntry(prefix: p)];
   }
   final heads = prefixes.isEmpty ? const [''] : prefixes;
+  final List<PromptBody?> middles = bodies.isEmpty ? const [null] : bodies;
+  final tails = characters.isEmpty ? const [''] : characters;
   return [
     for (final prefix in heads)
-      for (final body in bodies) PromptAxisEntry(prefix: prefix, body: body),
+      for (final body in middles)
+        for (final character in tails)
+          PromptAxisEntry(prefix: prefix, body: body, character: character),
   ];
 }
 
@@ -164,12 +288,15 @@ StylePreset _candidate(int i, Object? raw) {
     throw FormatException('kandidát "$id" nemá block');
   }
   return StylePreset(
+    kind: StyleKind.values.asNameMap()[raw['kind']] ??
+        (raw['artist'] != null ? StyleKind.artist : StyleKind.culture),
     id: id,
     label: (raw['label'] as String?) ?? id,
     block: block,
     booru: raw['booru'] as String?,
     artist: raw['artist'] as String?,
     period: raw['period'] as String?,
+    year: (raw['year'] as num?)?.toInt(),
   );
 }
 
@@ -185,12 +312,13 @@ PromptDialect styleDialectFor(Object? param, PromptDialect model) {
       '${PromptDialect.values.map((d) => d.name).join('|')}, ne "$param"');
 }
 
-/// Where a cell's style text sits in the prompt. The app always sends
-/// `end` (prefix, subject, style — [applyStylePreset]); the other two exist
-/// for the lab, because CLIP weights early tokens more and the quality prefix
-/// of the anime lineages comes first.
+/// Where a cell's style text sits in the prompt. The app sends `end`
+/// (prefix, subject, style — [applyStylePreset]) everywhere but repose, which
+/// sends `front` ([kRestyleStyleInFront]); `first` exists for the lab, because
+/// CLIP weights early tokens more and the quality prefix of the anime lineages
+/// comes first.
 enum StylePosition {
-  /// `prefix, subject, style` — what the app sends.
+  /// `prefix, subject, style` — what the app sends outside repose.
   end,
 
   /// `prefix, style, subject` — style ahead of the subject, prefix still first.
@@ -200,8 +328,28 @@ enum StylePosition {
   first,
 }
 
-StylePosition stylePositionFor(Object? param) {
-  if (param == null) return StylePosition.end;
+/// The position a cell gets when `param.stylePosition` is not set.
+///
+/// The restyle step puts the style in front. Its prompt carries the position
+/// and the character too, often 150–200 tokens with weighted tags, and a style
+/// at the end lands in the last CLIP chunk with the least weight: measured on
+/// Illustrious over a Hassaku photo, `front` moved the picture 2–4× more than
+/// `end` (mean pixel distance from the baseline 39–60 against 12–20), while the
+/// depth hint kept the pose. The app's repose ("Zachovej pózu") does the
+/// same ([kRestyleStyleInFront]), so both restyle flows follow it; every other
+/// flow stays on `end`.
+StylePosition defaultStylePosition(String flow) =>
+    isRestyleFlow(flow) && kRestyleStyleInFront
+        ? StylePosition.front
+        : StylePosition.end;
+
+/// The flows that run the app's repose prompt rules: `restyle` (two steps) and
+/// `repose` (over a reference). A txt2img on `POSE_MODE=depth` builds the same
+/// graph but keeps txt2img's prompt — the app never sends that combination.
+bool isRestyleFlow(String flow) => flow == 'restyle' || flow == 'repose';
+
+StylePosition stylePositionFor(Object? param, {String flow = ''}) {
+  if (param == null) return defaultStylePosition(flow);
   for (final p in StylePosition.values) {
     if (p.name == param) return p;
   }
@@ -209,13 +357,51 @@ StylePosition stylePositionFor(Object? param) {
       '${StylePosition.values.map((p) => p.name).join('|')}, ne "$param"');
 }
 
-/// `param.qualityPrefix=on|off` — whether the preset's quality tags go in.
-bool qualityPrefixFor(Object? param) => switch (param) {
-      null || true || 'on' => true,
+/// Whether a cell keeps the preset's quality tags when `param.qualityPrefix`
+/// is not set: the app's rule ([restyleKeepsPrefix]) — a styled restyle drops
+/// them on the models where they held the style back (measured on L40S,
+/// `README.md` „Restyl z fotky“); everything else keeps them.
+///
+/// The baseline of a restyle flow follows its styled cells: it is what their
+/// reaction is measured against, so it may differ from them by the style block
+/// only. Hence [subject], not the style — a style goes out wherever the
+/// subject is not empty ([styleApplies]), and the baseline mirrors that.
+bool defaultQualityPrefix(
+  ImageModelSpec m, {
+  required String flow,
+  required String subject,
+}) =>
+    !isRestyleFlow(flow) ||
+    restyleKeepsPrefix(m, styled: subject.trim().isNotEmpty);
+
+/// `param.qualityPrefix=on|off` — whether the preset's quality tags go in;
+/// unset is [fallback].
+bool qualityPrefixFor(Object? param, {bool fallback = true}) =>
+    switch (param) {
+      null => fallback,
+      true || 'on' => true,
       false || 'off' => false,
       _ => throw FormatException(
           'param.qualityPrefix musí být on|off, ne "$param"'),
     };
+
+/// `param.hint=depth|canny` — what the restyle ControlNet reads off the
+/// stage-1 picture. Unlike [StructureHint.parse] this one throws: a typo in a
+/// sweep value would otherwise quietly render the default under a wrong label.
+StructureHint structureHintFor(Object? param) {
+  if (param == null || param == '') return StructureHint.depth;
+  for (final h in StructureHint.values) {
+    if (h.name == param) return h;
+  }
+  throw FormatException('param.hint musí být '
+      '${StructureHint.values.map((h) => h.name).join('|')}, ne "$param"');
+}
+
+/// Server-side name a restyle graph is dumped with in place of the stage-1
+/// picture. The dump cannot know the real one — the picture does not exist
+/// yet and ComfyUI names uploads itself — so the runner swaps this for the
+/// name the upload returned, once stage 1 has produced the file.
+String stage1Placeholder(String stage1CellId) => 'lab_stage1__$stage1CellId.png';
 
 /// The prompt a cell hands to the builder, and whether the builder should
 /// still put the quality prefix in front of it.

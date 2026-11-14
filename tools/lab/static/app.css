@@ -14,6 +14,7 @@
   --flow-txt2img: #2aa9ff;
   --flow-img2img: #ff8c33;
   --flow-repose: #ff4d9d;
+  --flow-restyle: #9d7bff;
 
   --ok: #3ddc97;
   --warn: #f5c451;
@@ -85,6 +86,9 @@ textarea { min-height: 68px; resize: vertical; font-size: 12px; }
 .row > * { flex: 1; min-width: 0; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.stylebar { display: flex; align-items: center; gap: 5px; margin: 6px 0 8px;
+  color: var(--dim); font-size: 11px; }
+.stylebar span { flex: 1; }
 .chip {
   border: 1px solid var(--line); background: var(--ink); color: var(--muted);
   border-radius: 4px; padding: 4px 8px; font-size: 11.5px; cursor: pointer;
@@ -92,12 +96,15 @@ textarea { min-height: 68px; resize: vertical; font-size: 12px; }
 .chip[aria-pressed="true"] { border-color: var(--flow-txt2img); color: var(--paper);
   background: color-mix(in srgb, var(--flow-txt2img) 16%, var(--ink)); }
 .chip small { display: block; color: var(--dim); font-size: 10px; font-family: var(--sans); }
+.chip small.restylenote { color: var(--flow-restyle); }
 .chip[data-flow="txt2img"][aria-pressed="true"] { border-color: var(--flow-txt2img);
   background: color-mix(in srgb, var(--flow-txt2img) 18%, var(--ink)); }
 .chip[data-flow="img2img"][aria-pressed="true"] { border-color: var(--flow-img2img);
   background: color-mix(in srgb, var(--flow-img2img) 18%, var(--ink)); }
 .chip[data-flow="repose"][aria-pressed="true"] { border-color: var(--flow-repose);
   background: color-mix(in srgb, var(--flow-repose) 18%, var(--ink)); }
+.chip[data-flow="restyle"][aria-pressed="true"] { border-color: var(--flow-restyle);
+  background: color-mix(in srgb, var(--flow-restyle) 18%, var(--ink)); }
 
 .poses { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
 .poses button { padding: 0; border: 1px solid var(--line); background: var(--ink);
@@ -172,6 +179,11 @@ tr.band .flowtag {
 .flowtag[data-flow="txt2img"] { color: var(--flow-txt2img); border-color: var(--flow-txt2img); }
 .flowtag[data-flow="img2img"] { color: var(--flow-img2img); border-color: var(--flow-img2img); }
 .flowtag[data-flow="repose"] { color: var(--flow-repose); border-color: var(--flow-repose); }
+.flowtag[data-flow="restyle"], .flowtag[data-flow="position"] {
+  color: var(--flow-restyle); border-color: var(--flow-restyle); }
+tbody th.rowhead .sourcethumb {
+  float: left; width: 40px; height: 56px; object-fit: cover; border-radius: 3px;
+  margin: 0 8px 2px 0; }
 
 .cellstrip { display: flex; gap: 3px; padding: 3px; }
 button.cell {
@@ -209,8 +221,36 @@ tr.sub th {
   border-top: 1px solid var(--line); text-align: left;
   padding: 6px 10px; font-weight: 400; font-size: 11.5px; color: var(--paper);
 }
+.outfilter { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 10px; }
+.outfilter #outquery { flex: 1; min-width: 220px; max-width: 420px; }
+.outfilter #outcount { color: var(--dim); font-size: 11px; }
+.outfilter .chips { flex-basis: 100%; max-height: 92px; overflow-y: auto; }
 .ordering { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
 .ordering .grouplabel { margin-right: 2px; }
+table.matrix thead th.colhead { cursor: pointer; }
+table.matrix thead th.colhead:hover .mname { text-decoration: underline; }
+table.matrix thead th.colhead[draggable="true"] { cursor: grab; }
+table.matrix thead th.dragging { opacity: .4; }
+table.matrix thead th.dropbefore { box-shadow: inset 3px 0 0 var(--flow-txt2img); }
+table.matrix thead th.dropafter { box-shadow: inset -3px 0 0 var(--flow-txt2img); }
+table.matrix thead th.collapsed {
+  min-width: 0; width: 26px; padding: 8px 4px; vertical-align: top;
+  background: var(--panel-2); border-left: 1px dashed var(--line); border-right: 1px dashed var(--line);
+}
+th.collapsed .mname {
+  writing-mode: vertical-rl; white-space: nowrap; color: var(--dim);
+  text-decoration: line-through;
+}
+td.collapsed {
+  width: 26px; background: var(--panel-2);
+  border-left: 1px dashed var(--line); border-right: 1px dashed var(--line);
+}
+.pager { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0; }
+.pager .chip[disabled] { opacity: .4; cursor: default; }
+.pager select {
+  background: var(--panel); color: var(--paper); border: 1px solid var(--line);
+  border-radius: 5px; padding: 5px 6px; font: inherit; font-size: 12px; width: auto;
+}
 
 .skiprow { color: var(--dim); font-size: 11px; padding: 6px 10px; font-family: var(--sans); }
 

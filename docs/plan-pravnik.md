@@ -518,7 +518,7 @@ knihovních souborů v `rag/`.
    ExecStart=%h/deploy/WorldLibraryProject/rag/.venv/bin/python3 server.py \
      --port 8098 --prompt-file prompts/pravnik_cs.md \
      --collection law_v1 --channels vec,fts --no-translate-excerpts \
-     --pg-dsn postgresql://library:…@192.168.88.88:5433/law \
+     --pg-dsn postgresql://library:…@JODA_HOST:5433/law \
      --max-per-work 6 --rewrite terms --summaries-file law/summaries.json \
      --llm-url http://localhost:8080/v1
    ```
@@ -567,7 +567,7 @@ knihovních souborů v `rag/`.
     `ragBackend` + hint per backend („Zeptej se na zákon…"). Přepnutí backendu
     (ř. 358–376) funguje beze změny — porovnává řetězec.
 15. `Makefile`: `$(if $(LAW_CHAT_URL),--dart-define=LAW_CHAT_URL=$(LAW_CHAT_URL),)`;
-    `CLAUDE.md`: řádek do „Volitelné URL overrides" (+ LAN `http://192.168.88.66:8098`
+    `CLAUDE.md`: řádek do „Volitelné URL overrides" (+ LAN `http://SPARK_HOST:8098`
     jen s `make debug`) a odstavec do sekce Chat (tabulka backendů dostane třetí sloupec).
 16. Testy: `test/fixtures/law_stream.sse` **zachycený z běžícího serveru přes
     tunel** (stejně jako knihovní fixture — `curl -N` na `/chat/stream`, dotaz

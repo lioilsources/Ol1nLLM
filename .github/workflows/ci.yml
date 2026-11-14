@@ -33,7 +33,9 @@ jobs:
 
       - name: Test
         working-directory: .
-        run: flutter test
+        # The screenshot goldens compare pixels and borrow macOS system fonts;
+        # on this runner they would fail on rendering, not on a regression.
+        run: flutter test --exclude-tags screenshots
 
   build-android-debug:
     name: Android Debug Build
@@ -61,9 +63,11 @@ jobs:
         working-directory: .
         run: flutter pub get
 
+      # No CF Access token in CI builds: their artifacts are downloadable by
+      # anyone signed in to GitHub, and a build check does not need the servers.
       - name: Build APK (debug)
         working-directory: .
-        run: flutter build apk --debug --dart-define=CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }} --dart-define=CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: flutter build apk --debug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -94,7 +98,7 @@ jobs:
 
       - name: Build iOS (no signing)
         working-directory: .
-        run: flutter build ios --debug --no-codesign --dart-define=CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }} --dart-define=CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: flutter build ios --debug --no-codesign
 
       - name: Upload app artifact
         uses: actions/upload-artifact@v4

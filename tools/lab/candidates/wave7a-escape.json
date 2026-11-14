@@ -1,0 +1,92 @@
+[
+ {
+  "id": "himba@7a",
+  "label": "Himba (Namibia)",
+  "block": "african, red ochre, earth tones, orange theme, warm lighting, desert, textured, painting (medium), traditional media",
+  "booru": "african, red ochre, earth tones, orange theme, warm lighting, desert, textured, painting (medium), traditional media"
+ },
+ {
+  "id": "burmese@7a",
+  "label": "Burmese temple painting",
+  "block": "temple mural, southeast asian, gold, red theme, ornate, flowing lines, glowing, soft lighting, painting (medium), traditional media",
+  "booru": "temple mural, southeast asian, gold, red theme, ornate, flowing lines, glowing, soft lighting, painting (medium), traditional media"
+ },
+ {
+  "id": "arabian@7a",
+  "label": "Pre-Islamic Arabian",
+  "block": "ancient, desert, brown theme, beige, muted colors, flowing lines, elongated, elegant, soft lighting, painting (medium), traditional media",
+  "booru": "ancient, desert, brown theme, beige, muted colors, flowing lines, elongated, elegant, soft lighting, painting (medium), traditional media"
+ },
+ {
+  "id": "indian@7a",
+  "label": "Classical Indian miniature",
+  "block": "indian miniature, miniature painting, gouache (medium), flat color, intricate pattern, ornate border, border, red theme, gold, stylized, traditional media",
+  "booru": "indian miniature, miniature painting, gouache (medium), flat color, intricate pattern, ornate border, border, red theme, gold, stylized, traditional media"
+ },
+ {
+  "id": "artdeco@7a",
+  "label": "Art Deco plakát",
+  "block": "art deco, 1920s (style), retro artstyle, poster (medium), geometric, symmetry, gold, black and gold, flat color, streamlined",
+  "booru": "art deco, 1920s (style), retro artstyle, poster (medium), geometric, symmetry, gold, black and gold, flat color, streamlined"
+ },
+ {
+  "id": "constructivist@7a",
+  "label": "Konstruktivistický plakát",
+  "block": "constructivism, soviet poster, poster (medium), diagonal composition, red theme, black and white, geometric shapes, photomontage, limited palette, retro artstyle",
+  "booru": "constructivism, soviet poster, poster (medium), diagonal composition, red theme, black and white, geometric shapes, photomontage, limited palette, retro artstyle"
+ },
+ {
+  "id": "davinci@7a",
+  "label": "Da Vinci — sfumato portrét",
+  "block": "oil painting (medium), traditional media, renaissance, sfumato, soft shading, muted colors, brown theme, dark green background, faint smile, realistic, fine art parody",
+  "booru": "oil painting (medium), traditional media, renaissance, sfumato, soft shading, muted colors, brown theme, dark green background, faint smile, realistic, fine art parody"
+ },
+ {
+  "id": "picasso-blue@7a",
+  "label": "Picasso — modré období",
+  "block": "oil painting (medium), traditional media, blue theme, monochrome, melancholy, thin, hunched, elongated hands, flat background, post-impressionism, fine art parody",
+  "booru": "oil painting (medium), traditional media, blue theme, monochrome, melancholy, thin, hunched, elongated hands, flat background, post-impressionism, fine art parody"
+ },
+ {
+  "id": "hockney-pool@7a",
+  "label": "Hockney — bazén, ploché akryly",
+  "block": "acrylic paint (medium), traditional media, flat color, pool, blue theme, palm tree, minimalism, clean lines, sunlight, mid-century, pop art, sharp shadows",
+  "booru": "acrylic paint (medium), traditional media, flat color, pool, blue theme, palm tree, minimalism, clean lines, sunlight, mid-century, pop art, sharp shadows"
+ },
+ {
+  "id": "monet@7a",
+  "label": "Monet — figura v plenéru",
+  "block": "impressionism, oil painting (medium), traditional media, parasol, meadow, wind, dappled sunlight, painterly, loose brushwork, pastel colors, sky, cloud",
+  "booru": "impressionism, oil painting (medium), traditional media, parasol, meadow, wind, dappled sunlight, painterly, loose brushwork, pastel colors, sky, cloud"
+ },
+ {
+  "id": "kandinsky-early@7a",
+  "label": "Kandinskij — raná pohádková tempera",
+  "block": "tempera (medium), traditional media, fairy tale, russian clothes, horseback riding, dark background, pointillism, glowing, jewel tones, night, castle, folk art, colorful",
+  "booru": "tempera (medium), traditional media, fairy tale, russian clothes, horseback riding, dark background, pointillism, glowing, jewel tones, night, castle, folk art, colorful"
+ },
+ {
+  "id": "vangogh-arles@7a",
+  "label": "Van Gogh — Arles, impasto portrét",
+  "block": "oil painting (medium), traditional media, impasto, post-impressionism, thick brushstrokes, yellow theme, blue theme, complementary colors, painterly, textured, flat background, visible brushstrokes",
+  "booru": "oil painting (medium), traditional media, impasto, post-impressionism, thick brushstrokes, yellow theme, blue theme, complementary colors, painterly, textured, flat background, visible brushstrokes"
+ },
+ {
+  "id": "seurat@7a",
+  "label": "Seurat — pointilismus",
+  "block": "pointillism, oil painting (medium), traditional media, dots, stippling, profile, park, riverside, sunny, stiff, formal, shimmering, pastel colors",
+  "booru": "pointillism, oil painting (medium), traditional media, dots, stippling, profile, park, riverside, sunny, stiff, formal, shimmering, pastel colors"
+ },
+ {
+  "id": "hopper@7a",
+  "label": "Hopper",
+  "block": "oil painting (medium), traditional media, realism, solo, indoors, window, sunlight, sharp shadows, muted colors, green theme, lonely, diner, quiet, americana",
+  "booru": "oil painting (medium), traditional media, realism, solo, indoors, window, sunlight, sharp shadows, muted colors, green theme, lonely, diner, quiet, americana"
+ },
+ {
+  "id": "bacon@7a",
+  "label": "Francis Bacon",
+  "block": "expressionism, oil painting (medium), traditional media, distorted, blurry face, smeared, twisted, sitting, cage, lines, orange background, flat background, flesh, disturbing",
+  "booru": "expressionism, oil painting (medium), traditional media, distorted, blurry face, smeared, twisted, sitting, cage, lines, orange background, flat background, flesh, disturbing"
+ }
+]

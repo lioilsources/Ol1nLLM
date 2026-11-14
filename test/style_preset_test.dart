@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ol1n_llm/models/gen_node.dart';
 import 'package:ol1n_llm/models/image_model.dart';
 import 'package:ol1n_llm/models/style_preset.dart';
+import 'package:ol1n_llm/models/style_quiet.dart';
 
 /// The style blocks are the ones measured in the 10×25 matrix — the ids are
 /// persisted on nodes, so renaming one silently breaks old sessions.
@@ -12,8 +13,17 @@ void main() {
       expect(ids.toSet().length, ids.length);
       expect(ids, containsAll(['ukiyoe', 'chineseink', 'egyptian', 'baroque']));
       // Second wave, kept only where a model demonstrably reacted.
-      expect(ids, containsAll(['byzantine', 'stainedglass', 'artdeco',
-          'constructivist', 'impressionist', 'thangka']));
+      expect(
+        ids,
+        containsAll([
+          'byzantine',
+          'stainedglass',
+          'artdeco',
+          'constructivist',
+          'impressionist',
+          'thangka',
+        ]),
+      );
       // Dropped on purpose: the metric moved but the style never landed —
       // the model just tinted its own default scene.
       expect(ids, isNot(contains('suprematism')));
@@ -23,8 +33,19 @@ void main() {
       expect(ids, isNot(contains('mughal'))); // = persian
       // Third wave: styles after named artists, measured on five models with
       // a text per prompt dialect.
-      expect(ids, containsAll(['vangogh-arles', 'vangogh-saintremy', 'kubista',
-          'lada', 'josef-capek', 'mucha-slav-epic', 'klimt-golden', 'seurat']));
+      expect(
+        ids,
+        containsAll([
+          'vangogh-arles',
+          'vangogh-saintremy',
+          'kubista',
+          'lada',
+          'josef-capek',
+          'mucha-slav-epic',
+          'klimt-golden',
+          'seurat',
+        ]),
+      );
       // Dropped: only a tint or a backdrop — the artist's hand never came.
       expect(ids, isNot(contains('zrzavy')));
       expect(ids, isNot(contains('modigliani')));
@@ -34,12 +55,12 @@ void main() {
       // Dropped as duplicates; Mucha's text went into artnouveau instead.
       expect(ids, isNot(contains('rembrandt'))); // = baroque
       expect(ids, isNot(contains('mucha-poster'))); // → artnouveau
-      expect(kStylePresets.length, 82);
+      expect(kStylePresets.length, 310);
     });
 
     test('every artist style carries its period and a tag variant', () {
       final artists = kStylePresets.where((s) => s.artist != null).toList();
-      expect(artists.length, 42);
+      expect(artists.length, 103);
       for (final s in artists) {
         expect(s.period, isNotNull, reason: s.id);
         expect(s.booru, isNotNull, reason: s.id);
@@ -51,6 +72,12 @@ void main() {
       expect(nouveau.block, contains('Alphonse Mucha'));
       expect(nouveau.booru, isNotNull);
       expect(nouveau.artist, isNull);
+    });
+
+    test('the section follows from what a style is', () {
+      for (final s in kStylePresets) {
+        expect(s.artist != null, s.kind == StyleKind.artist, reason: s.id);
+      }
     });
 
     test('every preset carries a non-empty label and block', () {
@@ -72,6 +99,20 @@ void main() {
       final out = applyStyle('a ballerina', 'ukiyoe');
       expect(out, startsWith('a ballerina, '));
       expect(out, contains('japanese woodblock print aesthetic'));
+    });
+
+    test('front puts the block ahead of the prompt', () {
+      final out = applyStyle('a ballerina', 'ukiyoe', front: true);
+      expect(out, endsWith(', a ballerina'));
+      expect(out, contains('japanese woodblock print aesthetic'));
+      expect(applyStyle('', 'ukiyoe', front: true), '');
+    });
+
+    test('styleApplies matches what applyStyle actually adds', () {
+      final ukiyoe = styleById('ukiyoe');
+      expect(styleApplies('a ballerina', ukiyoe), isTrue);
+      expect(styleApplies('  ', ukiyoe), isFalse);
+      expect(styleApplies('a ballerina', null), isFalse);
     });
 
     test('no style leaves the prompt untouched', () {
@@ -97,12 +138,31 @@ void main() {
     const plain = StylePreset(id: 'y', label: 'Y', block: 'flat colour areas');
 
     test('an anime model gets the tags, everything else the block', () {
-      expect(tagged.blockFor(PromptDialect.booru), tagged.booru);
+      expect(
+        tagged.blockFor(PromptDialect.booru),
+        r'oil painting \(medium\), impasto',
+      );
       expect(tagged.blockFor(PromptDialect.natural), tagged.block);
       expect(
         applyStylePreset('a ballerina', tagged, dialect: PromptDialect.booru),
-        'a ballerina, oil painting (medium), impasto',
+        r'a ballerina, oil painting \(medium\), impasto',
       );
+    });
+
+    test('tag parentheses survive the ComfyUI weight parser', () {
+      // Bare, `(medium)` is a 1.1 weight on the word "medium", not the tag.
+      for (final s in kStylePresets) {
+        final sent = s.blockFor(PromptDialect.booru);
+        expect(sent, isNot(matches(r'(?<!\\)[()]')), reason: s.id);
+        expect(sent.replaceAll(r'\', ''), s.booru ?? s.block, reason: s.id);
+      }
+      expect(escapeTagParens(escapeTagParens('a (b)')), r'a \(b\)');
+    });
+
+    test('a phrase model never gets a backslash', () {
+      for (final s in kStylePresets) {
+        expect(s.blockFor(PromptDialect.natural), s.block, reason: s.id);
+      }
     });
 
     test('a style without tags sends what it always sent', () {
@@ -170,6 +230,10 @@ void main() {
       expect(styleMatchesQuery(zrzavy, '   '), isTrue);
     });
 
+    test('a period is searchable', () {
+      expect(styleMatchesQuery(styleById('lempicka')!, '1925'), isTrue);
+    });
+
     test('a style without an artist matches by label alone', () {
       expect(styleMatchesQuery(styleById('ukiyoe')!, 'ukiyo'), isTrue);
       expect(styleMatchesQuery(styleById('ukiyoe')!, 'woodblock'), isTrue);
@@ -187,14 +251,143 @@ void main() {
       final json = GenNode.create(prompt: 'x', styleId: 'baroque').toJson();
       expect(json['styleId'], 'baroque');
       expect(GenNode.fromJson(json).styleId, 'baroque');
-      expect(GenNode.create(prompt: 'x').toJson().containsKey('styleId'),
-          isFalse);
+      expect(
+        GenNode.create(prompt: 'x').toJson().containsKey('styleId'),
+        isFalse,
+      );
     });
 
     test('survives copyWith', () {
-      final n = GenNode.create(prompt: 'x', styleId: 'persian')
-          .copyWith(status: GenStatus.ready);
+      final n = GenNode.create(
+        prompt: 'x',
+        styleId: 'persian',
+      ).copyWith(status: GenStatus.ready);
       expect(n.styleId, 'persian');
+    });
+  });
+
+  group('picker order', () {
+    test('cultures and artists carry a year, media do not', () {
+      for (final s in kStylePresets) {
+        expect(s.year != null, s.kind != StyleKind.medium, reason: s.id);
+      }
+    });
+
+    test('cultures by history, artists by birth, media alphabetically', () {
+      expect(kStylePresetsSorted.length, kStylePresets.length);
+      final ids = kStylePresetsSorted.map((s) => s.id).toList();
+      bool before(String a, String b) => ids.indexOf(a) < ids.indexOf(b);
+      expect(before('cave-painting', 'egyptian'), isTrue);
+      expect(before('egyptian', 'artnouveau'), isTrue);
+      expect(before('van-eyck', 'davinci'), isTrue);
+      expect(before('davinci', 'basquiat'), isTrue);
+      // One artist's periods keep the registry order.
+      expect(before('picasso-blue', 'picasso-rose'), isTrue);
+      expect(before('picasso-rose', 'picasso-cubist'), isTrue);
+      final kinds = kStylePresetsSorted.map((s) => s.kind.index).toList();
+      expect(kinds, [...kinds]..sort());
+      final media = kStylePresetsSorted
+          .where((s) => s.kind == StyleKind.medium)
+          .map((s) => s.label)
+          .toList();
+      expect(media, [...media]..sort(compareCzech));
+      expect(media.first, startsWith('Airbrush'));
+    });
+
+    test('label carries the year at the end', () {
+      expect(styleById('vermeer')!.labelWithYear, 'Vermeer (1632)');
+      expect(
+        styleById('cave-painting')!.labelWithYear,
+        'Jeskynní malba (Lascaux) (17\u00a0000 př. n. l.)',
+      );
+      expect(
+        styleById('egyptian')!.labelWithYear,
+        'Ancient Egyptian wall painting (2600 př. n. l.)',
+      );
+      final medium = kStylePresets.firstWhere(
+        (s) => s.kind == StyleKind.medium,
+      );
+      expect(medium.labelWithYear, medium.label);
+      expect(styleMatchesQuery(styleById('vermeer')!, '1632'), isTrue);
+    });
+
+    test('Czech collation', () {
+      final words = [
+        'Šablona',
+        'Chrom',
+        'Ivory',
+        'Cyan',
+        'Čaj',
+        'Hrnec',
+        'Dub',
+        'Řez',
+        'Rez',
+        'Sůl',
+        'Zinek',
+        'Žula',
+      ];
+      expect(words..sort(compareCzech), [
+        'Cyan',
+        'Čaj',
+        'Dub',
+        'Hrnec',
+        'Chrom',
+        'Ivory',
+        'Rez',
+        'Řez',
+        'Sůl',
+        'Šablona',
+        'Zinek',
+        'Žula',
+      ]);
+    });
+  });
+
+  group('quiet pairs', () {
+    final modelIds = kImageModels.map((m) => m.id).toSet();
+    final styleIds = kStylePresets.map((s) => s.id).toSet();
+
+    test('generated map names only registry models and styles', () {
+      expect(kStyleQuietOn, isNotEmpty);
+      for (final e in kStyleQuietOn.entries) {
+        expect(modelIds, contains(e.key));
+        expect(e.value, isNotEmpty, reason: e.key);
+        for (final s in e.value) {
+          expect(styleIds, contains(s), reason: '${e.key}: $s');
+        }
+      }
+    });
+
+    test('unmeasured and unknown pairs are not quiet', () {
+      expect(styleQuietOn('watercolor-wet', 'hassaku-illustrious'), isTrue);
+      expect(styleQuietOn('watercolor-wet', 'flux-schnell'), isFalse);
+      expect(styleQuietOn('no-such-style', 'pony'), isFalse);
+      expect(styleQuietOn(null, 'pony'), isFalse);
+      expect(styleQuietOn('watercolor-wet', 'no-such-model'), isFalse);
+    });
+
+    test('alternative is the first willing model that is available', () {
+      final all = modelIds;
+      expect(
+        styleAlternativeModel('watercolor-wet', 'hassaku-illustrious', all),
+        'sdxl-base',
+      );
+      expect(
+        styleAlternativeModel('watercolor-wet', 'sdxl-base', all),
+        'juggernaut-xl',
+      );
+      expect(
+        styleAlternativeModel('watercolor-wet', 'hassaku-illustrious', [
+          'hassaku-illustrious',
+          'pony',
+        ]),
+        isNull,
+      );
+      // A fallback that is itself quiet on the style is skipped.
+      final quietOnBase = kStyleQuietOn['sdxl-base']!.first;
+      final alt = styleAlternativeModel(quietOnBase, 'pony', all);
+      expect(alt, isNot('sdxl-base'));
+      expect(alt, isNotNull);
     });
   });
 

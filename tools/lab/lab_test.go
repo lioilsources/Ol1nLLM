@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -62,7 +63,7 @@ func TestEstimateBlocksBeforeSpendingGPU(t *testing.T) {
 	// The ceiling exists because 600 cells took 3h40m once; an accidental
 	// sweep must hit a wall, not the GPU.
 	big := base
-	big.Prompts = make([]string, 200)
+	big.Prompts = make([]string, MaxCells+1)
 	for i := range big.Prompts {
 		big.Prompts[i] = "p"
 	}
@@ -1068,6 +1069,30 @@ func TestExportMapsCellsOntoGalleryNodes(t *testing.T) {
 	}
 }
 
+// A cell that ran without the quality prefix (a styled restyle on NoobAI or
+// Illustrious) must not claim it in the gallery.
+func TestExportDropsAPrefixTheCellDidNotSend(t *testing.T) {
+	run := fakeRun(t, false)
+	run.man.Cells[0].Params["qualityPrefix"] = false
+	run.man.Cells[1].Params["qualityPrefix"] = true
+	plan, err := run.BuildExport()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body struct {
+		Nodes []map[string]any `json:"nodes"`
+	}
+	if err := json.Unmarshal(plan.Body, &body); err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range body.Nodes {
+		want := map[string]any{"a ballerina, ukiyo-e": nil, "a ballerina": "masterpiece"}[n["prompt"].(string)]
+		if n["positivePrefix"] != want {
+			t.Errorf("%v: positivePrefix = %v (čekáno %v)", n["prompt"], n["positivePrefix"], want)
+		}
+	}
+}
+
 func TestExportRefusesPlaceholders(t *testing.T) {
 	if _, err := fakeRun(t, true).BuildExport(); err == nil {
 		t.Fatal("běh nanečisto se nesmí dát odeslat — jsou to šrafy, ne výsledky")
@@ -1670,5 +1695,52 @@ func fakeNimRun(t *testing.T, base string) *Run {
 		env:   &Env{Nim: NewNim(base, "id", "secret")},
 		state: RunState{ID: "t", Cells: map[string]CellState{id: {ID: id}}},
 		subs:  map[chan RunState]struct{}{},
+	}
+}
+
+func TestConnectionLossIsNotACellVerdict(t *testing.T) {
+	for _, msg := range []string{
+		`Post "http://127.0.0.1:18188/prompt": dial tcp 127.0.0.1:18188: connect: connection refused`,
+		`Post "http://127.0.0.1:18188/prompt": EOF`,
+	} {
+		if !isConnectionLoss(errors.New(msg)) {
+			t.Errorf("%q je výpadek spojení", msg)
+		}
+	}
+	if isConnectionLoss(errors.New("ComfyUI execution_error: out of memory")) {
+		t.Error("chyba grafu není výpadek spojení")
+	}
+}
+
+func TestFluxGraphFoldsIntoOneCheckpoint(t *testing.T) {
+	wf := map[string]any{
+		"1": map[string]any{"class_type": "UNETLoader", "inputs": map[string]any{"unet_name": "flux1-dev.safetensors"}},
+		"2": map[string]any{"class_type": "DualCLIPLoader", "inputs": map[string]any{}},
+		"3": map[string]any{"class_type": "VAELoader", "inputs": map[string]any{}},
+		"4": map[string]any{"class_type": "CLIPTextEncode", "inputs": map[string]any{"clip": []any{"2", float64(0)}}},
+		"5": map[string]any{"class_type": "KSampler", "inputs": map[string]any{"model": []any{"1", float64(0)}}},
+		"6": map[string]any{"class_type": "VAEDecode", "inputs": map[string]any{"vae": []any{"3", float64(0)}}},
+	}
+	fluxToCheckpoint(wf, "flux1-dev-fp8.safetensors")
+	if len(wf) != 4 || wf["1"].(map[string]any)["class_type"] != "CheckpointLoaderSimple" {
+		t.Fatalf("graf: %v", wf)
+	}
+	in := func(id, k string) []any { return wf[id].(map[string]any)["inputs"].(map[string]any)[k].([]any) }
+	if in("4", "clip")[1] != float64(1) || in("6", "vae")[1] != float64(2) || in("5", "model")[1] != float64(0) {
+		t.Fatalf("hrany: %v", wf)
+	}
+}
+
+func TestSchnellGraphCarriesRequest(t *testing.T) {
+	wf := schnellGraph(map[string]any{"prompt": "a cat", "width": float64(1024), "height": float64(1024), "steps": float64(4), "seed": float64(778)}, "flux1-schnell-fp8.safetensors")
+	ks := wf["5"].(map[string]any)["inputs"].(map[string]any)
+	if ks["seed"] != float64(778) || ks["steps"] != float64(4) || ks["cfg"] != float64(1) {
+		t.Fatalf("sampler: %v", ks)
+	}
+	if got := wf["2"].(map[string]any)["inputs"].(map[string]any)["text"]; got != "a cat" {
+		t.Fatalf("prompt: %v", got)
+	}
+	if got := wf["1"].(map[string]any)["inputs"].(map[string]any)["ckpt_name"]; got != "flux1-schnell-fp8.safetensors" {
+		t.Fatalf("ckpt: %v", got)
 	}
 }

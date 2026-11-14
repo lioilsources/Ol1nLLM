@@ -1,0 +1,255 @@
+# Nativní postavy — danbooru postavy (postava, série), které model zná z tréninku.
+# Zdroj: build/lab/animagine-girls-v2 (2026-09-20), 3866 postav. Tam měla každá
+# postava jinou pózu a oblečení; tady je námět pevný a oblečení se nezadává,
+# aby bylo vidět, jestli model postavu zná i s jejím kostýmem.
+#
+# Jen rodina `danbooru`. `baseline` je námět bez postavy (`original`).
+# Výběr: každý 32. položka celého seznamu (abecedně), ne podle kvality.
+#
+#   lab run --prompts-yaml tools/lab/candidates/native-characters-sample.yaml \
+#           --models animagine-xl,illustrious-xl,noobai-xl --flows txt2img --no-styles --latent 832x1216
+
+baseline:
+  danbooru: '1girl, solo, original, full body, standing, looking at viewer, simple background'
+'<key> (blue archive), blue archive':
+  danbooru: '1girl, solo, <key> \(blue archive\), blue archive, full body, standing, looking at viewer, simple background'
+'admiral hipper (azur lane), azur lane':
+  danbooru: '1girl, solo, admiral hipper \(azur lane\), azur lane, full body, standing, looking at viewer, simple background'
+'aiz wallenstein, dungeon ni deai wo motomeru no wa machigatteiru darou ka':
+  danbooru: '1girl, solo, aiz wallenstein, dungeon ni deai wo motomeru no wa machigatteiru darou ka, full body, standing, looking at viewer, simple background'
+'akino (princess connect!), princess connect!':
+  danbooru: '1girl, solo, akino \(princess connect!\), princess connect!, full body, standing, looking at viewer, simple background'
+'amagi-chan (azur lane), azur lane':
+  danbooru: '1girl, solo, amagi-chan \(azur lane\), azur lane, full body, standing, looking at viewer, simple background'
+'ando ruruka, danganronpa (series)':
+  danbooru: '1girl, solo, ando ruruka, danganronpa \(series\), full body, standing, looking at viewer, simple background'
+'anya melfissa, hololive':
+  danbooru: '1girl, solo, anya melfissa, hololive, full body, standing, looking at viewer, simple background'
+'arona (blue archive), blue archive':
+  danbooru: '1girl, solo, arona \(blue archive\), blue archive, full body, standing, looking at viewer, simple background'
+'asaka karin, love live!':
+  danbooru: '1girl, solo, asaka karin, love live!, full body, standing, looking at viewer, simple background'
+'audrey burne, gundam':
+  danbooru: '1girl, solo, audrey burne, gundam, full body, standing, looking at viewer, simple background'
+'azusawa kohane, project sekai':
+  danbooru: '1girl, solo, azusawa kohane, project sekai, full body, standing, looking at viewer, simple background'
+'bataan (azur lane), azur lane':
+  danbooru: '1girl, solo, bataan \(azur lane\), azur lane, full body, standing, looking at viewer, simple background'
+'bitey (arknights), arknights':
+  danbooru: '1girl, solo, bitey \(arknights\), arknights, full body, standing, looking at viewer, simple background'
+'bremerton (day-off date) (azur lane), azur lane':
+  danbooru: '1girl, solo, bremerton \(day-off date\) \(azur lane\), azur lane, full body, standing, looking at viewer, simple background'
+'calamity jane (fate), fate/grand order':
+  danbooru: '1girl, solo, calamity jane \(fate\), fate/grand order, full body, standing, looking at viewer, simple background'
+'cavall the 2nd, fate/grand order':
+  danbooru: '1girl, solo, cavall the 2nd, fate/grand order, full body, standing, looking at viewer, simple background'
+'charlotte corday (third ascension) (fate), fate/grand order':
+  danbooru: '1girl, solo, charlotte corday \(third ascension\) \(fate\), fate/grand order, full body, standing, looking at viewer, simple background'
+'chouzetsusaikawa tenshi-chan, needy girl overdose':
+  danbooru: '1girl, solo, chouzetsusaikawa tenshi-chan, needy girl overdose, full body, standing, looking at viewer, simple background'
+'contender (girls'' frontline), girls'' frontline':
+  danbooru: '1girl, solo, contender \(girls'' frontline\), girls'' frontline, full body, standing, looking at viewer, simple background'
+'daiwa scarlet (trifle vacation) (umamusume), umamusume':
+  danbooru: '1girl, solo, daiwa scarlet \(trifle vacation\) \(umamusume\), umamusume, full body, standing, looking at viewer, simple background'
+'dido (azur lane), azur lane':
+  danbooru: '1girl, solo, dido \(azur lane\), azur lane, full body, standing, looking at viewer, simple background'
+'dsr-50 (girls'' frontline), girls'' frontline':
+  danbooru: '1girl, solo, dsr-50 \(girls'' frontline\), girls'' frontline, full body, standing, looking at viewer, simple background'
+'elira pendora (3rd costume), nijisanji':
+  danbooru: '1girl, solo, elira pendora \(3rd costume\), nijisanji, full body, standing, looking at viewer, simple background'
+'enterprise (wind catcher) (azur lane), azur lane':
+  danbooru: '1girl, solo, enterprise \(wind catcher\) \(azur lane\), azur lane, full body, standing, looking at viewer, simple background'
+'eva 02, neon genesis evangelion':
+  danbooru: '1girl, solo, eva 02, neon genesis evangelion, full body, standing, looking at viewer, simple background'
+'female commander (azur lane), azur lane':
+  danbooru: '1girl, solo, female commander \(azur lane\), azur lane, full body, standing, looking at viewer, simple background'
+'flora (fire emblem), fire emblem':
+  danbooru: '1girl, solo, flora \(fire emblem\), fire emblem, full body, standing, looking at viewer, simple background'
+'frenda seivelun, toaru majutsu no index':
+  danbooru: '1girl, solo, frenda seivelun, toaru majutsu no index, full body, standing, looking at viewer, simple background'
+'fujiwara chika, kaguya-sama wa kokurasetai ~tensai-tachi no renai zunousen~':
+  danbooru: '1girl, solo, fujiwara chika, kaguya-sama wa kokurasetai ~tensai-tachi no renai zunousen~, full body, standing, looking at viewer, simple background'
+'ganyu (genshin impact), genshin impact':
+  danbooru: '1girl, solo, ganyu \(genshin impact\), genshin impact, full body, standing, looking at viewer, simple background'
+'gold city (umamusume), umamusume':
+  danbooru: '1girl, solo, gold city \(umamusume\), umamusume, full body, standing, looking at viewer, simple background'
+'gummy (arknights), arknights':
+  danbooru: '1girl, solo, gummy \(arknights\), arknights, full body, standing, looking at viewer, simple background'
+'hamakaze (kancolle), kantai collection':
+  danbooru: '1girl, solo, hamakaze \(kancolle\), kantai collection, full body, standing, looking at viewer, simple background'
+'hassan of serenity (fate), fate (series)':
+  danbooru: '1girl, solo, hassan of serenity \(fate\), fate \(series\), full body, standing, looking at viewer, simple background'
+'henya the genius, vshojo':
+  danbooru: '1girl, solo, henya the genius, vshojo, full body, standing, looking at viewer, simple background'
+'hildr (fate), fate/grand order':
+  danbooru: '1girl, solo, hildr \(fate\), fate/grand order, full body, standing, looking at viewer, simple background'
+'hisaishi kanade, hibike! euphonium':
+  danbooru: '1girl, solo, hisaishi kanade, hibike! euphonium, full body, standing, looking at viewer, simple background'
+'hoshiguma (ronin huntress) (arknights), arknights':
+  danbooru: '1girl, solo, hoshiguma \(ronin huntress\) \(arknights\), arknights, full body, standing, looking at viewer, simple background'
+'houshou marine (summer), hololive':
+  danbooru: '1girl, solo, houshou marine \(summer\), hololive, full body, standing, looking at viewer, simple background'
+'ichigo (darling in the franxx), darling in the franxx':
+  danbooru: '1girl, solo, ichigo \(darling in the franxx\), darling in the franxx, full body, standing, looking at viewer, simple background'
+'ilsa (granblue fantasy), granblue fantasy':
+  danbooru: '1girl, solo, ilsa \(granblue fantasy\), granblue fantasy, full body, standing, looking at viewer, simple background'
+'inui shinju, sono bisque doll wa koi wo suru':
+  danbooru: '1girl, solo, inui shinju, sono bisque doll wa koi wo suru, full body, standing, looking at viewer, simple background'
+'isonade orca, indie virtual youtuber':
+  danbooru: '1girl, solo, isonade orca, indie virtual youtuber, full body, standing, looking at viewer, simple background'
+'jeanne d''arc (fate), fate (series)':
+  danbooru: '1girl, solo, jeanne d''arc \(fate\), fate \(series\), full body, standing, looking at viewer, simple background'
+'jouga maya, gochuumon wa usagi desu ka?':
+  danbooru: '1girl, solo, jouga maya, gochuumon wa usagi desu ka?, full body, standing, looking at viewer, simple background'
+'kaga nazuna, vspo!':
+  danbooru: '1girl, solo, kaga nazuna, vspo!, full body, standing, looking at viewer, simple background'
+'kamiki mirai, gundam':
+  danbooru: '1girl, solo, kamiki mirai, gundam, full body, standing, looking at viewer, simple background'
+'kasaki nozomi, hibike! euphonium':
+  danbooru: '1girl, solo, kasaki nozomi, hibike! euphonium, full body, standing, looking at viewer, simple background'
+'kefla (dragon ball), dragon ball':
+  danbooru: '1girl, solo, kefla \(dragon ball\), dragon ball, full body, standing, looking at viewer, simple background'
+'kinuhata saiai, toaru majutsu no index':
+  danbooru: '1girl, solo, kinuhata saiai, toaru majutsu no index, full body, standing, looking at viewer, simple background'
+'kitazawa hagumi, bang dream!':
+  danbooru: '1girl, solo, kitazawa hagumi, bang dream!, full body, standing, looking at viewer, simple background'
+'kokona (blue archive), blue archive':
+  danbooru: '1girl, solo, kokona \(blue archive\), blue archive, full body, standing, looking at viewer, simple background'
+'kotori (cheer squad) (blue archive), blue archive':
+  danbooru: '1girl, solo, kotori \(cheer squad\) \(blue archive\), blue archive, full body, standing, looking at viewer, simple background'
+'kujo jolyne, jojo no kimyou na bouken':
+  danbooru: '1girl, solo, kujo jolyne, jojo no kimyou na bouken, full body, standing, looking at viewer, simple background'
+'kyouka (halloween) (princess connect!), princess connect!':
+  danbooru: '1girl, solo, kyouka \(halloween\) \(princess connect!\), princess connect!, full body, standing, looking at viewer, simple background'
+'larva tiamat (fate), fate/grand order':
+  danbooru: '1girl, solo, larva tiamat \(fate\), fate/grand order, full body, standing, looking at viewer, simple background'
+'lich (granblue fantasy), granblue fantasy':
+  danbooru: '1girl, solo, lich \(granblue fantasy\), granblue fantasy, full body, standing, looking at viewer, simple background'
+'lize helesta (1st costume), nijisanji':
+  danbooru: '1girl, solo, lize helesta \(1st costume\), nijisanji, full body, standing, looking at viewer, simple background'
+'lunafreya nox fleuret, final fantasy':
+  danbooru: '1girl, solo, lunafreya nox fleuret, final fantasy, full body, standing, looking at viewer, simple background'
+'m99 (girls'' frontline), girls'' frontline':
+  danbooru: '1girl, solo, m99 \(girls'' frontline\), girls'' frontline, full body, standing, looking at viewer, simple background'
+'mankanshoku sukuyo, kill la kill':
+  danbooru: '1girl, solo, mankanshoku sukuyo, kill la kill, full body, standing, looking at viewer, simple background'
+'marisa (fire emblem), fire emblem':
+  danbooru: '1girl, solo, marisa \(fire emblem\), fire emblem, full body, standing, looking at viewer, simple background'
+'matou sakura, fate (series)':
+  danbooru: '1girl, solo, matou sakura, fate \(series\), full body, standing, looking at viewer, simple background'
+'megurine luka, vocaloid':
+  danbooru: '1girl, solo, megurine luka, vocaloid, full body, standing, looking at viewer, simple background'
+'mercedes von martritz, fire emblem':
+  danbooru: '1girl, solo, mercedes von martritz, fire emblem, full body, standing, looking at viewer, simple background'
+'miki sayaka, mahou shoujo madoka magica':
+  danbooru: '1girl, solo, miki sayaka, mahou shoujo madoka magica, full body, standing, looking at viewer, simple background'
+'minfilia warde, final fantasy':
+  danbooru: '1girl, solo, minfilia warde, final fantasy, full body, standing, looking at viewer, simple background'
+'miyamoto musashi (second ascension) (fate), fate/grand order':
+  danbooru: '1girl, solo, miyamoto musashi \(second ascension\) \(fate\), fate/grand order, full body, standing, looking at viewer, simple background'
+'momosuzu nene (2nd costume), hololive':
+  danbooru: '1girl, solo, momosuzu nene \(2nd costume\), hololive, full body, standing, looking at viewer, simple background'
+'mori calliope (1st costume), hololive':
+  danbooru: '1girl, solo, mori calliope \(1st costume\), hololive, full body, standing, looking at viewer, simple background'
+'murasaki shion (5th costume), hololive':
+  danbooru: '1girl, solo, murasaki shion \(5th costume\), hololive, full body, standing, looking at viewer, simple background'
+'na''el (xenoblade), xenoblade chronicles (series)':
+  danbooru: '1girl, solo, na''el \(xenoblade\), xenoblade chronicles \(series\), full body, standing, looking at viewer, simple background'
+'nakiri ayame (hololive summer 2019), hololive':
+  danbooru: '1girl, solo, nakiri ayame \(hololive summer 2019\), hololive, full body, standing, looking at viewer, simple background'
+'natsumi (date a live), date a live':
+  danbooru: '1girl, solo, natsumi \(date a live\), date a live, full body, standing, looking at viewer, simple background'
+'nero claudius (fate/extra), fate (series)':
+  danbooru: '1girl, solo, nero claudius \(fate/extra\), fate \(series\), full body, standing, looking at viewer, simple background'
+'nina kosaka (1st costume), nijisanji':
+  danbooru: '1girl, solo, nina kosaka \(1st costume\), nijisanji, full body, standing, looking at viewer, simple background'
+'nodoka (blue archive), blue archive':
+  danbooru: '1girl, solo, nodoka \(blue archive\), blue archive, full body, standing, looking at viewer, simple background'
+'oboro (fire emblem), fire emblem':
+  danbooru: '1girl, solo, oboro \(fire emblem\), fire emblem, full body, standing, looking at viewer, simple background'
+'olivier mira armstrong, fullmetal alchemist':
+  danbooru: '1girl, solo, olivier mira armstrong, fullmetal alchemist, full body, standing, looking at viewer, simple background'
+'osakabehime (fate), fate/grand order':
+  danbooru: '1girl, solo, osakabehime \(fate\), fate/grand order, full body, standing, looking at viewer, simple background'
+'p90 (girls'' frontline), girls'' frontline':
+  danbooru: '1girl, solo, p90 \(girls'' frontline\), girls'' frontline, full body, standing, looking at viewer, simple background'
+'penthesilea (fate), fate/grand order':
+  danbooru: '1girl, solo, penthesilea \(fate\), fate/grand order, full body, standing, looking at viewer, simple background'
+'piyoko (uruha rushia), hololive':
+  danbooru: '1girl, solo, piyoko \(uruha rushia\), hololive, full body, standing, looking at viewer, simple background'
+'ppsh-41 (girls'' frontline), girls'' frontline':
+  danbooru: '1girl, solo, ppsh-41 \(girls'' frontline\), girls'' frontline, full body, standing, looking at viewer, simple background'
+'pyra (pro swimmer) (xenoblade), xenoblade chronicles (series)':
+  danbooru: '1girl, solo, pyra \(pro swimmer\) \(xenoblade\), xenoblade chronicles \(series\), full body, standing, looking at viewer, simple background'
+'razia, granblue fantasy':
+  danbooru: '1girl, solo, razia, granblue fantasy, full body, standing, looking at viewer, simple background'
+'reunion soldier (arknights), arknights':
+  danbooru: '1girl, solo, reunion soldier \(arknights\), arknights, full body, standing, looking at viewer, simple background'
+'robin (arknights), arknights':
+  danbooru: '1girl, solo, robin \(arknights\), arknights, full body, standing, looking at viewer, simple background'
+'ruan mei (honkai: star rail), honkai: star rail':
+  danbooru: '1girl, solo, ruan mei \(honkai: star rail\), honkai: star rail, full body, standing, looking at viewer, simple background'
+'saijo juri, idolmaster':
+  danbooru: '1girl, solo, saijo juri, idolmaster, full body, standing, looking at viewer, simple background'
+'sakuragi mano, idolmaster':
+  danbooru: '1girl, solo, sakuragi mano, idolmaster, full body, standing, looking at viewer, simple background'
+'satono crown (umamusume), umamusume':
+  danbooru: '1girl, solo, satono crown \(umamusume\), umamusume, full body, standing, looking at viewer, simple background'
+'seele vollerei (herrscher of rebirth), honkai (series)':
+  danbooru: '1girl, solo, seele vollerei \(herrscher of rebirth\), honkai \(series\), full body, standing, looking at viewer, simple background'
+'serika (blue archive), blue archive':
+  danbooru: '1girl, solo, serika \(blue archive\), blue archive, full body, standing, looking at viewer, simple background'
+'sheffield (azur lane), azur lane':
+  danbooru: '1girl, solo, sheffield \(azur lane\), azur lane, full body, standing, looking at viewer, simple background'
+'shinano (moonlit chrome) (azur lane), azur lane':
+  danbooru: '1girl, solo, shinano \(moonlit chrome\) \(azur lane\), azur lane, full body, standing, looking at viewer, simple background'
+'shiranui flare, hololive':
+  danbooru: '1girl, solo, shiranui flare, hololive, full body, standing, looking at viewer, simple background'
+'shizuka rin (1st costume), nijisanji':
+  danbooru: '1girl, solo, shizuka rin \(1st costume\), nijisanji, full body, standing, looking at viewer, simple background'
+'silence suzuka (umamusume), umamusume':
+  danbooru: '1girl, solo, silence suzuka \(umamusume\), umamusume, full body, standing, looking at viewer, simple background'
+'smol gura, hololive':
+  danbooru: '1girl, solo, smol gura, hololive, full body, standing, looking at viewer, simple background'
+'space ishtar (first ascension) (fate), fate/grand order':
+  danbooru: '1girl, solo, space ishtar \(first ascension\) \(fate\), fate/grand order, full body, standing, looking at viewer, simple background'
+'subaru duck, hololive':
+  danbooru: '1girl, solo, subaru duck, hololive, full body, standing, looking at viewer, simple background'
+'surtr (liberte echec) (arknights), arknights':
+  danbooru: '1girl, solo, surtr \(liberte echec\) \(arknights\), arknights, full body, standing, looking at viewer, simple background'
+'sword maiden, goblin slayer!':
+  danbooru: '1girl, solo, sword maiden, goblin slayer!, full body, standing, looking at viewer, simple background'
+'takanashi rikka, chuunibyou demo koi ga shitai!':
+  danbooru: '1girl, solo, takanashi rikka, chuunibyou demo koi ga shitai!, full body, standing, looking at viewer, simple background'
+'tana (fire emblem), fire emblem':
+  danbooru: '1girl, solo, tana \(fire emblem\), fire emblem, full body, standing, looking at viewer, simple background'
+'terumi mei, naruto (series)':
+  danbooru: '1girl, solo, terumi mei, naruto \(series\), full body, standing, looking at viewer, simple background'
+'tiki (adult) (summer) (fire emblem), fire emblem':
+  danbooru: '1girl, solo, tiki \(adult\) \(summer\) \(fire emblem\), fire emblem, full body, standing, looking at viewer, simple background'
+'tokoyami towa (5th costume), hololive':
+  danbooru: '1girl, solo, tokoyami towa \(5th costume\), hololive, full body, standing, looking at viewer, simple background'
+'triandra (fire emblem), fire emblem':
+  danbooru: '1girl, solo, triandra \(fire emblem\), fire emblem, full body, standing, looking at viewer, simple background'
+'type 79 (girls'' frontline), girls'' frontline':
+  danbooru: '1girl, solo, type 79 \(girls'' frontline\), girls'' frontline, full body, standing, looking at viewer, simple background'
+'unicorn (long-awaited date) (azur lane), azur lane':
+  danbooru: '1girl, solo, unicorn \(long-awaited date\) \(azur lane\), azur lane, full body, standing, looking at viewer, simple background'
+'utsumi erice (swimsuit avenger), fate/grand order':
+  danbooru: '1girl, solo, utsumi erice \(swimsuit avenger\), fate/grand order, full body, standing, looking at viewer, simple background'
+'vikala (granblue fantasy), granblue fantasy':
+  danbooru: '1girl, solo, vikala \(granblue fantasy\), granblue fantasy, full body, standing, looking at viewer, simple background'
+'wamdus (granblue fantasy), granblue fantasy':
+  danbooru: '1girl, solo, wamdus \(granblue fantasy\), granblue fantasy, full body, standing, looking at viewer, simple background'
+'wonderlands x showtime miku, project sekai':
+  danbooru: '1girl, solo, wonderlands x showtime miku, project sekai, full body, standing, looking at viewer, simple background'
+'yamada elf, eromanga sensei':
+  danbooru: '1girl, solo, yamada elf, eromanga sensei, full body, standing, looking at viewer, simple background'
+'yelan (genshin impact), genshin impact':
+  danbooru: '1girl, solo, yelan \(genshin impact\), genshin impact, full body, standing, looking at viewer, simple background'
+'yozora mel, hololive':
+  danbooru: '1girl, solo, yozora mel, hololive, full body, standing, looking at viewer, simple background'
+'yuna (ff10), final fantasy':
+  danbooru: '1girl, solo, yuna \(ff10\), final fantasy, full body, standing, looking at viewer, simple background'
+'zaku ii, gundam':
+  danbooru: '1girl, solo, zaku ii, gundam, full body, standing, looking at viewer, simple background'

@@ -2047,7 +2047,10 @@ class _ModelChip extends StatelessWidget {
                       : spec.img2img
                       ? '${spec.capabilityLabel} — vyžaduje obrázek'
                       : '${spec.capabilityLabel} — jen nové generování';
-                  final note = spec.styleNote;
+                  // In repose the restyle verdict is the one that matters.
+                  final note = needsPose
+                      ? spec.restyleNote ?? spec.styleNote
+                      : spec.styleNote;
                   return Opacity(
                     opacity: usable ? 1.0 : 0.38,
                     child: ListTile(
@@ -2198,17 +2201,44 @@ class _ReposePill extends StatelessWidget {
 
 /// Art style appended to every prompt in the session.
 class _StyleChip extends StatelessWidget {
-  const _StyleChip({required this.selected, required this.onChanged});
+  const _StyleChip({
+    required this.selected,
+    required this.model,
+    required this.models,
+    required this.onChanged,
+  });
 
   final String? selected;
+
+  /// The model the next request runs on: a style the lab found quiet on it
+  /// is dimmed in the list and the chip warns when it is the selected one.
+  final ImageModelSpec model;
+  final List<ImageModelSpec> models;
   final ValueChanged<String?> onChanged;
+
+  /// „Na Pony skoro bez reakce, zkus SDXL base“ — null when the style is not
+  /// quiet on [model].
+  String? _quietNote(String styleId) {
+    if (!styleQuietOn(styleId, model.id)) return null;
+    final alt = styleAlternativeModel(
+      styleId,
+      model.id,
+      models.map((m) => m.id),
+    );
+    final altLabel = alt == null
+        ? null
+        : models.firstWhere((m) => m.id == alt).label;
+    return altLabel == null
+        ? 'Na ${model.label} skoro bez reakce'
+        : 'Na ${model.label} skoro bez reakce, zkus $altLabel';
+  }
 
   void _pick(BuildContext context) {
     _dismissKeyboard();
     var query = '';
-    // Sections only once there is something to split: cultures and epochs on
-    // one side, styles after a named artist on the other.
-    final sectioned = kStylePresets.any((s) => s.artist != null);
+    // With a few hundred entries an open list is a scroll to nowhere, so the
+    // sections start folded except the one holding the current style.
+    final open = <StyleKind>{styleById(selected)?.kind ?? StyleKind.culture};
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppTheme.surface,
@@ -2218,18 +2248,24 @@ class _StyleChip extends StatelessWidget {
       ),
       builder: (_) => StatefulBuilder(
         builder: (ctx, setSheetState) {
-          final hits = kStylePresets
+          final hits = kStylePresetsSorted
               .where((s) => styleMatchesQuery(s, query))
               .toList();
-          final cultures = hits.where((s) => s.artist == null).toList();
-          final artists = hits.where((s) => s.artist != null).toList();
+          final searching = query.trim().isNotEmpty;
           // One flat list of headers and presets — the split is what makes
-          // ~90 entries findable, it does not need a widget tree of its own.
+          // the entries findable, it does not need a widget tree of its own.
+          // A search shows every hit: a fold must not hide what was asked for.
           final items = <Object>[
-            if (sectioned && cultures.isNotEmpty) 'Kultury a epochy',
-            ...cultures,
-            if (sectioned && artists.isNotEmpty) 'Umělci',
-            ...artists,
+            for (final kind in StyleKind.values)
+              ...() {
+                final inKind = hits.where((s) => s.kind == kind).toList();
+                final shown = searching || open.contains(kind);
+                return [
+                  if (inKind.isNotEmpty)
+                    (kind: kind, n: inKind.length, shown: shown),
+                  if (shown) ...inKind,
+                ];
+              }(),
           ];
           return Padding(
             // The search field is the only input here: once the user taps
@@ -2340,61 +2376,96 @@ class _StyleChip extends StatelessWidget {
                               itemCount: items.length,
                               itemBuilder: (_, i) {
                                 final item = items[i];
-                                if (item is String) {
-                                  return Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      16,
-                                      10,
-                                      16,
-                                      2,
-                                    ),
-                                    child: Text(
-                                      item,
-                                      style: const TextStyle(
-                                        color: AppTheme.textSecondary,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
+                                if (item case (
+                                  kind: final StyleKind kind,
+                                  n: final int n,
+                                  shown: final bool shown,
+                                )) {
+                                  return InkWell(
+                                    onTap: searching
+                                        ? null
+                                        : () => setSheetState(
+                                            () => shown
+                                                ? open.remove(kind)
+                                                : open.add(kind),
+                                          ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        16,
+                                        12,
+                                        12,
+                                        8,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              '${kind.label} · $n',
+                                              style: const TextStyle(
+                                                color: AppTheme.textSecondary,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                          Icon(
+                                            shown
+                                                ? Icons.expand_less
+                                                : Icons.expand_more,
+                                            size: 18,
+                                            color: AppTheme.textSecondary,
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   );
                                 }
                                 final st = item as StylePreset;
                                 final isSel = st.id == selected;
-                                return ListTile(
-                                  leading: Icon(
-                                    isSel
-                                        ? Icons.radio_button_checked
-                                        : Icons.radio_button_unchecked,
-                                    color: isSel
-                                        ? AppTheme.accent
-                                        : AppTheme.textSecondary,
-                                    size: 20,
-                                  ),
-                                  title: Text(
-                                    st.label,
-                                    style: TextStyle(
+                                // A quiet style stays pickable — the metric
+                                // sees colour only — it is just dimmed and
+                                // says where it did react.
+                                final quiet = _quietNote(st.id);
+                                return Opacity(
+                                  opacity: quiet == null ? 1.0 : 0.5,
+                                  child: ListTile(
+                                    leading: Icon(
+                                      isSel
+                                          ? Icons.radio_button_checked
+                                          : Icons.radio_button_unchecked,
                                       color: isSel
                                           ? AppTheme.accent
-                                          : AppTheme.textPrimary,
+                                          : AppTheme.textSecondary,
+                                      size: 20,
                                     ),
-                                  ),
-                                  // An artist's label names the manner; the
-                                  // period says which of their years it is.
-                                  subtitle: Text(
-                                    st.period == null
-                                        ? st.block
-                                        : '${st.period} · ${st.block}',
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: AppTheme.textSecondary,
-                                      fontSize: 11,
+                                    title: Text(
+                                      st.labelWithYear,
+                                      style: TextStyle(
+                                        color: isSel
+                                            ? AppTheme.accent
+                                            : AppTheme.textPrimary,
+                                      ),
                                     ),
+                                    // An artist's label names the manner; the
+                                    // period says which of their years it is.
+                                    subtitle: Text(
+                                      [
+                                        ?quiet,
+                                        ?st.period,
+                                        st.block,
+                                      ].join(' · '),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: AppTheme.textSecondary,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                    onTap: () {
+                                      onChanged(st.id);
+                                      Navigator.of(ctx).pop();
+                                    },
                                   ),
-                                  onTap: () {
-                                    onChanged(st.id);
-                                    Navigator.of(ctx).pop();
-                                  },
                                 );
                               },
                             ),
@@ -2412,9 +2483,10 @@ class _StyleChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = styleById(selected);
+    final quiet = style != null && styleQuietOn(style.id, model.id);
     return _ChipShell(
       active: style != null,
-      icon: Icons.palette_outlined,
+      icon: quiet ? Icons.warning_amber_rounded : Icons.palette_outlined,
       label: style?.label ?? 'Styl',
       onTap: () => _pick(context),
     );
@@ -2935,6 +3007,8 @@ class _StudioInputBarState extends ConsumerState<_StudioInputBar> {
                     const SizedBox(width: 8),
                     _StyleChip(
                       selected: widget.state.selectedStyleId,
+                      model: widget.state.model,
+                      models: widget.state.availableModels,
                       onChanged: (v) =>
                           ref.read(imageStudioProvider.notifier).setStyle(v),
                     ),
@@ -3239,7 +3313,6 @@ class _VideoNodeViewState extends State<_VideoNodeView> {
 /// What the 3D tile action makes: the printable model or a dancing figure.
 enum _ThreeDChoice { print, figure }
 
-
 /// What the „Rozhýbat" sheet returns: a scene, or the user's own motion text
 /// with a length in 5 s segments.
 class _AnimateChoice {
@@ -3328,7 +3401,8 @@ class _AnimateSheetState extends State<_AnimateSheet> {
                     fontSize: 14,
                   ),
                   decoration: InputDecoration(
-                    hintText: 'Co se má pohnout — např. „otočí se k oknu, '
+                    hintText:
+                        'Co se má pohnout — např. „otočí se k oknu, '
                         'usměje se a zamává"',
                     hintStyle: const TextStyle(
                       color: AppTheme.textSecondary,

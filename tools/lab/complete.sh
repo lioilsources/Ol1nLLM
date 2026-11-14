@@ -186,7 +186,10 @@ models() {
   local probe=$OUT/complete-$NAME-probe
   if [[ ! -f $probe/wf/manifest.json ]]; then
     mkdir -p $probe
-    $LAB run --dry --no-styles --flows repose --ref $REF --subject probe \
+    # MODELS is this script's knob for the styles part, but dump.dart reads
+    # the same name from the environment — without clearing it the probe
+    # sees only those models and the tag parts silently get none.
+    MODELS= $LAB run --dry --no-styles --flows repose --ref $REF --subject probe \
       --out $probe > $probe/complete.log 2>&1 || {
       echo "plán modelů selhal, viz $probe/complete.log" >&2; return 1
     }

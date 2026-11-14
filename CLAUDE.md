@@ -19,7 +19,7 @@ Volitelné URL overrides (`.env.local`, Makefile je propouští jen když jsou
 neprázdné): `COMFYUI_URL`, `FINETUNE_URL`, `FLUX_NIM_URL`, `VLLM_URL`,
 `LIBRARY_CHAT_URL`, `LAW_CHAT_URL`, `LEADS_CHAT_URL`, `UGC_FC_URL`, `AUDIO_URL`,
 `STYLEMAP_URL`. Pro vývoj knihovny proti SPARKu na LAN:
-`LIBRARY_CHAT_URL=http://192.168.88.66:8090` (Právník: `LAW_CHAT_URL=http://192.168.88.66:8098`; Leads: `LEADS_CHAT_URL=http://192.168.88.66:8099`,
+`LIBRARY_CHAT_URL=http://SPARK_HOST:8090` (Právník: `LAW_CHAT_URL=http://SPARK_HOST:8098`; Leads: `LEADS_CHAT_URL=http://SPARK_HOST:8099`,
 to je zároveň výchozí hodnota, tunel zatím není) — pak ale **jen `make debug`**
 (release Android manifest nemá `usesCleartextTraffic` a iOS nemá výjimku
 v `Info.plist`, takže čistý HTTP tam neprojde).
@@ -152,7 +152,7 @@ Pořadí v řadě je záměrné: model → styl → síla úpravy → póza → 
 jako poslední** (používá se nejmíň, a řada scrolluje, takže co je vpravo,
 je z palce nejdál).
 ComfyUI URL jde přepnout přes `--dart-define=COMFYUI_URL=...`
-(např. LAN `http://192.168.88.66:8188` pro testování bez CF).
+(např. LAN `http://SPARK_HOST:8188` pro testování bez CF).
 
 **Chipy sledují node**: `navigateTo()` po přesunu na node zavolá
 `_adoptNodeSettings()` — čistá funkce `adoptableSettings()` (testovatelná bez
@@ -177,15 +177,18 @@ mimo pole řeší `GestureDetector` kolem těla obrazovky, ale ten se k dotykům
 potomky nedostane, proto ta explicitní volání. Repose režim klávesnici
 **neotevírá** sám.
 
-**Styly (`lib/models/style_preset.dart`)**: 82 výtvarných bloků (40 kultur
-a epoch, 42 podle konkrétních umělců) ověřených
-měřením (`docs/style-matrix.md`) — každý prošel testem, že na něj aspoň jeden
-model skutečně reaguje, a že nedubluje jiný styl v seznamu, vybírané `_StyleChip` v input baru. Blok se
+**Styly (`lib/models/style_preset.dart`)**: 310 výtvarných bloků (97 kultur
+a epoch, 103 podle konkrétních umělců, 110 médií a technik) ověřených
+měřením (`docs/style-matrix.md`, vlna 7 v `docs/plan-styles-wave7.md`) — každý
+prošel testem, že na něj aspoň jeden model skutečně reaguje, a že nedubluje
+jiný styl v seznamu, vybírané `_StyleChip` v input baru. Blok se
 připojuje **za** prompt (`applyStyle()`) — vlastní zadání má přednost; prázdný
 prompt (foto root) zůstane prázdný, aby se styl nestal jediným obsahem. Na uzlu
 se persistuje jen `GenNode.styleId`, text je z něj odvoditelný (stejný princip
 jako u póz). Platí pro generate/refine/repose, **ne pro inpaint** (ten popisuje
-jen zamalovanou oblast, celoobrazový styl by se s ním pral).
+jen zamalovanou oblast, celoobrazový styl by se s ním pral). **Repose je
+výjimka** (styl vpředu, prefix podle `restyleKeepsPrefix()`, repose uzly před
+v1.39 mají styl na konci): `tools/lab/README.md`, „Restyl z fotky“.
 
 **Dialekty stylu (`PromptDialect`)**: styl má dva texty — `block` (volná
 fráze, čte ji CLIP i T5) a volitelně `booru` (danbooru tagy **bez jména
@@ -202,9 +205,23 @@ třetí vlny v `docs/style-matrix.md`.
 **Picker stylů**: jedna zploštělá lista se sekcemi „Kultury a epochy" /
 „Umělci" (podle `StylePreset.artist`; `artist` a `period` jsou jen pro UI,
 do promptu nejdou) a hledáním podle labelu a autora bez ohledu na diakritiku
-(`styleMatchesQuery`). Vyhledávací pole se samo nefokusuje a seznam schovává
+(`styleMatchesQuery`). Pořadí v sekcích dává `kStylePresetsSorted`: kultury podle
+přibližného začátku, umělci podle roku narození (`StylePreset.year`), média
+podle české abecedy; registr sám zůstává v pořadí měření. Řádek pickeru
+a mapa stylů ukazují `labelWithYear` („Vermeer (1632)“), chip v input baru
+kvůli šířce jen `label`. Vyhledávací pole se samo nefokusuje a seznam schovává
 klávesnici při tažení. Podtitulek je vždy `block`, i u anime modelu — tagy by
 se četly hůř.
+
+**Ticho podle modelu (`lib/models/style_quiet.dart`, generuje
+`tools/lab/reactions.py` z běhů vlny 7)**: dvojice (model, styl), u kterých
+model namaloval s blokem totéž co bez něj (barevná vzdálenost od vlastního
+baseline pod 0.15). Řádek pickeru se na vybraném modelu ztlumí a řekne, kde
+styl reagoval (`styleAlternativeModel`: sdxl-base → juggernaut → lightning →
+schnell, první dostupný a sám netichý); chip ukáže výstrahu. **Nikdy se
+neskrývá**: metrika vidí jen barvu — Illustrious má u médií reakci 0.85 tím,
+že postavu rozpustí v čmáranice, Pony u malířů 0.49 kostýmem — takže „změnilo
+se“ neznamená „styl prošel“ a nezměřená dvojice se ukazuje normálně.
 
 **Síla úpravy (`_EditStrengthChip`)**: `ComfyUIService.setEditDenoise()`
 přebíjí presetový `img2imgDenoise`. Měření ukázalo, že při presetových ~0.72 je
@@ -386,15 +403,23 @@ masky) — stejně jako `loraStrength` jen s LoRA. Dotažení tváře
 |---|---|---|
 | `instantid` | `ApplyInstantIDAdvanced` (embedding + vlastní keypoint CN, zvlášť síly) | PuLID |
 | `faceid` | `IPAdapterFaceID` PlusV2 (jen model hrana) | PuLID |
-| `both` | obě, FaceID první na model hraně | PuLID |
+| `both` | obě, InstantID první na model hraně | PuLID |
 
 Rodina se pozná z grafu (`_isFluxGraph` = obsahuje `UNETLoader`), ne z
 presetu — patchuje se graf. FLUX má jediný mechanismus, takže se na něj
 mapuje každý režim; lab si proto **skutečnou** metodu čte zpátky z grafu
 (`_effectiveFaceIdentity`), ne z toho, co se objednalo.
 
-Model hrana se řetězí `loader → [__lora__] → [__faceid_apply__] →
-__face_apply__ → KSampler`; InstantID navíc vrací podmínění, takže sedí
+Model hrana se řetězí `loader → [__lora__] → [__face_apply__] →
+[__faceid_apply__] → KSampler`. **Pořadí není kosmetické**: oba uzly patchují
+attention přes sdílený `Attn2Replace` a druhý v řadě volá `.add()` na objekt
+z předchozího uzlu, místo aby ho zkopíroval. Dřív byl FaceID první — jeho
+výstup ComfyUI cachuje (na promptu nezávisí), InstantID se přepočítá s každým
+promptem, takže každý další prompt přidal do cachovaného modelu další
+InstantID patch. Restyle řada jedné fotky se tím buňku po buňce rozpouštěla
+do šumu (běh `20261111-144619`: stddev obrázku 105 → 48 za 60 stylů, reset
+u další fotky; běhy `none`/`instantid` rovné). V telefonu totéž při
+opakovaném generování se stejnou předlohou. InstantID navíc vrací podmínění, takže sedí
 **před** `__cn_apply__` (`__cn_apply__.positive == ['__face_apply__', 1]`) a
 oba ControlNety se skládají — klíčové body obličeje uvnitř hloubkové siluety.
 `end_at` **1.0**: hloubka se pouští na 90 %, aby dosedly textury,
@@ -406,7 +431,7 @@ InstantID má **dvě síly**, proto `ApplyInstantIDAdvanced` a ne základní uze
 (kde tvář je), `ip_weight` 0.6 je IP-Adapter embedding předlohy (čí tvář to
 je). Embedding je obrazový embedding *fotografie* vstříknutý do
 cross-attention vedle textových tokenů, takže při 0.8 přes celý rozvrh
-přebíjí blok stylu (ten je na konci promptu, s nejnižší vahou). V img2img se
+přebíjí blok stylu (ten je mimo repose na konci promptu, s nejnižší vahou). V img2img se
 to skládá se zdrojovým latentem (denoise 0.72) a auto-depth hintem (0.7) —
 tři kotvy k fotce proti jednomu stylu — a styl přežil jen na Juggernautu
 (fotoreal SDXL-base finetune, doména, na které je adaptér natrénovaný;
@@ -772,7 +797,7 @@ v `AiStack/services/audio/NOTES.md`.
   appka u ní nabídne „Poslechnout znovu".
 
 `AUDIO_URL` přepne server (výchozí `https://llm.ol1n.com`; LAN
-`http://192.168.88.66:8093` jen s `make debug`, CF hlavičky jsou pak
+`http://SPARK_HOST:8093` jen s `make debug`, CF hlavičky jsou pak
 volitelné). Veřejně jde `llm.ol1n.com/v1/audio/*` přes AiStack Go gateway
 (`AUDIO_API_URL=http://audio:8093`), takže orchestrátor musí běžet z compose
 (`make up-audio`) — ručně spuštěný kontejner nemá DNS alias `audio`
@@ -846,6 +871,23 @@ jako u MusicStudia (AiStack `services/audio`, sekce TTS v jeho README),
   (server je zapíše k hlasu a do manifestu každého jobu). Id hlasu na serveru
   je `voiceIdFor(jméno)`; obsazené jméno vrátí 409 a formulář chybu ukáže
   sám (snackbar by byl schovaný za sheetem, proto `createVoice()` hází).
+- **Rytmus** (sekce „Rytmus", `SpeechRhythm` v `voice.dart`): tempo v BPM,
+  styl frázování (`PhrasingStyle` — jména hodnot jsou id presetů serveru)
+  a klik. Server pak text rozdělí na fráze a každou zarovná na doby
+  (`rhythm` v `/v1/audio/tts`, AiStack `app/tts/rhythm.py`). **Není to
+  flow** — zarovnává se začátek a délka fráze, ne slabiky, a UI to říká.
+  Proč jen tohle (ACE-Step text nepřečte, tvar textu rytmus neudělá):
+  stavový blok v `docs/plan-voice-rhythm.md`. Rytmus je **nastavení studia**
+  (Hive `voice_studio`, klíč `rhythm`), ne persony ani hlasu, a platí pro
+  každé čtení včetně reproduktoru v chatu — ten má pak ikonu ekvalizéru
+  místo reproduktoru. Je součástí názvu souboru v cache (`speechFileName`)
+  i klíče čtení (`SpeechPlayer.keyOf(…, variant)`), jinak by cache vrátila
+  obyčejnou verzi. Tempo jde vyťukat (`tapTempo`: průměr posledních klepnutí,
+  pauza přes 2,5 s začíná znovu) nebo převzít z ukázky změřené v Music
+  Studiu — to je cesta k „jeho BPM". Kusy (`speechChunks`) zůstávají: každý
+  končí na konci frázového slotu, takže další začne zase na době; mezera
+  mezi soubory v přehrávači ale mřížku mezi kusy o zlomek doby posune.
+  Starší server pole `rhythm` tiše ignoruje a přečte text obyčejně.
 - **GPU enginy běží jen někdy.** Kokoro a Piper jsou CPU a jedou pořád; XTTS
   a Chatterbox nejsou v rozvrhu SPARKu (AiStack `CLAUDE.md`, sekce TTS). Když
   neběží, server odmítne `/tts` hned `503` s větou pro člověka a appka ji
@@ -948,6 +990,13 @@ pouštějí znovu.
   a přednačítá osm snímků dopředu: na pomalé síti film zpomalí, místo aby
   ukazoval rozmazané výřezy z atlasu. Dotyk na mozaiku i posuvník přehrávání
   zastaví. Trasa po LPIPS skáče po mozaice, značka skáče s ní.
+- **Na celou obrazovku** (`fullscreen.dart`, ikona na konci lišty): film
+  přes celý displej, ovládání nad obrázkem (klepnutí ho schová) a **posuvník
+  rychlosti** 1–24 obrázků za vteřinu. Hraje to, co je zrovna na mapě — tedy
+  i výsledek filtru — a po zavření mapa pokračuje tam, kde film skončil, stejnou
+  rychlostí. Mapa i přehrávač jedou na jedné třídě `StyleMapPlayback`
+  (`playback.dart`), která o widgetech neví: čekání na náhled a přednačítání
+  (aspoň osm snímků, při vyšší rychlosti třetinu vteřiny) jsou tak jen jednou.
 - **Režimy** (`StyleMapMode`, ikony v rohu náhledu): tytéž obrázky jinak
   rozložené. *Mapa* je mozaika. *Osy* (`pad.dart`) je bodový graf dvou
   měřených vlastností (osy se vybírají z `axes[]` packu) a prst dostane
@@ -985,6 +1034,9 @@ a volá `ComfyUIService.prepareForTest` → `_prepare`, takže lab měří to, c
 appka opravdu posílá. Modely, styly i pózy se čtou z registrů (`kImageModels`
 prořezané podle nainstalovaných checkpointů, `kStylePresets`, `kPoseTemplates`)
 a přes `manifest.json` tečou do UI — Dart zůstává jediným zdrojem pravdy.
+Styly jdou v pořadí pickeru appky (`kStylePresetsSorted`) i s `labelWithYear`;
+UI tím pořadím řadí panel, řádky výstupu i čipy filtru až při vykreslení, takže
+i staré běhy (baseline první, kandidáti mimo registr hned za ní).
 
 **Modely bez grafu (gen-queue / NIM)**: `flux-schnell` jede přes gen-queue, ne
 ComfyUI, takže do `wf/<id>.json` jde místo grafu **request body** — a staví ho
@@ -1059,6 +1111,21 @@ v adresáři běhu, takže parser je v systému jediný a resume hraje tytéž p
 buňka `promptBody` a v `prompt` text přečtený zpátky z grafu. Ukázka:
 `candidates/prompts-example.yaml`.
 
+**Pozice → restyle (flow `restyle`)**: běh se dvěma modely — `--base-model`
+(v UI „model pozice“) nakreslí z textu fotku, `--models` ji přemalují do stylu
+přes ControlNet nad txt2img šablonou (graf „zachovej pózu“). Model pozice
+může být i `qwen-image` — jen v labu (`kLabOnlyModels`), čte sloupec `flux`
+i negativ, podrobnosti v `tools/lab/README.md`. Prompt má tři
+vrstvy: pozice (`--prompts-yaml`, YAML i CSV `id,juggernaut,pony,flux,negative` — negativ pozice se připojí za negativ běhu, v obou krocích),
+postava (`--characters`, řádek = postava) a styl; první krok dostane pozici
++ postavu, druhý všechny tři. Fotka vzniká jednou na pozici × postavu, buňka
+restylu ji nese jako `dependsOn` / `hintImage` a runner jede fotku po fotce
+(`position`, upload a přepsání `LoadImage`, hned její restyly; staré pořadí
+„nejdřív všechny fotky“ vrací `LAB_STAGE_ORDER=photos-first`). `--hint depth|canny`
+(osa `param.hint`): hrany jsou **jen laboratorní** cesta přes
+`StructureHint` v `comfyui_service.dart`, appka posílá vždy hloubku.
+Podrobnosti a co se přeskakuje: `tools/lab/README.md`.
+
 **Kandidáti stylů**: `--styles-file` čte `id/label/block` a volitelně
 `booru/artist/period`, ostatní klíče toleruje. Id, které v souboru chybí, se
 vezme z registru — kandidát tak stojí ve stejné tabulce jako styl, se kterým
@@ -1073,10 +1140,11 @@ běh. UI u doběhlého běhu s chybami nabízí *Doplnit selhané*.
 
 **Proč anime modely styl nepřevezmou** — dvě laboratorní osy a jeden soubor:
 `param.stylePosition=end|front|first` (appka posílá `end` = prefix, námět,
-styl) a `param.qualityPrefix=on|off` (tagy estetického hodnocení z
+styl, v repose `front`; flow `restyle` a `repose` mají výchozí `front` —
+měření v `tools/lab/README.md`) a `param.qualityPrefix=on|off` (tagy estetického hodnocení z
 `positivePrefix`, u NoobAI `very awa`, jdou první a CLIP je váží nejvíc).
 Skládá je `composeCellPrompt()` v `dump_spec.dart`; builder má kvůli tomu
-`positivePrefix: false`, výchozí `true` appku nemění. A
+`positivePrefix: false`, výchozí `true` appku mimo repose nemění. A
 `tools/lab/candidates/cultural-booru.json`: booru tagy pro 39 kulturních stylů,
 které je v registru nemají (booru text měli jen umělci), s bloky převzatými
 z registru — sweep `param.styleDialect=natural|booru` nad tímto souborem je
@@ -1132,6 +1200,32 @@ z dry-runu se neposílají. Galerie má vlastní registr modelů (repo
 FineTuneGallery, `server/meta.go`) — lab se na něj před odesláním zeptá přes
 `/api/meta` a modely, které v něm nejsou, vyjmenuje: obrázky dojdou, ale
 nepůjde podle nich filtrovat.
+
+## Screenshoty pro olin.now (`test/screenshots_test.dart`)
+
+Stránka appky na olin.now (repo `ol1n.now`, `apps/ol1nllm/`, podstránka
+`pages/features.html`) bere mobilní screenshoty z golden testu nad skutečnými
+obrazovkami, ne z telefonu:
+
+```bash
+flutter test test/screenshots_test.dart --update-goldens   # → test/screenshots/*.png
+cp test/screenshots/*.png ../ol1n.now/apps/ol1nllm/screenshots/raw/mobile/android/
+```
+
+Suita má tag `screenshots` (`dart_test.yaml`); běžný běh ji má vynechat přes
+`flutter test --exclude-tags screenshots`, protože goldeny srovnávají pixely
+a jiná verze Skia nebo fontu by shodila build kvůli rozdílu, který není chyba.
+Běží jen na macOS: emoji, `monospace` a ☐ si půjčuje ze systémových fontů.
+
+Na obrazovce není nic vymyšleného tam, kde appka ukazuje výstup serveru:
+odpovědi chatu jsou tytéž zachycené fixtury jako v testech parserů, katalogy
+v `test/fixtures/screenshots/` (scény, příběhy, tance, checkpointy) jsou
+stažené ze serveru, obrázky jsou výstupy labu. Výjimky jsou vypsané
+v hlavičce testu (LoRA seznam je výběr z živého, hudební projekt je vzorek).
+Stav se do providerů vkládá přímo (`notifier.state = …`), takže produkční kód
+kvůli screenshotům nemá žádný háček navíc. Dva záběry chybí, protože pro ně
+nebylo co pravdivého ukázat: odpověď Knihovníka a review záběrů ve StoryStudiu
+— až bude zachycená odpověď / keyframy skutečného jobu, stačí přidat fixturu.
 
 ## FINETUNE gallery export
 
@@ -1224,7 +1318,7 @@ z Registru smluv. Jiný serverový kód (LeadsRAG, unit `leadsd` na SPARKu :8099
 ale stejný SSE dialekt (navíc `: planning` / `: keepalive` komentáře, které
 `parseSseLine` zahodí), takže v appce zase jen instance
 `LibraryChatService.leads()` s `LEADS_CHAT_URL` (výchozí LAN
-`http://192.168.88.66:8099` — tunel zatím není, tedy jen `make debug`;
+`http://SPARK_HOST:8099` — tunel zatím není, tedy jen `make debug`;
 `top_k` 8, server vrací max 15 firem; chybové texty `[leads] …`). Zdroje jsou
 `LibrarySource`-kompatibilní: `work` = IČO, `name_cs` = firma, `title` =
 `IČO … · segment`, `group` = segment, `path` = číslo smlouvy, `excerpt` =

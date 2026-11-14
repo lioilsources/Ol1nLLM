@@ -30,6 +30,9 @@ class StyleMapPad extends StatelessWidget {
   static const padKey = ValueKey('stylemap-pad');
   static const _inset = 12.0;
 
+  /// The pack writes „low ↔ high"; some fonts draw that arrow as an emoji.
+  static String _plain(String label) => label.replaceAll('↔', '–');
+
   Future<void> _choose(BuildContext context, bool horizontal) async {
     final picked = await showModalBottomSheet<int>(
       context: context,
@@ -42,7 +45,7 @@ class StyleMapPad extends StatelessWidget {
               ListTile(
                 dense: true,
                 title: Text(
-                  pack.axes[k].label,
+                  _plain(pack.axes[k].label),
                   style: const TextStyle(color: Colors.white),
                 ),
                 trailing: k == (horizontal ? x : y)
@@ -71,7 +74,7 @@ class StyleMapPad extends StatelessWidget {
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  pack.axes[k].label,
+                  _plain(pack.axes[k].label),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: Colors.white, fontSize: 13),

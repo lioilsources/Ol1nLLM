@@ -48,6 +48,8 @@ lab run --subject "a ballerina" --models juggernaut-xl,pony \
 lab run --prompts-yaml candidates/prompts-example.yaml \
         --models pony,juggernaut-xl,flux-manga --flows txt2img --no-styles
 lab run --ref-prompt "photo of a dancer" --sweep '__cn_apply__.strength=0.5|0.75|1.0'
+lab run --flows restyle --base-model flux-manga --models illustrious-xl \\
+        --prompts-yaml pozice.csv --characters postavy.txt --styles vermeer
 lab resume build/lab/20260826-0023          # dopočítat přerušený běh
 lab score build/lab/20260826-0023
 lab export build/lab/20260826-0023 --send   # do FINETUNE gallery
@@ -121,6 +123,181 @@ rodiny — ten by jinak text tiše zahodil, takže ho parser odmítne i s čísl
 Osa promptů zůstává jednorozměrná: `manifest.prompts` nese **popisky** sloupců
 (text se liší model od modelu, takže jeden být nemůže), buňka nese `promptBody`
 a v `prompt` text přečtený zpátky z grafu — tedy ten, co se opravdu poslal.
+
+## Pozice → restyle (flow `restyle`)
+
+Dva modely na jeden obrázek: **model pozice** nakreslí z textu fotku, **model
+restylu** ji přemaluje do stylu. Každý umí půlku — FLUX nebo Juggernaut znají
+reálné věci a pózy, ale styly dělají slabě; Illustrious zná stovky stylů, ale
+složitější námět nenakreslí. Předávání obrázků mezi kroky dělá lab sám.
+
+```bash
+lab run --flows restyle --base-model flux-manga --models illustrious-xl \
+        --prompts-yaml pozice.csv --characters postavy.txt \
+        --styles vermeer,ukiyoe
+```
+
+V UI je to blok „pozice → restyle“: vybráním modelu pozice se flow přepne na
+`restyle`, modely zaškrtnuté v seznamu jsou ty, které přemalovávají.
+
+**Qwen-Image jako model pozice** (`--base-model qwen-image`): jednoprůchodová
+náhrada za FLUX v prvním kroku, licence Apache 2.0 (FLUX.1-dev je
+nekomerční). Graf `assets/comfyui/qwen_image_txt2img.api.json` je
+referenční nastavení ComfyUI: `qwen_image_fp8_e4m3fn` + Qwen2.5-VL 7B fp8
+(typ `qwen_image`), AuraFlow shift 3.1, 1328², 20 kroků, cfg 2.5. Na SPARKu
+(2026-11-10, vedle běžícího labu s Illustrious) **131–167 s na obrázek**,
+na L40S 20–35 s; restyl Illustrious nad fotkou pak 34 s. Volná paměť SPARKu
+klesla se Qwen + Illustrious v ComfyUI ze 47 na 31 GiB, profil `comfy`
+ho tedy unese. Fotka se dělá jednou na pozici × postavu, takže u běhu
+s desítkami stylů na fotku je to malá část času. Čte větu, tedy sloupec `flux`, ale na rozdíl od FLUXu
+**čte i negativ** (cfg 2.5), takže negativ běhu i sloupec `negative` u něj
+platí. Je **jen v labu** (`kLabOnlyModels` v `dump_spec.dart`), ne v appce,
+a nabízí se, jen když ComfyUI hlásí jeho váhy v `UNETLoader` (seznam vah
+neznámý = ukáže se). Jako model restylu se přeskočí (ControlNet v grafu
+nemá) a styly umí hůř než Illustrious.
+
+**Prompt má tři vrstvy** a každý krok dostane jen ty, které mu patří:
+
+| vrstva | odkud | 1. krok (pozice) | 2. krok (restyle) |
+|---|---|---|---|
+| pozice | `--prompts-yaml` (YAML nebo CSV), text podle rodiny modelu | ano | ano, v textu pro *svou* rodinu |
+| postava (vlasy, oči, etnikum) | `--characters`, jeden řádek = jedna postava | ano | ano |
+| styl (epocha, malíř, materiál) | `--styles` / `--styles-file`, dialekt podle modelu | ne | ano, **vpředu** (za quality prefixem) |
+
+Fotka pozice se dělá **jednou na dvojici pozice × postava** a každý další
+styl, model restylu nebo hodnota sweepu je jen druhý krok nad stejnou fotkou.
+Dvě pozice × dvě postavy × pět stylů × dva modely restylu = 4 fotky a 40
+restylů (+ baseline bez stylu ke každému modelu).
+
+**Styl jde v restylu dopředu** (`param.stylePosition=front` jako výchozí
+ve flow `restyle` i `repose`, stejně jako appka v „Zachovej pózu“; ostatní
+flow zůstávají na `end` jako appka jinde). Prompt restylu nese i pozici a postavu,
+často 150–200 tokenů s váženými tagy, a styl na konci padne do posledního
+77tokenového bloku CLIPu s nejmenší vahou — obrázky pak vycházely skoro
+stejné. Změřeno na Illustrious nad fotkou z Hassaku (2026-11-10): `front`
+pohnul obrázkem 2–4× víc než `end` (průměrná vzdálenost od baseline 39–60
+proti 12–20) a póza z hloubkové mapy zůstala. Appkové pořadí jde vrátit
+overridem nebo sweepem `param.stylePosition=end`. Pravidlo je jedno pro
+appku i lab (`kRestyleStyleInFront`).
+
+**Restyl z fotky** (L40S, 2026-11-11, dva běhy, seed 777, SFW pozice; čísla
+jsou průměrná reakce vůči baseline, tedy barva — rozhodl pohled na archy):
+
+- **Model pozice**: z fotoreálné fotky se styl přenáší silněji než z anime
+  obrázku — Juggernaut 0,64–0,79 proti Hassaku 0,38–0,67 u týchž restylerů.
+  Lustify, CyberRealistic a RealVis drží dvojici i pózu na všech buňkách
+  (3 scény páru × 6 restylerů × 7 stylů) a mezi sebou se liší míň než
+  restylery.
+- **Restyler**: NoobAI 0,61, Illustrious 0,60, AutismMix a Pony 0,52, SDXL
+  base 0,50, Hassaku 0,46. Baroko na Illustrious jen ztmaví (vysoké číslo
+  je tma, ne styl). SDXL base maluje olej a linoryt nejvěrněji, ale mění
+  tváře. Juggernaut jako restyler drží fotku (0,35–0,48): jeho prompt nese
+  `photorealistic` ze sloupce pozice.
+- **Prefix kvality**: na NoobAI tlumí styl o 0,12, na Illustrious nad anime
+  fotkou o 0,08. Pony a AutismMix bez score tagů vyblednou do sépie — score
+  tagy jsou jejich ovladač kvality. Proto `ImageModelSpec.restyleQualityPrefix`
+  (false jen u NoobAI a Illustrious) a výchozí `param.qualityPrefix` ve flow
+  `restyle`/`repose` podle něj — appka i lab volají tutéž funkci
+  `restyleKeepsPrefix()`. **Baseline restylu jede se stejným prefixem jako
+  stylované buňky**, tedy u NoobAI a Illustrious bez něj: reakce se měří
+  proti baseline a ta se smí lišit jen blokem stylu. Prázdný námět styl
+  nepošle (`styleApplies()`), a prefix pak zůstává.
+- **Dialekt**: booru tagy přenášejí styl silněji než věta (NoobAI +0,11 až
+  +0,16) — to už výchozí dialekt podle modelu dělá.
+
+Doporučené nastavení: model pozice Lustify / CyberRealistic / RealVis, restyl
+NoobAI nebo Illustrious, zbytek výchozí. Verdikt ke každému modelu je ve dvou
+polích podle role: `ImageModelSpec.restyleNote` (restyler — UI labu pod čipem
+modelu, appka v pickeru v režimu „Zachovej pózu“) a `positionNote` (model
+pozice — jen lab, pod čipem a v nápovědě u modelu pozice; appka tu roli nemá).
+Nápověda skládá doporučení z registru, ne z natvrdo psaných jmen.
+
+Na uzlu appky se pořadí neukládá: repose uzel z verze před 1.39 má styl na
+konci promptu, novější vpředu — rozliší je `GenNode.createdAt`. „Prefix
+vynechán“ je na uzlu `positivePrefix: null`, stejně jako u modelu bez
+prefixu; galerie při re-exportu takový null zatím nepřepíše (FineTuneGallery,
+`COALESCE` v ingestu) — oprava patří tam.
+
+`txt2img` s `POSE_MODE=depth` staví stejný graf jako `repose`, ale prompt
+skládá jako txt2img (styl na konci, prefix podle presetu): appka tuhle
+kombinaci neposílá, tak lab nemá co napodobit. Rozdíl mezi takovými sloupci
+je tedy flow i pořadí v promptu.
+
+Pozice jako tabulka — sloupec `pony` je rodina `danbooru`, oddělovač může být
+čárka, středník i tabulátor (český Excel), BOM nevadí:
+
+```csv
+id,juggernaut,pony,flux,negative
+standing,"a woman standing, full body","1girl, solo, standing, full body","A photograph of a woman standing, full body.","sitting, chair"
+sitting,"a woman sitting on a chair","1girl, solo, sitting, chair","A photograph of a woman sitting on a chair.",
+```
+
+**Negativ pozice** (sloupec `negative`, v YAML klíč `negative:` vedle rodin)
+je volitelný a říká, co na téhle jedné pozici být nemá. Je jeden pro všechny
+rodiny a s negativem běhu (`--negative`, pole „negativ“) se **sčítá**:
+
+```
+negativ modelu (preset)  +  negativ běhu  +  negativ pozice
+```
+
+spojené čárkou v tomhle pořadí; tag, který je v negativu běhu i pozice, jde
+jednou. Platí v obou krocích — fotka pozice i každý její restyle — protože
+co na pozici nepatří, nepatří ani na přemalbu. Prázdná buňka = pozice jede jen
+s negativem běhu. **Čte ho jen generická SDXL šablona**: `flux-manga` (cfg 1)
+a `flux-schnell` negativní podmínění nemají, takže u nich se neuplatní žádný
+z těch tří a odhad to před startem řekne jmenovitě. Co do buňky opravdu šlo,
+je v manifestu jako `negative` (čtené zpátky z grafu).
+
+Postavy jsou obyčejný text, řádek na postavu (`long red hair, green eyes,
+pale skin`), a **jdou všem rodinám stejně** — jsou to krátké výčty, které čte
+tagový model i FLUX. U věty pro FLUX se postava připojí za čárku místo tečky.
+
+**Předání fotky.** Buňka restylu nese v manifestu `dependsOn` (id buňky
+pozice) a `hintImage` (zástupné jméno v grafu). Runner jede **fotku po fotce**: nakreslí
+fotku pozice, nahraje ji do ComfyUI, přepíše zástupné jméno v `LoadImage`
+a hned pustí všechny její restyly; teprve pak další fotku. Výsledky tak
+přibývají po celých řádcích a přerušený běh má hotové pozice kompletní.
+Cena: modely se střídají u každé fotky — zadarmo, dokud je ComfyUI udrží
+v paměti všechny, jinak je to nahrání checkpointu na každé přepnutí. Pak
+pomůže `LAB_STAGE_ORDER=photos-first` (nejdřív všechny fotky, potom restyly
+model po modelu). Když se fotka nevygeneruje, závislé buňky selžou
+s důvodem („fotka pozice … se nevygenerovala“) a `lab resume` je doplní.
+V tabulce jde fotka pozice **hned nad své restyly** (řazení „prompt → styly
+pod sebou“, u dvoufázového běhu výchozí, dokud si řazení nevybereš sám) a její
+náhled je v hlavičce každého řádku restylu. Při řazení podle stylu fotka
+„svůj“ řádek nemá, takže pás fotek zůstává vcelku a je až za restyly — dřív
+byl první a u tisíců pozic zabral celé první strany, kde byla hotová jediná
+fotka.
+
+**Čím restyle fotku drží** (`--hint`, v UI „čím restyle drží fotku“, osa sweepu
+`param.hint=depth|canny`):
+
+- `depth` (výchozí) — hloubková mapa, stejný graf jako „zachovej pózu“
+  v appce (txt2img šablona, denoise 1.0, síla 0.75 / konec 0.9 u SDXL, 0.55
+  u FLUXu). Drží objem a postoj.
+- `canny` — hrany (`Canny` 0.4 / 0.8) přes tentýž SDXL union ControlNet
+  s typem `canny/lineart/anime_lineart/mlsd`. Drží siluetu a nechá model
+  měnit povrch; stojí na hranách, takže hladký předmět s málo hranami se
+  rozpadne a členitý drží. Appka tuhle cestu neposílá — je to jen laboratorní
+  volba (`StructureHint` v `comfyui_service.dart`, výchozí `depth`).
+
+Co se přeskočí (vždy s důvodem v tabulce, odhad na to upozorní předem):
+
+- model restylu bez ControlNetu (`sd15`),
+- FLUX jako model restylu s `canny` — jeho hint síť je jen hloubková,
+- gen-queue modely (`flux-schnell`) ve druhém kroku — nemají graf, do
+  kterého by šlo fotku zapojit.
+
+Odhad počtu buněk tyhle přeskočené počítá, takže může vyjít vyšší než běh.
+
+**FLUX.1-dev je v registru `flux-manga`**: jeho txt2img graf je `UNETLoader
+flux1-dev` bez LoRA. Qwen-Image v `kImageModels` není, takže ho lab jako
+model pozice zatím nenabídne — chce `ImageModelSpec` a šablonu v appce.
+`canny` cesta je ověřená jen nanečisto (tvar grafu); že server má uzel
+`Canny` a union typ, ukáže až první ostrý běh.
+
+Do FINETUNE gallery jde restyle jako potomek své fotky pozice, takže strom
+v galerii odpovídá tomu, z čeho obrázek vznikl.
 
 ## Kandidáti stylů
 
@@ -288,11 +465,14 @@ a přitom čte tagy.
 | metoda tváře | `param.faceIdentity` | `none` | SDXL: tři různé mechanismy; flux: každá hodnota je PuLID (manifest píše, co doopravdy běželo) |
 | text stylu | `param.styleDialect` | jazyk modelu | jen s vybraným stylem; rozdíl dává jen styl s `booru` textem (umělci), kulturní styly posílají obě hodnoty stejně |
 | síla dotažení tváře | `__face_detail__.denoise` | 0.4 | jen se zapnutou identitou **a** dotažením; SDXL i flux |
-| pozice stylu | `param.stylePosition` | `end` (appka) | jen s vybraným stylem: `end` = prefix, námět, styl; `front` = prefix, styl, námět; `first` = styl, prefix, námět. Bez prefixu (Juggernaut, flux, nebo `qualityPrefix=off`) je `front` totéž co `first` |
-| kvalitativní prefix | `param.qualityPrefix` | `on` (appka) | modely s `positivePrefix`: anime SDXL (`masterpiece, best quality…`, u NoobAI `very awa`) a pony score tagy. Juggernaut a flux žádný nemají, buňky vyjdou stejné |
+| pozice stylu | `param.stylePosition` | `end` (appka), ve flow `restyle` a `repose` `front` (appka v „Zachovej pózu“) | jen s vybraným stylem: `end` = prefix, námět, styl; `front` = prefix, styl, námět; `first` = styl, prefix, námět. Bez prefixu (Juggernaut, flux, `qualityPrefix=off` nebo restyl na NoobAI a Illustrious) je `first` totéž co `front` — taková buňka se přeskočí s důvodem |
+| kvalitativní prefix | `param.qualityPrefix` | `on` (appka); restyle/repose se stylem `off` u NoobAI a Illustrious | modely s `positivePrefix`: anime SDXL (`masterpiece, best quality…`, u NoobAI `very awa`) a pony score tagy. Juggernaut a flux žádný nemají, buňky vyjdou stejné |
+| čím se drží fotka pozice | `param.hint` | `depth` | jen flow `restyle`: `depth` nebo `canny`; FLUX jako model restylu má jen `depth`, buňky s `canny` se přeskočí |
 
-Pozice stylu a prefix jsou **jen laboratorní osy** — appka posílá vždy
-`prefix, námět, styl` (`applyStylePreset`, `_prepare`). Existují kvůli otázce,
+Pozice stylu a prefix jsou laboratorní osy, jejich výchozí hodnoty jsou
+appka: `prefix, námět, styl` všude kromě „Zachovej pózu“, kde jde styl
+dopředu a prefix podle `restyleKeepsPrefix()` (`applyStylePreset`,
+`_prepare`). Existují kvůli otázce,
 proč anime modely styl nepřevezmou: CLIP váží dřívější tokeny víc a tagy
 estetického hodnocení v prefixu jdou první. Skládání je v
 `composeCellPrompt()` (`dump_spec.dart`), builder dostane `positivePrefix:

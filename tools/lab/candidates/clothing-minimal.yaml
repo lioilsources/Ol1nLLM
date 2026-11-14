@@ -1,0 +1,55 @@
+# Matice E — odhalení. Řádky = kdo × kolik, sloupce = modely, bez stylu.
+#
+# Otázka: udělá to model vůbec a jak čistě (anatomie, nechtěné oblečení zpět,
+# nechtěná sexualizace)? Postoj je všude tentýž neutrální stoj, aby se měnilo
+# jen oblečení. Všechny postavy jsou výslovně dospělé. Nekřížit se scénou
+# `campus` z couple-scenes.yaml.
+#
+#   lab run --prompts-yaml tools/lab/candidates/clothing-minimal.yaml \
+#           --models juggernaut-xl,flux-manga,illustrious-xl \
+#           --flows txt2img --no-styles --sweep 'param.seed=777|778|779'
+
+woman-swimsuit:
+  danbooru: "1girl, solo, adult, mature female, bikini, standing, full body, facing viewer, beach, day"
+  juggernaut: "a full body photo of an adult woman in her late twenties wearing a bikini, standing, facing the camera, beach, daylight"
+  flux: "A full body photograph of an adult woman in her late twenties wearing a bikini, standing on a beach and facing the camera in daylight."
+
+woman-underwear:
+  danbooru: "1girl, solo, adult, mature female, underwear, bra, panties, standing, full body, facing viewer, bedroom"
+  juggernaut: "a full body photo of an adult woman in her late twenties wearing a bra and panties, standing, facing the camera, bedroom, soft light"
+  flux: "A full body photograph of an adult woman in her late twenties wearing a bra and panties, standing in a bedroom and facing the camera in soft light."
+
+woman-nude:
+  danbooru: "1girl, solo, adult, mature female, completely nude, standing, full body, facing viewer, bedroom"
+  juggernaut: "a full body nude photo of an adult woman in her late twenties, completely naked, standing, facing the camera, bedroom, soft light"
+  flux: "A full body nude photograph of an adult woman in her late twenties, completely naked, standing in a bedroom and facing the camera in soft light."
+
+man-swimsuit:
+  danbooru: "1boy, solo, adult, mature male, male swimwear, swim trunks, topless male, standing, full body, facing viewer, beach, day"
+  juggernaut: "a full body photo of an adult man in his late twenties wearing swim trunks, standing, facing the camera, beach, daylight"
+  flux: "A full body photograph of an adult man in his late twenties wearing swim trunks, standing on a beach and facing the camera in daylight."
+
+man-underwear:
+  danbooru: "1boy, solo, adult, mature male, male underwear, boxer briefs, topless male, standing, full body, facing viewer, bedroom"
+  juggernaut: "a full body photo of an adult man in his late twenties wearing boxer briefs, standing, facing the camera, bedroom, soft light"
+  flux: "A full body photograph of an adult man in his late twenties wearing boxer briefs, standing in a bedroom and facing the camera in soft light."
+
+man-nude:
+  danbooru: "1boy, solo, adult, mature male, completely nude, standing, full body, facing viewer, bedroom"
+  juggernaut: "a full body nude photo of an adult man in his late twenties, completely naked, standing, facing the camera, bedroom, soft light"
+  flux: "A full body nude photograph of an adult man in his late twenties, completely naked, standing in a bedroom and facing the camera in soft light."
+
+couple-swimsuit:
+  danbooru: "1girl, 1boy, hetero, couple, adult, bikini, swim trunks, topless male, standing, side-by-side, holding hands, full body, beach, day"
+  juggernaut: "a full body photo of an adult couple in their late twenties, a woman in a bikini and a man in swim trunks, standing side by side holding hands, beach, daylight"
+  flux: "A full body photograph of an adult couple in their late twenties, a woman in a bikini and a man in swim trunks, standing side by side on a beach and holding hands in daylight."
+
+couple-underwear:
+  danbooru: "1girl, 1boy, hetero, couple, adult, bra, panties, boxer briefs, topless male, standing, side-by-side, holding hands, full body, bedroom"
+  juggernaut: "a full body photo of an adult couple in their late twenties, a woman in a bra and panties and a man in boxer briefs, standing side by side holding hands, bedroom, soft light"
+  flux: "A full body photograph of an adult couple in their late twenties, a woman in a bra and panties and a man in boxer briefs, standing side by side in a bedroom and holding hands in soft light."
+
+couple-nude:
+  danbooru: "1girl, 1boy, hetero, couple, adult, completely nude, standing, side-by-side, holding hands, full body, bedroom"
+  juggernaut: "a full body nude photo of an adult couple in their late twenties, a man and a woman, completely naked, standing side by side holding hands, bedroom, soft light"
+  flux: "A full body nude photograph of an adult couple in their late twenties, a man and a woman, completely naked, standing side by side in a bedroom and holding hands in soft light."

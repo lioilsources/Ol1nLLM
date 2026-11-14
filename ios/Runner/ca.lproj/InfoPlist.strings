@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "S’utilitza per fer una foto amb què començar o que refinar a l’Estudi d’imatges.";
+"NSMicrophoneUsageDescription" = "L’Estudi de música grava la música que sona al teu voltant com a mostra per compondre, i l’Estudi de veu grava una veu per clonar.";
+"NSPhotoLibraryAddUsageDescription" = "S’utilitza per desar les imatges generades a la teva fototeca.";
+"NSPhotoLibraryUsageDescription" = "S’utilitza per triar imatges per editar i per a OCR.";

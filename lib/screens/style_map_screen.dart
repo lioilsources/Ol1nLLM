@@ -9,6 +9,7 @@ import '../models/style_preset.dart';
 import '../stylemap/model.dart';
 import '../stylemap/service.dart';
 import '../stylemap/stylemap.dart';
+import '../l10n/l10n.dart';
 
 /// Style maps: pick a set, then slide a finger across its pictures.
 ///
@@ -16,16 +17,19 @@ import '../stylemap/stylemap.dart';
 /// (the picture's prompt fragment and/or style preset). Without it the
 /// fragment goes to the clipboard, so the screen is useful on its own.
 class StyleMapScreen extends StatefulWidget {
-  const StyleMapScreen({super.key, this.pick = false});
+  const StyleMapScreen({super.key, this.pick = false, this.service});
 
   final bool pick;
+
+  /// Where the packs are read from; the server by default.
+  final StyleMapService? service;
 
   @override
   State<StyleMapScreen> createState() => _StyleMapScreenState();
 }
 
 class _StyleMapScreenState extends State<StyleMapScreen> {
-  final _service = StyleMapService();
+  late final _service = widget.service ?? StyleMapService();
 
   List<StyleMapEntry>? _index;
   StyleMapPack? _pack;
@@ -60,7 +64,7 @@ class _StyleMapScreenState extends State<StyleMapScreen> {
     } on StyleMapException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (e) {
-      if (mounted) setState(() => _error = 'mapa se nenačetla: $e');
+      if (mounted) setState(() => _error = context.l10n.mapLoadFailed('$e'));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -112,13 +116,13 @@ class _StyleMapScreenState extends State<StyleMapScreen> {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text('Zkopírováno: $text')));
+      ..showSnackBar(SnackBar(content: Text(context.l10n.copiedText(text))));
   }
 
   /// The pack carries registry ids; here they get the names the rest of the
   /// app shows. An id the registry no longer has stays as it is.
   String _label(StyleMapImage im) {
-    final style = styleById(im.styleId)?.label ?? im.styleId;
+    final style = styleById(im.styleId)?.labelWithYear ?? im.styleId;
     final model = _manyModels
         ? kImageModels.where((m) => m.id == im.modelId).firstOrNull?.label ??
               im.modelId
@@ -149,12 +153,12 @@ class _StyleMapScreenState extends State<StyleMapScreen> {
       child: Scaffold(
         backgroundColor: AppTheme.background,
         appBar: AppBar(
-          title: Text(open ? pack.title : 'Mapy stylů'),
+          title: Text(open ? pack.title : context.l10n.styleMaps),
           actions: [
             if (open)
               TextButton(
                 onPressed: canUse ? _use : null,
-                child: Text(widget.pick ? 'Použít' : 'Kopírovat'),
+                child: Text(widget.pick ? context.l10n.use : context.l10n.copy),
               ),
           ],
         ),
@@ -164,8 +168,7 @@ class _StyleMapScreenState extends State<StyleMapScreen> {
                   key: ValueKey(pack.id),
                   pack: pack,
                   atlas: atlas,
-                  headers: _service.headers,
-                  thumbUrl: (im) => _service.thumbUrl(pack, im),
+                  thumbOf: (im) => _service.thumb(pack, im),
                   labelOf: _label,
                   valueLabel: (key, v) => key == 'model'
                       ? kImageModels
@@ -198,7 +201,7 @@ class _StyleMapScreenState extends State<StyleMapScreen> {
                 style: const TextStyle(color: AppTheme.textSecondary),
               ),
               const SizedBox(height: 12),
-              TextButton(onPressed: _loadIndex, child: const Text('Znovu')),
+              TextButton(onPressed: _loadIndex, child: Text(context.l10n.retry)),
             ],
           ),
         ),
@@ -206,10 +209,10 @@ class _StyleMapScreenState extends State<StyleMapScreen> {
     }
     final index = _index ?? const <StyleMapEntry>[];
     if (index.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
-          'Na serveru zatím žádná mapa není.',
-          style: TextStyle(color: AppTheme.textSecondary),
+          context.l10n.noMapsOnServer,
+          style: const TextStyle(color: AppTheme.textSecondary),
         ),
       );
     }
@@ -225,7 +228,7 @@ class _StyleMapScreenState extends State<StyleMapScreen> {
             style: const TextStyle(color: AppTheme.textPrimary),
           ),
           subtitle: Text(
-            '${e.count} obrázků',
+            context.l10n.imageCount(e.count),
             style: const TextStyle(color: AppTheme.textSecondary),
           ),
           trailing: const Icon(

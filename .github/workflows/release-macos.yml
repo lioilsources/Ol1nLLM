@@ -1,16 +1,19 @@
 name: Release macOS
 
+# Manual build check only. There is no private channel for desktop builds
+# (Actions artifacts of a public repo are downloadable by anyone signed in),
+# and a release build would carry the Cloudflare Access service token — so
+# nothing is uploaded and no token goes in. Without it the app cannot reach
+# the servers; this only proves the build.
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-macos:
-    name: Build & Release macOS
+    name: Build check macos
     runs-on: macos-26
 
     steps:
@@ -30,18 +33,4 @@ jobs:
 
       - name: Build macOS (release)
         working-directory: .
-        run: flutter build macos --release --dart-define=CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }} --dart-define=CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-
-      - name: Package as ZIP
-        run: |
-          cd "./build/macos/Build/Products/Release"
-          zip -r "$OLDPWD/Ol1nLLM-${{ github.ref_name }}-macOS.zip" "ol1n_llm.app"
-
-      - name: Upload to GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: Ol1nLLM-${{ github.ref_name }}-macOS.zip
-          name: Ol1nLLM ${{ github.ref_name }}
-          tag_name: ${{ github.ref_name }}
-          draft: false
-          prerelease: true
+        run: flutter build macos --release

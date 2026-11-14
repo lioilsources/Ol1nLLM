@@ -31,6 +31,7 @@ type Server struct {
 	active   string
 	cache    struct {
 		checkpoints []string
+		unets       []string
 		loras       []string
 		samplers    []string
 		schedulers  []string
@@ -115,9 +116,17 @@ func (s *Server) guard(h http.HandlerFunc) http.HandlerFunc {
 				return
 			}
 		}
-		if r.Method != http.MethodGet && r.Header.Get("X-Lab-Token") != s.token {
-			http.Error(w, "chybí X-Lab-Token", http.StatusForbidden)
-			return
+		if r.Method != http.MethodGet {
+			switch got := r.Header.Get("X-Lab-Token"); {
+			case got == "":
+				http.Error(w, "chybí X-Lab-Token", http.StatusForbidden)
+				return
+			case got != s.token:
+				// The token is minted per start, so a tab left open across a
+				// restart of the lab sends the previous one.
+				http.Error(w, "stránka je ze staršího spuštění labu — obnov ji (⌘R)", http.StatusForbidden)
+				return
+			}
 		}
 		h(w, r)
 	}
@@ -204,7 +213,10 @@ func (s *Server) registries() (*Manifest, error) {
 		m, err := ReadManifest(manPath)
 		// A manifest from before the LoRA registry existed is not usable as a
 		// cache hit — it would silently leave every LoRA unclassified.
-		if err == nil && (len(m.Loras) > 0 || len(s.cache.loras) == 0) {
+		// Likewise one from before the picker order: its styles would come in
+		// registry order and without years.
+		ordered := err == nil && (len(m.Styles) == 0 || m.Styles[0].LabelWithYear != "")
+		if ordered && (len(m.Loras) > 0 || len(s.cache.loras) == 0) {
 			return m, nil
 		}
 	}
@@ -230,6 +242,13 @@ func (s *Server) registries() (*Manifest, error) {
 		if err := os.WriteFile(ckPath,
 			[]byte(strings.Join(s.cache.checkpoints, "\n")), 0o644); err == nil {
 			env = append(env, "CKPTS="+ckPath)
+		}
+	}
+	if len(s.cache.unets) > 0 {
+		unPath := filepath.Join(dir, "unets.txt")
+		if err := os.WriteFile(unPath,
+			[]byte(strings.Join(s.cache.unets, "\n")), 0o644); err == nil {
+			env = append(env, "UNETS="+unPath)
 		}
 	}
 	if len(s.cache.loras) > 0 {
@@ -284,6 +303,9 @@ func (s *Server) refreshOptions() {
 	}
 	if ck, err := s.env.Comfy.Checkpoints(); err == nil {
 		s.cache.checkpoints = ck
+	}
+	if un, err := s.env.Comfy.Unets(); err == nil {
+		s.cache.unets = un
 	}
 	if lo, err := s.env.Comfy.Loras(); err == nil {
 		s.cache.loras = lo

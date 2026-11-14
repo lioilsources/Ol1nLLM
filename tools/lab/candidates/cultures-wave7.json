@@ -1,0 +1,466 @@
+[
+ {
+  "id": "prerafael",
+  "kind": "culture",
+  "label": "Prerafaelité",
+  "block": "pre-raphaelite oil painting, bright jewel glazes over wet white ground, crisp botanical detail in every flower of the meadow, medieval gowns, copper red flowing hair, viridian and madder",
+  "booru": "oil painting (medium), traditional media, fine art parody, red hair, long hair, flower field, medieval, long dress, realistic",
+  "note": "Vrací se ze zamítnutých vlny 2 s jiným blokem (dřív ≈ greek kvůli mramorové pleti). Blok vnucuje zrzavé vlasy a louku; to je podstata stylu."
+ },
+ {
+  "id": "inuit-printmaking",
+  "kind": "culture",
+  "label": "Inuitský kamenotisk (Kinngait)",
+  "block": "inuit stonecut and stencil print on white washi paper, flat silhouette figures with no shading, feathered shapes radiating outward, two or three inks of black, red and blue, wide empty ground",
+  "booru": "traditional media, limited palette, silhouette, flat color, white background, simple background, negative space, greyscale",
+  "note": "Cape Dorset se dnes jmenuje Kinngait. Přesnost: stonecut + stencil na japonském papíře; proti ukiyoe drží bílé prázdné pozadí a absence linky oděvu."
+ },
+ {
+  "id": "cave-painting",
+  "kind": "culture",
+  "label": "Jeskynní malba (Lascaux)",
+  "block": "paleolithic cave painting on rough limestone wall, charcoal contour and blown red and yellow ochre, profile animal silhouettes, twisted perspective horns, cracked rock surface",
+  "booru": "rock, traditional media, charcoal (medium), wall, animal, silhouette, limited palette, brown theme",
+  "note": "OPRAVA: otisky dlaní plán přisuzoval Lascaux, ale tam prakticky nejsou (patří do Chauvet, Gargas, Cosquer), proto vypuštěny. Zvířata jsou podstata stylu a přepíší námět; měřit, zda figura přežije."
+ },
+ {
+  "id": "cycladic",
+  "kind": "culture",
+  "label": "Kykladská idolka",
+  "block": "cycladic marble idol, polished white stone body, folded arms across the abdomen, lyre-shaped head with only a ridge nose, flat geometric planes, plain grey background",
+  "booru": "statue, traditional media, marble (stone), white theme, monochrome, grey background, simple background, faceless, crossed arms, sculpture",
+  "note": "OPRAVA: „bez tváře“ upřesněno: nos jako hřbet zůstává, ostatní rysy byly původně malované a setřely se. Přepisuje figuru na sochu; bez obličeje rizikové pro Zachovat tvář."
+ },
+ {
+  "id": "greek-vase-black",
+  "kind": "culture",
+  "label": "Černofigurová váza",
+  "block": "attic black-figure pottery, glossy black silhouette figures on orange terracotta, fine incised lines, added white and purple details, meander border band",
+  "booru": "pottery, traditional media, silhouette, orange theme, orange background, limited palette, ancient greek clothes, profile",
+  "note": "Jiné než `greek` (mramor). Nosič: keramika, ryté detaily."
+ },
+ {
+  "id": "greek-vase-red",
+  "kind": "culture",
+  "label": "Červenofigurová váza",
+  "block": "attic red-figure pottery, orange terracotta figures reserved on lustrous black glaze, thin relief lines for anatomy and drapery folds, palmette and meander border",
+  "booru": "pottery, traditional media, black background, orange theme, limited palette, ancient greek clothes, profile, lineart",
+  "note": "Inverze proti `greek-vase-black`; měřit, zda je modely rozliší."
+ },
+ {
+  "id": "etruscan-tomb",
+  "kind": "culture",
+  "label": "Etruská hrobka (Tarquinia)",
+  "block": "etruscan tomb wall fresco on pale plaster, profile dancers with almond eyes and long pointed hands, red-brown male and cream female skin, black contours, striped wave and laurel bands",
+  "booru": "wall, painting (medium), traditional media, profile, red theme, brown theme, dancing, limited palette, flat color",
+  "note": "Konvence: muži červenohnědí, ženy světlé. Tanečníci jsou motiv Tarquinie; může přepsat pózu."
+ },
+ {
+  "id": "roman-mosaic",
+  "kind": "culture",
+  "label": "Římská mozaika",
+  "block": "roman floor mosaic of small stone tesserae, visible grout lines, figure built from cut cubes, terracotta, ochre, black and white stones, guilloche braid border",
+  "booru": "mosaic art, traditional media, tiles, roman clothes, border, brown theme, limited palette, tile floor",
+  "note": "Nosič a mřížka tesser; guilloche je rám, ne obsah."
+ },
+ {
+  "id": "fayum",
+  "kind": "culture",
+  "label": "Fajjúmský portrét",
+  "block": "fayum mummy portrait, encaustic wax on wooden panel, frontal bust, huge dark eyes with white highlights, olive skin, ochre and madder brushstrokes, plain grey-brown ground",
+  "booru": "painting (medium), traditional media, portrait, upper body, facing viewer, looking at viewer, black eyes, grey background",
+  "note": "Vynucuje frontální bustu, celofigurový námět se ořízne."
+ },
+ {
+  "id": "scythian-gold",
+  "kind": "culture",
+  "label": "Skythské zlato",
+  "block": "scythian gold plaque, hammered repousse relief, animal style with coiled panther and stag folded legs, curling antlers into scrolls, solid gold on black, granulated edges",
+  "booru": "gold, traditional media, yellow theme, carving, animal, deer, leopard, black background, monochrome, ornate",
+  "note": "Zvířata jsou podstata zvířecího stylu a přepíší námět. Ne plošně použitelné na figuru."
+ },
+ {
+  "id": "moche",
+  "kind": "culture",
+  "label": "Mochická keramika",
+  "block": "moche fineline pottery, cream slip with red-brown painted figures, thin calligraphic line, profile warriors and runners, stirrup spout vessel curve, dotted background fillers",
+  "booru": "pottery, traditional media, limited palette, profile, lineart, brown theme, white background, flat color",
+  "note": "Záměrně bez portrétních a erotických nádob Moche; jen fineline malba. Výraz „warriors“ může přidat zbroj."
+ },
+ {
+  "id": "nazca",
+  "kind": "culture",
+  "label": "Nazcká polychromie",
+  "block": "nazca polychrome slip pottery, flat burnished colors in black outline, stylized hummingbirds and spotted cats, cream, terracotta, grey and violet-black, rounded bowl band",
+  "booru": "pottery, traditional media, flat color, thick outlines, animal, bird, brown theme, patterned background",
+  "note": "OPRAVA: geoglyfy z bloku vypuštěny; jsou to obří linie v poušti, ne malířský styl, a vedly by na letecký snímek. Zvířata jsou podstata; hlavy-trofeje vynechány."
+ },
+ {
+  "id": "kells",
+  "kind": "culture",
+  "label": "Kniha z Kellsu",
+  "block": "insular gospel manuscript on vellum, interlace knotwork and triskele spirals, staring figure with stacked ribbon hair, orpiment yellow, verdigris, red lead and lichen purple, red dots",
+  "booru": "parchment, traditional media, celtic knot, spiral, celtic, ornate, border, yellow theme",
+  "note": "OPRAVA: Kniha z Kellsu nepoužívá zlato, žluť je auripigment; bez zlata se navíc nepřekrývá s `illumination` (gotika)."
+ },
+ {
+  "id": "bayeux",
+  "kind": "culture",
+  "label": "Bayeuxská výšivka",
+  "block": "bayeux embroidery, wool stem stitch on bare linen strip, flat profile figures, terracotta, mustard and blue-green thread, horizontal frieze with narrow animal borders, stitched latin captions",
+  "booru": "embroidery, traditional media, profile, medieval, armor, border, limited palette",
+  "note": "OPRAVA: není tapiserie, ale výšivka vlnou na lnu, proto „tapestry“ nepoužito. Popisky jsou text; hrozí pseudopísmo."
+ },
+ {
+  "id": "romanesque-fresco",
+  "kind": "culture",
+  "label": "Románská freska (Katalánsko)",
+  "block": "romanesque catalan apse fresco, hard black contours, staring frontal figure in almond mandorla, parallel fold lines, ultramarine, ochre and vermilion horizontal bands",
+  "booru": "painting (medium), traditional media, thick outlines, facing viewer, medieval, halo, blue theme, flat color",
+  "note": "Vzor: Sant Climent de Taüll. Mandorla může přidat náboženský obsah."
+ },
+ {
+  "id": "gothic-altarpiece",
+  "kind": "culture",
+  "label": "Gotický oltář",
+  "block": "gothic altarpiece panel, egg tempera on wood, tooled and punched gilt ground with halo patterns, soft rounded figures, carved tracery pinnacles, vermilion and azurite drapery",
+  "booru": "painting (medium), traditional media, triptych, gold background, halo, medieval, ornate, gothic architecture, realistic",
+  "note": "OPRAVA: Mistr Theodorik nemaloval oltář, ale deskové obrazy kaple sv. Kříže na Karlštejně; jeho měkké baculaté tvary zůstaly, jméno ne. Proti `byzantine` odlišuje tracerie a ražené zlato."
+ },
+ {
+  "id": "danse-macabre",
+  "kind": "culture",
+  "label": "Danse macabre",
+  "block": "late gothic woodcut, heavy black cut lines, parallel hatching, dancing skeletons leading the living by the hand, plain hand-colored ochre and red washes, gothic banner",
+  "booru": "ink (medium), traditional media, monochrome, hatching (texture), skeleton, skull, medieval, greyscale, dancing, lineart",
+  "note": "Kostlivci jsou podstata stylu; přidávají smrtelnou tematiku a přepisují scénu. Pokud se má veřejně nabízet, zvážit u lidských námětů."
+ },
+ {
+  "id": "urnes-viking",
+  "kind": "culture",
+  "label": "Urnes (vikinský)",
+  "block": "urnes style viking wood carving, weathered dark oak relief, slender ribbon beast in looping figure-eight interlace, thin and thick lines contrast, tar-black ground",
+  "booru": "carving, traditional media, wood, brown theme, monochrome, celtic knot, dragon, viking, ornate",
+  "note": "Propletená štíhlá šelma je podstata stylu; může přepsat figuru na ornament."
+ },
+ {
+  "id": "pskov-icon",
+  "kind": "culture",
+  "label": "Pskovská ikona",
+  "block": "russian pskov icon, egg tempera on linden panel, cinnabar red ground, dark olive shadows with sharp white highlight strokes, faceted angular drapery, square-shouldered figure",
+  "booru": "painting (medium), traditional media, red background, halo, flat color, green theme",
+  "note": "OPRAVA: červené pozadí je primárně novgorodské; pskovskou školu dělá tmavá olivová a ostré bílé světlo. Kotva sloučena; odlišení od `byzantine`: červeno místo zlata."
+ },
+ {
+  "id": "armenian-manuscript",
+  "kind": "culture",
+  "label": "Arménský rukopis (Kilikie)",
+  "block": "cilician armenian gospel manuscript on vellum, lapis blue fields, tall canon tables, slender figures, vine and peacock marginalia, bird-shaped initial letters, carmine and gold",
+  "booru": "parchment, traditional media, blue theme, ornate, border, peacock, bird, gold trim, medieval",
+  "note": "Ptačí písmo = zoomorfní iniciály, ne psaný text; generátor dá pseudopísmo."
+ },
+ {
+  "id": "flemish-still-life",
+  "kind": "culture",
+  "label": "Vlámské zátiší (vanitas)",
+  "block": "dutch and flemish vanitas oil painting, near-black ground, tight glazes, reflections on a glass roemer, peeled lemon, tarnished silver, snuffed candle, single raking window light",
+  "booru": "still life, oil painting (medium), traditional media, black background, dark background, wine glass, lemon, candle, skull, realistic",
+  "note": "OPRAVA: vanitas je hlavně holandská (Leiden), vlámská malba je spíš hojnost; blok jmenuje obě, id zůstává. Vedle figury přidává zátiší; lebka je jen v booru."
+ },
+ {
+  "id": "rococo",
+  "kind": "culture",
+  "label": "Rokoko",
+  "block": "rococo oil painting, feathery brushwork, powder pink, pale blue and pistachio, gilded rocaille shell scrolls framing the scene, floating putti, silk ruffles, swing garden",
+  "booru": "oil painting (medium), traditional media, pastel colors, pink theme, frills, ornate, cherub, gold trim, fine art parody",
+  "note": "Putti přidávají okřídlené děti; pro všechny náměty ověřit, zda se nepřidávají vedle dospělé postavy. Záměrně bez Fragonarda."
+ },
+ {
+  "id": "neoclassicism",
+  "kind": "culture",
+  "label": "Neoklasicismus",
+  "block": "neoclassical oil painting, invisible polished brushwork, marble-smooth sculpted figure, white chiton, doric columns, shallow frieze-like stage, cool grey wall, clear even light",
+  "booru": "oil painting (medium), traditional media, realistic, pillar, greco-roman clothes, white dress, indoors, fine art parody, grey background",
+  "note": "Proti `greek`: malba, nikoli mramorová socha."
+ },
+ {
+  "id": "romanticism-storm",
+  "kind": "culture",
+  "label": "Romantická bouře",
+  "block": "romantic oil painting, thick impasto sky, wrecked ship and towering waves, sulphur yellow and bruised indigo clouds, tiny figure against the sea, sweeping diagonal spray",
+  "booru": "oil painting (medium), traditional media, storm, ocean, waves, shipwreck, dark cloud, fine art parody, painterly",
+  "note": "Ztroskotání je podstata stylu a figuru zmenší; pro portrétní námět rizikové."
+ },
+ {
+  "id": "hudson-river",
+  "kind": "culture",
+  "label": "Hudson River",
+  "block": "hudson river school oil landscape, wide valley vista, tiny figure at the foreground crag, gnarled oak frame, golden hazy sunset light, glassy river, crisp distant ridges",
+  "booru": "oil painting (medium), traditional media, landscape, scenery, valley, river, sunset, tree, realistic, fine art parody",
+  "note": "Luminismus je pozdější odnož školy, ne synonymum; blok drží vlastní hudsonskou kompozici. Figura je malá."
+ },
+ {
+  "id": "orientalism",
+  "kind": "culture",
+  "label": "Orientalismus (19. stol.)",
+  "block": "nineteenth century academic oil painting, cool blue iznik tile walls, carved mashrabiya screen light, brass lamp, silk carpet, polished detailed brushwork, warm amber interior",
+  "booru": "oil painting (medium), traditional media, indoors, tile wall, carpet, lantern, arabian clothes, realistic, fine art parody, blue theme",
+  "note": "Obsahově citlivé, měřit na obou námětech. Plán zmiňuje „harém“; slovo i jeho nahotu záměrně vypouštím, styl nese interiér. Historicky je to evropská fantazie, ne obraz místa."
+ },
+ {
+  "id": "arts-and-crafts",
+  "kind": "culture",
+  "label": "Arts and Crafts (Morris)",
+  "block": "arts and crafts woodblock wallpaper, flat dense interlaced acanthus and willow leaves, no empty ground, indigo, madder and weld yellow, stylized thrush among strawberries, thick even outline",
+  "booru": "floral print, patterned background, traditional media, leaf, bird, blue theme, flat color",
+  "note": "Vzor může figuru pohltit; měřit."
+ },
+ {
+  "id": "victorian-fairy",
+  "kind": "culture",
+  "label": "Viktoriánské víly",
+  "block": "victorian fairy painting, minute oil detail, tiny winged folk among oversized foxgloves and mushrooms, moonlit dark green undergrowth, iridescent wings, sharp grass blades",
+  "booru": "oil painting (medium), traditional media, fairy, fairy wings, minigirl, mushroom, night, dark background, flower, foliage",
+  "note": "Přidává víly a měřítko mini; tag minigirl lze odebrat, pokud bude tlačit na feminizaci nebo zmenšení postavy dospělého."
+ },
+ {
+  "id": "symbolism",
+  "kind": "culture",
+  "label": "Symbolismus",
+  "block": "symbolist oil painting, jewel-dark ground incised with thin gold arabesque lines, pale androgynous figure, half-closed eyes, sphinx throne, lapis and garnet glazes",
+  "booru": "oil painting (medium), traditional media, ornate, gold trim, dark background, half-closed eyes, sphinx, fine art parody, blue theme",
+  "note": "Záměrně bez „tajemství“ z plánu (nálada), kotva je zlatá rytá linka. Sfinga přidá motiv; opatrně s androgynizací."
+ },
+ {
+  "id": "nabis",
+  "kind": "culture",
+  "label": "Nabis",
+  "block": "nabi interior painting on cardboard, flat matte patches of oil, patterned wallpaper merging with patterned dress, mustard, plum and dull rose, dark contours, tilted floor",
+  "booru": "oil painting (medium), traditional media, indoors, patterned clothing, patterned background, flat color, thick outlines, muted colors",
+  "note": "Vzor Bonnard/Vuillard bez jmen."
+ },
+ {
+  "id": "expressionism-painting",
+  "kind": "culture",
+  "label": "Expresionismus (malba)",
+  "block": "german expressionist oil painting, slashing visible strokes, thick black contours, unnatural cobalt and vermilion skin, acid yellow background, angular mask-like face",
+  "booru": "oil painting (medium), traditional media, impasto, thick outlines, blue skin, colored skin, yellow background, abstract",
+  "note": "Malba, ne `woodcut`. Tagy skin mohou u booru modelů vyrobit modrou postavu doslova."
+ },
+ {
+  "id": "dada-collage",
+  "kind": "culture",
+  "label": "Dada koláž",
+  "block": "dada photomontage, cut black and white newspaper photographs, mismatched scale, torn paper edges, gluey magazine lettering, gears and fragments of faces, red accent shapes",
+  "booru": "collage, newspaper, torn paper, greyscale, spot color, partially colored, traditional media",
+  "note": "Fragmenty tváří mohou rozbít identitu; pseudotext."
+ },
+ {
+  "id": "de-stijl",
+  "kind": "culture",
+  "label": "De Stijl",
+  "block": "de stijl neoplastic composition, thick black orthogonal grid, flat red, blue and yellow rectangles on white, no curves, no shading, figure reduced to rectangular planes",
+  "booru": "abstract, traditional media, flat color, black border, geometric pattern, grid, square, white background, minimalism, red theme",
+  "note": "Bez figury; měřit, zda vůbec. Blok ji mění na obdélníky."
+ },
+ {
+  "id": "bauhaus-poster",
+  "kind": "culture",
+  "label": "Bauhaus plakát",
+  "block": "bauhaus lithograph poster, circle, square and triangle construction, red, black and cream, diagonal sans-serif bars, figure built from ruled geometry, flat ink",
+  "booru": "poster (medium), geometric pattern, circle, triangle, limited palette, red theme, flat color, abstract, traditional media",
+  "note": "Text pravděpodobně pseudopísmo."
+ },
+ {
+  "id": "precisionism",
+  "kind": "culture",
+  "label": "Precisionismus",
+  "block": "american precisionist oil painting, razor-clean factory edges, smokestacks and steel ducts, flattened planes, smooth unbrushed surface, pale steel blue, rust red and cream",
+  "booru": "oil painting (medium), traditional media, factory, industrial, industrial pipe, flat color, smokestack, clean, geometric pattern, blue sky",
+  "note": "Tovární prostředí přepisuje pozadí; figura je stylu cizí."
+ },
+ {
+  "id": "socialist-realism",
+  "kind": "culture",
+  "label": "Socialistický realismus",
+  "block": "socialist realist oil painting, broad academic brushwork, low heroic viewpoint, worker in overalls, wheat field and red banners, sunlit vermilion and cobalt, upward gaze",
+  "booru": "oil painting (medium), traditional media, realistic, overalls, red flag, from below, looking up, wheat field, communism, red theme",
+  "note": "Citlivé: přidává propagandistické symboly (`red flag`, `communism`); kdyby se objevila srp a kladivo, tag communism vyřadit."
+ },
+ {
+  "id": "polish-poster",
+  "kind": "culture",
+  "label": "Polská plakátová škola",
+  "block": "polish poster school gouache, rough dry-brush shapes, single surreal visual metaphor, hand-scrawled lettering, ragged paper grain, muted background with one acid accent",
+  "booru": "gouache (medium), poster (medium), traditional media, painterly, surreal, limited palette, muted colors, paper texture",
+  "note": "Metafora není kotva vykreslitelná přímo; opřené o suchý štětec."
+ },
+ {
+  "id": "psychedelic-poster",
+  "kind": "culture",
+  "label": "Psychedelický plakát",
+  "block": "1960s psychedelic concert poster, swelling melting letterforms, flowing hair turning into lines, vibrating complementary orange and electric blue, magenta and lime, screenprinted flat ink",
+  "booru": "poster (medium), psychedelic, 1960s (style), colorful, wavy hair, flat color, traditional media",
+  "note": "Vzor Wes Wilson bez jména; text jako plakátové pseudopísmo."
+ },
+ {
+  "id": "memphis-80s",
+  "kind": "culture",
+  "label": "Memphis",
+  "block": "1980s memphis design, flat pastel mint and pink fields, black squiggle bacterio laminate, black dots, zigzag bands, terrazzo chips, primitive geometric blocks, hard shadows",
+  "booru": "1980s (style), traditional media, pink background, pastel colors, geometric pattern, polka dot, abstract background, retro artstyle, flat color, confetti",
+  "note": "Vzor bacterio je Sottsass; na figuru působí jako pozadí."
+ },
+ {
+  "id": "pin-up-50s",
+  "kind": "culture",
+  "label": "Pin-up 50. let",
+  "block": "1950s american pin-up calendar illustration, smooth glossy gouache and oil skin modeling, soft airbrush gradient background, candy red and cream, playful surprised pose, fine rim light",
+  "booru": "pinup (style), 1950s (style), retro artstyle, painting (medium), traditional media, red background, gradient background, realistic",
+  "note": "OPRAVA: Elvgren maloval olejem, airbrush je Vargas; blok spojuje obojí a drží 50. léta. Měřit na mužském námětu. Obsahově citlivé: sexualizující žánr, jen dospělé postavy."
+ },
+ {
+  "id": "nihonga",
+  "kind": "culture",
+  "label": "Nihonga",
+  "block": "nihonga painting on silk, granular crushed mineral pigments, soft outlineless modeling, pale flattened face, oyster white gofun, malachite and azurite, thin silver leaf mist",
+  "booru": "ink wash painting, painting (medium), traditional media, nihonga, pale skin, silk, muted colors, green theme",
+  "note": "Proti `rinpa` a `ukiyoe`: bez černé linky, stříbro místo zlatého pozadí, zrnitost pigmentů."
+ },
+ {
+  "id": "yamato-e",
+  "kind": "culture",
+  "label": "Yamato-e (emaki)",
+  "block": "yamato-e picture scroll, blown-off roof view from above, diagonal tatami and beams, band mist clouds of gold, tiny line-eye hook-nose court faces, heaped layered robes",
+  "booru": "scroll, japanese clothes, kimono, traditional media, from above, indoors, layered clothes, cloud, painting (medium)",
+  "note": "Pohled shora bez střechy (fukinuki yatai); dvorské obličeje (hikime kagibana) mažou identitu."
+ },
+ {
+  "id": "enso-zen",
+  "kind": "culture",
+  "label": "Ensō (zen)",
+  "block": "zen ink painting on raw white paper, a single black enso circle of one dry brushstroke, vast empty space, splintering bristle marks, one small red seal",
+  "booru": "ink (medium), ink wash painting, traditional media, monochrome, circle, white background, negative space, minimalism",
+  "note": "Téměř bez figury; měřit. Styl může obsah úplně nahradit."
+ },
+ {
+  "id": "kano-screen",
+  "kind": "culture",
+  "label": "Kanó paraván",
+  "block": "kano school folding screen, blazing gold cloud ground, massive gnarled pine trunk in angular black ink strokes, muscular brush outline, malachite needles, panel seams",
+  "booru": "folding screen, gold background, ink wash painting, tree, pine tree, traditional media, ink (medium), green theme",
+  "note": "Riziko = rinpa. Odlišení: tuhá tušová linka a masivní kmen proti bezkonturovým siluetám rinpa. Tygra z plánu vypouštím, přepsal by námět."
+ },
+ {
+  "id": "nianhua",
+  "kind": "culture",
+  "label": "Nianhua (novoroční tisk)",
+  "block": "chinese new year woodblock print, black key lines, hand-stenciled magenta, emerald and yellow, plump peony and carp, gold lucky symbols, symmetrical door panel layout",
+  "booru": "ink (medium), chinese clothes, traditional media, red theme, flower, peony (flower), fish, symmetry, flat color, colorful",
+  "note": "Plánové „baculaté děti“ vypuštěny, přepsaly by postavu a vnášely děti do každého obrazu; motiv nesou pivoňka a kapr, ti se přidají do scény."
+ },
+ {
+  "id": "peking-opera-mask",
+  "kind": "culture",
+  "label": "Pekingská opera (lianpu)",
+  "block": "peking opera lianpu painted face, symmetrical bold makeup in red, black and white, sweeping brow and cheek shapes, pheasant feather headdress, embroidered silk collar",
+  "booru": "facepaint, chinese clothes, symmetry, facing viewer, portrait, headdress, red theme, traditional media",
+  "note": "OPRAVA: není to maska, ale malba přímo na tvář (lianpu); id zůstává. Přepisuje obličej, s `Zachovat tvář` se pere."
+ },
+ {
+  "id": "tang-sancai",
+  "kind": "culture",
+  "label": "Tang sancai",
+  "block": "tang dynasty sancai glazed earthenware figurine, amber, cream and copper green lead glazes dripping over each other, molded robe folds, unglazed pale face, crackle sheen",
+  "booru": "figure, traditional media, pottery, statue, sculpture, green theme, yellow theme, shiny, chinese clothes, simple background",
+  "note": "Přepisuje figuru na keramickou sošku. Proti `chineseink`: glazura."
+ },
+ {
+  "id": "madhubani",
+  "kind": "culture",
+  "label": "Madhubani (Mithila)",
+  "block": "madhubani painting on handmade paper, double black outlines hatched inside, every gap filled with fish and leaf patterns, flat turmeric yellow, indigo, vermilion and leaf green",
+  "booru": "traditional media, thick outlines, patterned background, flat color, colorful, hatching (texture), fish",
+  "note": "Horror vacui: vzory mohou figuru zaplnit; ryby jsou motiv stylu."
+ },
+ {
+  "id": "warli",
+  "kind": "culture",
+  "label": "Warli",
+  "block": "warli painting, white rice paste on dark red-brown mud wall, stick figures made of two joined triangles, circular dance rows, simple dotted border",
+  "booru": "stick figure, triangle, limited palette, brown background, white theme, dancing, circle, flat color, traditional media",
+  "note": "Figura se změní na trojúhelníkovou panáčkovou kresbu; identitu nedrží. Pozadí upřesněno na červenohnědou blátivou stěnu (geru)."
+ },
+ {
+  "id": "pattachitra",
+  "kind": "culture",
+  "label": "Pattachitra (Urísa)",
+  "block": "pattachitra painted on chalk-primed cloth, hard black outline, large elongated eyes, flat vermilion background, conch white, indigo and lamp black, lotus and floral border",
+  "booru": "traditional media, thick outlines, red background, flat color, border, lotus, jewelry",
+  "note": "Bez božstev (Jagannáth), obecný obsah."
+ },
+ {
+  "id": "benin-bronze",
+  "kind": "culture",
+  "label": "Beninská plaketa",
+  "block": "benin court brass plaque, lost-wax cast high relief, frontal figure with stacked coral bead collar, punched quatrefoil ground, dark green-brown patina, rosette corner studs",
+  "booru": "bronze, traditional media, carving, brown theme, necklace, beads, facing viewer, monochrome",
+  "note": "OPRAVA: plakety jsou převážně mosaz (ztracený vosk), „bronz“ je tradiční nepřesnost; id zůstává. Království Benin je v dnešní Nigérii, ne stát Benin."
+ },
+ {
+  "id": "ndebele",
+  "kind": "culture",
+  "label": "Ndebele (fasády)",
+  "block": "ndebele house mural, thick black outlines on white limewash, stepped geometric architectural panels, saturated yellow, turquoise, magenta and green, razor-straight painted edges",
+  "booru": "geometric pattern, traditional media, thick outlines, white background, colorful, flat color, wall, abstract",
+  "note": "OPRAVA: plán má „pastel“, ale typická je sytá paleta na bílém vápně; opraveno."
+ },
+ {
+  "id": "kuba-cloth",
+  "kind": "culture",
+  "label": "Kuba (rafie)",
+  "block": "kuba raffia cut-pile velvet cloth, tufted soft surface, interrupted diamond and zigzag grids, dark brown on natural straw, deliberate irregular pattern breaks",
+  "booru": "geometric pattern, traditional media, argyle background, brown theme, limited palette, patterned background",
+  "note": "Není figura; vzor může přepsat postavu. Pochází z DR Kongo."
+ },
+ {
+  "id": "tingatinga",
+  "kind": "culture",
+  "label": "Tingatinga",
+  "block": "tingatinga bicycle enamel paint on square board, glossy flat color, plain bright sky background, naive giraffes and birds with dotted skin, thick outline, turquoise and tangerine",
+  "booru": "traditional media, animal, giraffe, flat color, colorful, polka dot, thick outlines",
+  "note": "Zvířata jsou podstata stylu a přepíší námět."
+ },
+ {
+  "id": "san-rock-art",
+  "kind": "culture",
+  "label": "Sanské skalní malby",
+  "block": "san rock art on sandstone overhang, red ochre and white shaded eland, thin elongated running figures with bows, fine brush line, flaking stone surface",
+  "booru": "rock, running, bow (weapon), animal, red theme, stick figure, traditional media",
+  "note": "Eland je podstata stylu, přidá zvíře. Spirituální tradice; běžící figury s lukem mohou přepsat pózu."
+ },
+ {
+  "id": "haida-formline",
+  "kind": "culture",
+  "label": "Haida formline",
+  "block": "haida formline painting, swelling black primary lines, ovoid eyes and u-forms, red secondary lines, unpainted cream cedar ground, split symmetrical crest figure",
+  "booru": "symmetry, traditional media, red theme, limited palette, flat color, thick outlines, abstract, native american, white background",
+  "note": "Crest figury jsou klanově vázané; blok obecná forma. Tvář se rozpadne v ovoidy."
+ },
+ {
+  "id": "navajo-sand",
+  "kind": "culture",
+  "label": "Navajo sandpainting",
+  "block": "navajo sandpainting, fine colored sand on tan ground, tall rectangular yei figures in symmetrical rows, white, black, blue, yellow and red, encircling rainbow guardian",
+  "booru": "sand, native american, symmetry, colorful, flat color, brown background, rainbow, traditional media",
+  "note": "Kulturně citlivé: posvátné léčebné obrazy; tradice sama vnáší do veřejných kopií záměrné odchylky. Zvážit, zda vůbec nabízet."
+ },
+ {
+  "id": "kamasan-bali",
+  "kind": "culture",
+  "label": "Kamasan (Bali)",
+  "block": "kamasan balinese painting on primed cotton cloth, wayang profile figures with curling hands, fine black line, ochre, indigo and brick red, cloud swirl and flame fillers",
+  "booru": "indonesian clothes, traditional media, profile, flat color, patterned background, cloud, brown theme, thick outlines, ornate",
+  "note": "Odlišení od zamítnutého `wayang` nosičem: plátno, ne kůže."
+ }
+]

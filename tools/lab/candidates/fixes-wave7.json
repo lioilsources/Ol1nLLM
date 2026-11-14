@@ -1,0 +1,109 @@
+[
+ {
+  "id": "dunhuang@old",
+  "kind": "culture",
+  "label": "Dunhuang jeskynní malba (dnes)",
+  "block": "dunhuang cave mural style, flowing celestial ribbons, ochre and lapis pigments, weathered plaster texture, serene stylized figures, flat halo"
+ },
+ {
+  "id": "dunhuang@new",
+  "kind": "culture",
+  "label": "Dunhuang jeskynní malba (návrh)",
+  "block": "mineral pigment mural on dry plaster, flying apsaras with long trailing scarves, malachite green and lapis blue, skin darkened to oxidized brown-black, lotus halo, cracked flaking surface",
+  "booru": "mural, traditional media, buddhism, floating scarf, halo, green theme, blue theme, brown theme, cracked wall"
+ },
+ {
+  "id": "romanfresco@old",
+  "kind": "culture",
+  "label": "Roman fresco (dnes)",
+  "block": "roman fresco style, soft pastel colors, slightly weathered texture, classical drapery, calm idealized faces, muted earth and ochre palette, wall-painting look"
+ },
+ {
+  "id": "romanfresco@new",
+  "kind": "culture",
+  "label": "Roman fresco (návrh)",
+  "block": "pompeian fresco on a cinnabar red wall panel, painted architectural frame with slender columns, black and red fields, garland ornament, matte chalky plaster, figures as small floating vignettes",
+  "booru": "mural, traditional media, red background, pillar, border, greco-roman clothes, muted colors, flat color"
+ },
+ {
+  "id": "assyrian@old",
+  "kind": "culture",
+  "label": "Assyrian palace relief (dnes)",
+  "block": "assyrian palace relief style, strong black outlines, low-relief shading, formal profile views, detailed hair and beard patterns, monumental composition"
+ },
+ {
+  "id": "assyrian@new",
+  "kind": "culture",
+  "label": "Assyrian palace relief (návrh)",
+  "block": "carved alabaster palace slab, pale monochrome stone, figures in strict profile, square beard in rows of tight spiral curls, rosette bracelets, band of cuneiform across the surface, shallow chiseled relief",
+  "booru": "carving, stone, monochrome, grey theme, from side, profile, beard, curly hair, hieroglyphics"
+ },
+ {
+  "id": "mesopotamian@old",
+  "kind": "culture",
+  "label": "Mesopotamian relief (dnes)",
+  "block": "mesopotamian relief style, composite profile views, formal hierarchical proportions, detailed patterned hair, carved stone texture, earthy tones",
+  "booru": "ancient, stone relief, carved, from side, profile, patterned hair, stone texture, brown theme, sepia, stylized, traditional media"
+ },
+ {
+  "id": "mesopotamian@new",
+  "kind": "culture",
+  "label": "Mesopotamian relief (návrh)",
+  "block": "sumerian votive statue, huge inlaid shell and lapis eyes, hands clasped at the chest, tufted fleece skirt, gypsum stone body, shell and lapis inlay panels with bitumen black",
+  "booru": "statue, stone, wide-eyed, own hands together, blue theme, white theme, facing viewer, carving"
+ },
+ {
+  "id": "hebrew@old",
+  "kind": "culture",
+  "label": "Ancient Near Eastern Hebrew (dnes)",
+  "block": "ancient near eastern hebrew inspired style, simple strong outlines, modest earth palette, solemn dignified figures, subtle patterned textiles, formal composition",
+  "booru": "ancient, lineart, thick outlines, earth tones, brown theme, muted colors, textile pattern, flat color, solemn, traditional media"
+ },
+ {
+  "id": "hebrew@new",
+  "kind": "culture",
+  "label": "Ancient Near Eastern Hebrew (návrh)",
+  "block": "dura-europos synagogue fresco, third century wall painting, rows of frontal figures, parthian tunics and trousers, simplified wide-eyed faces, red ochre and grey on plaster, framed narrative panels",
+  "booru": "mural, traditional media, facing viewer, wide-eyed, red theme, grey theme, border, flat color"
+ },
+ {
+  "id": "arabian@old",
+  "kind": "culture",
+  "label": "Pre-Islamic Arabian (dnes)",
+  "block": "pre-islamic arabian style, elegant elongated figures, soft desert tones, flowing drapery, refined facial features, calm monumental presence",
+  "booru": "ancient, desert, brown theme, beige, muted colors, flowing lines, elongated, elegant, soft lighting, painting (medium), traditional media"
+ },
+ {
+  "id": "arabian@new",
+  "kind": "culture",
+  "label": "Pre-Islamic Arabian (návrh)",
+  "block": "qaryat al-faw wall painting, frontal bust on white plaster, large almond eyes, red and black contour lines, grape vine border, flat ochre shading, ancient inscription band",
+  "booru": "mural, traditional media, facing viewer, wide-eyed, white background, red outline, grapes, vines, flat color"
+ },
+ {
+  "id": "inca@old",
+  "kind": "culture",
+  "label": "Inca textile and goldwork (dnes)",
+  "block": "inca textile and goldwork inspired style, precise geometric patterns, rich gold and deep red tones, formal frontal composition, stylized strong bodies"
+ },
+ {
+  "id": "inca@new",
+  "kind": "culture",
+  "label": "Inca textile and goldwork (návrh)",
+  "block": "andean tapestry tunic, tocapu grid of small square geometric signs, stepped diamond motifs, bands of red gold and black camelid wool, visible weave, hammered gold mask accents",
+  "booru": "embroidery, checkered clothes, geometric pattern, red theme, gold trim, stitches, flat color, symmetry, traditional media"
+ },
+ {
+  "id": "baroque@old",
+  "kind": "culture",
+  "label": "Dramatic Baroque (dnes)",
+  "block": "dramatic baroque painting, strong chiaroscuro lighting, deep shadows, rich dark colors, dynamic composition, emotional intensity, detailed fabric folds"
+ },
+ {
+  "id": "baroque@new",
+  "kind": "culture",
+  "label": "Dramatic Baroque (návrh)",
+  "block": "dramatic baroque painting, strong chiaroscuro lighting, deep shadows, rich dark colors, dynamic composition, emotional intensity, detailed fabric folds",
+  "booru": "oil painting (medium), traditional media, tenebrism, chiaroscuro, candlelight, dark background, black background, fine art parody, realistic"
+ }
+]
