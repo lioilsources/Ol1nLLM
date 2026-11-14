@@ -63,6 +63,12 @@ type ManifestCell struct {
 	// PresetOverridden marks a cell whose sampler settings no longer are the
 	// model's own — such a result must not be quoted back as a model verdict.
 	PresetOverridden bool `json:"presetOverridden"`
+	// DependsOn names the cell whose picture this one is drawn over (a restyle
+	// over its position photo). HintImage is the placeholder file name the dump
+	// put into the graph in its place — the runner swaps it for the uploaded
+	// photo once that exists.
+	DependsOn string `json:"dependsOn,omitempty"`
+	HintImage string `json:"hintImage,omitempty"`
 }
 
 type Variant struct {
@@ -83,15 +89,29 @@ type ManifestModel struct {
 	// size are fixed inside the NIM service, not in a checkpoint.
 	Backend      string `json:"backend"`
 	SupportsPose bool   `json:"supportsPose"`
+	// Txt2img is nil in manifests written before the restyle flow; a model is
+	// then assumed to draw from text, which is what every flow did assume.
+	Txt2img *bool `json:"txt2img,omitempty"`
 	// PromptDialect is how the model reads a style: "natural" or "booru".
 	PromptDialect string `json:"promptDialect"`
 	// PromptFamily is which text of a prompt file the model reads: "danbooru",
 	// "juggernaut" or "flux". Empty in manifests written before prompt files
 	// existed — promptFamilyOf derives it then.
-	PromptFamily string         `json:"promptFamily"`
-	StyleNote    *string        `json:"styleNote"`
-	CkptName     *string        `json:"ckptName"`
-	Preset       map[string]any `json:"preset"`
+	PromptFamily string `json:"promptFamily"`
+	// ReadsNegative says whether the model's graph takes a negative prompt.
+	// Nil in manifests written before Qwen-Image; readsNegative derives it.
+	ReadsNegative *bool   `json:"readsNegative,omitempty"`
+	StyleNote     *string `json:"styleNote"`
+	// RestyleNote is the restyle verdict; nil where it was not measured.
+	RestyleNote *string `json:"restyleNote,omitempty"`
+	// PositionNote is the verdict on the model as the restyle's position
+	// model; nil where it was not measured.
+	PositionNote *string `json:"positionNote,omitempty"`
+	// RestyleQualityPrefix says whether a styled restyle keeps the quality
+	// prefix. Nil in manifests written before it existed.
+	RestyleQualityPrefix *bool          `json:"restyleQualityPrefix,omitempty"`
+	CkptName             *string        `json:"ckptName"`
+	Preset               map[string]any `json:"preset"`
 }
 
 type ManifestStyle struct {

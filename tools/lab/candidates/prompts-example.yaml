@@ -18,11 +18,15 @@
 #
 # Prompty z textového pole se s tímhle souborem **násobí**: každý řádek pole je
 # prefix a jede přes všechny položky odsud.
+#
+# `negative` je volitelný a jeden pro všechny rodiny: co na tomhle jednom
+# promptu být nemá. Připojí se za negativ běhu (pole „negativ"), FLUX ho nečte.
 
 portrait:
   danbooru: "1girl, solo, looking at viewer, upper body, window light"
   juggernaut: "a portrait of a young woman, looking at the camera, upper body, soft window light"
   flux: "A portrait photograph of a young woman looking at the camera, lit by soft window light."
+  negative: "full body, from behind"
 
 street-night:
   danbooru: "1boy, city, night, rain, neon lights, from side"

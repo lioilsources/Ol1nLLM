@@ -40,9 +40,9 @@ Docker network so cloudflared can reach it by name):
 ```bash
 docker run -d --name comfyui --restart unless-stopped \
   --gpus all --network ai \
-  -v /home/ol1n/comfyui/models:/app/models \
-  -v /home/ol1n/comfyui/input:/app/input \
-  -v /home/ol1n/comfyui/output:/app/output \
+  -v /home/USER/comfyui/models:/app/models \
+  -v /home/USER/comfyui/input:/app/input \
+  -v /home/USER/comfyui/output:/app/output \
   -p 127.0.0.1:8188:8188 \
   ghcr.io/yanwk/comfyui-boot:cu124-slim
 ```

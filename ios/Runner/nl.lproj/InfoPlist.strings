@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "Wordt gebruikt om een foto te maken waarmee je in de Afbeeldingenstudio begint of een afbeelding verfijnt.";
+"NSMicrophoneUsageDescription" = "De Muziekstudio neemt muziek om je heen op als voorbeeld om mee te componeren, en de Stemmenstudio neemt een stem op om te klonen.";
+"NSPhotoLibraryAddUsageDescription" = "Wordt gebruikt om gegenereerde afbeeldingen in je fotobibliotheek te bewaren.";
+"NSPhotoLibraryUsageDescription" = "Wordt gebruikt om afbeeldingen te kiezen voor bewerking en OCR.";

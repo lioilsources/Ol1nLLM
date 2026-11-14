@@ -507,8 +507,21 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
   /// [prompt] with [styleId]'s text in the dialect of the model the request
   /// runs on. The one place that decides: an anime model never gets the phrase
   /// block, and a retry on another model re-derives the text for that model.
-  String _styled(String prompt, String? styleId) =>
-      applyStyle(prompt, styleId, dialect: state.model.promptDialect);
+  String _styled(String prompt, String? styleId, {bool front = false}) =>
+      applyStyle(
+        prompt,
+        styleId,
+        dialect: state.model.promptDialect,
+        front: front,
+      );
+
+  /// Whether a repose of [positive] with [styleId] keeps the preset's quality
+  /// prefix ([restyleKeepsPrefix]). Decided once per round and handed to both
+  /// the request and the node snapshot, so the two can't disagree.
+  bool _reposePrefix(String positive, String? styleId) => restyleKeepsPrefix(
+    state.model,
+    styled: styleApplies(positive, styleById(styleId)),
+  );
 
   /// The positive prompt that leaves for [nodeId], recorded on the node.
   ///
@@ -528,6 +541,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     String userText, {
     String? styleId,
     bool styled = true,
+    bool styleFront = false,
     bool translate = true,
   }) async {
     var text = userText;
@@ -541,7 +555,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         translator = tr.translator;
       }
     }
-    final sent = styled ? _styled(text, styleId) : text;
+    final sent = styled ? _styled(text, styleId, front: styleFront) : text;
     _patch(
       nodeId,
       (n) => n.copyWith(
@@ -1001,6 +1015,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     String? refFileName,
     bool refIsFace = false,
     bool isRepose = false,
+    bool reposePrefix = true,
     LatentSize? latentSize,
     String? hairstyleId,
   }) {
@@ -1056,7 +1071,11 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       faceIdentity: faceRan ? state.faceIdentity.name : null,
       seed: seed,
       negativePrompt: negative.isNotEmpty ? negative : null,
-      positivePrefix: preset != null && preset.positivePrefix.isNotEmpty
+      // Only a prefix that went out: a styled repose can drop it.
+      positivePrefix:
+          preset != null &&
+              preset.positivePrefix.isNotEmpty &&
+              (!isRepose || reposePrefix)
           ? preset.positivePrefix
           : null,
       // img2img latents come from VAEEncode of the source image, so recorded
@@ -1553,6 +1572,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     final parts = splitPromptNegatives(text);
     final seed = _newSeed();
     final latent = _reposeLatent(base);
+    final styleId = state.selectedStyleId;
+    final keepPrefix = _reposePrefix(parts.positive, styleId);
     final node = _createNodeWithMeta(
       parentId: state.currentNodeId,
       sourceImageId: base.id,
@@ -1560,6 +1581,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       seed: seed,
       isImg2img: false,
       isRepose: true,
+      reposePrefix: keepPrefix,
       latentSize: latent,
       userNegative: parts.negative,
     );
@@ -1573,7 +1595,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
     final sent = await _outgoing(
       node.id,
       parts.positive,
-      styleId: state.selectedStyleId,
+      styleId: styleId,
+      styleFront: kRestyleStyleInFront,
     );
     await _runAsync(
       node.id,
@@ -1584,6 +1607,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         seed: seed,
         negativePrompt: parts.negative.isEmpty ? null : parts.negative,
         latentSize: latent,
+        positivePrefix: keepPrefix,
       ),
     );
   }
@@ -1798,6 +1822,10 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       final parts = splitPromptNegatives(node.prompt);
       final seed = _newSeed();
       final latent = _reposeLatent(base);
+      // Like every other retry, the current chip decides — it is what the
+      // refreshed snapshot records ([_createNodeWithMeta]).
+      final styleId = state.selectedStyleId;
+      final keepPrefix = _reposePrefix(parts.positive, styleId);
       final refreshed = _createNodeWithMeta(
         id: node.id,
         parentId: node.parentId,
@@ -1806,6 +1834,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
         seed: seed,
         isImg2img: false,
         isRepose: true,
+        reposePrefix: keepPrefix,
         latentSize: latent,
         userNegative: parts.negative,
       ).copyWith(images: node.images);
@@ -1813,7 +1842,8 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       final sent = await _outgoing(
         nodeId,
         parts.positive,
-        styleId: node.styleId,
+        styleId: styleId,
+        styleFront: kRestyleStyleInFront,
       );
       await _runAsync(
         nodeId,
@@ -1824,6 +1854,7 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
           seed: seed,
           negativePrompt: parts.negative.isEmpty ? null : parts.negative,
           latentSize: latent,
+          positivePrefix: keepPrefix,
         ),
       );
       return;
@@ -1878,13 +1909,11 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
       Uint8List? refImage;
       if (node.maskFileName != null) {
         try {
-          mask = await File(
-            '${GenImage.baseDir}/${node.maskFileName}',
-          ).readAsBytes();
+          mask = await File('${GenImage.baseDir}/${node.maskFileName}')
+              .readAsBytes();
           if (node.refFileName != null) {
-            refImage = await File(
-              '${GenImage.baseDir}/${node.refFileName}',
-            ).readAsBytes();
+            refImage = await File('${GenImage.baseDir}/${node.refFileName}')
+                .readAsBytes();
           }
         } catch (_) {
           _patch(

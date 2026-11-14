@@ -19,7 +19,7 @@ Volitelné URL overrides (`.env.local`, Makefile je propouští jen když jsou
 neprázdné): `COMFYUI_URL`, `FINETUNE_URL`, `FLUX_NIM_URL`, `VLLM_URL`,
 `LIBRARY_CHAT_URL`, `LAW_CHAT_URL`, `LEADS_CHAT_URL`, `UGC_FC_URL`, `AUDIO_URL`,
 `STYLEMAP_URL`. Pro vývoj knihovny proti SPARKu na LAN:
-`LIBRARY_CHAT_URL=http://192.168.88.66:8090` (Právník: `LAW_CHAT_URL=http://192.168.88.66:8098`; Leads: `LEADS_CHAT_URL=http://192.168.88.66:8099`,
+`LIBRARY_CHAT_URL=http://SPARK_HOST:8090` (Právník: `LAW_CHAT_URL=http://SPARK_HOST:8098`; Leads: `LEADS_CHAT_URL=http://SPARK_HOST:8099`,
 to je zároveň výchozí hodnota, tunel zatím není) — pak ale **jen `make debug`**
 (release Android manifest nemá `usesCleartextTraffic` a iOS nemá výjimku
 v `Info.plist`, takže čistý HTTP tam neprojde).
@@ -152,7 +152,7 @@ Pořadí v řadě je záměrné: model → styl → síla úpravy → póza → 
 jako poslední** (používá se nejmíň, a řada scrolluje, takže co je vpravo,
 je z palce nejdál).
 ComfyUI URL jde přepnout přes `--dart-define=COMFYUI_URL=...`
-(např. LAN `http://192.168.88.66:8188` pro testování bez CF).
+(např. LAN `http://SPARK_HOST:8188` pro testování bez CF).
 
 **Chipy sledují node**: `navigateTo()` po přesunu na node zavolá
 `_adoptNodeSettings()` — čistá funkce `adoptableSettings()` (testovatelná bez
@@ -186,7 +186,9 @@ připojuje **za** prompt (`applyStyle()`) — vlastní zadání má přednost; p
 prompt (foto root) zůstane prázdný, aby se styl nestal jediným obsahem. Na uzlu
 se persistuje jen `GenNode.styleId`, text je z něj odvoditelný (stejný princip
 jako u póz). Platí pro generate/refine/repose, **ne pro inpaint** (ten popisuje
-jen zamalovanou oblast, celoobrazový styl by se s ním pral).
+jen zamalovanou oblast, celoobrazový styl by se s ním pral). **Repose je
+výjimka** (styl vpředu, prefix podle `restyleKeepsPrefix()`, repose uzly před
+v1.39 mají styl na konci): `tools/lab/README.md`, „Restyl z fotky“.
 
 **Dialekty stylu (`PromptDialect`)**: styl má dva texty — `block` (volná
 fráze, čte ji CLIP i T5) a volitelně `booru` (danbooru tagy **bez jména
@@ -210,6 +212,16 @@ a mapa stylů ukazují `labelWithYear` („Vermeer (1632)“), chip v input baru
 kvůli šířce jen `label`. Vyhledávací pole se samo nefokusuje a seznam schovává
 klávesnici při tažení. Podtitulek je vždy `block`, i u anime modelu — tagy by
 se četly hůř.
+
+**Ticho podle modelu (`lib/models/style_quiet.dart`, generuje
+`tools/lab/reactions.py` z běhů vlny 7)**: dvojice (model, styl), u kterých
+model namaloval s blokem totéž co bez něj (barevná vzdálenost od vlastního
+baseline pod 0.15). Řádek pickeru se na vybraném modelu ztlumí a řekne, kde
+styl reagoval (`styleAlternativeModel`: sdxl-base → juggernaut → lightning →
+schnell, první dostupný a sám netichý); chip ukáže výstrahu. **Nikdy se
+neskrývá**: metrika vidí jen barvu — Illustrious má u médií reakci 0.85 tím,
+že postavu rozpustí v čmáranice, Pony u malířů 0.49 kostýmem — takže „změnilo
+se“ neznamená „styl prošel“ a nezměřená dvojice se ukazuje normálně.
 
 **Síla úpravy (`_EditStrengthChip`)**: `ComfyUIService.setEditDenoise()`
 přebíjí presetový `img2imgDenoise`. Měření ukázalo, že při presetových ~0.72 je
@@ -391,15 +403,23 @@ masky) — stejně jako `loraStrength` jen s LoRA. Dotažení tváře
 |---|---|---|
 | `instantid` | `ApplyInstantIDAdvanced` (embedding + vlastní keypoint CN, zvlášť síly) | PuLID |
 | `faceid` | `IPAdapterFaceID` PlusV2 (jen model hrana) | PuLID |
-| `both` | obě, FaceID první na model hraně | PuLID |
+| `both` | obě, InstantID první na model hraně | PuLID |
 
 Rodina se pozná z grafu (`_isFluxGraph` = obsahuje `UNETLoader`), ne z
 presetu — patchuje se graf. FLUX má jediný mechanismus, takže se na něj
 mapuje každý režim; lab si proto **skutečnou** metodu čte zpátky z grafu
 (`_effectiveFaceIdentity`), ne z toho, co se objednalo.
 
-Model hrana se řetězí `loader → [__lora__] → [__faceid_apply__] →
-__face_apply__ → KSampler`; InstantID navíc vrací podmínění, takže sedí
+Model hrana se řetězí `loader → [__lora__] → [__face_apply__] →
+[__faceid_apply__] → KSampler`. **Pořadí není kosmetické**: oba uzly patchují
+attention přes sdílený `Attn2Replace` a druhý v řadě volá `.add()` na objekt
+z předchozího uzlu, místo aby ho zkopíroval. Dřív byl FaceID první — jeho
+výstup ComfyUI cachuje (na promptu nezávisí), InstantID se přepočítá s každým
+promptem, takže každý další prompt přidal do cachovaného modelu další
+InstantID patch. Restyle řada jedné fotky se tím buňku po buňce rozpouštěla
+do šumu (běh `20261111-144619`: stddev obrázku 105 → 48 za 60 stylů, reset
+u další fotky; běhy `none`/`instantid` rovné). V telefonu totéž při
+opakovaném generování se stejnou předlohou. InstantID navíc vrací podmínění, takže sedí
 **před** `__cn_apply__` (`__cn_apply__.positive == ['__face_apply__', 1]`) a
 oba ControlNety se skládají — klíčové body obličeje uvnitř hloubkové siluety.
 `end_at` **1.0**: hloubka se pouští na 90 %, aby dosedly textury,
@@ -411,7 +431,7 @@ InstantID má **dvě síly**, proto `ApplyInstantIDAdvanced` a ne základní uze
 (kde tvář je), `ip_weight` 0.6 je IP-Adapter embedding předlohy (čí tvář to
 je). Embedding je obrazový embedding *fotografie* vstříknutý do
 cross-attention vedle textových tokenů, takže při 0.8 přes celý rozvrh
-přebíjí blok stylu (ten je na konci promptu, s nejnižší vahou). V img2img se
+přebíjí blok stylu (ten je mimo repose na konci promptu, s nejnižší vahou). V img2img se
 to skládá se zdrojovým latentem (denoise 0.72) a auto-depth hintem (0.7) —
 tři kotvy k fotce proti jednomu stylu — a styl přežil jen na Juggernautu
 (fotoreal SDXL-base finetune, doména, na které je adaptér natrénovaný;
@@ -777,7 +797,7 @@ v `AiStack/services/audio/NOTES.md`.
   appka u ní nabídne „Poslechnout znovu".
 
 `AUDIO_URL` přepne server (výchozí `https://llm.ol1n.com`; LAN
-`http://192.168.88.66:8093` jen s `make debug`, CF hlavičky jsou pak
+`http://SPARK_HOST:8093` jen s `make debug`, CF hlavičky jsou pak
 volitelné). Veřejně jde `llm.ol1n.com/v1/audio/*` přes AiStack Go gateway
 (`AUDIO_API_URL=http://audio:8093`), takže orchestrátor musí běžet z compose
 (`make up-audio`) — ručně spuštěný kontejner nemá DNS alias `audio`
@@ -1091,6 +1111,21 @@ v adresáři běhu, takže parser je v systému jediný a resume hraje tytéž p
 buňka `promptBody` a v `prompt` text přečtený zpátky z grafu. Ukázka:
 `candidates/prompts-example.yaml`.
 
+**Pozice → restyle (flow `restyle`)**: běh se dvěma modely — `--base-model`
+(v UI „model pozice“) nakreslí z textu fotku, `--models` ji přemalují do stylu
+přes ControlNet nad txt2img šablonou (graf „zachovej pózu“). Model pozice
+může být i `qwen-image` — jen v labu (`kLabOnlyModels`), čte sloupec `flux`
+i negativ, podrobnosti v `tools/lab/README.md`. Prompt má tři
+vrstvy: pozice (`--prompts-yaml`, YAML i CSV `id,juggernaut,pony,flux,negative` — negativ pozice se připojí za negativ běhu, v obou krocích),
+postava (`--characters`, řádek = postava) a styl; první krok dostane pozici
++ postavu, druhý všechny tři. Fotka vzniká jednou na pozici × postavu, buňka
+restylu ji nese jako `dependsOn` / `hintImage` a runner jede fotku po fotce
+(`position`, upload a přepsání `LoadImage`, hned její restyly; staré pořadí
+„nejdřív všechny fotky“ vrací `LAB_STAGE_ORDER=photos-first`). `--hint depth|canny`
+(osa `param.hint`): hrany jsou **jen laboratorní** cesta přes
+`StructureHint` v `comfyui_service.dart`, appka posílá vždy hloubku.
+Podrobnosti a co se přeskakuje: `tools/lab/README.md`.
+
 **Kandidáti stylů**: `--styles-file` čte `id/label/block` a volitelně
 `booru/artist/period`, ostatní klíče toleruje. Id, které v souboru chybí, se
 vezme z registru — kandidát tak stojí ve stejné tabulce jako styl, se kterým
@@ -1105,10 +1140,11 @@ běh. UI u doběhlého běhu s chybami nabízí *Doplnit selhané*.
 
 **Proč anime modely styl nepřevezmou** — dvě laboratorní osy a jeden soubor:
 `param.stylePosition=end|front|first` (appka posílá `end` = prefix, námět,
-styl) a `param.qualityPrefix=on|off` (tagy estetického hodnocení z
+styl, v repose `front`; flow `restyle` a `repose` mají výchozí `front` —
+měření v `tools/lab/README.md`) a `param.qualityPrefix=on|off` (tagy estetického hodnocení z
 `positivePrefix`, u NoobAI `very awa`, jdou první a CLIP je váží nejvíc).
 Skládá je `composeCellPrompt()` v `dump_spec.dart`; builder má kvůli tomu
-`positivePrefix: false`, výchozí `true` appku nemění. A
+`positivePrefix: false`, výchozí `true` appku mimo repose nemění. A
 `tools/lab/candidates/cultural-booru.json`: booru tagy pro 39 kulturních stylů,
 které je v registru nemají (booru text měli jen umělci), s bloky převzatými
 z registru — sweep `param.styleDialect=natural|booru` nad tímto souborem je
@@ -1293,7 +1329,7 @@ z Registru smluv. Jiný serverový kód (LeadsRAG, unit `leadsd` na SPARKu :8099
 ale stejný SSE dialekt (navíc `: planning` / `: keepalive` komentáře, které
 `parseSseLine` zahodí), takže v appce zase jen instance
 `LibraryChatService.leads()` s `LEADS_CHAT_URL` (výchozí LAN
-`http://192.168.88.66:8099` — tunel zatím není, tedy jen `make debug`;
+`http://SPARK_HOST:8099` — tunel zatím není, tedy jen `make debug`;
 `top_k` 8, server vrací max 15 firem; chybové texty `[leads] …`). Zdroje jsou
 `LibrarySource`-kompatibilní: `work` = IČO, `name_cs` = firma, `title` =
 `IČO … · segment`, `group` = segment, `path` = číslo smlouvy, `excerpt` =

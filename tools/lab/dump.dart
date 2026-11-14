@@ -92,7 +92,20 @@ void main() {
             jsonDecode(File(env['PROMPT_BODIES']!).readAsStringSync())
                 as List<dynamic>,
           );
-    final prompts = buildPromptAxis(prefixes: promptLines, bodies: bodies);
+    // CHARACTERS_FILE: the second prompt layer — one line per character (hair,
+    // eyes, ethnicity), multiplied into the axis after the position.
+    final characters = env['CHARACTERS_FILE'] == null
+        ? const <String>[]
+        : File(env['CHARACTERS_FILE']!)
+              .readAsLinesSync()
+              .map((l) => l.trim())
+              .where((l) => l.isNotEmpty)
+              .toList();
+    final prompts = buildPromptAxis(
+      prefixes: promptLines,
+      bodies: bodies,
+      characters: characters,
+    );
     final indexPrompts = prompts.length > 1;
 
     // Styles: the app registry, unless the caller vets candidates from a file
@@ -120,8 +133,14 @@ void main() {
         : File(
             env['CKPTS']!,
           ).readAsLinesSync().where((l) => l.trim().isNotEmpty).toList();
+    // Diffusion weights of the UNETLoader graphs, for the lab-only models.
+    final unets = env['UNETS'] == null
+        ? const <String>[]
+        : File(
+            env['UNETS']!,
+          ).readAsLinesSync().where((l) => l.trim().isNotEmpty).toList();
     final wantedModels = _csv(env['MODELS']);
-    final wanted = imageModelsFor(installed)
+    final wanted = labModelsFor(installed, unets)
         .where((m) => wantedModels.isEmpty || wantedModels.contains(m.id))
         .toList();
     final models = wanted
@@ -134,10 +153,33 @@ void main() {
         .where((m) => m.kind == ImageBackendKind.fluxNim)
         .toList();
 
+    // Two-stage restyle: BASE_MODEL renders the position (stage 1, no style),
+    // every model in MODELS then repaints that picture in each style (stage
+    // 2). The base is looked up apart from MODELS — it need not be one of the
+    // restyle models, and usually is not.
+    final baseId = env['BASE_MODEL'] ?? '';
+    ImageModelSpec? base;
+    if (flows.contains('restyle') && baseId.isNotEmpty) {
+      base = labModelsFor(installed, unets)
+          .where((m) => m.id == baseId)
+          .firstOrNull;
+      if (base == null) {
+        fail('model pozice "$baseId" není v registru nebo na serveru chybí '
+            'jeho checkpoint');
+      }
+      final hasGraph =
+          base.kind == ImageBackendKind.comfyUi && base.preset != null;
+      if (!base.txt2img || !(hasGraph || base.kind == ImageBackendKind.fluxNim)) {
+        fail('model pozice "$baseId" neumí txt2img — fotku pozice z textu '
+            'nevyrobí');
+      }
+    }
+    final hintEnv = env['HINT'];
+
     // Every body has to cover every family in the run, and it is worth finding
     // out now rather than from the cell that happens to be dumped first: the
     // failure belongs to the file, not to whichever model tripped over it.
-    for (final m in [...models, ...nimModels]) {
+    for (final m in [...models, ...nimModels, ?base]) {
       for (final b in bodies) {
         b.textFor(promptFamilyFor(m));
       }
@@ -150,6 +192,83 @@ void main() {
     final cells = <Map<String, dynamic>>[];
     final skipped = <Map<String, String>>[];
     var n = 0;
+
+    // ── Stage 1: the position picture ─────────────────────────────────────
+    // One per prompt column — position + character, never a style — built the
+    // first time a restyle cell asks for it, so a plan whose restyle cells all
+    // get skipped does not render pictures nobody reads. They do not count
+    // against LIMIT: a restyle cell without its picture cannot run at all.
+    final stage1Cells = <Map<String, dynamic>>[];
+    final stage1 = <int, ({String id, LatentSize size})>{};
+    ({String id, LatentSize size}) stage1For(int pi) {
+      final known = stage1[pi];
+      if (known != null) return known;
+      final b = base!;
+      final id = cellId(
+        flow: 'position',
+        model: b.id,
+        style: '__baseline',
+        promptIndex: indexPrompts ? pi : null,
+      );
+      final subject = prompts[pi].subjectFor(promptFamilyFor(b));
+      final Map<String, dynamic> payload;
+      final String prompt;
+      String? sentNegative;
+      final LatentSize size;
+      if (b.kind == ImageBackendKind.fluxNim) {
+        final body = FluxNimService.requestBody(prompt: subject, seed: seed);
+        payload = {'backend': kBackendFluxNim, 'model': b.id, 'request': body};
+        prompt = body['prompt'] as String;
+        size = (w: body['width'] as int, h: body['height'] as int);
+      } else {
+        final preset = b.preset!;
+        LatentSize? asked;
+        if (latentEnv != null) {
+          final parts = latentEnv.split('x');
+          asked = (w: int.parse(parts[0]), h: int.parse(parts[1]));
+        }
+        payload = (ComfyUIService()..setPreset(preset)).prepareForTest(
+          _load(preset.txt2imgAsset),
+          prompt: subject,
+          batch: 1,
+          seed: seed,
+          latentSize: asked,
+          userNegative: prompts[pi].negativeWith(negative),
+        );
+        prompt = _encodedText(payload, positive: true) ?? subject;
+        sentNegative = _encodedText(payload, positive: false);
+        // Read off the graph rather than the preset: a dedicated template
+        // (flux-manga) carries its own latent, and stage 2 has to fit the
+        // picture that will really come back.
+        size = _latentOf(payload) ?? (w: preset.width, h: preset.height);
+      }
+      File('${out.path}/$id.json').writeAsStringSync(jsonEncode(payload));
+      stage1Cells.add({
+        'id': id,
+        'backend': b.kind == ImageBackendKind.fluxNim
+            ? kBackendFluxNim
+            : kBackendComfyUI,
+        'flow': 'position',
+        'model': b.id,
+        'modelLabel': b.label,
+        'style': '__baseline',
+        'styleLabel': null,
+        'styleText': null,
+        'promptIndex': pi,
+        'promptBody': prompts[pi].body?.id,
+        'prompt': prompt,
+        'negative': sentNegative,
+        'variant': null,
+        'params': {
+          'seed': seed,
+          'batch': 1,
+          'latent': '${size.w}x${size.h}',
+        },
+        'applied': const <String, List<String>>{},
+        'presetOverridden': false,
+      });
+      return stage1[pi] = (id: id, size: size);
+    }
 
     for (final m in models) {
       final preset = m.preset!;
@@ -255,12 +374,43 @@ void main() {
                 params['styleDialect'],
                 m.promptDialect,
               );
-              // Style position and the quality prefix are lab-only axes; with
-              // neither set this is exactly the app's applyStylePreset.
-              final stylePosition = stylePositionFor(params['stylePosition']);
-              final qualityPrefix = qualityPrefixFor(params['qualityPrefix']);
+              // Style position and the quality prefix are lab axes; unset,
+              // they follow the app (applyStylePreset, restyleKeepsPrefix).
+              final stylePosition = stylePositionFor(
+                params['stylePosition'],
+                flow: flow,
+              );
+              final subject = prompts[pi].subjectFor(promptFamilyFor(m));
+              final qualityPrefix = qualityPrefixFor(
+                params['qualityPrefix'],
+                fallback: defaultQualityPrefix(
+                  m,
+                  flow: flow,
+                  subject: subject,
+                ),
+              );
+              // Without a prefix to jump ahead of, `first` is `front` word for
+              // word — two labels on one picture would read as „first adds
+              // nothing“.
+              if (style != null &&
+                  params['stylePosition'] == StylePosition.first.name &&
+                  (!qualityPrefix || preset.positivePrefix.isEmpty)) {
+                skipped.add({
+                  'cell': cellId(
+                    flow: flow,
+                    model: m.id,
+                    style: styleId,
+                    variantLabel: variantValue == null ? null : sweep.label,
+                    variantValue: variantValue,
+                    promptIndex: indexPrompts ? pi : null,
+                  ),
+                  'reason': 'bez prefixu kvality je stylePosition=first '
+                      'totéž co front (${m.id})',
+                });
+                return;
+              }
               final composed = composeCellPrompt(
-                subject: prompts[pi].subjectFor(promptFamilyFor(m)),
+                subject: subject,
                 styleText: style?.blockFor(dialect),
                 prefix: preset.positivePrefix,
                 position: stylePosition,
@@ -296,6 +446,11 @@ void main() {
                 );
               }
 
+              // Restyle reads its hint off another cell's picture.
+              final cellHint = structureHintFor(params['hint'] ?? hintEnv);
+              String? dependsOn;
+              String? hintImage;
+
               final svc = ComfyUIService()..setPreset(preset);
               if (cellLora != null) {
                 svc
@@ -326,10 +481,53 @@ void main() {
                     seed: cellSeed,
                     depthImageName: refName,
                     latentSize: latent,
-                    userNegative: negative,
+                    userNegative: prompts[pi].negativeWith(negative),
                     faceIdentity: cellFace,
                     faceDetail: cellFaceDetail,
                     positivePrefix: composed.builderPrefix,
+                  );
+                case 'restyle':
+                  final String? why = base == null
+                      ? 'chybí model pozice'
+                      : !canRepose
+                      ? 'restyle potřebuje ControlNet — ${m.id} ho nemá'
+                      : cellHint == StructureHint.canny && !generic
+                      ? 'hrany (canny) umí jen SDXL union ControlNet, '
+                            '${m.id} má jen hloubkový'
+                      : null;
+                  if (why != null) {
+                    skipped.add({
+                      'cell': cellId(
+                        flow: flow,
+                        model: m.id,
+                        style: styleId,
+                        variantLabel: variantValue == null ? null : sweep.label,
+                        variantValue: variantValue,
+                        promptIndex: indexPrompts ? pi : null,
+                      ),
+                      'reason': why,
+                    });
+                    return;
+                  }
+                  final source = stage1For(pi);
+                  dependsOn = source.id;
+                  hintImage = stage1Placeholder(source.id);
+                  // The bucket nearest the stage-1 picture, like repose does
+                  // for an uploaded reference; whatever aspect is left over
+                  // is letterboxed by the fit node, never cropped.
+                  latent ??= snapToSdxlBucket(source.size.w, source.size.h);
+                  wf = svc.prepareForTest(
+                    _load(preset.txt2imgAsset),
+                    prompt: prompt,
+                    batch: batch,
+                    seed: cellSeed,
+                    depthImageName: hintImage,
+                    latentSize: latent,
+                    userNegative: prompts[pi].negativeWith(negative),
+                    faceIdentity: cellFace,
+                    faceDetail: cellFaceDetail,
+                    positivePrefix: composed.builderPrefix,
+                    structureHint: cellHint,
                   );
                 case 'img2img':
                   if (refName == null) {
@@ -354,7 +552,7 @@ void main() {
                     sourceDepth:
                         poseImage == null && poseMode != 'depth' && autoDepth,
                     depthImageName: poseMode == 'depth' ? refName : null,
-                    userNegative: negative,
+                    userNegative: prompts[pi].negativeWith(negative),
                     editDenoise: editDenoise,
                     faceIdentity: cellFace,
                     faceDetail: cellFaceDetail,
@@ -369,7 +567,7 @@ void main() {
                     poseImageName: poseImage,
                     depthImageName: poseMode == 'depth' ? refName : null,
                     latentSize: latent,
-                    userNegative: negative,
+                    userNegative: prompts[pi].negativeWith(negative),
                     faceIdentity: cellFace,
                     faceDetail: cellFaceDetail,
                     positivePrefix: composed.builderPrefix,
@@ -418,6 +616,11 @@ void main() {
                 'styleLabel': style?.labelWithYear,
                 'styleText': style?.blockFor(dialect),
                 'promptIndex': pi,
+                // Restyle only: the stage-1 cell whose picture this graph
+                // reads, and the placeholder name the runner swaps for the
+                // uploaded file.
+                'dependsOn': ?dependsOn,
+                'hintImage': ?hintImage,
                 // Which entry of the prompt file this column came from; null
                 // when the prompt box was the whole axis.
                 'promptBody': prompts[pi].body?.id,
@@ -451,6 +654,8 @@ void main() {
                   // say what ran, not what was requested.
                   'faceIdentity': _effectiveFaceIdentity(wf),
                   'faceDetail': wf.containsKey('__face_detail__'),
+                  // What the restyle ControlNet reads; null outside restyle.
+                  'hint': flow == 'restyle' ? cellHint.name : null,
                 },
                 'applied': applied,
                 'presetOverridden': graphOverrides.isNotEmpty,
@@ -573,7 +778,10 @@ void main() {
                 params['styleDialect'],
                 m.promptDialect,
               );
-              final stylePosition = stylePositionFor(params['stylePosition']);
+              final stylePosition = stylePositionFor(
+                params['stylePosition'],
+                flow: flow,
+              );
               final qualityPrefix = qualityPrefixFor(params['qualityPrefix']);
               // No preset, so no quality prefix to place: the score tags belong
               // to the booru checkpoints, and FLUX reads a sentence.
@@ -775,13 +983,25 @@ void main() {
     if (_flag(env['MANIFEST'])) {
       File('${out.path}/manifest.json').writeAsStringSync(
         const JsonEncoder.withIndent(' ').convert({
-          'cells': cells,
+          // Stage-1 pictures first: the runner orders by dependency on its
+          // own, but a reader of the file meets the position before the
+          // restyles made from it.
+          'cells': [...stage1Cells, ...cells],
           'skipped': skipped,
           'models': [
             // ComfyUI first, then gen-queue — the picker keeps this order, and
             // a NIM model has no preset to report: its numbers live in the NIM
             // service, not in a checkpoint the lab can read.
-            for (final m in [...models, ...nimModels])
+            // The position model joins the list even when it restyles
+            // nothing, so the table can name it.
+            for (final m in [
+              ...models,
+              ...nimModels,
+              if (stage1Cells.isNotEmpty &&
+                  !models.contains(base) &&
+                  !nimModels.contains(base))
+                base!,
+            ])
               {
                 'id': m.id,
                 'label': m.label,
@@ -789,12 +1009,23 @@ void main() {
                     ? kBackendComfyUI
                     : kBackendFluxNim,
                 'supportsPose': m.supportsPose,
+                // Whether it can make a picture from text alone — what a
+                // position model has to do.
+                'txt2img': m.txt2img,
                 'promptDialect': m.promptDialect.name,
                 // Which text of a prompt file this model reads. Derived here so
                 // the plan can check a file against the picked models without
                 // keeping a second opinion about the registry.
                 'promptFamily': promptFamilyFor(m).name,
+                // Whether the graph takes a negative — the plan warns where
+                // the negative box would go nowhere.
+                'readsNegative': readsNegative(m),
                 'styleNote': m.styleNote,
+                'restyleNote': m.restyleNote,
+                'positionNote': m.positionNote,
+                // Whether a styled restyle keeps the quality prefix — the UI
+                // builds its hint from this instead of naming models.
+                'restyleQualityPrefix': m.restyleQualityPrefix,
                 'ckptName': m.preset?.ckptName,
                 'preset': m.preset == null
                     ? null
@@ -851,14 +1082,29 @@ void main() {
       );
     }
     stdout.writeln(
-      'DUMP $n workflows · ${models.length + nimModels.length} modelů × '
+      'DUMP ${n + stage1Cells.length} workflows · '
+      '${models.length + nimModels.length} modelů × '
       '${prompts.length} promptů × ${styles.length + 1} stylů × '
       '${flows.length} flow'
       '${sweep.isEmpty ? '' : ' × ${sweep.values.length} variant'}'
+      '${stage1Cells.isEmpty ? '' : ' · ${stage1Cells.length} fotek pozice'}'
       '${skipped.isEmpty ? '' : ' · přeskočeno ${skipped.length}'}',
     );
     expect(n, greaterThan(0), reason: 'dump nevyrobil žádné workflow');
   });
+}
+
+/// The size a txt2img graph renders at, read from its empty-latent node.
+LatentSize? _latentOf(Map<String, dynamic> wf) {
+  for (final e in wf.values) {
+    final node = (e as Map).cast<String, dynamic>();
+    final cls = node['class_type'];
+    if (cls != 'EmptyLatentImage' && cls != 'EmptySD3LatentImage') continue;
+    final inputs = (node['inputs'] as Map).cast<String, dynamic>();
+    final w = inputs['width'], h = inputs['height'];
+    if (w is int && h is int) return (w: w, h: h);
+  }
+  return null;
 }
 
 /// The text actually fed to the sampler's positive/negative conditioning.

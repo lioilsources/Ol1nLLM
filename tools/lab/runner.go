@@ -77,6 +77,11 @@ type Run struct {
 	man    *Manifest
 	cancel context.CancelFunc
 	subs   map[chan RunState]struct{}
+	// staged maps a position cell to the name its picture has on the ComfyUI
+	// server. In memory only: a resumed run uploads again, which is an
+	// overwrite of the same name.
+	stageMu sync.Mutex
+	staged  map[string]string
 }
 
 func NewRun(env *Env, dir string, spec *Spec) *Run {
@@ -277,89 +282,97 @@ func (r *Run) Generate() {
 	var aborted atomic.Bool
 	polite := politeFromEnv()
 	lastModel := ""
-loop:
-	for _, c := range cells {
-		select {
-		case <-ctx.Done():
-			break loop
-		default:
-		}
-		if aborted.Load() {
-			break
-		}
-		if _, err := os.Stat(r.imgPath(c.ID)); err == nil {
-			r.update(func(s *RunState) { r.markDone(s, c.ID, 0, false) })
-			continue
-		}
-		firstOfModel := c.Model != lastModel
-		lastModel = c.Model
-		if !r.Spec.Dry && c.Backend != BackendNim && workers == 1 {
-			polite.wait(ctx, r.env.Comfy)
-		}
-		slots <- struct{}{}
-		wg.Add(1)
-		go func(c ManifestCell) {
-			defer func() { <-slots; wg.Done() }()
-			start := time.Now()
-			r.update(func(s *RunState) {
-				cs := s.Cells[c.ID]
-				cs.Status = CellRunning
-				s.Cells[c.ID] = cs
-			})
-			err := r.generateCell(ctx, c)
-			if err != nil {
-				var he *HTTPError
-				if asHTTPError(err, &he) && he.IsAuth() {
-					// Three in a row means the token is wrong, not that one cell
-					// is unlucky — failing 400 cells one by one helps nobody.
-					if authFails.Add(1) >= 3 && aborted.CompareAndSwap(false, true) {
-						_ = r.fail("run", fmt.Errorf("CF Access odmítá požadavky (%v) — zkontroluj .env.local", he))
-					}
-				} else {
-					authFails.Store(0)
-				}
-				// A lost connection is not a verdict on the cell. Without this
-				// a dropped tunnel fails thousands of cells in seconds and the
-				// run reports itself finished.
-				if isConnectionLoss(err) {
-					if netFails.Add(1) >= 8 && aborted.CompareAndSwap(false, true) {
-						_ = r.fail("run", fmt.Errorf("ComfyUI nedostupné (%v) — běh lze navázat", err))
-					}
-				} else {
-					netFails.Store(0)
-				}
+	// A restyle is drawn over the picture its position cell makes, so that
+	// picture has to be on disk before the restyle is queued — hence batches,
+	// each one waited for before the next starts.
+	pass := func(cells []ManifestCell) {
+	loop:
+		for _, c := range cells {
+			select {
+			case <-ctx.Done():
+				break loop
+			default:
+			}
+			if aborted.Load() {
+				break
+			}
+			if _, err := os.Stat(r.imgPath(c.ID)); err == nil {
+				r.update(func(s *RunState) { r.markDone(s, c.ID, 0, false) })
+				continue
+			}
+			firstOfModel := c.Model != lastModel
+			lastModel = c.Model
+			if !r.Spec.Dry && c.Backend != BackendNim && workers == 1 {
+				polite.wait(ctx, r.env.Comfy)
+			}
+			slots <- struct{}{}
+			wg.Add(1)
+			go func(c ManifestCell) {
+				defer func() { <-slots; wg.Done() }()
+				start := time.Now()
 				r.update(func(s *RunState) {
 					cs := s.Cells[c.ID]
-					cs.Status = CellFailed
-					cs.Error = err.Error()
+					cs.Status = CellRunning
 					s.Cells[c.ID] = cs
-					s.Failed++
 				})
-				return
-			}
-			authFails.Store(0)
-			netFails.Store(0)
-			secs := time.Since(start).Seconds()
-			r.update(func(s *RunState) { r.markDone(s, c.ID, secs, r.Spec.Dry) })
-			// A cell this slow means ComfyUI has fallen back to the CPU, and
-			// carrying on would cook the machine for hours. The first cell of
-			// a model pays for loading the checkpoint and gets a longer limit
-			// — but it gets one, because the fallback happens exactly there.
-			// With several cells queued the time includes the queue, so the
-			// limit only reads true one at a time.
-			limit := polite.maxCell
-			if firstOfModel {
-				limit = polite.maxFirst
-			}
-			if workers == 1 && limit > 0 && !r.Spec.Dry && secs > limit &&
-				aborted.CompareAndSwap(false, true) {
-				_ = r.fail("run", fmt.Errorf(
-					"buňka %s trvala %.0f s (strop %.0f s) — ComfyUI nejspíš počítá na CPU, běh zastaven",
-					c.ID, secs, limit))
-			}
-		}(c)
+				err := r.generateCell(ctx, c)
+				if err != nil {
+					var he *HTTPError
+					if asHTTPError(err, &he) && he.IsAuth() {
+						// Three in a row means the token is wrong, not that one cell
+						// is unlucky — failing 400 cells one by one helps nobody.
+						if authFails.Add(1) >= 3 && aborted.CompareAndSwap(false, true) {
+							_ = r.fail("run", fmt.Errorf("CF Access odmítá požadavky (%v) — zkontroluj .env.local", he))
+						}
+					} else {
+						authFails.Store(0)
+					}
+					// A lost connection is not a verdict on the cell. Without this
+					// a dropped tunnel fails thousands of cells in seconds and the
+					// run reports itself finished.
+					if isConnectionLoss(err) {
+						if netFails.Add(1) >= 8 && aborted.CompareAndSwap(false, true) {
+							_ = r.fail("run", fmt.Errorf("ComfyUI nedostupné (%v) — běh lze navázat", err))
+						}
+					} else {
+						netFails.Store(0)
+					}
+					r.update(func(s *RunState) {
+						cs := s.Cells[c.ID]
+						cs.Status = CellFailed
+						cs.Error = err.Error()
+						s.Cells[c.ID] = cs
+						s.Failed++
+					})
+					return
+				}
+				authFails.Store(0)
+				netFails.Store(0)
+				secs := time.Since(start).Seconds()
+				r.update(func(s *RunState) { r.markDone(s, c.ID, secs, r.Spec.Dry) })
+				// A cell this slow means ComfyUI has fallen back to the CPU, and
+				// carrying on would cook the machine for hours. The first cell of
+				// a model pays for loading the checkpoint and gets a longer limit
+				// — but it gets one, because the fallback happens exactly there.
+				// With several cells queued the time includes the queue, so the
+				// limit only reads true one at a time.
+				limit := polite.maxCell
+				if firstOfModel {
+					limit = polite.maxFirst
+				}
+				if workers == 1 && limit > 0 && !r.Spec.Dry && secs > limit &&
+					aborted.CompareAndSwap(false, true) {
+					_ = r.fail("run", fmt.Errorf(
+						"buňka %s trvala %.0f s (strop %.0f s) — ComfyUI nejspíš počítá na CPU, běh zastaven",
+						c.ID, secs, limit))
+				}
+			}(c)
+		}
+		wg.Wait()
 	}
-	wg.Wait()
+	for _, batch := range batchesByDependency(cells, photosFirst()) {
+		pass(batch)
+	}
 	if aborted.Load() {
 		return
 	}
@@ -476,6 +489,14 @@ func (r *Run) imgPath(id string) string   { return filepath.Join(r.Dir, "img", i
 func (r *Run) thumbPath(id string) string { return filepath.Join(r.Dir, "thumb", id+".jpg") }
 
 func (r *Run) generateCell(ctx context.Context, c ManifestCell) error {
+	// Before anything else, dry runs included: a restyle without its position
+	// photo has nothing to be drawn over, and saying which photo is missing is
+	// more use than whatever ComfyUI makes of a file name that does not exist.
+	if c.DependsOn != "" {
+		if _, err := os.Stat(r.imgPath(c.DependsOn)); err != nil {
+			return fmt.Errorf("fotka pozice %s se nevygenerovala", c.DependsOn)
+		}
+	}
 	if r.Spec.Dry {
 		data := Placeholder(832, 1216, c.ID)
 		if err := writeFile(r.imgPath(c.ID), data); err != nil {
@@ -508,6 +529,16 @@ func (r *Run) generateCell(ctx context.Context, c ManifestCell) error {
 	}
 	if ckpt := os.Getenv("LAB_FLUX_CKPT"); ckpt != "" {
 		fluxToCheckpoint(wf, ckpt)
+	}
+	if c.DependsOn != "" {
+		name, err := r.stageImage(c.DependsOn)
+		if err != nil {
+			return err
+		}
+		if patchHintImage(wf, c.HintImage, name) == 0 {
+			return fmt.Errorf("%s: graf nečte fotku pozice (%s) — manifest a workflow se rozešly",
+				c.ID, c.HintImage)
+		}
 	}
 	promptID, err := r.env.Comfy.Submit(wf, "lab-"+r.state.ID)
 	if err != nil {
@@ -551,6 +582,132 @@ func (r *Run) generateCell(ctx context.Context, c ManifestCell) error {
 		}
 		return r.saveImage(c.ID, data)
 	}
+}
+
+// batchesByDependency orders a run whose cells are drawn over each other's
+// pictures. Each batch has to finish before the next is queued.
+//
+// The default walks photo by photo: one position picture, then every restyle
+// of it, then the next. A long run shows finished rows from the first minutes
+// instead of thousands of photos and no restyle until they are all done, and
+// stopping it halfway leaves complete rows rather than a pile of photos.
+//
+// photosFirst is the other order — all pictures, then everything else, model
+// by model. It loads each checkpoint once; the default switches models at
+// every photo, which is free while ComfyUI can keep them all in memory and
+// costs a reload per switch when it cannot.
+//
+// One level of dependency, which is all the dump writes. A cell whose photo is
+// not in the list goes last with the independent cells, where generateCell
+// fails it with the reason. A run without dependencies is a single batch.
+func batchesByDependency(cells []ManifestCell, photosFirst bool) [][]ManifestCell {
+	dependents := map[string][]ManifestCell{}
+	for _, c := range cells {
+		if c.DependsOn != "" {
+			dependents[c.DependsOn] = append(dependents[c.DependsOn], c)
+		}
+	}
+	isPhoto := func(c ManifestCell) bool {
+		return c.DependsOn == "" && len(dependents[c.ID]) > 0
+	}
+	photoIDs := map[string]bool{}
+	var photos, rest, free []ManifestCell
+	for _, c := range cells {
+		if isPhoto(c) {
+			photos = append(photos, c)
+			photoIDs[c.ID] = true
+		}
+	}
+	for _, c := range cells {
+		switch {
+		case isPhoto(c):
+		case photoIDs[c.DependsOn]:
+			rest = append(rest, c)
+		default:
+			rest = append(rest, c)
+			free = append(free, c)
+		}
+	}
+	var out [][]ManifestCell
+	add := func(batch []ManifestCell) {
+		if len(batch) > 0 {
+			out = append(out, batch)
+		}
+	}
+	if photosFirst {
+		add(photos)
+		add(rest)
+		return out
+	}
+	for _, p := range photos {
+		add([]ManifestCell{p})
+		add(dependents[p.ID])
+	}
+	add(free)
+	return out
+}
+
+// photosFirst reads LAB_STAGE_ORDER. Anything but "photos-first" is the
+// default, photo by photo.
+func photosFirst() bool {
+	return os.Getenv("LAB_STAGE_ORDER") == "photos-first"
+}
+
+// stagedImageName is the name a position photo gets on the ComfyUI server:
+// unique per run and cell, so two runs cannot read each other's photo, and
+// deterministic, so a resume overwrites instead of piling up copies.
+func stagedImageName(runID, cellID string) string {
+	clean := func(s string) string {
+		return strings.Map(func(r rune) rune {
+			switch {
+			case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9',
+				r == '_', r == '-', r == '.':
+				return r
+			}
+			return '_'
+		}, s)
+	}
+	return "lab_pos_" + clean(runID) + "_" + clean(cellID) + ".png"
+}
+
+// stageImage uploads a position photo once per run and returns its server-side
+// name. Held under the lock for the whole upload on purpose: every restyle of
+// one photo asks at the same moment, and all but the first should wait for the
+// name rather than upload the same file again.
+func (r *Run) stageImage(cellID string) (string, error) {
+	r.stageMu.Lock()
+	defer r.stageMu.Unlock()
+	if name, ok := r.staged[cellID]; ok {
+		return name, nil
+	}
+	name, err := r.env.Comfy.Upload(r.imgPath(cellID), stagedImageName(r.state.ID, cellID))
+	if err != nil {
+		return "", fmt.Errorf("upload fotky pozice %s: %w", cellID, err)
+	}
+	if r.staged == nil {
+		r.staged = map[string]string{}
+	}
+	r.staged[cellID] = name
+	return name, nil
+}
+
+// patchHintImage points every LoadImage that reads the dump's placeholder at
+// the real file, and says how many it found. Zero is the caller's error: the
+// graph would run on a file that does not exist.
+func patchHintImage(wf map[string]any, placeholder, name string) int {
+	n := 0
+	for _, raw := range wf {
+		node, _ := raw.(map[string]any)
+		if node["class_type"] != "LoadImage" {
+			continue
+		}
+		inputs, _ := node["inputs"].(map[string]any)
+		if inputs["image"] == placeholder {
+			inputs["image"] = name
+			n++
+		}
+	}
+	return n
 }
 
 // nimPollInterval is the app's own cadence (FluxNimService). A var rather than

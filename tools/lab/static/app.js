@@ -16,7 +16,8 @@ const state = {
   ref: null,
   promptsYaml: null,
   promptsYamlName: '',
-  rowOrder: localStorage.getItem('labRowOrder') || 'style',
+  // null = never picked: the run decides (see rowOrderFor).
+  rowOrder: localStorage.getItem('labRowOrder'),
   page: 0,
   pageAnchor: null,
   hiddenModels: new Set(loadHiddenModels()),
@@ -63,7 +64,11 @@ const FLOW_LABEL = {
   txt2img: 'txt2img',
   img2img: 'img2img',
   repose: 'zachovej pózu',
+  restyle: 'pozice → restyle',
 };
+// Bands of the run table. `position` is never picked — the restyle flow makes
+// those cells itself, one photo per prompt column.
+const BAND_LABEL = { ...FLOW_LABEL, position: 'fotka pozice (1. krok)' };
 
 async function api(path, opts = {}) {
   let res;
@@ -121,9 +126,18 @@ async function loadConfig() {
 
   $('models').innerHTML = cfg.models.map((m) => `
     <button class="chip" data-model="${esc(m.id)}" aria-pressed="false">
-      ${esc(m.label)}<small>${esc(m.styleNote || '')}</small>
+      ${esc(m.label)}<small>${esc(m.styleNote || '')}</small>${m.restyleNote
+        ? `<small class="restylenote">restyl: ${esc(m.restyleNote)}</small>` : ''}${m.positionNote
+        ? `<small class="restylenote">pozice: ${esc(m.positionNote)}</small>` : ''}
     </button>`).join('');
   $('models').onclick = (e) => toggle(e, 'model', state.models);
+
+  // Any model that draws from text can make the position photo; the ones that
+  // only edit (flux-fill) have nothing to start from.
+  $('baseModel').insertAdjacentHTML('beforeend', cfg.models
+    .filter((m) => m.txt2img !== false)
+    .map((m) => `<option value="${esc(m.id)}">${esc(m.label)}${m.positionNote ? ' — změřeno' : ''}</option>`).join(''));
+  updateRestyleHint();
 
   // Two rows, not one: with the artists the registry is ~90 chips, and a single
   // wrap of them is unusable. Cultures and epochs are the styles without an
@@ -396,6 +410,39 @@ function updateFaceHint() {
   $('facehint').textContent = parts.join(' ');
 }
 
+// Picking a position model is picking the two-stage run: the flow follows the
+// choice, so there is one control to set and not two to keep in step.
+$('baseModel').onchange = () => {
+  if ($('baseModel').value) {
+    state.flows.clear();
+    state.flows.add('restyle');
+  } else {
+    state.flows.delete('restyle');
+    if (!state.flows.size) state.flows.add('repose');
+  }
+  $('flows').querySelectorAll('[data-flowsel]').forEach((b) =>
+    b.setAttribute('aria-pressed', state.flows.has(b.dataset.flowsel)));
+  updateRestyleHint();
+  estimate();
+};
+$('hint').onchange = () => estimate();
+
+function updateRestyleHint() {
+  const base = (state.config?.models || []).find((m) => m.id === $('baseModel').value);
+  // Recommendations come from the registry (positionNote, restyleQualityPrefix),
+  // so a new measurement changes the hint without touching this file.
+  const models = state.config?.models || [];
+  const names = (pick) => models.filter(pick).map((m) => m.label).join(', ');
+  const noPrefix = names((m) => m.restyleQualityPrefix === false);
+  $('restylehint').textContent = base
+    ? `${base.label} vyrobí z každé pozice a postavy jednu fotku bez stylu. Modely vybrané níž ji `
+      + 'pak přemalují v každém stylu — tatáž fotka pro všechny styly i modely.'
+      + (base.positionNote ? ` Jako model pozice: ${base.positionNote}.` : '')
+      + (noPrefix ? ` Bez prefixu kvality (se stylem) jedou: ${noPrefix}.` : '')
+    : 'S modelem pozice má běh dva kroky: první model vyrobí fotku (pozice + postava), '
+      + 'ostatní ji přemalují do stylu. Bez něj jsou postavy jen další část promptu.';
+}
+
 $('sweepTarget').onchange = () => {
   const opt = $('sweepTarget').selectedOptions[0];
   $('sweephint').innerHTML = opt.dataset.preset
@@ -477,6 +524,9 @@ function spec() {
     models: [...state.models],
     prompts: $('prompts').value.split('\n').map((s) => s.trim()).filter(Boolean),
     promptsYaml: state.promptsYaml || '',
+    baseModel: $('baseModel').value,
+    characters: $('characters').value.split('\n').map((s) => s.trim()).filter(Boolean),
+    hint: $('hint').value,
     styles: [...state.styles],
     flows: [...state.flows],
     refName: state.ref?.refName || '',
@@ -514,7 +564,7 @@ function estimate() {
     }
   }, 220);
 }
-['prompts', 'seed', 'batch', 'negative', 'editDenoise', 'sweepValues', 'mode'].forEach((id) =>
+['prompts', 'characters', 'seed', 'batch', 'negative', 'editDenoise', 'sweepValues', 'mode'].forEach((id) =>
   $(id).addEventListener('input', estimate));
 
 $('startbtn').onclick = async () => {
@@ -639,7 +689,7 @@ function renderInner() {
   // order, and that is the reader's call: grouping by style puts the same style
   // with different prompts under each other, grouping by prompt does the
   // opposite.
-  const byStyle = state.rowOrder === 'style';
+  const byStyle = rowOrderFor(man) === 'style';
   // Every SSE tick redraws the table, so cells are looked up by key rather
   // than filtered per row × model — at 4000 cells the filter was quadratic.
   const cellKey = (flow, model, prompt, style) => `${flow}\u0000${model}\u0000${prompt}\u0000${style}`;
@@ -651,10 +701,24 @@ function renderInner() {
   }
   const rowCells = (r) => models.reduce(
     (n, m) => n + (byKey.get(cellKey(r.flow, m.id, r.prompt, r.style)) || []).length, 0);
+  // A two-stage run goes photo by photo, so its table does too: the position
+  // photo is the first row of its own restyles instead of a band of every
+  // photo in front of them. With thousands of positions that band was pages
+  // long, and the first page showed one finished photo while its restyles
+  // piled up out of sight. Ordered by style there is no "its own" row to sit
+  // above, so the band stays whole and goes last.
+  const staged = isStagedRun(man);
+  const flowOrder = [...new Set(man.cells.map((c) => c.flow))];
+  if (staged) flowOrder.push(...flowOrder.splice(flowOrder.indexOf('position'), 1));
+  const photoPrompts = new Set(
+    man.cells.filter((c) => c.flow === 'position').map((c) => c.promptIndex));
+  const placedPhotos = new Set();
   const rows = [];
-  for (const flow of [...new Set(man.cells.map((c) => c.flow))]) {
-    const inFlow = man.cells.filter((c) => c.flow === flow && outStyleVisible(c.style));
+  for (const flow of flowOrder) {
+    const inFlow = man.cells.filter((c) => c.flow === flow && outStyleVisible(c.style)
+      && !(flow === 'position' && placedPhotos.has(c.promptIndex)));
     if (!inFlow.length) continue;
+    const hostsPhotos = staged && !byStyle && inFlow.some((c) => c.dependsOn);
     const primaryOf = (c) => (byStyle ? c.style : String(c.promptIndex));
     const secondaryOf = (c) => (byStyle ? String(c.promptIndex) : c.style);
     const primaries = [...new Set(inFlow.map(primaryOf))];
@@ -669,6 +733,15 @@ function renderInner() {
         ? `${flow}|${primary}` : null;
       const groupLabel = groupKey
         ? (byStyle ? styleRowLabel(primary) : promptRowLabel(man, Number(primary))) : '';
+      const prompt = Number(primary);
+      if (hostsPhotos && photoPrompts.has(prompt) && !placedPhotos.has(prompt)) {
+        const photo = {
+          flow: 'position', bandFlow: flow, groupKey, groupLabel,
+          style: '__baseline', prompt, single: false,
+        };
+        photo.n = rowCells(photo);
+        if (photo.n) { rows.push(photo); placedPhotos.add(prompt); }
+      }
       for (const secondary of secondaries) {
         const r = {
           flow,
@@ -732,7 +805,8 @@ function renderInner() {
   const shown = [];
   let lastFlow = null, lastGroup = null;
   for (const r of pageRows) {
-    if (r.flow !== lastFlow) { shown.push({ band: r.flow }); lastFlow = r.flow; lastGroup = null; }
+    const band = r.bandFlow || r.flow;
+    if (band !== lastFlow) { shown.push({ band }); lastFlow = band; lastGroup = null; }
     if (r.groupKey && r.groupKey !== lastGroup) shown.push({ group: r.groupLabel });
     lastGroup = r.groupKey;
     shown.push(r);
@@ -754,19 +828,27 @@ function renderInner() {
   const body = shown.map((r) => {
     if (r.band) {
       return `<tr class="band"><th colspan="${span}">
-        <span class="flowtag" data-flow="${esc(r.band)}">${esc(FLOW_LABEL[r.band] || r.band)}</span></th></tr>`;
+        <span class="flowtag" data-flow="${esc(r.band)}">${esc(BAND_LABEL[r.band] || r.band)}</span></th></tr>`;
     }
     if (r.group) {
       return `<tr class="sub"><th colspan="${span}">${esc(r.group)}</th></tr>`;
     }
     // Inside a group the row head names the axis that varies; when a group has
     // a single row it names both, so nothing is left implicit.
-    const styleTxt = r.style === '__baseline' ? 'bez stylu (baseline)' : styleLabel(r.style);
+    const styleTxt = r.flow === 'position' ? 'fotka pozice (1. krok)'
+      : r.style === '__baseline' ? 'bez stylu (baseline)' : styleLabel(r.style);
     const promptTxt = (man.prompts[r.prompt] || '').slice(0, 70);
     const showBoth = r.single || man.prompts.length <= 1;
     const primaryTxt = byStyle && !showBoth ? promptTxt : styleTxt;
     const secondTxt = byStyle && !showBoth ? '' : (man.prompts.length > 1 ? promptTxt : '');
     const label = `<span class="styleid">${esc(primaryTxt)}</span>`;
+    // A restyle row shows what it was drawn over. Every cell of the row shares
+    // the photo, so the first one that names it will do.
+    const source = models.flatMap((m) => byKey.get(cellKey(r.flow, m.id, r.prompt, r.style)) || [])
+      .find((c) => c.dependsOn)?.dependsOn;
+    const sourceImg = source && ((run.cells || {})[source] || {}).status === 'done'
+      ? `<img class="sourcethumb" loading="lazy" alt="fotka pozice" title="${esc(source)}"
+           src="/media/${state.runId}/thumb/${encodeURIComponent(source)}.jpg">` : '';
     const promptLine = secondTxt ? `<div class="promptline">${esc(secondTxt)}</div>` : '';
     const cols = runModels.map((m) => {
       if (!shownCol.has(m.id)) return '<td class="collapsed"></td>';
@@ -781,7 +863,7 @@ function renderInner() {
         return h;
       }).join('')}</div></td>`;
     }).join('');
-    return `<tr><th class="rowhead">${label}${promptLine}</th>${cols}</tr>`;
+    return `<tr><th class="rowhead">${sourceImg}${label}${promptLine}</th>${cols}</tr>`;
   }).join('');
 
   const skipped = (man.skipped || []).length
@@ -821,10 +903,14 @@ function renderInner() {
   // Order and hiding both count: moving a hidden column, or a shown one past a
   // hidden strip, leaves the shown ids in the same order.
   const cols = runModels.map((m) => `${m.id}:${shownCol.has(m.id)}`).join();
+  // Row heads of a restyle carry the position photo, which the per-cell swap
+  // below does not reach — a newly finished photo is a full redraw. There is
+  // one per prompt column, so that is a handful of redraws per run.
+  const photosDone = man.cells.filter((c) => c.flow === 'position' && statusOf(c) === 'done').length;
   const layout = state.drawn;
   if (layout && layout.runId === state.runId && layout.page === state.page
-      && layout.order === state.rowOrder && layout.manifest === man
-      && layout.cols === cols
+      && layout.order === rowOrderFor(man) && layout.manifest === man
+      && layout.cols === cols && layout.photosDone === photosDone
       && layout.pages === pages.length && $('runhead')) {
     if (layout.runhead !== runhead) { $('runhead').innerHTML = runhead; layout.runhead = runhead; }
     for (const sel of $('content').querySelectorAll('[data-pagesel]')) {
@@ -851,9 +937,9 @@ function renderInner() {
     return;
   }
   state.drawn = {
-    runId: state.runId, page: state.page, order: state.rowOrder, manifest: man,
+    runId: state.runId, page: state.page, order: rowOrderFor(man), manifest: man,
     cols,
-    pages: pages.length, runhead, cells: htmlById,
+    pages: pages.length, runhead, cells: htmlById, photosDone,
   };
 
   $('content').innerHTML =
@@ -977,6 +1063,18 @@ function renderInner() {
 
 function rowId(r) {
   return `${r.flow}|${r.prompt}|${r.style}`;
+}
+
+// A run whose cells are drawn over another cell's picture (position → restyle).
+function isStagedRun(man) {
+  return man.cells.some((c) => c.dependsOn) && man.cells.some((c) => c.flow === 'position');
+}
+
+// The order picked by hand wins. Until one is, a two-stage run reads by
+// prompt — a photo with its restyles under it, which is also the order it is
+// generated in — and every other run by style, as before.
+function rowOrderFor(man) {
+  return state.rowOrder || (isStagedRun(man) ? 'prompt' : 'style');
 }
 
 // ── output filter ──────────────────────────────────────────

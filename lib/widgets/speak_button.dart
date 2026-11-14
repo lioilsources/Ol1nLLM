@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/theme.dart';
 import '../providers/speech_player.dart';
 import '../providers/voice_studio_provider.dart';
+import '../l10n/l10n.dart';
 
 /// Reads [text] aloud in voice [voiceId] through the app's one
 /// [SpeechPlayer]: a tap starts reading (sound comes after the first short
@@ -69,11 +70,13 @@ class SpeakButton extends ConsumerWidget {
       ),
     };
     final tooltip = switch (status) {
-      SpeechStatus.loading => 'Zrušit čtení',
-      SpeechStatus.playing => 'Pozastavit',
-      SpeechStatus.paused => 'Pokračovat',
+      SpeechStatus.loading => context.l10n.speakCancel,
+      SpeechStatus.playing => context.l10n.speakPause,
+      SpeechStatus.paused => context.l10n.speakResume,
       SpeechStatus.idle =>
-        rhythm == null ? 'Přečíst nahlas' : 'Přečíst v rytmu (${rhythm.label})',
+        rhythm == null
+            ? context.l10n.speakAloud
+            : context.l10n.speakRhythm(rhythm.label),
     };
     void tap() {
       // Listening is not typing.

@@ -48,6 +48,27 @@ enum FaceIdentity {
   bool get isOn => this != FaceIdentity.none;
 }
 
+/// What the structure ControlNet reads off a reference image.
+///
+/// The app always sends [depth]. [canny] exists for the lab's two-stage
+/// restyle run, where the reference is another model's render of an *object*
+/// and the silhouette lives in its edges rather than in its volume.
+enum StructureHint {
+  /// DepthAnything v2 map: keeps stance, orientation and proportions.
+  depth,
+
+  /// Canny edges: keeps the outline and inner contours, lets the surface go.
+  /// SDXL only — the FLUX hint net here is depth-only.
+  canny;
+
+  /// Tolerant parse for the lab's string plumbing, same contract as
+  /// [FaceIdentity.parse]: an unknown name is the default, not a crash.
+  static StructureHint parse(String? name) => StructureHint.values.firstWhere(
+        (v) => v.name == name,
+        orElse: () => StructureHint.depth,
+      );
+}
+
 /// Talks to a ComfyUI instance behind Cloudflare Access at comfyui.ol1n.com,
 /// reusing the same CF service-token credentials as the chat/diffusers paths.
 ///
@@ -179,6 +200,12 @@ class ComfyUIService implements ImageBackend {
   static const _unionControlNet =
       'controlnet-union-sdxl-promax-xinsir.safetensors';
   static const _depthStrength = 0.7;
+
+  // Lab-only edge hint (see [StructureHint.canny]): ComfyUI's core Canny node
+  // at its own defaults, and the union net's name for the edge family.
+  static const _cannyLowThreshold = 0.4;
+  static const _cannyHighThreshold = 0.8;
+  static const _unionTypeCanny = 'canny/lineart/anime_lineart/mlsd';
 
   // Repose: the depth hint drives a txt2img render at denoise 1.0, where
   // (unlike img2img) no source latent carries structure — so a touch more
@@ -727,6 +754,9 @@ class ComfyUIService implements ImageBackend {
     // passes it explicitly per cell.
     FaceIdentity? faceIdentity,
     bool faceDetail = false,
+    // False drops the preset's quality tags (see
+    // [ImageModelSpec.restyleQualityPrefix]); the provider decides per round.
+    bool positivePrefix = true,
   }) async* {
     if (!_reposeSupported) {
       yield const GenFailed('[ComfyUI] „Zachovej pózu“ tenhle model neumí.');
@@ -751,6 +781,7 @@ class ComfyUIService implements ImageBackend {
       userNegative: negativePrompt,
       faceIdentity: faceIdentity ?? _faceIdentity,
       faceDetail: faceDetail,
+      positivePrefix: positivePrefix,
     );
     yield* _run(wf);
   }
@@ -1441,6 +1472,7 @@ class ComfyUIService implements ImageBackend {
     FaceIdentity faceIdentity = FaceIdentity.none,
     bool faceDetail = false,
     bool positivePrefix = true,
+    StructureHint structureHint = StructureHint.depth,
   }) => _prepare(
     template,
     prompt: prompt,
@@ -1458,6 +1490,7 @@ class ComfyUIService implements ImageBackend {
     faceIdentity: faceIdentity,
     faceDetail: faceDetail,
     positivePrefix: positivePrefix,
+    structureHint: structureHint,
   );
 
   Map<String, dynamic> _prepare(
@@ -1487,10 +1520,13 @@ class ComfyUIService implements ImageBackend {
     // Second, cropped pass over the detected face. Only with an identity
     // active: detailing a face nothing pins just re-rolls it.
     bool faceDetail = false,
-    // The preset's quality tags in front of the prompt. Always on in the app;
-    // the lab turns it off to measure how much those tags hold a model in its
-    // house style (`param.qualityPrefix`).
+    // The preset's quality tags in front of the prompt. Off in the app only
+    // for a styled repose on a model whose [ImageModelSpec.restyleQualityPrefix]
+    // says so; the lab sweeps it (`param.qualityPrefix`).
     bool positivePrefix = true,
+    // What the reference ControlNet reads off [depthImageName]. Always depth
+    // in the app; the lab's restyle flow can ask for edges (`param.hint`).
+    StructureHint structureHint = StructureHint.depth,
   }) {
     final wf = jsonDecode(jsonEncode(template)) as Map<String, dynamic>;
     _userPrompt[wf] = prompt;
@@ -1565,6 +1601,7 @@ class ComfyUIService implements ImageBackend {
         fitTo: imageName == null
             ? _txt2imgLatent(wf, latentSize: latentSize)
             : null,
+        hint: structureHint,
       );
     } else if (poseImageName != null) {
       _injectPoseControlNet(wf, poseImageName);
@@ -1684,6 +1721,10 @@ class ComfyUIService implements ImageBackend {
     // Letterbox the reference onto this size before anything reads it, so
     // the ControlNet never center-crops the hint (see [_fitUpscaleMethod]).
     LatentSize? fitTo,
+    // Lab only: read edges instead of depth. Node ids stay `__depth_*__` so
+    // everything keyed on them (face identity, sweeps on `__cn_apply__`)
+    // works unchanged. FLUX has no edge net here, so it always reads depth.
+    StructureHint hint = StructureHint.depth,
   }) {
     wf['__depth_src__'] = {
       'class_type': 'LoadImage',
@@ -1706,19 +1747,30 @@ class ComfyUIService implements ImageBackend {
         },
       };
     }
-    wf['__depth_pre__'] = {
-      'class_type': 'DepthAnythingV2Preprocessor',
-      '_meta': {'title': 'Depth map from source'},
-      'inputs': {
-        'image': _referenceImage(wf),
-        'ckpt_name': _depthPreprocessorCkpt,
-        'resolution': _depthResolution,
-      },
-    };
     // Per family: SDXL runs xinsir's union ControlNet switched to depth mode,
     // FLUX the dedicated InstantX depth net — which needs no type node but
     // does need the VAE, because it encodes its hint through it.
     final flux = _isFluxGraph(wf);
+    final canny = hint == StructureHint.canny && !flux;
+    wf['__depth_pre__'] = canny
+        ? {
+            'class_type': 'Canny',
+            '_meta': {'title': 'Edges from source'},
+            'inputs': {
+              'image': _referenceImage(wf),
+              'low_threshold': _cannyLowThreshold,
+              'high_threshold': _cannyHighThreshold,
+            },
+          }
+        : {
+            'class_type': 'DepthAnythingV2Preprocessor',
+            '_meta': {'title': 'Depth map from source'},
+            'inputs': {
+              'image': _referenceImage(wf),
+              'ckpt_name': _depthPreprocessorCkpt,
+              'resolution': _depthResolution,
+            },
+          };
     wf['__depth_cn__'] = {
       'class_type': 'ControlNetLoader',
       '_meta': {'title': flux ? 'FLUX depth ControlNet' : 'Union ControlNet'},
@@ -1729,10 +1781,10 @@ class ComfyUIService implements ImageBackend {
     if (!flux) {
       wf['__depth_type__'] = {
         'class_type': 'SetUnionControlNetType',
-        '_meta': {'title': 'Union type: depth'},
+        '_meta': {'title': 'Union type: ${canny ? 'canny' : 'depth'}'},
         'inputs': {
           'control_net': ['__depth_cn__', 0],
-          'type': 'depth',
+          'type': canny ? _unionTypeCanny : 'depth',
         },
       };
     }
@@ -1882,13 +1934,26 @@ class ComfyUIService implements ImageBackend {
       _injectPulid(wf);
       return;
     }
-    // FaceID first, so InstantID ends up last on the model edge:
-    // loader → [__lora__] → [__faceid_apply__] → __face_apply__ → sampler.
-    if (mode == FaceIdentity.faceid || mode == FaceIdentity.both) {
-      _injectFaceIdV2(wf);
-    }
+    // InstantID first, FaceID last on the model edge:
+    // loader → [__lora__] → [__face_apply__] → [__faceid_loader__ →
+    // __faceid_apply__] → sampler.
+    //
+    // The order is not cosmetic. Both nodes patch attention through the same
+    // `Attn2Replace` object, and when the key is already there the second one
+    // calls `.add()` on the object it got from upstream instead of copying
+    // it. FaceID first made that upstream object FaceID's output, which
+    // ComfyUI caches (nothing in it depends on the prompt), while InstantID
+    // re-runs on every prompt (it takes the conditioning) — so each queued
+    // prompt appended one more InstantID callback to the cached model. A
+    // restyle row of one photo then drifted into mush cell by cell (lab run
+    // 20261111-144619: image stddev 105 → 48 over 60 styles, reset at the
+    // next photo, none/instantid runs flat). This way round the shared
+    // object is born in InstantID on every run, so nothing accumulates.
     if (mode == FaceIdentity.instantid || mode == FaceIdentity.both) {
       _injectInstantId(wf);
+    }
+    if (mode == FaceIdentity.faceid || mode == FaceIdentity.both) {
+      _injectFaceIdV2(wf);
     }
   }
 

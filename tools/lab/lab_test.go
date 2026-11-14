@@ -1069,6 +1069,30 @@ func TestExportMapsCellsOntoGalleryNodes(t *testing.T) {
 	}
 }
 
+// A cell that ran without the quality prefix (a styled restyle on NoobAI or
+// Illustrious) must not claim it in the gallery.
+func TestExportDropsAPrefixTheCellDidNotSend(t *testing.T) {
+	run := fakeRun(t, false)
+	run.man.Cells[0].Params["qualityPrefix"] = false
+	run.man.Cells[1].Params["qualityPrefix"] = true
+	plan, err := run.BuildExport()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body struct {
+		Nodes []map[string]any `json:"nodes"`
+	}
+	if err := json.Unmarshal(plan.Body, &body); err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range body.Nodes {
+		want := map[string]any{"a ballerina, ukiyo-e": nil, "a ballerina": "masterpiece"}[n["prompt"].(string)]
+		if n["positivePrefix"] != want {
+			t.Errorf("%v: positivePrefix = %v (čekáno %v)", n["prompt"], n["positivePrefix"], want)
+		}
+	}
+}
+
 func TestExportRefusesPlaceholders(t *testing.T) {
 	if _, err := fakeRun(t, true).BuildExport(); err == nil {
 		t.Fatal("běh nanečisto se nesmí dát odeslat — jsou to šrafy, ne výsledky")

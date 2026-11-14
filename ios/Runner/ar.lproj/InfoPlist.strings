@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "يُستخدم لالتقاط صورة تبدأ بها أو تحسّنها في استوديو الصور.";
+"NSMicrophoneUsageDescription" = "يسجّل استوديو الموسيقى الموسيقى المسموعة حولك كعيّنة للتأليف، ويسجّل استوديو الصوت صوتًا لاستنساخه.";
+"NSPhotoLibraryAddUsageDescription" = "يُستخدم لحفظ الصور المُنشأة في مكتبة الصور لديك.";
+"NSPhotoLibraryUsageDescription" = "يُستخدم لاختيار الصور للتحرير والتعرّف الضوئي على الحروف.";

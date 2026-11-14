@@ -237,10 +237,47 @@ void main() {
       expect(composeCellPrompt(subject: ' ', styleText: 'x', prefix: 'p').prompt, ' ');
 
       expect(stylePositionFor(null), StylePosition.end);
+      expect(stylePositionFor(null, flow: 'txt2img'), StylePosition.end);
+      // The restyle step defaults to the style in front; an explicit value
+      // still wins, so `end` remains measurable there.
+      expect(stylePositionFor(null, flow: 'restyle'), StylePosition.front);
+      expect(stylePositionFor('end', flow: 'restyle'), StylePosition.end);
+      // The app's repose puts the style in front too, so the lab follows it.
+      expect(stylePositionFor(null, flow: 'repose'), StylePosition.front);
       expect(qualityPrefixFor(null), isTrue);
+      expect(qualityPrefixFor(null, fallback: false), isFalse);
+      expect(qualityPrefixFor('on', fallback: false), isTrue);
       expect(qualityPrefixFor('off'), isFalse);
       expect(() => stylePositionFor('start'), throwsFormatException);
       expect(() => qualityPrefixFor('no'), throwsFormatException);
+    });
+
+    test('a styled restyle drops the prefix only where it was measured to', () {
+      bool dflt(String id, String flow, {String subject = 'a dancer'}) =>
+          defaultQualityPrefix(imageModelById(id), flow: flow, subject: subject);
+      expect(dflt('noobai-xl', 'restyle'), isFalse);
+      expect(dflt('illustrious-xl', 'repose'), isFalse);
+      // Pony's score tags are its quality control: without them it fades.
+      expect(dflt('pony', 'restyle'), isTrue);
+      expect(dflt('autismmix-pony', 'restyle'), isTrue);
+      // Every other flow stays on the app's prefix.
+      expect(dflt('noobai-xl', 'txt2img'), isTrue);
+      expect(dflt('noobai-xl', 'img2img'), isTrue);
+      // An empty subject sends no style, so the prefix stays — as in the app.
+      expect(dflt('noobai-xl', 'restyle', subject: ' '), isTrue);
+    });
+
+    test('the lab default is the app rule, baseline included', () {
+      for (final m in kImageModels) {
+        // Styled cell = the app's styled repose.
+        expect(defaultQualityPrefix(m, flow: 'restyle', subject: 'a dancer'),
+            restyleKeepsPrefix(m, styled: true), reason: m.id);
+      }
+      // The baseline (no style) shares the styled cells' prefix — the
+      // function does not look at the style, so they can't differ.
+      expect(defaultStylePosition('restyle'),
+          kRestyleStyleInFront ? StylePosition.front : StylePosition.end);
+      expect(isRestyleFlow('txt2img'), isFalse);
     });
 
     test('the builder drops the preset prefix only when asked', () {
@@ -378,6 +415,33 @@ void main() {
       expect(promptFamilyFor(imageModelById('flux-schnell')), PromptFamily.flux);
     });
 
+    test('Qwen-Image is a lab-only position model', () {
+      final qwen = kLabOnlyModels.single;
+      // Not in the app's picker: the app would offer it on a server without
+      // the weights.
+      expect(kImageModels.where((m) => m.id == qwen.id), isEmpty);
+      // It reads a sentence, so the flux column — and still a negative.
+      expect(promptFamilyFor(qwen), PromptFamily.flux);
+      expect(readsNegative(qwen), isTrue);
+      expect(readsNegative(imageModelById('flux-manga')), isFalse);
+      expect(readsNegative(imageModelById('flux-schnell')), isFalse);
+      expect(readsNegative(imageModelById('juggernaut-xl')), isTrue);
+
+      // Shown while the weights are unknown, hidden when the server lacks them.
+      expect(labModelsFor(const [], const []).map((m) => m.id),
+          contains(qwen.id));
+      expect(labModelsFor(const [], const ['flux1-dev.safetensors'])
+          .map((m) => m.id), isNot(contains(qwen.id)));
+      expect(labModelsFor(const [], const [kQwenImageUnet]).map((m) => m.id),
+          contains(qwen.id));
+
+      // The graph carries the sentinels the service fills in.
+      final graph = File(kQwenImageTxt2img).readAsStringSync();
+      expect(graph, contains('__PROMPT__'));
+      expect(graph, contains('__NEGATIVE__'));
+      expect(graph, contains(kQwenImageUnet));
+    });
+
     test('a model reads its own text, and a missing one is never borrowed', () {
       final body = two().first;
       expect(body.textFor(PromptFamily.danbooru), '1girl, solo');
@@ -429,6 +493,93 @@ void main() {
       }
     });
 
+    test('characters are the innermost layer of the axis', () {
+      // Position × character: one position's characters sit side by side, and
+      // the text reads prefix, position, character — the style comes after,
+      // from the cell.
+      final axis = buildPromptAxis(
+        prefixes: const [],
+        bodies: two(),
+        characters: const ['red hair, green eyes', 'black hair, brown eyes'],
+      );
+      expect(axis.map((e) => e.label), [
+        'portrait · red hair, green eyes',
+        'portrait · black hair, brown eyes',
+        'street · red hair, green eyes',
+        'street · black hair, brown eyes',
+      ]);
+      expect(axis.first.subjectFor(PromptFamily.danbooru),
+          '1girl, solo, red hair, green eyes');
+      // One text per character: every family reads it as written. A sentence
+      // loses its full stop so the character continues it.
+      expect(axis.first.subjectFor(PromptFamily.flux),
+          'A portrait photograph of a young woman, red hair, green eyes');
+      // Without a character the body is sent as written.
+      expect(
+          buildPromptAxis(prefixes: const [], bodies: two())
+              .first
+              .subjectFor(PromptFamily.flux),
+          'A portrait photograph of a young woman.');
+    });
+
+    test('a character alone is a prompt; with a box the box is a prefix', () {
+      final alone = buildPromptAxis(
+          prefixes: const [], bodies: const [], characters: const ['a redhead']);
+      expect(alone.single.label, 'a redhead');
+      expect(alone.single.subjectFor(PromptFamily.juggernaut), 'a redhead');
+
+      final boxed = buildPromptAxis(
+        prefixes: const ['a dancer'],
+        bodies: const [],
+        characters: const ['red hair', 'black hair'],
+      );
+      expect(boxed.map((e) => e.subjectFor(PromptFamily.danbooru)),
+          ['a dancer, red hair', 'a dancer, black hair']);
+    });
+
+    test('the run negative and the prompt negative are sent together', () {
+      final bodies = parsePromptBodies([
+        {
+          'id': 'standing',
+          'texts': {'juggernaut': 'a woman standing'},
+          'negative': ' sitting, chair ',
+        },
+        {
+          'id': 'sitting',
+          'texts': {'juggernaut': 'a woman sitting'},
+        },
+      ]);
+      expect(bodies.map((b) => b.negative), ['sitting, chair', '']);
+
+      final axis = buildPromptAxis(prefixes: const [''], bodies: bodies);
+      // Run-wide first, then what this one prompt adds.
+      expect(axis[0].negativeWith('blurry'), 'blurry, sitting, chair');
+      expect(axis[0].negativeWith(null), 'sitting, chair');
+      expect(axis[1].negativeWith('blurry'), 'blurry');
+      // Nothing asked anywhere: the service must get null, not '', so the
+      // graph is the one a run without negatives always sent.
+      expect(axis[1].negativeWith(null), isNull);
+      expect(axis[1].negativeWith('  '), isNull);
+      // A tag both name goes once, where it stood first.
+      expect(axis[0].negativeWith('Chair, blurry'), 'Chair, blurry, sitting');
+      // A typed prompt has no file behind it.
+      expect(const PromptAxisEntry(prefix: 'a dancer').negativeWith('blurry'),
+          'blurry');
+    });
+
+    test('a negative that is not text is rejected', () {
+      expect(
+        () => parsePromptBodies([
+          {
+            'id': 'x',
+            'texts': {'flux': 'a'},
+            'negative': ['blurry'],
+          },
+        ]),
+        throwsFormatException,
+      );
+    });
+
     test('a body that would render as something else is rejected', () {
       expect(() => parsePromptBodies(['x']), throwsFormatException);
       expect(
@@ -464,6 +615,26 @@ void main() {
         ]),
         throwsFormatException,
       );
+    });
+  });
+
+  group('two-stage restyle', () {
+    test('the hint defaults to depth and a typo is an error', () {
+      expect(structureHintFor(null), StructureHint.depth);
+      expect(structureHintFor(''), StructureHint.depth);
+      expect(structureHintFor('canny'), StructureHint.canny);
+      // A sweep value that quietly rendered the default would put a depth
+      // picture under a "lineart" label.
+      expect(() => structureHintFor('lineart'), throwsFormatException);
+    });
+
+    test('the placeholder is derived from the photo cell, nothing else', () {
+      // The runner finds the LoadImage to patch by this exact name; two
+      // photos must never share one.
+      final a = stage1Placeholder('position__juggernaut-xl____baseline__p00');
+      final b = stage1Placeholder('position__juggernaut-xl____baseline__p01');
+      expect(a, 'lab_stage1__position__juggernaut-xl____baseline__p00.png');
+      expect(a, isNot(b));
     });
   });
 

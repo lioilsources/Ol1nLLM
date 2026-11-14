@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ol1n_llm/models/gen_node.dart';
 import 'package:ol1n_llm/models/image_model.dart';
 import 'package:ol1n_llm/models/style_preset.dart';
+import 'package:ol1n_llm/models/style_quiet.dart';
 
 /// The style blocks are the ones measured in the 10×25 matrix — the ids are
 /// persisted on nodes, so renaming one silently breaks old sessions.
@@ -98,6 +99,20 @@ void main() {
       final out = applyStyle('a ballerina', 'ukiyoe');
       expect(out, startsWith('a ballerina, '));
       expect(out, contains('japanese woodblock print aesthetic'));
+    });
+
+    test('front puts the block ahead of the prompt', () {
+      final out = applyStyle('a ballerina', 'ukiyoe', front: true);
+      expect(out, endsWith(', a ballerina'));
+      expect(out, contains('japanese woodblock print aesthetic'));
+      expect(applyStyle('', 'ukiyoe', front: true), '');
+    });
+
+    test('styleApplies matches what applyStyle actually adds', () {
+      final ukiyoe = styleById('ukiyoe');
+      expect(styleApplies('a ballerina', ukiyoe), isTrue);
+      expect(styleApplies('  ', ukiyoe), isFalse);
+      expect(styleApplies('a ballerina', null), isFalse);
     });
 
     test('no style leaves the prompt untouched', () {
@@ -325,6 +340,54 @@ void main() {
         'Zinek',
         'Žula',
       ]);
+    });
+  });
+
+  group('quiet pairs', () {
+    final modelIds = kImageModels.map((m) => m.id).toSet();
+    final styleIds = kStylePresets.map((s) => s.id).toSet();
+
+    test('generated map names only registry models and styles', () {
+      expect(kStyleQuietOn, isNotEmpty);
+      for (final e in kStyleQuietOn.entries) {
+        expect(modelIds, contains(e.key));
+        expect(e.value, isNotEmpty, reason: e.key);
+        for (final s in e.value) {
+          expect(styleIds, contains(s), reason: '${e.key}: $s');
+        }
+      }
+    });
+
+    test('unmeasured and unknown pairs are not quiet', () {
+      expect(styleQuietOn('watercolor-wet', 'hassaku-illustrious'), isTrue);
+      expect(styleQuietOn('watercolor-wet', 'flux-schnell'), isFalse);
+      expect(styleQuietOn('no-such-style', 'pony'), isFalse);
+      expect(styleQuietOn(null, 'pony'), isFalse);
+      expect(styleQuietOn('watercolor-wet', 'no-such-model'), isFalse);
+    });
+
+    test('alternative is the first willing model that is available', () {
+      final all = modelIds;
+      expect(
+        styleAlternativeModel('watercolor-wet', 'hassaku-illustrious', all),
+        'sdxl-base',
+      );
+      expect(
+        styleAlternativeModel('watercolor-wet', 'sdxl-base', all),
+        'juggernaut-xl',
+      );
+      expect(
+        styleAlternativeModel('watercolor-wet', 'hassaku-illustrious', [
+          'hassaku-illustrious',
+          'pony',
+        ]),
+        isNull,
+      );
+      // A fallback that is itself quiet on the style is skipped.
+      final quietOnBase = kStyleQuietOn['sdxl-base']!.first;
+      final alt = styleAlternativeModel(quietOnBase, 'pony', all);
+      expect(alt, isNot('sdxl-base'));
+      expect(alt, isNotNull);
     });
   });
 
