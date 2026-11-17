@@ -55,3 +55,17 @@ tools/lab/ol1n-lab
 tools/lab/.venv/
 # stylemap: venv pro pipeline map stylů (make stylemap-env)
 tools/stylemap/.venv/
+# devconv:start
+.env
+.env.*
+!.env.example
+*.p8
+*.p12
+*.jks
+key.properties
+.claude/settings.local.json
+CLAUDE.local.md
+# devconv:end
+build/
+.flutter-plugins
+lib/**/secrets.dart
