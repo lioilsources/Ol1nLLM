@@ -394,7 +394,9 @@ void main() {
       // up here rather than as a run measuring the wrong sentence.
       for (final m in kImageModels) {
         final family = promptFamilyFor(m);
-        expect(family == PromptFamily.flux, m.id.startsWith('flux-'),
+        // Qwen-Image is no FLUX, but it reads a sentence: the flux column.
+        final sentence = m.id.startsWith('flux-') || m.id == 'qwen-image';
+        expect(family == PromptFamily.flux, sentence,
             reason: '${m.id} → ${family.name}');
         if (m.promptDialect == PromptDialect.booru) {
           expect(family, PromptFamily.danbooru, reason: m.id);
@@ -415,11 +417,11 @@ void main() {
       expect(promptFamilyFor(imageModelById('flux-schnell')), PromptFamily.flux);
     });
 
-    test('Qwen-Image is a lab-only position model', () {
-      final qwen = kLabOnlyModels.single;
-      // Not in the app's picker: the app would offer it on a server without
-      // the weights.
-      expect(kImageModels.where((m) => m.id == qwen.id), isEmpty);
+    test('Qwen-Image comes from the app registry, pruned by its weights', () {
+      final qwen = imageModelById('qwen-image');
+      expect(qwen.preset?.unetName, kQwenImageUnet);
+      expect(qwen.txt2img, isTrue);
+      expect(qwen.img2img, isFalse);
       // It reads a sentence, so the flux column — and still a negative.
       expect(promptFamilyFor(qwen), PromptFamily.flux);
       expect(readsNegative(qwen), isTrue);
