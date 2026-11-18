@@ -133,7 +133,7 @@ void main() {
         : File(
             env['CKPTS']!,
           ).readAsLinesSync().where((l) => l.trim().isNotEmpty).toList();
-    // Diffusion weights of the UNETLoader graphs, for the lab-only models.
+    // Diffusion weights of the UNETLoader graphs (prunes Qwen-Image).
     final unets = env['UNETS'] == null
         ? const <String>[]
         : File(

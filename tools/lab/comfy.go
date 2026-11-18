@@ -138,7 +138,8 @@ func (c *Comfy) Checkpoints() ([]string, error) {
 }
 
 // Unets lists the diffusion weights a UNETLoader graph can load — what the
-// lab-only models (Qwen-Image) are pruned by, as checkpoints prune the rest.
+// dedicated models that name their weights (Qwen-Image) are pruned by, as
+// checkpoints prune the rest.
 func (c *Comfy) Unets() ([]string, error) {
 	info, err := c.ObjectInfo("UNETLoader")
 	if err != nil {

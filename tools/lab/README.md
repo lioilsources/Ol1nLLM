@@ -151,8 +151,8 @@ klesla se Qwen + Illustrious v ComfyUI ze 47 na 31 GiB, profil `comfy`
 ho tedy unese. Fotka se dělá jednou na pozici × postavu, takže u běhu
 s desítkami stylů na fotku je to malá část času. Čte větu, tedy sloupec `flux`, ale na rozdíl od FLUXu
 **čte i negativ** (cfg 2.5), takže negativ běhu i sloupec `negative` u něj
-platí. Je **jen v labu** (`kLabOnlyModels` v `dump_spec.dart`), ne v appce,
-a nabízí se, jen když ComfyUI hlásí jeho váhy v `UNETLoader` (seznam vah
+platí. Je v registru appky (`kImageModels`, jen txt2img) a lab ho bere
+odtamtud; nabízí se, jen když ComfyUI hlásí jeho váhy v `UNETLoader` (seznam vah
 neznámý = ukáže se). Jako model restylu se přeskočí (ControlNet v grafu
 nemá) a styly umí hůř než Illustrious.
 
@@ -291,8 +291,7 @@ Co se přeskočí (vždy s důvodem v tabulce, odhad na to upozorní předem):
 Odhad počtu buněk tyhle přeskočené počítá, takže může vyjít vyšší než běh.
 
 **FLUX.1-dev je v registru `flux-manga`**: jeho txt2img graf je `UNETLoader
-flux1-dev` bez LoRA. Qwen-Image v `kImageModels` není, takže ho lab jako
-model pozice zatím nenabídne — chce `ImageModelSpec` a šablonu v appce.
+flux1-dev` bez LoRA.
 `canny` cesta je ověřená jen nanečisto (tvar grafu); že server má uzel
 `Canny` a union typ, ukáže až první ostrý běh.
 
