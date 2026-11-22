@@ -321,10 +321,10 @@ packages:
     dependency: "direct main"
     description:
       name: gal
-      sha256: "1bdef5879e4569910cfd8c77f460f98fcb7a1f910026af1daa80869856c67d66"
+      sha256: "5bd6542d6a387b76b50a803ad87573f3f505baea7c7153054f6d8fac7fc46d98"
       url: "https://pub.dev"
     source: hosted
-    version: "1.9.1"
+    version: "3.0.1"
   glob:
     dependency: transitive
     description:
