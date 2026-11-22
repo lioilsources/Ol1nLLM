@@ -315,6 +315,12 @@ class ComfyUIService implements ImageBackend {
   Future<List<String>> fetchCheckpoints() =>
       _fetchComboOptions('CheckpointLoaderSimple', 'ckpt_name');
 
+  /// Diffusion weights a UNETLoader graph can load — what prunes the
+  /// dedicated models that declare [ComfyPreset.unetName] (Qwen-Image).
+  /// Empty means unknown, as for checkpoints.
+  Future<List<String>> fetchUnets() =>
+      _fetchComboOptions('UNETLoader', 'unet_name');
+
   /// Reads one combo-widget's option list out of `/object_info/{node}`. ComfyUI
   /// nests it as `{node: {input: {required: {field: [[…options], {…meta}]}}}}` —
   /// the per-node endpoint keeps this cheap (the full /object_info is megabytes).
@@ -1536,8 +1542,9 @@ class ComfyUIService implements ImageBackend {
         ? prompt
         : '${preset.positivePrefix}, $prompt';
     // Preset negative + user ALL-CAPS negatives. Only applied where the
-    // template carries a __NEGATIVE__ sentinel (generic SDXL workflows);
-    // dedicated flux workflows run cfg=1 and have no usable negative input.
+    // template carries a __NEGATIVE__ sentinel (generic SDXL workflows and
+    // Qwen-Image, cfg 2.5); dedicated flux workflows run cfg=1 and have no
+    // usable negative input.
     final fullNegative = [
       preset.negativePrompt,
       if (userNegative != null) userNegative,
