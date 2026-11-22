@@ -1235,7 +1235,7 @@ class _NodeGrid extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              e.type == GalExceptionType.accessDenied
+              e.type == GalExceptionType.permissionDenied
                   ? 'Gallery permission denied'
                   : 'Failed to save: ${e.type.message}',
             ),
