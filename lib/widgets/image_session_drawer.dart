@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../core/constants/theme.dart';
 import '../models/image_session.dart';
 import '../providers/image_studio_provider.dart';
+import '../l10n/l10n.dart';
 
 class ImageSessionDrawer extends ConsumerWidget {
   const ImageSessionDrawer({super.key});
@@ -26,7 +28,7 @@ class ImageSessionDrawer extends ConsumerWidget {
                   Navigator.pop(context);
                 },
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text('New session'),
+                label: Text(context.l10n.newSession),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppTheme.accent,
                   foregroundColor: Colors.white,
@@ -37,10 +39,10 @@ class ImageSessionDrawer extends ConsumerWidget {
             const Divider(height: 1),
             Expanded(
               child: state.sessions.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
-                        'No saved sessions yet',
-                        style: TextStyle(color: AppTheme.textSecondary),
+                        context.l10n.noSavedSessionsYet,
+                        style: const TextStyle(color: AppTheme.textSecondary),
                       ),
                     )
                   : ListView.builder(
@@ -52,8 +54,8 @@ class ImageSessionDrawer extends ConsumerWidget {
                           key: ValueKey(session.id),
                           direction: DismissDirection.endToStart,
                           background: Container(
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 16),
+                            alignment: AlignmentDirectional.centerEnd,
+                            padding: const EdgeInsetsDirectional.only(end: 16),
                             color: Colors.red.shade900,
                             child: const Icon(Icons.delete, color: Colors.white),
                           ),
@@ -74,7 +76,7 @@ class ImageSessionDrawer extends ConsumerWidget {
                               ),
                             ),
                             subtitle: Text(
-                              _formatDate(session.updatedAt),
+                              _formatDate(context, session.updatedAt),
                               style: const TextStyle(
                                 color: AppTheme.textSecondary,
                                 fontSize: 11,
@@ -105,15 +107,17 @@ class ImageSessionDrawer extends ConsumerWidget {
     );
   }
 
-  String _formatDate(DateTime dt) {
+  String _formatDate(BuildContext context, DateTime dt) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final day = DateTime(dt.year, dt.month, dt.day);
     final diff = today.difference(day).inDays;
-    if (diff == 0) return 'dnes';
-    if (diff == 1) return 'včera';
-    final yearSuffix = dt.year != now.year ? ' ${dt.year}' : '';
-    return '${dt.day}. ${dt.month}.$yearSuffix';
+    if (diff == 0) return context.l10n.today;
+    if (diff == 1) return context.l10n.yesterday;
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    return dt.year != now.year
+        ? DateFormat.yMMMd(locale).format(dt)
+        : DateFormat.MMMd(locale).format(dt);
   }
 }
 
@@ -158,8 +162,8 @@ class _ExportIcon extends StatelessWidget {
         color: upToDate ? Colors.greenAccent : AppTheme.textSecondary,
       ),
       tooltip: upToDate
-          ? 'Exportováno do FINETUNE gallery'
-          : 'Exportovat do FINETUNE gallery',
+          ? context.l10n.exportedToFinetune
+          : context.l10n.exportToFinetune,
       onPressed: enabled ? onTap : null,
     );
   }

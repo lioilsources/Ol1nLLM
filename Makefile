@@ -1,4 +1,4 @@
-.PHONY: run debug build-ios build-android lab lab-dry lab-check lab-arcface lab-resume lab-score stylemap-env stylemap stylemap-tags stylemap-serve stylemap-publish
+.PHONY: run debug build-ios build-android lab lab-dry lab-check lab-arcface lab-resume lab-score lab-complete stylemap-env stylemap stylemap-tags stylemap-serve stylemap-publish
 
 -include .env.local
 
@@ -52,6 +52,14 @@ lab-resume:
 
 lab-score:
 	cd tools/lab && go run . score $(RUN)
+
+# The whole matrix from one photo — repose with the photo's face on every SDXL
+# model × every style, and every native artist and character on the tag
+# models. ~40 000 cells: it runs only in ComfyUI's hours on SPARK and resumes
+# by itself, so start it detached and leave it (knobs: tools/lab/complete.sh):
+#   nohup make lab-complete REF=foto.jpg > build/lab/complete.log 2>&1 &
+lab-complete:
+	tools/lab/complete.sh $(REF)
 
 # ArcFace metric for the lab (tools/lab/arcface.py): a local venv with
 # insightface on CPU and the antelopev2 models copied from SPARK, the same

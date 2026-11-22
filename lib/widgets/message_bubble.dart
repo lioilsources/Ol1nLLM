@@ -8,6 +8,7 @@ import '../core/constants/theme.dart';
 import '../models/message.dart';
 import 'agent_step_view.dart';
 import 'source_list.dart';
+import '../l10n/l10n.dart';
 
 class MessageBubble extends StatefulWidget {
   final Message message;
@@ -136,9 +137,9 @@ class _MessageBubbleState extends State<MessageBubble>
     Clipboard.setData(ClipboardData(text: widget.message.content));
     HapticFeedback.lightImpact();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Odpověď zkopírována do schránky'),
-        duration: Duration(seconds: 2),
+      SnackBar(
+        content: Text(context.l10n.replyCopied),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -314,7 +315,7 @@ class _MessageBubbleState extends State<MessageBubble>
             if (_waitSeconds >= 3) ...[
               const SizedBox(width: 8),
               Text(
-                'hledám… $_waitSeconds s',
+                context.l10n.searchingSeconds(_waitSeconds),
                 style: const TextStyle(
                   color: AppTheme.textSecondary,
                   fontSize: 12,

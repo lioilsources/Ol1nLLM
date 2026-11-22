@@ -3,7 +3,6 @@
 /// unit-tested without booting a dump (`test/dump_spec_test.dart`).
 library;
 
-import 'package:flutter/material.dart' show Color, Icons;
 import 'package:ol1n_llm/models/image_model.dart';
 import 'package:ol1n_llm/models/style_preset.dart';
 import 'package:ol1n_llm/services/comfyui_service.dart' show StructureHint;
@@ -40,58 +39,17 @@ PromptFamily promptFamilyFor(ImageModelSpec m) {
   return flux ? PromptFamily.flux : PromptFamily.juggernaut;
 }
 
-/// Qwen-Image's dedicated txt2img graph (UNETLoader + Qwen2.5-VL encoder,
-/// AuraFlow shift 3.1, 1328², 20 steps, cfg 2.5 — the ComfyUI reference
-/// setting; 131–167 s a picture on SPARK, 20–35 s on the L40S).
-const kQwenImageTxt2img = 'assets/comfyui/qwen_image_txt2img.api.json';
-
-/// The diffusion weights that graph loads, for pruning by the server's list.
-const kQwenImageUnet = 'qwen_image_fp8_e4m3fn.safetensors';
-
-/// Models the lab runs and the app does not offer.
-///
-/// Qwen-Image is a position model for the restyle flow: one pass, Apache 2.0
-/// where FLUX.1-dev is non-commercial, and it reads a sentence, so it takes
-/// the `flux` column of a prompt file. It is no restyle model — it knows
-/// styles worse than Illustrious and has no depth ControlNet in the graph —
-/// so the dump skips its restyle cells like any model that cannot repose.
-/// Kept out of [kImageModels] because the app would offer it in the picker
-/// on a server that does not have the weights.
-const kLabOnlyModels = [
-  ImageModelSpec(
-    id: 'qwen-image',
-    label: 'Qwen-Image',
-    promptDialect: PromptDialect.natural,
-    icon: Icons.translate,
-    color: Color(0xFF8C6BC8),
-    kind: ImageBackendKind.comfyUi,
-    txt2img: true,
-    img2img: false,
-    styleNote: 'jen jako model pozice; styly umí hůř než Illustrious',
-    preset: ComfyPreset(
-      txt2imgAsset: kQwenImageTxt2img,
-      img2imgAsset: kQwenImageTxt2img,
-    ),
-  ),
-];
-
-/// Diffusion weights each lab-only model needs on the server.
-const _labOnlyUnets = {'qwen-image': kQwenImageUnet};
-
 /// The models a lab run can pick: the app's registry pruned by the server's
-/// checkpoints, then the lab-only ones whose weights the server has.
+/// checkpoints and, for the dedicated graphs that name their weights
+/// (Qwen-Image), by its UNETLoader list.
 ///
-/// An empty [unets] means "unknown" (offline, or an old lab without the
-/// list), as it does for checkpoints in [imageModelsFor]: everything shows.
+/// An empty list means "unknown" (offline, or an old lab without it), as in
+/// [imageModelsFor]: everything shows.
 List<ImageModelSpec> labModelsFor(
   List<String> installedCheckpoints,
   List<String> unets,
 ) =>
-    [
-      ...imageModelsFor(installedCheckpoints),
-      for (final m in kLabOnlyModels)
-        if (unets.isEmpty || unets.contains(_labOnlyUnets[m.id])) m,
-    ];
+    imageModelsFor(installedCheckpoints, unets: unets);
 
 /// Whether a model's graph takes a negative prompt at all.
 ///

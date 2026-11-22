@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "Bruges til at tage et foto, du kan starte med eller forfine i Billedstudie.";
+"NSMicrophoneUsageDescription" = "Musikstudie optager musik, der spiller omkring dig, som udgangspunkt for komposition, og Stemmestudie optager en stemme til kloning.";
+"NSPhotoLibraryAddUsageDescription" = "Bruges til at gemme genererede billeder i dit fotobibliotek.";
+"NSPhotoLibraryUsageDescription" = "Bruges til at vælge billeder til redigering og OCR.";

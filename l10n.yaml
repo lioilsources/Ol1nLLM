@@ -1,0 +1,9 @@
+# gen-l10n: Czech is the source language (template); every other locale
+# must define every key. Generated Dart lands next to the ARB files and is
+# committed. Unknown device locales fall back to English.
+arb-dir: lib/l10n
+template-arb-file: app_cs.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+preferred-supported-locales: [en]
+untranslated-messages-file: build/l10n_untranslated.json

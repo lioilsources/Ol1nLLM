@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "משמש לצילום תמונה שממנה תתחיל או שתשפר בסטודיו תמונות.";
+"NSMicrophoneUsageDescription" = "סטודיו מוזיקה מקליט מוזיקה שמתנגנת סביבך כדוגמה ליצירה, וסטודיו קול מקליט קול לשכפול.";
+"NSPhotoLibraryAddUsageDescription" = "משמש לשמירת תמונות שנוצרו בספריית התמונות שלך.";
+"NSPhotoLibraryUsageDescription" = "משמש לבחירת תמונות לעריכה ולזיהוי טקסט (OCR).";

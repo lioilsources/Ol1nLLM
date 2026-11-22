@@ -1,0 +1,142 @@
+{
+  "@@locale": "cs",
+  "newChat": "Nový chat",
+  "noConversationsYet": "Zatím žádné konverzace",
+  "newConversation": "Nová konverzace",
+  "newSession": "Nové sezení",
+  "noSavedSessionsYet": "Zatím žádná uložená sezení",
+  "today": "dnes",
+  "yesterday": "včera",
+  "exportedToFinetune": "Exportováno do galerie FINETUNE",
+  "exportToFinetune": "Exportovat do galerie FINETUNE",
+  "tooltipImageStudio": "Obrázkové studio",
+  "tooltipMusicStudio": "Hudební studio",
+  "tooltipVoiceStudio": "Hlasové studio",
+  "tooltipStoryStudio": "Příběhové studio",
+  "branchHint": "Nová zpráva založí větev z „{label}“",
+  "@branchHint": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "messageHint": "Napiš zprávu…",
+  "ocrHint": "Volitelná instrukce…",
+  "pickImage": "Vybrat obrázek",
+  "inputMode": "Režim",
+  "askLibrary": "Zeptej se knihovny…",
+  "askLaw": "Zeptej se na zákon…",
+  "askLeads": "Zeptej se na firmy ze smluv…",
+  "nextMessageRole": "Role pro další zprávu",
+  "replyCopied": "Odpověď zkopírována do schránky",
+  "searchingSeconds": "hledám… {seconds} s",
+  "@searchingSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "personasLoadFailed": "Nepodařilo se načíst persony:\n{error}",
+  "@personasLoadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "pickPersona": "Vyber si personu",
+  "pickPersonaSub": "S kým si dnes budeš povídat?",
+  "speakCancel": "Zrušit čtení",
+  "speakPause": "Pozastavit",
+  "speakResume": "Pokračovat",
+  "speakAloud": "Přečíst nahlas",
+  "speakRhythm": "Přečíst v rytmu ({rhythm})",
+  "@speakRhythm": {
+    "placeholders": {
+      "rhythm": {
+        "type": "String"
+      }
+    }
+  },
+  "sourceOriginal": "originál",
+  "linkOpenFailed": "Odkaz nejde otevřít: {uri}",
+  "@linkOpenFailed": {
+    "placeholders": {
+      "uri": {
+        "type": "String"
+      }
+    }
+  },
+  "openOriginal": "Otevřít originál",
+  "figureIdCopied": "ID figurky zkopírováno do schránky",
+  "figureNameCopied": "Název zkopírován do schránky",
+  "dancingFigure": "Tančící figurka",
+  "shareGlb": "Sdílet GLB (Blender, 3D prohlížeče)",
+  "figureLoadFailed": "Figurku se nepodařilo načíst: {error}",
+  "@figureLoadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "model3d": "3D model",
+  "shareStl": "Sdílet STL (Prusa Slicer)",
+  "glbLoadFailed": "GLB se nepodařilo načíst: {error}",
+  "@glbLoadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "videoSavedToPhotos": "Video uloženo do Fotek",
+  "photosRejectedVideo": "Fotky video nepřijaly ({code}) — zkus Sdílet",
+  "@photosRejectedVideo": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "share": "Sdílet",
+  "video": "Video",
+  "saveToPhotos": "Uložit do Fotek",
+  "hairdresser": "Kadeřník",
+  "hairdresserHint": "Tvář zůstane; barva vlasů taky, pokud nevybereš novou. Nejlíp funguje čelní portrét s celými vlasy, bez čepice.",
+  "colourUnchanged": "Barva beze změny",
+  "colourOnly": "Jen barva",
+  "noHairstylesYet": "Zatím žádné účesy.",
+  "searchHairstyle": "Hledat účes",
+  "mapLoadFailed": "mapa se nenačetla: {error}",
+  "@mapLoadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "copiedText": "Zkopírováno: {text}",
+  "@copiedText": {
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
+  "styleMaps": "Mapy stylů",
+  "use": "Použít",
+  "copy": "Kopírovat",
+  "retry": "Znovu",
+  "noMapsOnServer": "Na serveru zatím žádná mapa není.",
+  "imageCount": "{count, plural, one{{count} obrázek} few{{count} obrázky} other{{count} obrázků}}",
+  "@imageCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
+}

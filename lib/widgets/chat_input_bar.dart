@@ -10,6 +10,7 @@ import '../models/persona.dart';
 import '../providers/chat_provider.dart';
 import '../services/chat_backend.dart';
 import '../services/persona_service.dart';
+import '../l10n/l10n.dart';
 
 enum InputMode { chat, ocr }
 
@@ -24,9 +25,9 @@ extension on InputMode {
     InputMode.ocr => 'OCR',
   };
 
-  String get hint => switch (this) {
-    InputMode.chat => 'Message lab…',
-    InputMode.ocr => 'Optional instruction…',
+  String hint(BuildContext context) => switch (this) {
+    InputMode.chat => context.l10n.messageHint,
+    InputMode.ocr => context.l10n.ocrHint,
   };
 
   bool get needsImage => this == InputMode.ocr;
@@ -183,7 +184,7 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
                   IconButton(
                     icon: const Icon(Icons.image_outlined),
                     color: AppTheme.textSecondary,
-                    tooltip: 'Pick image',
+                    tooltip: context.l10n.pickImage,
                     onPressed: isBusy ? null : _pickImage,
                   ),
                 ],
@@ -207,13 +208,12 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
                         decoration: InputDecoration(
                           hintText: _mode == InputMode.chat
                               ? switch (ragBackend) {
-                                  kChatBackendLibrary => 'Zeptej se knihovny…',
-                                  kChatBackendLaw => 'Zeptej se na zákon…',
-                                  kChatBackendLeads =>
-                                    'Zeptej se na firmy ze smluv…',
-                                  _ => _mode.hint,
+                                  kChatBackendLibrary => context.l10n.askLibrary,
+                                  kChatBackendLaw => context.l10n.askLaw,
+                                  kChatBackendLeads => context.l10n.askLeads,
+                                  _ => _mode.hint(context),
                                 }
-                              : _mode.hint,
+                              : _mode.hint(context),
                           hintStyle: const TextStyle(
                             color: AppTheme.textSecondary,
                           ),
@@ -251,7 +251,7 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
   Widget _buildModeButton(bool isBusy) {
     return PopupMenuButton<InputMode>(
       enabled: !isBusy,
-      tooltip: 'Mode',
+      tooltip: context.l10n.inputMode,
       icon: Icon(_mode.icon, color: AppTheme.accent),
       color: AppTheme.surface,
       onSelected: _setMode,
@@ -329,11 +329,11 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Text(
-                'Role pro další zprávu',
-                style: TextStyle(
+                ctx.l10n.nextMessageRole,
+                style: const TextStyle(
                   color: AppTheme.textPrimary,
                   fontSize: 16,
                   fontWeight: FontWeight.w600,

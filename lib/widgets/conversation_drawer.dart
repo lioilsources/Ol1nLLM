@@ -4,6 +4,7 @@ import '../core/constants/theme.dart';
 import '../models/persona.dart';
 import '../providers/chat_provider.dart';
 import '../services/persona_service.dart';
+import '../l10n/l10n.dart';
 
 class ConversationDrawer extends ConsumerWidget {
   const ConversationDrawer({super.key});
@@ -37,7 +38,7 @@ class ConversationDrawer extends ConsumerWidget {
                   Navigator.pop(context);
                 },
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text('New chat'),
+                label: Text(context.l10n.newChat),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppTheme.accent,
                   foregroundColor: Colors.white,
@@ -48,10 +49,10 @@ class ConversationDrawer extends ConsumerWidget {
             const Divider(height: 1),
             Expanded(
               child: state.conversations.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
-                        'No conversations yet',
-                        style: TextStyle(color: AppTheme.textSecondary),
+                        context.l10n.noConversationsYet,
+                        style: const TextStyle(color: AppTheme.textSecondary),
                       ),
                     )
                   : ListView.builder(
@@ -64,8 +65,8 @@ class ConversationDrawer extends ConsumerWidget {
                           key: ValueKey(conv.id),
                           direction: DismissDirection.endToStart,
                           background: Container(
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 16),
+                            alignment: AlignmentDirectional.centerEnd,
+                            padding: const EdgeInsetsDirectional.only(end: 16),
                             color: Colors.red.shade900,
                             child: const Icon(
                               Icons.delete,
@@ -84,7 +85,9 @@ class ConversationDrawer extends ConsumerWidget {
                                     style: const TextStyle(fontSize: 20),
                                   ),
                             title: Text(
-                              conv.title,
+                              conv.title == 'New conversation'
+                                  ? context.l10n.newConversation
+                                  : conv.title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(

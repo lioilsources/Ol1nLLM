@@ -23,10 +23,10 @@ services:
     expose:
       - "8188"
     volumes:
-      - ${COMFYUI_DATA:-/home/ol1n/comfyui}/models:/app/models
-      - ${COMFYUI_DATA:-/home/ol1n/comfyui}/input:/app/input
-      - ${COMFYUI_DATA:-/home/ol1n/comfyui}/output:/app/output
-      - ${COMFYUI_DATA:-/home/ol1n/comfyui}/custom_nodes:/app/custom_nodes
+      - ${COMFYUI_DATA:-./comfyui-data}/models:/app/models
+      - ${COMFYUI_DATA:-./comfyui-data}/input:/app/input
+      - ${COMFYUI_DATA:-./comfyui-data}/output:/app/output
+      - ${COMFYUI_DATA:-./comfyui-data}/custom_nodes:/app/custom_nodes
     networks: [ai]
     deploy:
       resources:

@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "Służy do zrobienia zdjęcia, od którego zaczniesz lub które dopracujesz w Studiu obrazów.";
+"NSMicrophoneUsageDescription" = "Studio muzyczne nagrywa muzykę grającą wokół ciebie jako próbkę do komponowania, a Studio głosu nagrywa głos do sklonowania.";
+"NSPhotoLibraryAddUsageDescription" = "Służy do zapisywania wygenerowanych obrazów w twojej bibliotece zdjęć.";
+"NSPhotoLibraryUsageDescription" = "Służy do wybierania obrazów do edycji i OCR.";

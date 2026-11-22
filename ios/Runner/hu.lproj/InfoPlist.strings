@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "Fotó készítésére szolgál, amelyből a Képstúdióban elindulsz vagy amelyet finomítasz.";
+"NSMicrophoneUsageDescription" = "A Zenestúdió a körülötted szóló zenét rögzíti mintaként a komponáláshoz, a Hangstúdió pedig egy klónozandó hangot rögzít.";
+"NSPhotoLibraryAddUsageDescription" = "A létrehozott képek fotótárba mentésére szolgál.";
+"NSPhotoLibraryUsageDescription" = "Képek kiválasztására szolgál szerkesztéshez és OCR-hez.";

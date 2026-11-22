@@ -108,7 +108,7 @@ obrázku v `build/stylemap/_tags/`, takže přerušený běh nic neztratí a sad
 otagovat napůl — `build_map.py` vezme, co je.
 
 Model je `openclaw-default` (qwen36) přes LiteLLM na SPARKu
-(`http://192.168.88.66:8080/v1`) a běží jen v okně **19:15–00:50**, souběžnost
+(`http://SPARK_HOST:8080/v1`) a běží jen v okně **19:15–00:50**, souběžnost
 nejvýš 2 (domluveno s plánovačem SPARKu 2026-10-08; model se dělí s Právníkem
 a StoryTellerem). Mimo okno vrací gateway 500 — skript po osmi chybách po sobě
 skončí, stejně jako v `--until` (výchozí 00:50).

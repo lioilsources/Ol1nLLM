@@ -11,8 +11,9 @@ enum ImageBackendKind { comfyUi, fluxNim, fluxKontextNim }
 /// ComfyUI generation parameters for one model.
 ///
 /// [ckptName] == null means the model ships dedicated workflow JSONs with all
-/// values baked in (flux-manga's UNETLoader graph) — only the __PROMPT__ /
-/// __IMAGE__ sentinels and batch/seed get patched. With a ckptName the model
+/// values baked in (flux-manga's and Qwen-Image's UNETLoader graphs) — only
+/// the __PROMPT__ / __NEGATIVE__ / __IMAGE__ sentinels and batch/seed get
+/// patched. With a ckptName the model
 /// runs on the generic sdxl_* templates and every field here is patched in.
 class ComfyPreset {
   const ComfyPreset({
@@ -22,6 +23,7 @@ class ComfyPreset {
     this.inpaintRefAsset,
     this.inpaintFaceAsset,
     this.ckptName,
+    this.unetName,
     this.positivePrefix = '',
     this.negativePrompt = '',
     this.width = 1024,
@@ -50,6 +52,11 @@ class ComfyPreset {
   /// looks. Null = the face toggle is hidden for this model.
   final String? inpaintFaceAsset;
   final String? ckptName;
+
+  /// Diffusion weights a dedicated UNETLoader graph loads, for pruning the
+  /// picker by the server's `UNETLoader` list the way [ckptName] prunes by
+  /// checkpoints (see [imageModelsFor]). Null = not checked (flux-manga).
+  final String? unetName;
   final String positivePrefix;
   final String negativePrompt;
   final int width;
@@ -183,6 +190,15 @@ const _fluxFillInpaint = 'assets/comfyui/flux_fill_inpaint.api.json';
 const _fluxFillInpaintRef = 'assets/comfyui/flux_fill_inpaint_ref.api.json';
 const _fluxFillInpaintFace = 'assets/comfyui/flux_fill_inpaint_face.api.json';
 
+/// Qwen-Image's dedicated txt2img graph (UNETLoader + Qwen2.5-VL encoder,
+/// AuraFlow shift 3.1, 1328², 20 steps, cfg 2.5 — the ComfyUI reference
+/// setting; 131–167 s a picture on SPARK, 20–36 s on the L40S). Unlike the
+/// FLUX graphs it runs real CFG, so it carries a __NEGATIVE__ sentinel.
+const kQwenImageTxt2img = 'assets/comfyui/qwen_image_txt2img.api.json';
+
+/// The diffusion weights that graph loads.
+const kQwenImageUnet = 'qwen_image_fp8_e4m3fn.safetensors';
+
 const _ponyScoreTags = 'score_9, score_8_up, score_7_up, score_6_up';
 const _ponyNegative =
     'score_4, score_5, score_6, bad quality, worst quality, low quality, '
@@ -232,6 +248,32 @@ const kImageModels = <ImageModelSpec>[
     preset: ComfyPreset(
       txt2imgAsset: kFluxMangaTxt2img,
       img2imgAsset: _fluxMangaImg2img,
+    ),
+  ),
+  ImageModelSpec(
+    id: 'qwen-image',
+    label: 'Qwen-Image',
+    promptDialect: PromptDialect.natural,
+    icon: Icons.translate,
+    color: Color(0xFF8C6BC8),
+    kind: ImageBackendKind.comfyUi,
+    txt2img: true,
+    // No edit graph (Qwen-Image-Edit is other weights) and no depth
+    // ControlNet, so neither img2img nor repose. Takes no LoRA: the
+    // server's files are all FLUX/SDXL lineages, and the graph has no
+    // DualCLIPLoader for the injection to find.
+    img2img: false,
+    // S1 comparison, 2026-11-17 (schnell × dev × Qwen, 24 subjects × 13
+    // styles): closest to correct lettering and the cleanest machines, but
+    // still adds people in ukiyo-e and art nouveau; slowest of the three.
+    styleNote: 'nejlíp píše text v obrázku; pomalý (minuty na obrázek)',
+    positionNote: 'jednoprůchodová fotka pozice, licence Apache 2.0; '
+        'jako model restylu nejde (nemá ControlNet)',
+    preset: ComfyPreset(
+      txt2imgAsset: kQwenImageTxt2img,
+      // Never used (img2img is false); the type demands a value.
+      img2imgAsset: kQwenImageTxt2img,
+      unetName: kQwenImageUnet,
     ),
   ),
   ImageModelSpec(
@@ -724,21 +766,25 @@ ImageModelSpec imageModelById(String id) => kImageModels.firstWhere(
 ///
 /// An empty [installedCheckpoints] means the list is unknown (offline, or the
 /// fetch failed) — then everything stays visible, i.e. the pre-fetch behaviour.
+/// [unets] prunes the dedicated graphs that declare
+/// [ComfyPreset.unetName] the same way, and empty means unknown there too.
 /// [keepId] is never filtered out, so a session restored with a since-removed
 /// model still shows its own entry as the selected one.
 List<ImageModelSpec> imageModelsFor(
   List<String> installedCheckpoints, {
+  List<String> unets = const [],
   String? keepId,
 }) {
-  if (installedCheckpoints.isEmpty) return kImageModels;
-  final installed = installedCheckpoints.toSet();
+  final ckpts = installedCheckpoints.toSet();
+  final diffusion = unets.toSet();
+  bool has(Set<String> list, String? name) =>
+      name == null || list.isEmpty || list.contains(name);
   return [
     for (final m in kImageModels)
-      // preset == null (NIM) and ckptName == null (flux-manga's UNETLoader
-      // graph) load no checkpoint, so nothing to check.
+      // preset == null (NIM) loads nothing; flux-manga declares neither name.
       if (m.id == keepId ||
-          m.preset?.ckptName == null ||
-          installed.contains(m.preset!.ckptName))
+          (has(ckpts, m.preset?.ckptName) &&
+              has(diffusion, m.preset?.unetName)))
         m,
   ];
 }

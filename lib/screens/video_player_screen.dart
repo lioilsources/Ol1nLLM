@@ -8,6 +8,7 @@ import 'package:video_player/video_player.dart';
 import 'dart:async';
 
 import '../core/constants/theme.dart';
+import '../l10n/l10n.dart';
 
 /// Fullscreen looping player for an animated („Rozhýbat") clip, with save to
 /// Photos and the platform share sheet. Plays the local mp4 straight from the
@@ -18,6 +19,7 @@ import '../core/constants/theme.dart';
 /// místo aby uživatel zůstal jen s chybou.
 Future<void> saveVideo(BuildContext context, String path) async {
   final messenger = ScaffoldMessenger.of(context);
+  final l = context.l10n;
   try {
     // Kopie do tmp: Photos čte soubor mimo sandbox appky spolehlivěji než
     // z Application Support, a přípona musí sedět na obsah.
@@ -28,7 +30,7 @@ Future<void> saveVideo(BuildContext context, String path) async {
     await Gal.putVideo(tmp.path);
     unawaited(tmp.delete().catchError((_) => tmp));
     messenger.showSnackBar(
-      const SnackBar(content: Text('Video uloženo do Fotek')),
+      SnackBar(content: Text(l.videoSavedToPhotos)),
     );
   } catch (e) {
     // Kód chyby do hlášky: „unsupported format" má víc příčin (konverze,
@@ -36,9 +38,9 @@ Future<void> saveVideo(BuildContext context, String path) async {
     final code = e is GalException ? e.type.name : e.runtimeType.toString();
     messenger.showSnackBar(
       SnackBar(
-        content: Text('Fotky video nepřijaly ($code) — zkus Sdílet'),
+        content: Text(l.photosRejectedVideo(code)),
         action: SnackBarAction(
-          label: 'Sdílet',
+          label: l.share,
           onPressed: () => SharePlus.instance.share(
             ShareParams(files: [XFile(path, mimeType: 'video/mp4')]),
           ),
@@ -88,15 +90,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-        title: Text(widget.title ?? 'Video'),
+        title: Text(widget.title ?? context.l10n.video),
         actions: [
           IconButton(
-            tooltip: 'Uložit do Fotek',
+            tooltip: context.l10n.saveToPhotos,
             icon: const Icon(Icons.download_outlined),
             onPressed: () => saveVideo(context, widget.path),
           ),
           IconButton(
-            tooltip: 'Sdílet',
+            tooltip: context.l10n.share,
             icon: const Icon(Icons.ios_share),
             onPressed: () => SharePlus.instance.share(
               ShareParams(files: [XFile(widget.path, mimeType: 'video/mp4')]),

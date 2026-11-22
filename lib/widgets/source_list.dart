@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/constants/theme.dart';
 import '../models/library_source.dart';
+import '../l10n/l10n.dart';
 
 /// Collapsible "📖 Zdroje" section under a library (RAG) answer.
 ///
@@ -75,9 +76,9 @@ class _SourceListState extends State<SourceList> {
                       ),
                       if (source.hasTranslation) ...[
                         const SizedBox(height: 12),
-                        const Text(
-                          'originál',
-                          style: TextStyle(
+                        Text(
+                          context.l10n.sourceOriginal,
+                          style: const TextStyle(
                             color: AppTheme.textSecondary,
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -238,6 +239,7 @@ class OriginalLink extends StatelessWidget {
 
   Future<void> _open(BuildContext context) async {
     final messenger = ScaffoldMessenger.maybeOf(context);
+    final l = context.l10n;
     var ok = false;
     try {
       ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -246,7 +248,7 @@ class OriginalLink extends StatelessWidget {
     }
     if (!ok) {
       messenger?.showSnackBar(
-        SnackBar(content: Text('Odkaz nejde otevřít: $uri')),
+        SnackBar(content: Text(l.linkOpenFailed('$uri'))),
       );
     }
   }
@@ -262,9 +264,9 @@ class OriginalLink extends StatelessWidget {
           children: [
             const Icon(Icons.open_in_new, size: 16, color: AppTheme.accent),
             const SizedBox(width: 6),
-            const Text(
-              'Otevřít originál',
-              style: TextStyle(
+            Text(
+              context.l10n.openOriginal,
+              style: const TextStyle(
                 color: AppTheme.accent,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,

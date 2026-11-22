@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "Serve a scattare una foto da cui partire o che perfezionare nello Studio immagini.";
+"NSMicrophoneUsageDescription" = "Lo Studio musicale registra la musica che suona intorno a te come campione da cui comporre, e lo Studio vocale registra una voce da clonare.";
+"NSPhotoLibraryAddUsageDescription" = "Serve a salvare le immagini generate nella tua libreria foto.";
+"NSPhotoLibraryUsageDescription" = "Serve a scegliere le immagini per la modifica e l’OCR.";

@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "Används för att ta ett foto att starta eller förfina en bild från i Bildstudio.";
+"NSMicrophoneUsageDescription" = "Musikstudio spelar in musik som spelas omkring dig som underlag för att komponera, och Röststudio spelar in en röst att klona.";
+"NSPhotoLibraryAddUsageDescription" = "Används för att spara genererade bilder i ditt fotobibliotek.";
+"NSPhotoLibraryUsageDescription" = "Används för att välja bilder för redigering och OCR.";

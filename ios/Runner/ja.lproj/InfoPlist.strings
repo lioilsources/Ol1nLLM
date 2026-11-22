@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "イメージスタジオで画像を作り始めたり調整したりするための写真を撮影するために使用します。";
+"NSMicrophoneUsageDescription" = "ミュージックスタジオは、作曲の素材として周囲で流れている音楽を録音し、ボイススタジオはクローン用の声を録音します。";
+"NSPhotoLibraryAddUsageDescription" = "生成した画像を写真ライブラリに保存するために使用します。";
+"NSPhotoLibraryUsageDescription" = "編集やOCRのために画像を選択するために使用します。";

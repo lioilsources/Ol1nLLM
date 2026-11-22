@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "Digunakan untuk mengambil foto sebagai awal atau untuk menyempurnakan gambar di Studio Gambar.";
+"NSMicrophoneUsageDescription" = "Studio Musik merekam musik yang diputar di sekitar Anda sebagai sampel untuk menggubah, dan Studio Suara merekam suara untuk dikloning.";
+"NSPhotoLibraryAddUsageDescription" = "Digunakan untuk menyimpan gambar yang dihasilkan ke pustaka foto Anda.";
+"NSPhotoLibraryUsageDescription" = "Digunakan untuk memilih gambar untuk diedit dan OCR.";

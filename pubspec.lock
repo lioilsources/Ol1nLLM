@@ -278,6 +278,11 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.0.0"
+  flutter_localizations:
+    dependency: "direct main"
+    description: flutter
+    source: sdk
+    version: "0.0.0"
   flutter_markdown:
     dependency: "direct main"
     description:
@@ -316,10 +321,10 @@ packages:
     dependency: "direct main"
     description:
       name: gal
-      sha256: "1bdef5879e4569910cfd8c77f460f98fcb7a1f910026af1daa80869856c67d66"
+      sha256: "5bd6542d6a387b76b50a803ad87573f3f505baea7c7153054f6d8fac7fc46d98"
       url: "https://pub.dev"
     source: hosted
-    version: "1.9.1"
+    version: "3.0.1"
   glob:
     dependency: transitive
     description:
@@ -456,6 +461,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.2.2"
+  intl:
+    dependency: "direct main"
+    description:
+      name: intl
+      sha256: "3df61194eb431efc39c4ceba583b95633a403f46c9fd341e550ce0bfa50e9aa5"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.20.2"
   jni:
     dependency: transitive
     description:
@@ -625,7 +638,7 @@ packages:
     source: hosted
     version: "2.2.1"
   path_provider_platform_interface:
-    dependency: "direct dev"
+    dependency: transitive
     description:
       name: path_provider_platform_interface
       sha256: "88f5779f72ba699763fa3a3b06aa4bf6de76c8e5de842cf6f29e2e06476c2334"

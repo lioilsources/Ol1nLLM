@@ -4,6 +4,7 @@ import '../core/constants/theme.dart';
 import '../models/persona.dart';
 import '../providers/chat_provider.dart';
 import '../services/persona_service.dart';
+import '../l10n/l10n.dart';
 
 class PersonaPicker extends ConsumerWidget {
   const PersonaPicker({super.key});
@@ -20,7 +21,7 @@ class PersonaPicker extends ConsumerWidget {
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Text(
-            'Nepodařilo se načíst persony:\n$e',
+            context.l10n.personasLoadFailed('$e'),
             textAlign: TextAlign.center,
             style: const TextStyle(color: AppTheme.textSecondary),
           ),
@@ -49,22 +50,22 @@ class _PersonaGrid extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Padding(
-                padding: EdgeInsets.only(bottom: 16),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
                 child: Column(
                   children: [
                     Text(
-                      'Vyber si personu',
-                      style: TextStyle(
+                      context.l10n.pickPersona,
+                      style: const TextStyle(
                         color: AppTheme.textPrimary,
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    SizedBox(height: 6),
+                    const SizedBox(height: 6),
                     Text(
-                      'S kým si dnes budeš povídat?',
-                      style: TextStyle(
+                      context.l10n.pickPersonaSub,
+                      style: const TextStyle(
                         color: AppTheme.textSecondary,
                         fontSize: 14,
                       ),

@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "Käytetään kuvan ottamiseen, josta aloitat tai jota hienosäädät Kuvastudiossa.";
+"NSMicrophoneUsageDescription" = "Musiikkistudio tallentaa ympärilläsi soivaa musiikkia sävellyksen pohjaksi, ja Äänistudio tallentaa kloonattavan äänen.";
+"NSPhotoLibraryAddUsageDescription" = "Käytetään luotujen kuvien tallentamiseen kuvakirjastoosi.";
+"NSPhotoLibraryUsageDescription" = "Käytetään kuvien valitsemiseen muokkausta ja tekstintunnistusta varten.";

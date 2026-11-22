@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "Usada para tirar uma fotografia com que começar ou refinar uma imagem no Estúdio de imagens.";
+"NSMicrophoneUsageDescription" = "O Estúdio de música grava a música que toca à tua volta como amostra para compor, e o Estúdio de voz grava uma voz para clonar.";
+"NSPhotoLibraryAddUsageDescription" = "Usada para guardar as imagens geradas na tua fototeca.";
+"NSPhotoLibraryUsageDescription" = "Usada para escolher imagens para edição e OCR.";

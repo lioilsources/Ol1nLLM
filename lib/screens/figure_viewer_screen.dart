@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../core/constants/theme.dart';
 import '../models/figure_clip.dart';
+import '../l10n/l10n.dart';
 
 /// Fullscreen viewer of a dancing figure: the GLB plays one of its dances,
 /// the chips below switch between them.
@@ -66,8 +67,8 @@ class _FigureViewerScreenState extends State<FigureViewerScreen> {
       SnackBar(
         content: Text(
           widget.figureId != null
-              ? 'ID figurky zkopírováno do schránky'
-              : 'Název zkopírován do schránky',
+              ? context.l10n.figureIdCopied
+              : context.l10n.figureNameCopied,
         ),
         duration: const Duration(seconds: 2),
       ),
@@ -80,7 +81,7 @@ class _FigureViewerScreenState extends State<FigureViewerScreen> {
       backgroundColor: AppTheme.background,
       appBar: AppBar(
         backgroundColor: AppTheme.background,
-        title: const Text('Tančící figurka'),
+        title: Text(context.l10n.dancingFigure),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(20),
           child: GestureDetector(
@@ -99,7 +100,7 @@ class _FigureViewerScreenState extends State<FigureViewerScreen> {
         ),
         actions: [
           IconButton(
-            tooltip: 'Sdílet GLB (Blender, 3D prohlížeče)',
+            tooltip: context.l10n.shareGlb,
             icon: const Icon(Icons.ios_share),
             onPressed: () => SharePlus.instance.share(
               ShareParams(
@@ -119,7 +120,7 @@ class _FigureViewerScreenState extends State<FigureViewerScreen> {
                   if (snap.hasError) {
                     return Center(
                       child: Text(
-                        'Figurku se nepodařilo načíst: ${snap.error}',
+                        context.l10n.figureLoadFailed('${snap.error}'),
                         style: const TextStyle(color: AppTheme.textSecondary),
                       ),
                     );
@@ -137,7 +138,7 @@ class _FigureViewerScreenState extends State<FigureViewerScreen> {
                     autoPlay: true,
                     animationName: _clip,
                     disableZoom: false,
-                    alt: 'Tančící figurka',
+                    alt: context.l10n.dancingFigure,
                   );
                 },
               ),

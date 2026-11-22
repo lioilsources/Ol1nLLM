@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "Dùng để chụp ảnh để bắt đầu hoặc tinh chỉnh một hình ảnh trong Xưởng ảnh.";
+"NSMicrophoneUsageDescription" = "Xưởng nhạc ghi lại nhạc đang phát quanh bạn làm mẫu để sáng tác, còn Xưởng giọng nói ghi lại một giọng nói để nhân bản.";
+"NSPhotoLibraryAddUsageDescription" = "Dùng để lưu các hình ảnh được tạo vào thư viện ảnh của bạn.";
+"NSPhotoLibraryUsageDescription" = "Dùng để chọn hình ảnh để chỉnh sửa và OCR.";

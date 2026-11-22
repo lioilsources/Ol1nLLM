@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "Brukes til å ta et bilde du kan starte med eller finjustere i Bildestudio.";
+"NSMicrophoneUsageDescription" = "Musikkstudio tar opp musikk som spilles rundt deg som utgangspunkt for komponering, og Stemmestudio tar opp en stemme som kan klones.";
+"NSPhotoLibraryAddUsageDescription" = "Brukes til å lagre genererte bilder i bildebiblioteket ditt.";
+"NSPhotoLibraryUsageDescription" = "Brukes til å velge bilder for redigering og OCR.";

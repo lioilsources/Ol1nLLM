@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "Görsel Stüdyosu’nda başlangıç yapacağın veya inceltmek istediğin bir fotoğraf çekmek için kullanılır.";
+"NSMicrophoneUsageDescription" = "Müzik Stüdyosu, besteleme için çevrende çalan müziği örnek olarak kaydeder; Ses Stüdyosu ise klonlanacak bir sesi kaydeder.";
+"NSPhotoLibraryAddUsageDescription" = "Oluşturulan görselleri fotoğraf kitaplığına kaydetmek için kullanılır.";
+"NSPhotoLibraryUsageDescription" = "Düzenleme ve OCR için görsel seçmekte kullanılır.";

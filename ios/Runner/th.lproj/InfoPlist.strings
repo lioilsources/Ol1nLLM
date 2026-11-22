@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "ใช้ถ่ายภาพเพื่อเริ่มต้นหรือปรับแต่งภาพในสตูดิโอภาพ";
+"NSMicrophoneUsageDescription" = "สตูดิโอเพลงบันทึกเพลงที่เล่นอยู่รอบตัวคุณเป็นตัวอย่างสำหรับแต่งเพลง และสตูดิโอเสียงบันทึกเสียงเพื่อโคลน";
+"NSPhotoLibraryAddUsageDescription" = "ใช้บันทึกภาพที่สร้างขึ้นลงในคลังรูปภาพของคุณ";
+"NSPhotoLibraryUsageDescription" = "ใช้เลือกภาพสำหรับแก้ไขและ OCR";
