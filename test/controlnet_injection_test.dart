@@ -703,4 +703,55 @@ void main() {
       expect(FaceIdentity.parse('typo'), FaceIdentity.none);
     });
   });
+
+  group('img2img source scaled to ~1 MP', () {
+    Map _encodeSrc(Map<String, dynamic> wf) =>
+        wf[(_byClass(wf, 'VAEEncode').single['inputs']['pixels'] as List)[0]]
+            as Map;
+
+    test('SDXL img2img encodes a ~1 MP copy, aspect kept', () {
+      final wf = (ComfyUIService()..setPreset(pony)).prepareForTest(
+        _img2img(),
+        prompt: 'x',
+        batch: 1,
+        seed: 1,
+        imageName: 'source.png',
+        sourceDepth: true,
+      );
+      final scale = _encodeSrc(wf);
+      expect(scale['class_type'], 'ImageScaleToTotalPixels');
+      expect(scale['inputs']['megapixels'], ComfyUIService.kImg2imgMegapixels);
+      final load = wf[(scale['inputs']['image'] as List)[0]] as Map;
+      expect(load['class_type'], 'LoadImage');
+      expect(load['inputs']['image'], 'source.png');
+      // The depth reference keeps reading the full-size upload.
+      expect(
+        _byClass(wf, 'DepthAnythingV2Preprocessor').single['inputs']['image'],
+        ['__depth_src__', 0],
+      );
+    });
+
+    test('txt2img and repose have nothing to scale', () {
+      final svc = ComfyUIService()..setPreset(pony);
+      for (final wf in [
+        svc.prepareForTest(_txt2img(), prompt: 'x', batch: 1, seed: 1),
+        svc.prepareForTest(_txt2img(),
+            prompt: 'x', batch: 1, seed: 1, depthImageName: 'ref.png'),
+      ]) {
+        expect(wf.containsKey('__img2img_scale__'), isFalse);
+      }
+    });
+
+    test('a masked round keeps the source size so the mask lines up', () {
+      final wf = (ComfyUIService()..setPreset(pony)).prepareForTest(
+        _img2img(),
+        prompt: 'x',
+        batch: 1,
+        seed: 1,
+        imageName: 'source.png',
+        maskName: 'mask.png',
+      );
+      expect(wf.containsKey('__img2img_scale__'), isFalse);
+    });
+  });
 }
