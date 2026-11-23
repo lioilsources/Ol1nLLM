@@ -440,3 +440,30 @@ func TestExportHangsARestyleOffItsPhoto(t *testing.T) {
 		t.Errorf("restyle visí pod %v, ne pod fotkou %v", restyle["parentId"], photo["id"])
 	}
 }
+
+// Within a model the flows run in blocks, not interleaved per style as the
+// manifest lists them: each flow prepares the reference differently and
+// ComfyUI caches only the previous prompt, so alternating recomputed the
+// depth map on every cell. Order inside a flow stays the manifest's.
+func TestGenerationOrderGroupsFlowsWithinModel(t *testing.T) {
+	in := []ManifestCell{
+		{ID: "img2img__b__x", Flow: "img2img", Model: "b"},
+		{ID: "repose__b__x", Flow: "repose", Model: "b"},
+		{ID: "img2img__a__y", Flow: "img2img", Model: "a"},
+		{ID: "repose__a__y", Flow: "repose", Model: "a"},
+		{ID: "img2img__a__x", Flow: "img2img", Model: "a"},
+		{ID: "repose__a__x", Flow: "repose", Model: "a"},
+	}
+	var got []string
+	for _, c := range generationOrder(in) {
+		got = append(got, c.ID)
+	}
+	want := []string{"img2img__a__y", "img2img__a__x", "repose__a__y", "repose__a__x",
+		"img2img__b__x", "repose__b__x"}
+	if strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Fatalf("pořadí\n got %v\nwant %v", got, want)
+	}
+	if in[0].ID != "img2img__b__x" {
+		t.Fatal("vstup se nesmí přeskládat na místě")
+	}
+}
