@@ -670,10 +670,22 @@ bez dozoru:
   `MAX_FIRST_CELL`) — to ComfyUI spadl na CPU, a celá matice tím končí. V runneru
   to řídí `LAB_SHARED_PAUSE` a `LAB_MAX_CELL_SECONDS`; platí i pro `lab resume`.
 - **Teplota.** Jednou za minutu si přečte nejteplejší zónu SPARKu
-  (`~/ops/thermal.csv`, sloupec `zone_max_c`); od 95 °C nepustí další buňku,
-  dokud neklesne pod 90 °C (`LAB_THERMAL_CMD/MAX/RESUME`). Když se log přečíst
-  nedá, pokračuje. První hodina (2026-10-09, tři souběžné zátěže): zóna
-  průměr 89 °C, maximum 95,2 °C, bez throttlingu.
+  (`~/ops/thermal.csv`, sloupec `zone_max_c`, přes `ssh
+  sync-spark-99bb_local` — alias `spark` bez Tailscale nepřeloží); od 95 °C
+  nepustí další buňku, dokud neklesne pod 90 °C (`LAB_THERMAL_CMD/MAX/RESUME`,
+  ve skriptu `THERMAL_CMD/MAX/RESUME`). Pojistka je v runneru, takže platí pro
+  **každý** běh — `lab run`, `lab resume`, UI i tenhle skript — a je
+  **fail-closed**: třikrát po sobě nečitelná teplota buňku pozdrží, dokud se
+  číslo nevrátí (UI to ukáže ve zprávě běhu). Vypnout jde jen výslovně,
+  `LAB_THERMAL_CMD=""`. Proč: 2026-11-23 SPARK třikrát spadl při plné zátěži
+  SDXL (SoC 96–97 °C) — skript volal nepřeložitelný alias a pojistka tiše
+  pokračovala, resume a UI ji neměly vůbec. První hodina (2026-10-09, tři
+  souběžné zátěže): zóna průměr 89 °C, maximum 95,2 °C, bez throttlingu.
+- **Jeden běh naráz.** Generovat smí na tomhle Macu jen jeden běh labu
+  (`flock` na `~/Library/Caches/ol1n-lab/generate.lock`; tunel i LAN vedou na
+  týž SPARK, proto zámek nezávisí na URL). Druhý skončí hned s chybou, kdo
+  generuje. Týž den se běh z UI a `lab resume` prokládaly: každý bral úlohu
+  toho druhého jako cizí, pauzy zmizely a GPU jelo naplno.
 - **Bez FLUXu.** Bere jen modely s generickým SDXL grafem; které to jsou a
   které čtou tagy, říká registr, které jsou nainstalované, ComfyUI.
 - **Tvář** (`FACE`, výchozí `faceid` — lehčí a rychlejší; `instantid` jde
