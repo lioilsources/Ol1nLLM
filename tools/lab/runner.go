@@ -263,6 +263,14 @@ func (r *Run) Generate() {
 		_ = r.fail("run", fmt.Errorf("chybí manifest — nejdřív dump"))
 		return
 	}
+	if !r.Spec.Dry {
+		release, err := acquireRunLock(r.State().ID)
+		if err != nil {
+			_ = r.fail("run", err)
+			return
+		}
+		defer release()
+	}
 	_ = os.MkdirAll(filepath.Join(r.Dir, "img"), 0o755)
 	_ = os.MkdirAll(filepath.Join(r.Dir, "thumb"), 0o755)
 
@@ -281,6 +289,12 @@ func (r *Run) Generate() {
 	var authFails, netFails atomic.Int32
 	var aborted atomic.Bool
 	polite := politeFromEnv()
+	polite.say = func(m string) {
+		if m != "" {
+			fmt.Println("▸ " + m)
+		}
+		r.update(func(s *RunState) { s.Message = m })
+	}
 	lastModel := ""
 	// A restyle is drawn over the picture its position cell makes, so that
 	// picture has to be on disk before the restyle is queued — hence batches,
@@ -302,8 +316,8 @@ func (r *Run) Generate() {
 			}
 			firstOfModel := c.Model != lastModel
 			lastModel = c.Model
-			if !r.Spec.Dry && c.Backend != BackendNim && workers == 1 {
-				polite.wait(ctx, r.env.Comfy)
+			if !r.Spec.Dry && c.Backend != BackendNim {
+				polite.wait(ctx, r.env.Comfy, workers == 1)
 			}
 			slots <- struct{}{}
 			wg.Add(1)
@@ -1007,12 +1021,19 @@ func (r *Run) exportFailed(err error) {
 // In this mode a "no face" error also stops the run instead of failing
 // thousands of cells one by one.
 //
-//	LAB_THERMAL_CMD     a shell command printing the machine's temperature
-//	LAB_THERMAL_MAX     at or above this no new cell starts …
-//	LAB_THERMAL_RESUME  … until it is back under this
+//	LAB_THERMAL_CMD     a shell command printing the machine's temperature;
+//	                    defaults to SPARK's thermal log, set it empty to turn
+//	                    the guard off (another ComfyUI, a dry run elsewhere)
+//	LAB_THERMAL_MAX     at or above this no new cell starts … (default 95)
+//	LAB_THERMAL_RESUME  … until it is back under this (default 90)
 //
-// The temperature is read at most once a minute; a command that fails or
-// prints no number never holds the run up.
+// The guard applies to every path that generates — `lab run`, `lab resume`,
+// the UI and complete.sh — because SPARK went down three times in one day
+// (2026-11-23) under runs that had no guard at all. The temperature is read at
+// most once a minute. It fails closed: after thermalMaxMisses readings in a
+// row that give no number, no new cell starts until one does. A guard that
+// quietly carries on when it cannot see is how those runs cooked the machine
+// (complete.sh asked for an ssh alias that did not resolve off Tailscale).
 type polite struct {
 	pause    time.Duration
 	maxCell  float64
@@ -1020,8 +1041,25 @@ type polite struct {
 
 	thermalCmd                string
 	thermalMax, thermalResume float64
-	thermalAt                 *time.Time
+	thermal                   *thermalState
+	// say puts a line where the person watching the run sees it — the run's
+	// message in the UI, stdout in the terminal.
+	say func(string)
 }
+
+type thermalState struct {
+	at     time.Time
+	misses int
+}
+
+// defaultThermalCmd reads the hottest zone from SPARK's thermal log over the
+// LAN name, which resolves without Tailscale (the `spark` alias does not).
+const defaultThermalCmd = "ssh -o ConnectTimeout=5 -o BatchMode=yes sync-spark-99bb_local " +
+	"'tail -1 ~/ops/thermal.csv' | cut -d, -f9"
+
+// thermalMaxMisses is how many unreadable temperatures in a row are put down
+// to a blip before the run holds.
+const thermalMaxMisses = 3
 
 func politeFromEnv() polite {
 	var p polite
@@ -1034,24 +1072,33 @@ func politeFromEnv() polite {
 	if v, err := strconv.ParseFloat(os.Getenv("LAB_MAX_FIRST_CELL_SECONDS"), 64); err == nil && v > 0 {
 		p.maxFirst = v
 	}
-	p.thermalCmd = os.Getenv("LAB_THERMAL_CMD")
-	p.thermalMax, _ = strconv.ParseFloat(os.Getenv("LAB_THERMAL_MAX"), 64)
-	p.thermalResume, _ = strconv.ParseFloat(os.Getenv("LAB_THERMAL_RESUME"), 64)
-	if p.thermalResume <= 0 || p.thermalResume > p.thermalMax {
+	cmd, set := os.LookupEnv("LAB_THERMAL_CMD")
+	if !set {
+		cmd = defaultThermalCmd
+	}
+	p.thermalCmd = strings.TrimSpace(cmd)
+	p.thermalMax = 95
+	if v, err := strconv.ParseFloat(os.Getenv("LAB_THERMAL_MAX"), 64); err == nil && v > 0 {
+		p.thermalMax = v
+	}
+	p.thermalResume = 90
+	if v, err := strconv.ParseFloat(os.Getenv("LAB_THERMAL_RESUME"), 64); err == nil && v > 0 {
+		p.thermalResume = v
+	}
+	if p.thermalResume > p.thermalMax {
 		p.thermalResume = p.thermalMax
 	}
-	p.thermalAt = new(time.Time)
+	p.thermal = &thermalState{}
+	p.say = func(m string) { fmt.Println("▸ " + m) }
 	return p
 }
 
-// wait holds until nothing is running or pending — the lab submits one cell
-// at a time and waits for it, so anything in the queue here is someone
-// else's — and then for the pause. An unreachable queue does not block: the
-// cell will fail on its own and say why.
-func (p polite) wait(ctx context.Context, c *Comfy) {
-	if p.pause <= 0 {
-		return
-	}
+// wait runs before each cell sent to ComfyUI. With a pause set and one cell at
+// a time it first holds until nothing is running or pending — the lab submits
+// one cell and waits for it, so anything in the queue here is someone else's.
+// An unreachable queue does not block: the cell will fail on its own and say
+// why. The temperature is checked whatever the pause.
+func (p polite) wait(ctx context.Context, c *Comfy, alone bool) {
 	sleep := func(d time.Duration) bool {
 		select {
 		case <-ctx.Done():
@@ -1060,17 +1107,21 @@ func (p polite) wait(ctx context.Context, c *Comfy) {
 			return true
 		}
 	}
-	for {
-		q, err := c.Queue()
-		if err != nil || q.Running+q.Pending == 0 {
-			break
-		}
-		if !sleep(5 * time.Second) {
-			return
+	if p.pause > 0 && alone {
+		for {
+			q, err := c.Queue()
+			if err != nil || q.Running+q.Pending == 0 {
+				break
+			}
+			if !sleep(5 * time.Second) {
+				return
+			}
 		}
 	}
 	p.cool(sleep)
-	sleep(p.pause)
+	if p.pause > 0 {
+		sleep(p.pause)
+	}
 }
 
 // temperature runs the configured command; ok is false when there is no
@@ -1086,24 +1137,44 @@ func (p polite) temperature() (float64, bool) {
 	return v, err == nil
 }
 
-// cool holds the next cell back while the machine is too hot: from the
+// cool holds the next cell back while the machine is too hot — from the
 // maximum down to the resume temperature, so it does not start again a
-// degree below the line and cross it with the next cell.
+// degree below the line and cross it with the next cell — or while the
+// temperature cannot be read.
 func (p polite) cool(sleep func(time.Duration) bool) {
-	if p.thermalCmd == "" || p.thermalMax <= 0 || time.Since(*p.thermalAt) < time.Minute {
+	if p.thermalCmd == "" || p.thermalMax <= 0 || time.Since(p.thermal.at) < time.Minute {
 		return
 	}
-	*p.thermalAt = time.Now()
-	t, ok := p.temperature()
-	if !ok || t < p.thermalMax {
+	read := func() (float64, bool) {
+		p.thermal.at = time.Now()
+		t, ok := p.temperature()
+		if ok {
+			p.thermal.misses = 0
+		} else {
+			p.thermal.misses++
+		}
+		return t, ok
+	}
+	t, ok := read()
+	blind := func() bool { return !ok && p.thermal.misses >= thermalMaxMisses }
+	hot := ok && t >= p.thermalMax
+	if !hot && !blind() {
 		return
 	}
-	fmt.Printf("▸ %.1f °C — čekám, až stroj vychladne pod %.0f °C\n", t, p.thermalResume)
-	for ok && t >= p.thermalResume {
+	for {
+		switch {
+		case blind():
+			p.say(fmt.Sprintf("teplotu stroje nejde přečíst (%d× za sebou) — čekám; "+
+				"vypnout: LAB_THERMAL_CMD=\"\"", p.thermal.misses))
+		case ok && t >= p.thermalResume:
+			p.say(fmt.Sprintf("%.1f °C — čekám, až stroj vychladne pod %.0f °C", t, p.thermalResume))
+		default:
+			p.say("")
+			return
+		}
 		if !sleep(time.Minute) {
 			return
 		}
-		t, ok = p.temperature()
+		t, ok = read()
 	}
-	*p.thermalAt = time.Now()
 }
