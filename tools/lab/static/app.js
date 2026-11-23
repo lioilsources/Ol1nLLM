@@ -12,6 +12,7 @@ const state = {
   poseId: '',
   faceIdentity: 'none',
   faceDetail: false,
+  refTags: false,
   lora: '',
   ref: null,
   promptsYaml: null,
@@ -462,6 +463,7 @@ $('ref').onchange = async () => {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
     state.ref = data;
+    refreshRefTags();
     $('refpreview').innerHTML = data.thumb
       ? `<img src="${esc(data.thumb)}" alt="předloha" style="width:100%;border-radius:4px;margin-bottom:8px">`
       : '<p class="hint">nahráno</p>';
@@ -470,6 +472,39 @@ $('ref').onchange = async () => {
   }
   estimate();
 };
+
+// WD14 tags of the reference: previewed as soon as there is a reference and
+// the box is ticked, so the prompt a run sends is on screen before it starts.
+$('refTags').onchange = () => {
+  state.refTags = $('refTags').checked;
+  refreshRefTags();
+  estimate();
+};
+
+async function refreshRefTags() {
+  const hint = $('reftagshint');
+  if (!state.refTags) {
+    hint.textContent = '';
+    return;
+  }
+  if (!state.ref?.localPath) {
+    hint.textContent = 'Nahraj referenční obrázek — tagy se přečtou z něj.';
+    return;
+  }
+  const path = state.ref.localPath;
+  hint.textContent = 'čtu tagy…';
+  try {
+    const t = await api('/api/ref-tags', { method: 'POST', body: JSON.stringify({ refFile: path }) });
+    if (state.ref?.localPath !== path || !state.refTags) return; // stale answer
+    const dropped = t.dropped?.length
+      ? `<br>vynecháno (popisují fotku, ne obsah): ${esc(t.dropped.join(', '))}`
+      : '';
+    hint.innerHTML = `Připojí se za každý prompt, s prázdným polem jsou promptem samy:<br>`
+      + `<code>${esc(t.tags.join(', '))}</code>${dropped}`;
+  } catch (err) {
+    hint.innerHTML = `<span class="danger">${esc(err.message)}</span>`;
+  }
+}
 
 // The prompt YAML is parsed on upload, so a typo shows while the file is still
 // on screen. What comes back is a list of ids and the families each one covers
@@ -520,7 +555,8 @@ function spec() {
   const values = $('sweepValues').value.trim();
   const target = $('sweepTarget').value;
   return {
-    title: ($('prompts').value.split('\n')[0] || state.promptsYamlName || 'běh').slice(0, 60),
+    title: ($('prompts').value.split('\n')[0] || state.promptsYamlName
+      || (state.refTags ? 'tagy z předlohy' : '') || 'běh').slice(0, 60),
     models: [...state.models],
     prompts: $('prompts').value.split('\n').map((s) => s.trim()).filter(Boolean),
     promptsYaml: state.promptsYaml || '',
@@ -535,6 +571,7 @@ function spec() {
     poseId: state.poseId,
     faceIdentity: state.faceIdentity,
     faceDetail: state.faceDetail,
+    refTags: state.refTags,
     seed: Number($('seed').value) || 777,
     batch: Number($('batch').value) || 1,
     negative: $('negative').value.trim(),

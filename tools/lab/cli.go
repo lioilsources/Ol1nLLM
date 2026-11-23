@@ -32,6 +32,8 @@ func runCLI(env *Env, args []string) error {
 	hairstyles := fs.String("hairstyles", "", "id účesů oddělená čárkou (výchozí: všechny)")
 	ref := fs.String("ref", "", "referenční obrázek")
 	refPrompt := fs.String("ref-prompt", "", "vygenerovat referenci z promptu")
+	refTags := fs.Bool("ref-tags", false,
+		"WD14 tagy z předlohy za každý prompt, bez promptu jako prompt (make lab-wd14)")
 	pose := fs.String("pose", "none", "none|depth|template")
 	poseID := fs.String("pose-id", "", "id šablony pózy (ol1..ol8)")
 	faceIdentity := fs.String("face-identity", "none",
@@ -68,7 +70,7 @@ func runCLI(env *Env, args []string) error {
 		BaseModel: *baseModel, Hint: *hint,
 		HairFile: *hairFile, HairMasks: *hairMasks, Hairstyles: splitCSV(*hairstyles),
 		PoseMode: *pose, PoseID: *poseID,
-		FaceIdentity: *faceIdentity, FaceDetail: *faceDetail,
+		FaceIdentity: *faceIdentity, FaceDetail: *faceDetail, RefTags: *refTags,
 		Seed: *seed, Batch: *batch, Negative: *negative, EditDenoise: *editDenoise, Latent: *latent,
 		Lora:  *lora,
 		Sweep: *sweep, Overrides: splitCSV(*overrides), Dry: *dry,
@@ -103,12 +105,17 @@ func runCLI(env *Env, args []string) error {
 	case *charactersFile != "":
 		// A character is a whole prompt on its own when there is no position
 		// to put it in.
+	case *refTags:
+		// The reference's tags are the prompt.
 	default:
-		return fmt.Errorf("chybí --prompts, --subject, --prompts-yaml nebo --characters")
+		return fmt.Errorf("chybí --prompts, --subject, --prompts-yaml, --characters nebo --ref-tags")
 	}
 	titleFile := *promptsYAML
 	if titleFile == "" {
 		titleFile = *charactersFile
+	}
+	if titleFile == "" && *refTags {
+		titleFile = "tagy z předlohy"
 	}
 	spec.Title = firstOr(spec.Prompts, filepath.Base(titleFile))
 
@@ -147,6 +154,9 @@ func runCLI(env *Env, args []string) error {
 		} else {
 			spec.RefName = filepath.Base(abs)
 		}
+	}
+	if spec.RefTags && spec.RefFile == "" {
+		return fmt.Errorf("--ref-tags potřebuje --ref")
 	}
 	if spec.PoseMode == "template" && spec.PoseID == "" {
 		return fmt.Errorf("--pose template vyžaduje --pose-id (ol1..ol8)")

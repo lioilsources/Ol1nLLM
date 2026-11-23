@@ -54,6 +54,12 @@ type Spec struct {
 
 	RefName string `json:"refName"` // server-side filename (after upload)
 	RefFile string `json:"refFile"` // local path, for the latent bucket
+	// RefTags reads WD14 booru tags off the reference (reftags.go) and puts
+	// them behind every prompt line, or makes them the prompt when the box is
+	// empty. The tags themselves land in refTagText at dump time and in
+	// ref-tags.json of the run — never in spec.json, so a replay re-reads them.
+	RefTags    bool `json:"refTags,omitempty"`
+	refTagText string
 
 	PoseMode    string `json:"poseMode"` // none | depth | template
 	PoseID      string `json:"poseId"`
@@ -297,7 +303,7 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 	// is prompts too: with one the box is allowed to be empty.
 	// A character line is a prompt as well — "a redhead with green eyes" alone
 	// is a legal column.
-	if len(s.Prompts) == 0 && s.PromptsYAML == "" && len(characters) == 0 {
+	if len(s.Prompts) == 0 && s.PromptsYAML == "" && len(characters) == 0 && !s.RefTags {
 		e.Blockers = append(e.Blockers, "napiš aspoň jeden prompt")
 	}
 	if len(s.Flows) == 0 {
@@ -336,6 +342,9 @@ func (s *Spec) Estimate(man *Manifest, secondsPerCell map[string]float64) Estima
 				"%s umí jen hloubkový hint — buňky s hranami (canny) se u něj přeskočí",
 				strings.Join(depthOnly, ", ")))
 		}
+	}
+	if s.RefTags && s.RefFile == "" {
+		e.Blockers = append(e.Blockers, "tagy z předlohy potřebují referenční obrázek")
 	}
 	if s.needsRef() && s.RefName == "" {
 		e.Blockers = append(e.Blockers,
@@ -660,9 +669,10 @@ func (s *Spec) DumpEnv(dir string) ([]string, error) {
 		}
 		return a
 	}
+	prompts := withRefTags(s.Prompts, s.refTagText)
 	promptsPath := filepath.Join(dir, "prompts.txt")
 	if err := os.WriteFile(promptsPath,
-		[]byte(strings.Join(s.Prompts, "\n")+"\n"), 0o644); err != nil {
+		[]byte(strings.Join(prompts, "\n")+"\n"), 0o644); err != nil {
 		return nil, err
 	}
 	// The YAML is parsed here and handed over as JSON, next to prompts.txt:
@@ -699,7 +709,7 @@ func (s *Spec) DumpEnv(dir string) ([]string, error) {
 	set("OUT_DIR", filepath.Join(dir, "wf"))
 	set("MANIFEST", "1")
 	set("PROMPTS_FILE", promptsPath)
-	set("SUBJECT", firstOr(s.Prompts, "a photo"))
+	set("SUBJECT", firstOr(prompts, "a photo"))
 	set("SEED", strconv.Itoa(s.Seed))
 	set("BATCH", strconv.Itoa(maxIntv(s.Batch, 1)))
 	set("FLOWS", strings.Join(s.Flows, ","))
