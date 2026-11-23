@@ -1098,8 +1098,9 @@ class ImageStudioNotifier extends StateNotifier<ImageStudioState>
               (!isRepose || reposePrefix)
           ? preset.positivePrefix
           : null,
-      // img2img latents come from VAEEncode of the source image, so recorded
-      // dimensions stay null (source-derived) even when a pose is active.
+      // img2img latents come from VAEEncode of the source image (scaled to
+      // ~1 MP on SDXL, aspect kept), so recorded dimensions stay null
+      // (source-derived) even when a pose is active.
       // Repose records the bucket snapped to the reference's aspect.
       width: patched && !isImg2img
           ? (isRepose

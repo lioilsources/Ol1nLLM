@@ -1680,10 +1680,53 @@ class ComfyUIService implements ImageBackend {
       if (inputs.containsKey('noise_seed')) inputs['noise_seed'] = seed;
     }
 
+    if (preset.ckptName != null && imageName != null && maskName == null) {
+      _scaleImg2imgSource(wf);
+    }
+
     // Last, after the patch loop, so the face pass can copy the sampler's
     // *final* steps/cfg/sampler instead of the template's placeholders.
     if (faceDetail) _injectFaceDetailer(wf, seed);
     return wf;
+  }
+
+  /// Megapixels an SDXL img2img source is scaled to before VAEEncode.
+  static const kImg2imgMegapixels = 1.0;
+
+  /// SDXL img2img samples at whatever size the source photo has, because the
+  /// latent is VAEEncode of the upload. A 1536×2048 reference is 3.1 MP:
+  /// the KSampler took 60 s where repose on the same model, at the ~1 MP the
+  /// model was trained on, took 22 s (lab, cyberrealistic-xl, 2026-11-23),
+  /// and SDXL off its training size is the one known to double limbs and
+  /// lose the composition. `ImageScaleToTotalPixels` brings the source to
+  /// ~1 MP keeping its aspect — nothing is cropped, unlike snapping to a
+  /// bucket — so a small source goes up and a phone photo comes down.
+  /// Only the latent's source: the depth and face references keep reading
+  /// the full-size upload (`__depth_src__`), which only helps the face
+  /// detector. Masked rounds keep their size — the mask has to line up.
+  void _scaleImg2imgSource(Map<String, dynamic> wf) {
+    const scaleId = '__img2img_scale__';
+    for (final node in wf.values.toList()) {
+      final n = (node as Map).cast<String, dynamic>();
+      if (n['class_type'] != 'VAEEncode') continue;
+      final inputs = (n['inputs'] as Map).cast<String, dynamic>();
+      final pixels = inputs['pixels'];
+      if (pixels is! List || pixels.length != 2) continue;
+      final src = wf[pixels[0]] as Map?;
+      if (src == null || src['class_type'] != 'LoadImage') continue;
+      wf[scaleId] = {
+        'class_type': 'ImageScaleToTotalPixels',
+        '_meta': {'title': 'img2img source → ~1 MP'},
+        'inputs': {
+          'image': [pixels[0], pixels[1]],
+          'upscale_method': 'lanczos',
+          'megapixels': kImg2imgMegapixels,
+          // Multiples of 8 keep the aspect closest; VAEEncode needs them.
+          'resolution_steps': 8,
+        },
+      };
+      inputs['pixels'] = [scaleId, 0];
+    }
   }
 
   // ── ControlNet injection ────────────────────────────────────

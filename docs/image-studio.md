@@ -246,6 +246,18 @@ zůstává odvozený ze zdrojového obrázku (VAEEncode). Strength 1.0 /
 end_percent 1.0 — slabší hodnoty prohrávaly s promptem (ověřeno).
 `selectedPoseId` se persistuje v session jako `selectedLora`.
 
+**img2img zdroj na ~1 MP**: SDXL img2img latent je VAEEncode nahrané fotky,
+takže se dřív samplovalo v jejím plném rozlišení — fotka 1536×2048 je
+3,1 MP a KSampler na ní běžel 60 s, kde repose téhož modelu na ~1 MP 22 s
+(lab, cyberrealistic-xl, 2026-11-23). `_scaleImg2imgSource()` proto mezi
+`LoadImage` a `VAEEncode` vloží `__img2img_scale__`
+(`ImageScaleToTotalPixels`, `kImg2imgMegapixels` = 1.0, lanczos, násobky 8):
+poměr stran zůstává, nic se neořízne, malá fotka jde nahoru. Celá buňka
+72 → 26 s; na ověřovací buňce styl prošel výrazněji, kompozice beze změny.
+Hloubka i tvář dál čtou plnou předlohu (`__depth_src__`). Kolo s maskou
+(inpaint, Kadeřník) velikost drží, maska musí sedět. Výstup img2img má tedy
+~1 MP, ne rozlišení zdroje.
+
 **Auto póza ze zdroje (img2img)**: když u pose-capable modelu (SDXL,
 `supportsPose`) běží `edit()` **bez** vybrané šablony, `_prepare()` protáhne
 zdrojový obrázek přes `_injectSourceDepthControlNet()` — `LoadImage(zdroj) →
