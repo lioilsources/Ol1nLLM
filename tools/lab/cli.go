@@ -185,7 +185,7 @@ func resolveRunDir(env *Env, arg string) (string, error) {
 		// Run ids are timestamps, so the lexically last one is the newest.
 		for i := len(entries) - 1; i >= 0; i-- {
 			e := entries[i]
-			if !e.IsDir() || strings.HasPrefix(e.Name(), "_") {
+			if !isRunDir(base, e) || strings.HasPrefix(e.Name(), "_") {
 				continue
 			}
 			if _, err := os.Stat(filepath.Join(base, e.Name(), "state.json")); err == nil {
@@ -618,4 +618,19 @@ func shortDuration(d time.Duration) string {
 		return fmt.Sprintf("%dm%02ds", int(d.Minutes()), int(d.Seconds())%60)
 	}
 	return fmt.Sprintf("%dh%02dm", int(d.Hours()), int(d.Minutes())%60)
+}
+
+// isRunDir reports whether a build/lab entry is a run directory. Finished runs
+// are offloaded to an external disk and left behind as symlinks, which a
+// DirEntry reports as non-directories — Stat follows the link. A dangling
+// link (disk unplugged) is skipped, not an error.
+func isRunDir(base string, e os.DirEntry) bool {
+	if e.IsDir() {
+		return true
+	}
+	if e.Type()&os.ModeSymlink == 0 {
+		return false
+	}
+	st, err := os.Stat(filepath.Join(base, e.Name()))
+	return err == nil && st.IsDir()
 }
