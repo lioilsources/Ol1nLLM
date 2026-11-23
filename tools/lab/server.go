@@ -659,7 +659,7 @@ func (s *Server) loadRuns() {
 		return
 	}
 	for _, e := range entries {
-		if !e.IsDir() || strings.HasPrefix(e.Name(), "_") {
+		if !isRunDir(base, e) || strings.HasPrefix(e.Name(), "_") {
 			continue
 		}
 		dir := filepath.Join(base, e.Name())
