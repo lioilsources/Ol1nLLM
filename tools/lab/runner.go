@@ -274,9 +274,7 @@ func (r *Run) Generate() {
 	_ = os.MkdirAll(filepath.Join(r.Dir, "img"), 0o755)
 	_ = os.MkdirAll(filepath.Join(r.Dir, "thumb"), 0o755)
 
-	// Grouped by model so each checkpoint loads once instead of once per style.
-	cells := append([]ManifestCell{}, man.Cells...)
-	sort.SliceStable(cells, func(i, j int) bool { return cells[i].Model < cells[j].Model })
+	cells := generationOrder(man.Cells)
 
 	r.update(func(s *RunState) { s.Status = "running"; s.Message = "" })
 	// LAB_PARALLEL keeps that many prompts in ComfyUI's queue. One at a time, the
@@ -399,6 +397,26 @@ func (r *Run) Generate() {
 		s.Status = "done"
 		s.Message = fmt.Sprintf("hotovo: %d ok, %d chyb", s.Done, s.Failed)
 	})
+}
+
+// generationOrder groups cells by model, so each checkpoint loads once
+// instead of once per style, and within a model by flow. ComfyUI keeps the outputs of the previous
+// prompt only, and the flows prepare the reference differently (img2img
+// reads the photo as it is, repose fits it to the latent first), so the
+// manifest's order — img2img and repose of one style side by side — threw
+// the depth map away on every cell. Measured 2026-11-23 on run
+// 20261123-160559 (cyberrealistic-xl, 1536×2048 reference): 8.7 s of
+// DepthAnything per cell when alternating, none when grouped; 104 s per
+// img2img+repose pair down to 86 s. The images are the same.
+func generationOrder(in []ManifestCell) []ManifestCell {
+	cells := append([]ManifestCell{}, in...)
+	sort.SliceStable(cells, func(i, j int) bool {
+		if cells[i].Model != cells[j].Model {
+			return cells[i].Model < cells[j].Model
+		}
+		return cells[i].Flow < cells[j].Flow
+	})
+	return cells
 }
 
 // fluxToCheckpoint rewrites a split FLUX graph (UNETLoader + DualCLIPLoader +
