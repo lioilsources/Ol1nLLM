@@ -223,6 +223,9 @@ make stylemap-video RUN=<běh> NAME=mrizka GRID=1 RATE=2 LABEL=1
 # běh labu → 2 modely pod sebou, jen úplné snímky, minutová videa po promptech
 make stylemap-video RUN=<běh> NAME=pod-sebou GRID=1 COLS=1 COMPLETE=1 SPLIT=60 RATE=3
 
+# běh labu → styl → všechny prompty, minutová videa po stylech
+make stylemap-video RUN=<běh> NAME=styl-prompty OUTER=style SPLIT=60 RATE=4
+
 # mapa stylů (pack) → slideshow po LPIPS trase jako v appce
 make stylemap-video SET=<sada> NAME=mapa RATE=8 FADE=0.3
 ```
@@ -291,6 +294,19 @@ prompt 2 ─┬─ bez stylu ─ model A, B, C      přes vybrané obrázky (--n
   (neuvedené modely jdou za ně).
 - Víc flow (repose + img2img) se střídá uvnitř stylu; jednu vybereš
   `WHERE="flow=repose"`.
+- **`OUTER=style`** otočí vnější úroveň: styl → všechny prompty, pak další
+  styl. `SPLIT` pak dělí **mezi styly** (styl nikdy nepřeteče do dalšího
+  videa).
+
+```
+OUTER=prompt (výchozí)                  OUTER=style
+prompt 1 ─┬─ bez stylu                 bez stylu ─┬─ prompt 1
+          ├─ Lascaux                              ├─ prompt 2
+          └─ …                                    └─ …
+prompt 2 ─┬─ bez stylu                 Lascaux ───┬─ prompt 1
+          └─ …                                    └─ …
+SPLIT řeže mezi prompty                 SPLIT řeže mezi styly
+```
 
 ### 4. Snímek: jeden obrázek, nebo mřížka (`GRID=1`, `COLS=`, `LABEL=1`)
 
@@ -338,8 +354,8 @@ SPLIT=60 (vteřin), dělí se jen mezi prompty:
 - **`FADE`** podíl času snímku na prolínačku (výchozí 0.4, `0` = střih). Při
   vysoké rychlosti je čistší střih.
 - **`SPLIT=N`** rozseká výstup na víc videí po nejvýš N vteřinách, **jen mezi
-  prompty** — prompt nikdy nepřeteče do dalšího videa; prompt delší než N
-  dostane video sám.
+  prompty** (s `OUTER=style` mezi styly) — skupina nikdy nepřeteče do dalšího
+  videa; skupina delší než N dostane video sama.
 - **`VIDEO_ARGS="--max-seconds N"`** naopak **zkrátí** jedno video rovnoměrným
   výběrem (u `ORDER=style` po celých stylech). Se `SPLIT` se nejdřív zkrátí
   a pak rozdělí — obvykle chceš jen jedno z nich.

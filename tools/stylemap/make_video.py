@@ -136,7 +136,8 @@ def tour_order(pics: list[Pic], set_dir: Path, items: list[dict], replan: bool) 
     return sorted(pics, key=lambda p: p.extra[key])
 
 
-def style_order(pics: list[Pic], styles: list[str], models: list[str]) -> list[Pic]:
+def style_order(pics: list[Pic], styles: list[str], models: list[str],
+                outer: str = "prompt") -> list[Pic]:
     """Prompt → style → flow → model. Styles the order list does not know
     (candidates from a file) follow in the order they first appear."""
     rank: dict[str, int] = {BASELINE: -1}
@@ -152,6 +153,8 @@ def style_order(pics: list[Pic], styles: list[str], models: list[str]) -> list[P
     frank: dict[str, int] = {}
     for p in pics:
         frank.setdefault(p.flow, len(frank))
+    if outer == "style":  # one style through every prompt, then the next style
+        return sorted(pics, key=lambda p: (rank[p.style], p.prompt, frank[p.flow], mrank[p.model]))
     return sorted(pics, key=lambda p: (p.prompt, rank[p.style], frank[p.flow], mrank[p.model]))
 
 
@@ -305,10 +308,11 @@ def grid_frame(slide: list[Pic | None], slots: list[str], w: int, h: int,
     return np.asarray(canvas)
 
 
-def split_parts(prompts: list[int], seconds_each: float, limit: float) -> list[tuple[int, int]]:
+def split_parts(prompts: list, seconds_each: float, limit: float) -> list[tuple[int, int]]:
     """Cut the slide list into [start, end) parts of at most `limit` seconds,
-    only where the prompt changes: a prompt never spans two videos. A prompt
-    longer than the limit gets a part of its own."""
+    only where the outer key (prompt, or style with --outer style) changes:
+    a group never spans two videos. A group longer than the limit gets a part
+    of its own."""
     runs: list[tuple[int, int]] = []
     for i, pr in enumerate(prompts):
         if runs and prompts[runs[-1][0]] == pr:
@@ -324,7 +328,7 @@ def split_parts(prompts: list[int], seconds_each: float, limit: float) -> list[t
     return parts
 
 
-def render_parts(args, w: int, h: int, prompts: list[int], frame) -> None:
+def render_parts(args, w: int, h: int, prompts: list, frame) -> None:
     """The whole video, or with --split one file per part (NAME-01.mp4 …)."""
     hold = args.fps / args.rate
     n = len(prompts)
@@ -332,7 +336,8 @@ def render_parts(args, w: int, h: int, prompts: list[int], frame) -> None:
         render(args, args.out, w, h, hold, 0, n, frame)
         return
     parts = split_parts(prompts, 1 / args.rate, args.split)
-    print(f"→ {len(parts)} videí po nejvýš {args.split:g} s, dělené mezi prompty", flush=True)
+    print(f"→ {len(parts)} videí po nejvýš {args.split:g} s, dělené mezi "
+          f"{'styly' if args.outer == 'style' else 'prompty'}", flush=True)
     for k, (a, b) in enumerate(parts, 1):
         out = args.out.with_name(f"{args.out.stem}-{k:02d}{args.out.suffix}")
         render(args, out, w, h, hold, a, b, frame)
@@ -385,6 +390,9 @@ def main() -> None:
     ap.add_argument("--order", choices=["tour", "style"],
                     help="tour = trasa mapy (výchozí u --set), style = styl po stylu přes "
                          "všechny modely (výchozí u --run)")
+    ap.add_argument("--outer", choices=["prompt", "style"], default="prompt",
+                    help="u --order style: prompt = prompt → styly (výchozí), style = styl → "
+                         "prompty; --split dělí podle vnější úrovně")
     ap.add_argument("--model-order", default="",
                     help="pořadí modelů uvnitř stylu, čárkami (jinak pořadí běhu)")
     ap.add_argument("--label", action="store_true", help="vypálit popisek „styl · model“")
@@ -441,7 +449,7 @@ def main() -> None:
             # step from one style to the next is a small one too.
             styles = list(dict.fromkeys(p.style for p in tour_order(pics, args.set, items, False)))
         models = [m for m in args.model_order.split(",") if m] + models
-        pics = style_order(pics, styles, models)
+        pics = style_order(pics, styles, models, args.outer)
     else:
         pics = tour_order(pics, args.set, items, replan=bool(where) and not args.no_replan)
 
@@ -488,8 +496,10 @@ def main() -> None:
         print(f"{len(slides)} stylů × {len(slots)} modelů ({layout[0]}×{layout[1]}) · "
               f"{args.rate:g}/s · prolínačka {args.fade:g} · {len(slides) / args.rate:.1f} s · "
               f"{w}×{h}", flush=True)
-        render_parts(args, w, h,
-                     [next(x for x in sl if x is not None).prompt for sl in slides], frame)
+        def key(p: Pic):
+            return p.style if args.outer == "style" else p.prompt
+
+        render_parts(args, w, h, [key(next(x for x in sl if x is not None)) for sl in slides], frame)
         return
 
     if args.max_seconds and len(pics) / args.rate > args.max_seconds:
@@ -516,7 +526,7 @@ def main() -> None:
     def frame(i: int) -> np.ndarray:
         return frame_of(pics[i], w, h, args.fit, label_of(pics[i]))
 
-    render_parts(args, w, h, [p.prompt for p in pics], frame)
+    render_parts(args, w, h, [p.style if args.outer == "style" else p.prompt for p in pics], frame)
 
 
 if __name__ == "__main__":
