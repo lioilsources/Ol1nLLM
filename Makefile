@@ -1,4 +1,4 @@
-.PHONY: run debug build-ios build-android lab lab-dry lab-check lab-arcface lab-wd14 lab-resume lab-score lab-complete stylemap-env stylemap stylemap-tags stylemap-serve stylemap-publish
+.PHONY: run debug build-ios build-android lab lab-dry lab-check lab-arcface lab-wd14 lab-resume lab-score lab-complete stylemap-env stylemap stylemap-tags stylemap-serve stylemap-video stylemap-publish
 
 -include .env.local
 
@@ -121,6 +121,26 @@ stylemap-tags:
 	$(STYLEMAP_PY) tools/stylemap/build_map.py --set build/stylemap/$(SET) \
 		--title "$$(python3 -c "import json;print(json.load(open('build/stylemap/$(SET)/map.json'))['title'])")"
 	$(STYLEMAP_PY) tools/stylemap/make_thumbs.py --set build/stylemap/$(SET)
+
+# Slideshow as a vertical MP4 for TikTok/Reels/Shorts (make_video.py), from a
+# pack (SET=…, the LPIPS route, re-planned over a filtered subset) or straight
+# from a lab run (RUN=…, no pack needed). ORDER=style plays one style at a time
+# across all models (default for RUN), LABEL=1 burns in "style · model".
+# WHERE filters like the app (model=…, style=…, flow=repose), RATE = pictures
+# per second, FADE = share of each picture spent crossfading (0 = cut).
+# VIDEO_ARGS passes the rest (--fit cover, --max-seconds 60, --audio song.mp3,
+# --model-order a,b,c, --size 1080x1350).
+#   make stylemap-video SET=muj-beh NAME=noobai-4fps WHERE="model=noobai-xl" RATE=4
+#   make stylemap-video RUN=20261124-112650 NAME=po-stylech RATE=3 LABEL=1
+# A run needs only numpy and Pillow, so without the stylemap venv it uses python3.
+VIDEO_PY = $(if $(wildcard $(STYLEMAP_PY)),$(STYLEMAP_PY),python3)
+stylemap-video:
+	$(VIDEO_PY) tools/stylemap/make_video.py \
+		$(if $(RUN),--run build/lab/$(RUN),--set build/stylemap/$(SET)) \
+		--out $(if $(RUN),build/lab/$(RUN),build/stylemap/$(SET))/video/$(or $(NAME),$(SET),$(RUN)).mp4 \
+		$(foreach w,$(WHERE),--where $(w)) $(if $(RATE),--rate $(RATE),) \
+		$(if $(FADE),--fade $(FADE),) $(if $(ORDER),--order $(ORDER),) \
+		$(if $(LABEL),--label,) $(VIDEO_ARGS)
 
 # Serves the packs to a phone on the LAN (STYLEMAP_URL=http://<mac-ip>:8770,
 # `make debug` only — cleartext). Generated pictures, no credentials.

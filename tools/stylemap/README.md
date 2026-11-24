@@ -15,6 +15,8 @@ make stylemap SET=<jméno sady> SESSIONS="<id> <id>" TITLE="…" TAG_REGEX='arti
 make stylemap-tags SET=<jméno sady>     # VLM tagy (jen v okně modelu, viz níž)
 make stylemap-serve                     # packy pro telefon na LAN, port 8770
 make stylemap-publish                   # packy na NAS, galerie je servíruje na /stylemaps/
+make stylemap-video SET=<sada> NAME=… WHERE="model=…" RATE=4 FADE=0.4   # MP4 na výšku
+make stylemap-video RUN=<běh labu> NAME=… RATE=3 LABEL=1                 # styl po stylu přes modely
 ```
 
 Výstup jde do `build/stylemap/<SET>/`. Sada má dva možné zdroje:
@@ -198,6 +200,68 @@ působí na telefonu, z nich neplyne.
 | `blond-curly-hair` | 132 | 0,63 | 0,463 → 0,419 | 0,425 → 0,292 |
 | `curly-redhead` | 224 | 0,48 | 0,368 → 0,326 | 0,325 → 0,227 |
 | `naked-woman` | 208 | 0,51 | 0,338 → 0,300 | 0,305 → 0,226 |
+
+## Video na výšku (`make stylemap-video`, `make_video.py`)
+
+Slideshow jako MP4 1080×1920 (H.264, 30 fps) pro TikTok, Reels a Shorts. Zdroj
+je pack (`SET=…`, totéž co přehrávač v appce, jen do souboru) nebo rovnou běh
+labu (`RUN=…`, bez stavby mapy — stačí numpy a Pillow, bez venvu jede
+`python3`). Výstup jde do `build/stylemap/<SET>/video/<NAME>.mp4`, resp.
+`build/lab/<RUN>/video/<NAME>.mp4`.
+
+```bash
+make stylemap-video SET=muj-beh NAME=vse-12 RATE=12 FADE=0
+make stylemap-video SET=muj-beh NAME=noobai-3 WHERE="model=noobai-xl" RATE=3 FADE=0.5
+make stylemap-video SET=muj-beh NAME=repose WHERE="flow=repose" \
+     VIDEO_ARGS="--max-seconds 60 --audio song.mp3 --fit cover"
+```
+
+- **`ORDER=style`** (u `RUN` výchozí): styl po stylu přes všechny modely —
+  prompt → styl → flow → model. Styly jdou v pořadí pickeru appky (manifest
+  běhu, baseline první), u packu v pořadí, v jakém je potká trasa. Pořadí
+  modelů uvnitř stylu je pořadí běhu, nebo `VIDEO_ARGS="--model-order a,b,c"`.
+  `--max-seconds` tu bere **celé styly**, aby žádný nebyl bez některého modelu.
+- **`LABEL=1`** vypálí popisek: styl (zalomený) a pod ním model, tmavý box
+  v horní části — pod záložkami, které TikTok a Shorts kreslí nahoře.
+- **Pořadí `tour`** (u `SET` výchozí) je trasa (nejmenší kroky v LPIPS), jako v appce. S filtrem
+  (`WHERE`) se trasa **naplánuje znovu** jen přes vybrané obrázky (`tour()`
+  z `build_map.py` nad podmaticí `lpips.npy`): globální trasa by mezi nimi
+  skákala přes ty vyřazené. `--no-replan` vrátí pořadí appky.
+- **`WHERE`** funguje jako filtr v appce: hodnoty jednoho klíče jsou
+  alternativy, různé klíče platí všechny. Klíče jsou pole obrázku (`model`,
+  `medium`, `style`…), jeho VLM tagy a `flow` (z id buňky labu).
+- **`RATE`** obrázků za vteřinu (výchozí 4, nejvýš fps videa), **`FADE`** podíl
+  času obrázku na prolínačku do dalšího (výchozí 0.4, 0 = střih). Při vysoké
+  rychlosti je prolínačka jen pár snímků, tam je čistší střih.
+- **`--fit`**: `contain` (výchozí) ukáže celý obrázek na rozmazané ztmavené
+  kopii sebe sama, `cover` ořízne na výšku. `--size 1080x1350` pro 4:5.
+- **`--max-seconds`** zkrátí rovnoměrným výběrem po trase (TikTok: do 10 min,
+  ale nejlíp fungují desítky vteřin). **`--audio`** přidá stopu, ořízne se.
+- **Zdroj snímků**: originály podle `items.json` (běh labu, `FULL=1`), jinak
+  384px náhledy packu — ty jsou na 1080 px měkké a skript to při startu řekne.
+
+Renderuje se na Macu (asi 1 s na 4 s videa); telefon video jen sdílí.
+
+## Co kam jde (síť, NAS, telefon)
+
+| Příkaz | Čte | Zapisuje | Síť |
+|---|---|---|---|
+| `make stylemap SESSIONS=…` | FINETUNE gallery (`/api/images`, náhledy nebo `FULL=1` originály) | `build/stylemap/<SET>/` | **ano** — `finetune.ol1n.com`, CF Access |
+| `make stylemap RUN=…` | `build/lab/<RUN>/` | `build/stylemap/<SET>/` | ne |
+| `make stylemap-tags` | pack | `tags.json` v packu | **ano** — VLM na SPARKu, v okně modelu |
+| `make stylemap-video` | pack (`SET`) nebo běh labu (`RUN`) z disku | `build/stylemap/<SET>/video/` nebo `build/lab/<RUN>/video/` | **ne** — jen lokální ffmpeg |
+| `make stylemap-publish` | `build/stylemap/` | NAS `joda:…/FineTuneGallery/stylemaps` (rsync) | **ano** — LAN/ssh na JODU |
+| `make stylemap-serve` | `build/stylemap/` | — (HTTP na :8770 pro telefon v LAN) | jen LAN |
+
+- **Na NAS (a tím do appky) jdou jen mapy** — `stylemap-publish` kopíruje
+  výhradně `index.json`, `*/map.json`, `*/atlas.webp` a `*/t/*.webp`. Videa,
+  `features.npz`, `lpips.npy`, `items.json` a cache se **neposílají**, ani když
+  leží ve složce packu. Galerie mapy servíruje na
+  `finetune.ol1n.com/stylemaps/<SET>/`, appka si je čte přes `STYLEMAP_URL`.
+- **Videa zůstávají na Macu**, nic je nikam nenahrává. Do telefonu AirDropem
+  z Finderu (do Fotek), odtud na TikTok/Shorts/Reels.
+- **Do FINETUNE gallery jako session** se běh labu dostane jen přes
+  `lab export --send` (obrázky a metadata, ne mapa ani video).
 
 ## Co zatím není
 
