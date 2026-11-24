@@ -242,6 +242,27 @@ make stylemap-video SET=muj-beh NAME=repose WHERE="flow=repose" \
 
 Renderuje se na Macu (asi 1 s na 4 s videa); telefon video jen sdílí.
 
+## Co kam jde (síť, NAS, telefon)
+
+| Příkaz | Čte | Zapisuje | Síť |
+|---|---|---|---|
+| `make stylemap SESSIONS=…` | FINETUNE gallery (`/api/images`, náhledy nebo `FULL=1` originály) | `build/stylemap/<SET>/` | **ano** — `finetune.ol1n.com`, CF Access |
+| `make stylemap RUN=…` | `build/lab/<RUN>/` | `build/stylemap/<SET>/` | ne |
+| `make stylemap-tags` | pack | `tags.json` v packu | **ano** — VLM na SPARKu, v okně modelu |
+| `make stylemap-video` | pack (`SET`) nebo běh labu (`RUN`) z disku | `build/stylemap/<SET>/video/` nebo `build/lab/<RUN>/video/` | **ne** — jen lokální ffmpeg |
+| `make stylemap-publish` | `build/stylemap/` | NAS `joda:…/FineTuneGallery/stylemaps` (rsync) | **ano** — LAN/ssh na JODU |
+| `make stylemap-serve` | `build/stylemap/` | — (HTTP na :8770 pro telefon v LAN) | jen LAN |
+
+- **Na NAS (a tím do appky) jdou jen mapy** — `stylemap-publish` kopíruje
+  výhradně `index.json`, `*/map.json`, `*/atlas.webp` a `*/t/*.webp`. Videa,
+  `features.npz`, `lpips.npy`, `items.json` a cache se **neposílají**, ani když
+  leží ve složce packu. Galerie mapy servíruje na
+  `finetune.ol1n.com/stylemaps/<SET>/`, appka si je čte přes `STYLEMAP_URL`.
+- **Videa zůstávají na Macu**, nic je nikam nenahrává. Do telefonu AirDropem
+  z Finderu (do Fotek), odtud na TikTok/Shorts/Reels.
+- **Do FINETUNE gallery jako session** se běh labu dostane jen přes
+  `lab export --send` (obrázky a metadata, ne mapa ani video).
+
 ## Co zatím není
 
 Z plánu chybí: popisky clusterů z VLM tagů (jsou zatím z média a medoidu),
