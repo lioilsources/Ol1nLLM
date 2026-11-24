@@ -354,6 +354,8 @@ def main() -> None:
     ap.add_argument("--label", action="store_true", help="vypálit popisek „styl · model“")
     ap.add_argument("--grid", action="store_true",
                     help="jeden snímek na styl: obrázky všech modelů v mřížce (--rate = stylů/s)")
+    ap.add_argument("--cols", type=int, default=0,
+                    help="sloupců mřížky (řádky se dopočítají); 0 = vybrat podle velikosti obrázků")
     ap.add_argument("--rate", type=float, default=4, help="obrázků za vteřinu (výchozí 4)")
     ap.add_argument("--fade", type=float, default=0.4,
                     help="podíl času obrázku na prolínačku do dalšího, 0 = střih (výchozí 0.4)")
@@ -421,8 +423,12 @@ def main() -> None:
         cap = (font(round(w * 0.026)).getbbox("ÁÝgjy")[3] + pad // 2) if args.label else 0
         title_h = (2 * font(round(w * 0.042)).getbbox("ÁÝgjy")[3] + round(pad * 0.4) + 3 * pad
                    if args.label else 0)
-        layout = grid_layout(len(slots), aspect, w - pad,
-                             round(h * 0.88) - round(h * 0.085) - title_h, cap + pad)
+        if args.cols > 0:
+            cols = min(args.cols, len(slots))
+            layout = (cols, -(-len(slots) // cols))
+        else:
+            layout = grid_layout(len(slots), aspect, w - pad,
+                                 round(h * 0.88) - round(h * 0.085) - title_h, cap + pad)
 
         def slide_title(sl: list[Pic | None]) -> str:
             p = next(x for x in sl if x is not None)

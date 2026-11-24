@@ -224,7 +224,8 @@ make stylemap-video SET=muj-beh NAME=repose WHERE="flow=repose" \
   `--max-seconds` tu bere **celé styly**, aby žádný nebyl bez některého modelu.
 - **`GRID=1`** — mřížka: jeden snímek na styl (a prompt, flow), v něm obrázky
   **všech modelů** vedle sebe. Rozložení se vybere samo tak, aby byl každý
-  obrázek co největší (6 modelů na výšku = 3 × 2). Model má po celé video
+  obrázek co největší (6 modelů na výšku = 3 × 2); `COLS=2` nebo `COLS=3`
+  počet sloupců vnutí, řádky se dopočítají. Model má po celé video
   stejnou dlaždici a chybějící obrázek je prázdný rámeček, takže oko srovnává
   styl, ne pozice. `RATE` tu znamená **stylů** za vteřinu (6 modelů chce čas:
   1–2/s); s `LABEL=1` je nahoře název stylu (pruh má vždy výšku dvou řádků,
