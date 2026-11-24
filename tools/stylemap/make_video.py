@@ -305,17 +305,53 @@ def grid_frame(slide: list[Pic | None], slots: list[str], w: int, h: int,
     return np.asarray(canvas)
 
 
-def render(args, w: int, h: int, total: int, hold: float, n: int, frame) -> None:
-    """Pipe the slides to ffmpeg: each holds `hold` video frames, the last
-    `fade` share of them crossfading into the next."""
-    args.out.parent.mkdir(parents=True, exist_ok=True)
+def split_parts(prompts: list[int], seconds_each: float, limit: float) -> list[tuple[int, int]]:
+    """Cut the slide list into [start, end) parts of at most `limit` seconds,
+    only where the prompt changes: a prompt never spans two videos. A prompt
+    longer than the limit gets a part of its own."""
+    runs: list[tuple[int, int]] = []
+    for i, pr in enumerate(prompts):
+        if runs and prompts[runs[-1][0]] == pr:
+            runs[-1] = (runs[-1][0], i + 1)
+        else:
+            runs.append((i, i + 1))
+    parts: list[tuple[int, int]] = []
+    for a, b in runs:
+        if parts and (b - parts[-1][0]) * seconds_each <= limit:
+            parts[-1] = (parts[-1][0], b)
+        else:
+            parts.append((a, b))
+    return parts
+
+
+def render_parts(args, w: int, h: int, prompts: list[int], frame) -> None:
+    """The whole video, or with --split one file per part (NAME-01.mp4 …)."""
+    hold = args.fps / args.rate
+    n = len(prompts)
+    if not args.split:
+        render(args, args.out, w, h, hold, 0, n, frame)
+        return
+    parts = split_parts(prompts, 1 / args.rate, args.split)
+    print(f"→ {len(parts)} videí po nejvýš {args.split:g} s, dělené mezi prompty", flush=True)
+    for k, (a, b) in enumerate(parts, 1):
+        out = args.out.with_name(f"{args.out.stem}-{k:02d}{args.out.suffix}")
+        render(args, out, w, h, hold, a, b, frame)
+
+
+def render(args, out_path: Path, w: int, h: int, hold: float, start: int, end: int,
+           frame) -> None:
+    """Pipe slides [start, end) to ffmpeg: each holds `hold` video frames, the
+    last `fade` share of them crossfading into the next."""
+    n = end - start
+    total = round(hold * n)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",
            "-s", f"{w}x{h}", "-r", str(args.fps), "-i", "-"]
     if args.audio:
         cmd += ["-i", str(args.audio), "-map", "0:v", "-map", "1:a", "-c:a", "aac",
                 "-b:a", "192k", "-shortest"]
     cmd += ["-c:v", "libx264", "-preset", "medium", "-crf", str(args.crf),
-            "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(args.out)]
+            "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(out_path)]
     ff = subprocess.Popen(cmd, stdin=subprocess.PIPE)
 
     t0 = time.time()
@@ -323,8 +359,8 @@ def render(args, w: int, h: int, total: int, hold: float, n: int, frame) -> None
     for k in range(total):
         i = min(int(k / hold), n - 1)
         if k == 0 or int((k - 1) / hold) != i:  # a new picture starts
-            cur = nxt if nxt is not None else frame(i)
-            nxt = frame(i + 1) if i + 1 < n else None
+            cur = nxt if nxt is not None else frame(start + i)
+            nxt = frame(start + i + 1) if i + 1 < n else None
         out = cur
         phase = (k - i * hold) / hold  # 0..1 within this picture
         if nxt is not None and args.fade > 0 and phase > 1 - args.fade:
@@ -336,7 +372,7 @@ def render(args, w: int, h: int, total: int, hold: float, n: int, frame) -> None
     ff.stdin.close()
     if ff.wait() != 0:
         sys.exit("ffmpeg skončil chybou")
-    print(f"hotovo → {args.out}  ({time.time() - t0:.0f} s)")
+    print(f"hotovo → {out_path}  ({total / args.fps:.1f} s videa, {time.time() - t0:.0f} s)")
 
 
 def main() -> None:
@@ -356,6 +392,11 @@ def main() -> None:
                     help="jeden snímek na styl: obrázky všech modelů v mřížce (--rate = stylů/s)")
     ap.add_argument("--cols", type=int, default=0,
                     help="sloupců mřížky (řádky se dopočítají); 0 = vybrat podle velikosti obrázků")
+    ap.add_argument("--complete", action="store_true",
+                    help="u --grid vynechat snímky, kde některému modelu chybí obrázek")
+    ap.add_argument("--split", type=float, default=0,
+                    help="rozdělit na videa po nejvýš tolika vteřinách, vždy mezi prompty "
+                         "(NAME-01.mp4, NAME-02.mp4 …)")
     ap.add_argument("--rate", type=float, default=4, help="obrázků za vteřinu (výchozí 4)")
     ap.add_argument("--fade", type=float, default=0.4,
                     help="podíl času obrázku na prolínačku do dalšího, 0 = střih (výchozí 0.4)")
@@ -413,6 +454,12 @@ def main() -> None:
             groups.setdefault((p.prompt, p.style, p.flow), {})[p.model] = p
         flows = {p.flow for p in pics}
         slides = [[g.get(m) for m in slots] for g in groups.values()]
+        if args.complete:
+            full = [sl for sl in slides if all(x is not None for x in sl)]
+            print(f"vynecháno {len(slides) - len(full)} neúplných snímků", flush=True)
+            slides = full
+            if not slides:
+                sys.exit("žádný snímek nemá obrázky všech modelů")
         if args.max_seconds and len(slides) / args.rate > args.max_seconds:
             keep = max(1, int(args.max_seconds * args.rate))
             slides = [slides[round(i * (len(slides) - 1) / max(1, keep - 1))] for i in range(keep)]
@@ -438,12 +485,11 @@ def main() -> None:
             return grid_frame(slides[i], slots, w, h,
                               slide_title(slides[i]) if args.label else "", args.label, layout, aspect)
 
-        hold = args.fps / args.rate
-        total = round(hold * len(slides))
         print(f"{len(slides)} stylů × {len(slots)} modelů ({layout[0]}×{layout[1]}) · "
-              f"{args.rate:g}/s · prolínačka {args.fade:g} · {total / args.fps:.1f} s · {w}×{h}",
-              flush=True)
-        render(args, w, h, total, hold, len(slides), frame)
+              f"{args.rate:g}/s · prolínačka {args.fade:g} · {len(slides) / args.rate:.1f} s · "
+              f"{w}×{h}", flush=True)
+        render_parts(args, w, h,
+                     [next(x for x in sl if x is not None).prompt for sl in slides], frame)
         return
 
     if args.max_seconds and len(pics) / args.rate > args.max_seconds:
@@ -463,16 +509,14 @@ def main() -> None:
         return (p.label, p.model_label) if args.label else None
 
     soft = sum(1 for p in pics if p.thumb)
-    hold = args.fps / args.rate  # video frames per picture
-    total = round(hold * len(pics))
     print(f"{len(pics)} obrázků · {order} · {args.rate:g}/s · prolínačka {args.fade:g} · "
-          f"{total / args.fps:.1f} s · {w}×{h}"
+          f"{len(pics) / args.rate:.1f} s · {w}×{h}"
           + (f" · {soft} jen z 384px náhledů" if soft else ""), flush=True)
 
     def frame(i: int) -> np.ndarray:
         return frame_of(pics[i], w, h, args.fit, label_of(pics[i]))
 
-    render(args, w, h, total, hold, len(pics), frame)
+    render_parts(args, w, h, [p.prompt for p in pics], frame)
 
 
 if __name__ == "__main__":

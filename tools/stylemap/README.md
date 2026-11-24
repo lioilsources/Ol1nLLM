@@ -225,7 +225,12 @@ make stylemap-video SET=muj-beh NAME=repose WHERE="flow=repose" \
 - **`GRID=1`** — mřížka: jeden snímek na styl (a prompt, flow), v něm obrázky
   **všech modelů** vedle sebe. Rozložení se vybere samo tak, aby byl každý
   obrázek co největší (6 modelů na výšku = 3 × 2); `COLS=2` nebo `COLS=3`
-  počet sloupců vnutí, řádky se dopočítají. Model má po celé video
+  počet sloupců vnutí, řádky se dopočítají. `COMPLETE=1` vynechá snímky, kde
+  některému modelu obrázek chybí (nedoběhlý běh), místo prázdné dlaždice.
+- **`SPLIT=60`** rozseká výstup na víc videí po nejvýš 60 s
+  (`NAME-01.mp4`, `NAME-02.mp4` …), a to **jen mezi prompty**: prompt nikdy
+  nepřeteče do dalšího videa, prompt delší než limit dostane video sám.
+  Funguje s mřížkou i bez ní. Model má po celé video
   stejnou dlaždici a chybějící obrázek je prázdný rámeček, takže oko srovnává
   styl, ne pozice. `RATE` tu znamená **stylů** za vteřinu (6 modelů chce čas:
   1–2/s); s `LABEL=1` je nahoře název stylu (pruh má vždy výšku dvou řádků,
