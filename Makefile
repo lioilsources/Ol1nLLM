@@ -126,7 +126,11 @@ stylemap-tags:
 # pack (SET=…, the LPIPS route, re-planned over a filtered subset) or straight
 # from a lab run (RUN=…, no pack needed). ORDER=style plays one style at a time
 # across all models (default for RUN), LABEL=1 burns in "style · model",
-# GRID=1 puts every model of one style on one frame (RATE = styles per second).
+# GRID=1 puts every model of one style on one frame (RATE = styles per second),
+# COLS=3 fixes its columns (rows follow; default picks the largest pictures),
+# COMPLETE=1 drops grid frames where a model has no picture. OUTER=style plays
+# style → prompts instead of prompt → styles. SPLIT=60 cuts the output into
+# videos of at most 60 s, only between prompts (or styles) (NAME-01.mp4 …).
 # WHERE filters like the app (model=…, style=…, flow=repose), RATE = pictures
 # per second, FADE = share of each picture spent crossfading (0 = cut).
 # VIDEO_ARGS passes the rest (--fit cover, --max-seconds 60, --audio song.mp3,
@@ -141,8 +145,10 @@ stylemap-video:
 		$(if $(RUN),--run build/lab/$(RUN),--set build/stylemap/$(SET)) \
 		--out $(if $(RUN),build/lab/$(RUN),build/stylemap/$(SET))/video/$(or $(NAME),$(SET),$(RUN)).mp4 \
 		$(foreach w,$(WHERE),--where $(w)) $(if $(RATE),--rate $(RATE),) \
-		$(if $(FADE),--fade $(FADE),) $(if $(ORDER),--order $(ORDER),) \
-		$(if $(LABEL),--label,) $(if $(GRID),--grid,) $(VIDEO_ARGS)
+		$(if $(FADE),--fade $(FADE),) $(if $(ORDER),--order $(ORDER),) $(if $(OUTER),--outer $(OUTER),) \
+		$(if $(LABEL),--label,) $(if $(GRID),--grid,) \
+		$(if $(COLS),--cols $(COLS),) $(if $(COMPLETE),--complete,) \
+		$(if $(SPLIT),--split $(SPLIT),) $(VIDEO_ARGS)
 
 # Serves the packs to a phone on the LAN (STYLEMAP_URL=http://<mac-ip>:8770,
 # `make debug` only — cleartext). Generated pictures, no credentials.
