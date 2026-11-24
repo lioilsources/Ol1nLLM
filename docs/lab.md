@@ -90,6 +90,15 @@ v adresáři běhu, takže parser je v systému jediný a resume hraje tytéž p
 buňka `promptBody` a v `prompt` text přečtený zpátky z grafu. Ukázka:
 `candidates/prompts-example.yaml`.
 
+**Tagy z předlohy (`--ref-tags`, v UI zaškrtávátko pod referencí)**: WD14
+booru tagy předlohy se připojí za každý prompt, s prázdným polem jsou promptem
+samy — img2img z fotky na booru modelu bez psaní. `tools/lab/wd14.py` je
+zrcadlo taggeru FINETUNE gallery (týž model, preprocess i prahy), běží lokálně
+na CPU (`make lab-wd14`). Tagy popisující fotku jako médium (`realistic`,
+`photo (medium)`, `blurry`…) se vynechávají, jinak by booru model táhly zpátky
+k fotce. Běh je ukládá do `ref-tags.json`, ne do `spec.json`. Podrobnosti:
+`tools/lab/README.md`.
+
 **Pozice → restyle (flow `restyle`)**: běh se dvěma modely — `--base-model`
 (v UI „model pozice“) nakreslí z textu fotku, `--models` ji přemalují do stylu
 přes ControlNet nad txt2img šablonou (graf „zachovej pózu“). Model pozice

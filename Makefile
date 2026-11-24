@@ -1,4 +1,4 @@
-.PHONY: run debug build-ios build-android lab lab-dry lab-check lab-arcface lab-resume lab-score lab-complete stylemap-env stylemap stylemap-tags stylemap-serve stylemap-publish
+.PHONY: run debug build-ios build-android lab lab-dry lab-check lab-arcface lab-wd14 lab-resume lab-score lab-complete stylemap-env stylemap stylemap-tags stylemap-serve stylemap-publish
 
 -include .env.local
 
@@ -70,6 +70,18 @@ lab-arcface:
 	tools/lab/.venv/bin/pip install -q insightface onnxruntime opencv-python-headless numpy
 	mkdir -p $(HOME)/.insightface/models
 	rsync -a spark:Code/ComfyUI/models/insightface/models/antelopev2 $(HOME)/.insightface/models/
+
+# WD14 tags of the reference for the lab (tools/lab/wd14.py, `--ref-tags` /
+# „tagy z předlohy“): the same tagger as the FINETUNE gallery sidecar, run on
+# CPU in the lab venv. Model ~450 MB from Hugging Face, downloaded once.
+WD14_DIR = $(HOME)/.cache/lab-wd14/SmilingWolf--wd-swinv2-tagger-v3
+WD14_URL = https://huggingface.co/SmilingWolf/wd-swinv2-tagger-v3/resolve/main
+lab-wd14:
+	test -x tools/lab/.venv/bin/python || python3 -m venv tools/lab/.venv
+	tools/lab/.venv/bin/pip install -q onnxruntime numpy pillow
+	mkdir -p $(WD14_DIR)
+	test -s $(WD14_DIR)/selected_tags.csv || curl -fL -o $(WD14_DIR)/selected_tags.csv $(WD14_URL)/selected_tags.csv
+	test -s $(WD14_DIR)/model.onnx || { curl -fL -o $(WD14_DIR)/model.onnx.part $(WD14_URL)/model.onnx && mv $(WD14_DIR)/model.onnx.part $(WD14_DIR)/model.onnx; }
 
 # Style maps (tools/stylemap): a set of pictures → a pack the app's StyleMap
 # widget reads (map.json + atlas + previews in build/stylemap/<SET>).

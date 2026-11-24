@@ -48,6 +48,8 @@ lab run --subject "a ballerina" --models juggernaut-xl,pony \
 lab run --prompts-yaml candidates/prompts-example.yaml \
         --models pony,juggernaut-xl,flux-manga --flows txt2img --no-styles
 lab run --ref-prompt "photo of a dancer" --sweep '__cn_apply__.strength=0.5|0.75|1.0'
+lab run --ref foto.png --ref-tags --flows img2img --no-styles \
+        --models illustrious-xl,pony --sweep 'param.editDenoise=0.5|0.65|0.8|0.9'
 lab run --flows restyle --base-model flux-manga --models illustrious-xl \\
         --prompts-yaml pozice.csv --characters postavy.txt --styles vermeer
 lab resume build/lab/20260826-0023          # dopočítat přerušený běh
@@ -123,6 +125,35 @@ rodiny — ten by jinak text tiše zahodil, takže ho parser odmítne i s čísl
 Osa promptů zůstává jednorozměrná: `manifest.prompts` nese **popisky** sloupců
 (text se liší model od modelu, takže jeden být nemůže), buňka nese `promptBody`
 a v `prompt` text přečtený zpátky z grafu — tedy ten, co se opravdu poslal.
+
+## Tagy z předlohy (`--ref-tags`)
+
+V UI zaškrtávátko „tagy z předlohy (WD14) jako prompt“ pod referencí. Z
+předlohy se přečtou booru tagy a připojí se **za** každý řádek promptu
+(vlastní text první, jako styl v appce); s prázdným polem jsou promptem samy.
+Účel: img2img z fotky na booru modelu (Illustrious, Pony, NoobAI…) bez psaní —
+tagový model prózu čte špatně a bez promptu nemá k čemu fotku přitáhnout.
+
+- **Tagger** je `wd14.py`, zrcadlo sidecaru FINETUNE gallery
+  (`finetune-gallery/tagger/main.py`): týž `wd-swinv2-tagger-v3`, preprocess
+  i prahy (0.35 obecné, 0.75 postavy), tedy stejné tagy, jaké galerie dá
+  obrázku jako `auto` caption. Běží lokálně na CPU (~3 s), protože sidecar je
+  na SPARKu jen v LAN bez Cloudflare. Nastavení jednou: `make lab-wd14`
+  (venv labu + model ~450 MB z Hugging Face do `~/.cache/lab-wd14`).
+- **Pořadí**: tagy postav, pak obecné podle jistoty; quality prefix modelu
+  (`score_9…`, `masterpiece…`) předřadí builder jako vždy. Rating tagy do
+  promptu nejdou.
+- **Vynechané tagy** (`refTagDrop` v `reftags.go`): ty, které popisují
+  předlohu *jako fotku*, ne co na ní je — `realistic`, `photorealistic`,
+  `photo (medium)`, `cosplay`, `blurry…`, `depth of field`, `film grain`,
+  vodoznaky a podpisy. Na booru modelu by táhly zpátky k fotce nebo by se
+  dokreslily. UI je vypíše pod náhledem tagů.
+- Běh si tagy uloží do `ref-tags.json` (co tagger viděl, co šlo do promptu,
+  co vypadlo) a do `prompts.txt`; `spec.json` je nemá, takže se při novém
+  běhu přečtou znovu. Chybějící venv nebo pád taggeru běh **zastaví** před
+  dumpem — buňky bez tagů by nesly popisek promptu, který nikdo neposlal.
+- U fotoreal modelů (Juggernaut) a FLUXu tagy fungují hůř než věta; flag je
+  stavěný na booru modely.
 
 ## Pozice → restyle (flow `restyle`)
 

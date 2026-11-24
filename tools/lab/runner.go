@@ -203,6 +203,18 @@ func (r *Run) Dump() error {
 	if err := os.MkdirAll(filepath.Join(r.Dir, "wf"), 0o755); err != nil {
 		return err
 	}
+	if r.Spec.RefTags {
+		r.update(func(s *RunState) { s.Message = "čtu tagy z předlohy (WD14)…" })
+		tags, err := tagReference(r.env, r.Spec.RefFile)
+		if err != nil {
+			// Running on without them would label the cells with prompts that
+			// were never asked for — fail before the dump instead.
+			return r.fail("dump", err)
+		}
+		data, _ := json.MarshalIndent(tags, "", " ")
+		_ = os.WriteFile(filepath.Join(r.Dir, "ref-tags.json"), data, 0o644)
+		r.Spec.refTagText = tags.Text()
+	}
 	env, err := r.Spec.DumpEnv(r.Dir)
 	if err != nil {
 		return r.fail("dump", err)

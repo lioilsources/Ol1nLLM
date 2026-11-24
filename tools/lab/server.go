@@ -56,6 +56,7 @@ func serve(env *Env, port int, open, forceDry bool) error {
 	mux.HandleFunc("/api/config", s.guard(s.handleConfig))
 	mux.HandleFunc("/api/estimate", s.guard(s.handleEstimate))
 	mux.HandleFunc("/api/upload-ref", s.guard(s.handleUploadRef))
+	mux.HandleFunc("/api/ref-tags", s.guard(s.handleRefTags))
 	mux.HandleFunc("/api/upload-prompts", s.guard(s.handleUploadPrompts))
 	mux.HandleFunc("/api/runs", s.guard(s.handleRuns))
 	mux.HandleFunc("/api/runs/", s.guard(s.handleRun))
@@ -339,6 +340,34 @@ func (s *Server) timings() map[string]float64 {
 		_ = json.Unmarshal(data, &out)
 	}
 	return out
+}
+
+// handleRefTags previews the WD14 tags of an uploaded reference, so the
+// prompt a run will send is on screen before it starts. Only uploads are
+// read — the path comes from the browser.
+func (s *Server) handleRefTags(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		RefFile string `json:"refFile"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, 400, map[string]string{"error": err.Error()})
+		return
+	}
+	refs := filepath.Join(s.env.RepoRoot, "build", "lab", "_refs") + string(filepath.Separator)
+	if !strings.HasPrefix(filepath.Clean(req.RefFile), refs) {
+		writeJSON(w, 400, map[string]string{"error": "neznámá předloha — nahraj ji znovu"})
+		return
+	}
+	tags, err := tagReference(s.env, req.RefFile)
+	if err != nil {
+		writeJSON(w, 502, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, 200, tags)
 }
 
 func (s *Server) handleUploadRef(w http.ResponseWriter, r *http.Request) {
