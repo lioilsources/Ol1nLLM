@@ -52,7 +52,7 @@ pouštějí znovu.
 - **Video**: totéž přehrávání do MP4 na výšku (TikTok/Reels) dělá
   `make stylemap-video` na Macu — rychlost, prolínačka, filtr jako v appce,
   s filtrem trasa přeplánovaná jen přes vybrané obrázky; z běhu labu i bez
-  mapy styl po stylu přes všechny modely (`ORDER=style`, popisky `LABEL=1`)
+  mapy styl po stylu přes všechny modely (`ORDER=style`, popisky `LABEL=1`, všechny modely stylu na jednom snímku `GRID=1`)
   (`tools/stylemap/README.md`, „Video na výšku“). Appka video nerenderuje.
   Video zůstává na Macu, nic ho nikam nenahrává; na NAS (a tím do appky) jde
   přes `make stylemap-publish` jen mapa. Co který příkaz čte, kam píše a jestli

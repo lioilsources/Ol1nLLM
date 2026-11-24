@@ -17,6 +17,7 @@ make stylemap-serve                     # packy pro telefon na LAN, port 8770
 make stylemap-publish                   # packy na NAS, galerie je servíruje na /stylemaps/
 make stylemap-video SET=<sada> NAME=… WHERE="model=…" RATE=4 FADE=0.4   # MP4 na výšku
 make stylemap-video RUN=<běh labu> NAME=… RATE=3 LABEL=1                 # styl po stylu přes modely
+make stylemap-video RUN=<běh labu> NAME=… GRID=1 RATE=2 LABEL=1          # všechny modely stylu na jednom snímku
 ```
 
 Výstup jde do `build/stylemap/<SET>/`. Sada má dva možné zdroje:
@@ -221,6 +222,13 @@ make stylemap-video SET=muj-beh NAME=repose WHERE="flow=repose" \
   běhu, baseline první), u packu v pořadí, v jakém je potká trasa. Pořadí
   modelů uvnitř stylu je pořadí běhu, nebo `VIDEO_ARGS="--model-order a,b,c"`.
   `--max-seconds` tu bere **celé styly**, aby žádný nebyl bez některého modelu.
+- **`GRID=1`** — mřížka: jeden snímek na styl (a prompt, flow), v něm obrázky
+  **všech modelů** vedle sebe. Rozložení se vybere samo tak, aby byl každý
+  obrázek co největší (6 modelů na výšku = 3 × 2). Model má po celé video
+  stejnou dlaždici a chybějící obrázek je prázdný rámeček, takže oko srovnává
+  styl, ne pozice. `RATE` tu znamená **stylů** za vteřinu (6 modelů chce čas:
+  1–2/s); s `LABEL=1` je nahoře název stylu (pruh má vždy výšku dvou řádků,
+  mřížka neposkakuje) a pod obrázky jména modelů.
 - **`LABEL=1`** vypálí popisek: styl (zalomený) a pod ním model, tmavý box
   v horní části — pod záložkami, které TikTok a Shorts kreslí nahoře.
 - **Pořadí `tour`** (u `SET` výchozí) je trasa (nejmenší kroky v LPIPS), jako v appce. S filtrem

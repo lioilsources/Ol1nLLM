@@ -225,6 +225,120 @@ def frame_of(p: Pic, w: int, h: int, fit: str, label: tuple[str, str] | None) ->
     return np.asarray(canvas)
 
 
+def grid_layout(n: int, aspect: float, rw: int, rh: int, caption: int) -> tuple[int, int]:
+    """Columns × rows for n pictures of width/height `aspect` in an rw×rh
+    region, each tile losing `caption` px to its model name: the split that
+    makes every picture the largest."""
+    best, best_area = (1, n), -1.0
+    for cols in range(1, n + 1):
+        rows = -(-n // cols)
+        tw, th = rw / cols, rh / rows - caption
+        if th <= 0:
+            continue
+        pw = min(tw, th * aspect)
+        if pw * pw / aspect > best_area:
+            best, best_area = (cols, rows), pw * pw / aspect
+    return best
+
+
+def grid_frame(slide: list[Pic | None], slots: list[str], w: int, h: int,
+               title: str, names: bool, layout: tuple[int, int], aspect: float) -> np.ndarray:
+    """All models of one style on one frame. A model keeps its tile for the
+    whole video (an empty tile where its picture is missing), so the eye
+    compares styles, not positions. Title in a box below the TikTok/Shorts
+    tabs; the grid stops above where they put the caption."""
+    canvas = Image.new("RGB", (w, h), (16, 16, 18))
+    d = ImageDraw.Draw(canvas)
+    pad = round(w * 0.02)
+    top = round(h * 0.085)
+    if title:
+        # The band is two lines tall on every slide, so the grid below it
+        # never moves when a long style name wraps.
+        f = font(round(w * 0.042))
+        lines = wrap(d, title, f, w - 6 * pad)
+        if len(lines) > 2:
+            lines = [lines[0], " ".join(lines[1:])]
+            while d.textlength(lines[1] + "…", font=f) > w - 6 * pad and " " in lines[1]:
+                lines[1] = lines[1].rsplit(" ", 1)[0]
+            lines[1] += "…"
+        lh, gap = f.getbbox("ÁÝgjy")[3], round(pad * 0.4)
+        band = 2 * lh + gap + 2 * pad
+        bh = lh * len(lines) + gap * (len(lines) - 1) + 2 * pad
+        y0 = top + (band - bh) // 2
+        d.rounded_rectangle((pad, y0, w - pad, y0 + bh), radius=pad, fill=(40, 40, 44))
+        y = y0 + pad
+        for line in lines:
+            d.text(((w - d.textlength(line, font=f)) / 2, y), line, font=f, fill=(255, 255, 255))
+            y += lh + gap
+        top += band + pad
+    bottom = round(h * 0.88)
+    cols, rows = layout
+    small = font(round(w * 0.026))
+    cap = small.getbbox("ÁÝgjy")[3] + pad // 2 if names else 0
+    tw, th = (w - pad) / cols, (bottom - top) / rows
+    # Every picture gets the same box (the run's aspect), the name right
+    # under it, and the whole grid is centred in the free region.
+    pw = min(tw - pad, (th - pad - cap) * aspect)
+    ph = pw / aspect
+    cell_h = ph + cap + pad
+    y_start = top + ((bottom - top) - rows * cell_h) / 2
+    for k, model in enumerate(slots):
+        r, c = divmod(k, cols)
+        x = pad / 2 + c * tw + (tw - pw) / 2
+        y = y_start + r * cell_h + pad / 2
+        p = slide[k]
+        if p is not None:
+            im = Image.open(p.path).convert("RGB")
+            s_ = min(pw / im.width, ph / im.height)
+            im = im.resize((max(1, round(im.width * s_)), max(1, round(im.height * s_))), Image.LANCZOS)
+            canvas.paste(im, (round(x + (pw - im.width) / 2), round(y + (ph - im.height) / 2)))
+        else:
+            d.rectangle((x, y, x + pw, y + ph), outline=(60, 60, 64), width=2)
+        if names:
+            name = p.model_label if p is not None else model
+            f, size = small, round(w * 0.026)
+            while d.textlength(name, font=f) > tw - pad / 2 and size > 12:
+                size -= 1
+                f = font(size)
+            d.text((pad / 2 + c * tw + (tw - d.textlength(name, font=f)) / 2, y + ph + pad / 4),
+                   name, font=f, fill=(210, 210, 210) if p is not None else (110, 110, 110))
+    return np.asarray(canvas)
+
+
+def render(args, w: int, h: int, total: int, hold: float, n: int, frame) -> None:
+    """Pipe the slides to ffmpeg: each holds `hold` video frames, the last
+    `fade` share of them crossfading into the next."""
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",
+           "-s", f"{w}x{h}", "-r", str(args.fps), "-i", "-"]
+    if args.audio:
+        cmd += ["-i", str(args.audio), "-map", "0:v", "-map", "1:a", "-c:a", "aac",
+                "-b:a", "192k", "-shortest"]
+    cmd += ["-c:v", "libx264", "-preset", "medium", "-crf", str(args.crf),
+            "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(args.out)]
+    ff = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+
+    t0 = time.time()
+    cur = nxt = None
+    for k in range(total):
+        i = min(int(k / hold), n - 1)
+        if k == 0 or int((k - 1) / hold) != i:  # a new picture starts
+            cur = nxt if nxt is not None else frame(i)
+            nxt = frame(i + 1) if i + 1 < n else None
+        out = cur
+        phase = (k - i * hold) / hold  # 0..1 within this picture
+        if nxt is not None and args.fade > 0 and phase > 1 - args.fade:
+            a = (phase - (1 - args.fade)) / args.fade
+            out = (cur * (1 - a) + nxt * a).astype(np.uint8)
+        ff.stdin.write(np.ascontiguousarray(out).tobytes())
+        if k and k % (args.fps * 10) == 0:
+            print(f"  {k / total:4.0%}  ({time.time() - t0:.0f} s)", flush=True)
+    ff.stdin.close()
+    if ff.wait() != 0:
+        sys.exit("ffmpeg skončil chybou")
+    print(f"hotovo → {args.out}  ({time.time() - t0:.0f} s)")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     src = ap.add_mutually_exclusive_group(required=True)
@@ -238,6 +352,8 @@ def main() -> None:
     ap.add_argument("--model-order", default="",
                     help="pořadí modelů uvnitř stylu, čárkami (jinak pořadí běhu)")
     ap.add_argument("--label", action="store_true", help="vypálit popisek „styl · model“")
+    ap.add_argument("--grid", action="store_true",
+                    help="jeden snímek na styl: obrázky všech modelů v mřížce (--rate = stylů/s)")
     ap.add_argument("--rate", type=float, default=4, help="obrázků za vteřinu (výchozí 4)")
     ap.add_argument("--fade", type=float, default=0.4,
                     help="podíl času obrázku na prolínačku do dalšího, 0 = střih (výchozí 0.4)")
@@ -259,7 +375,9 @@ def main() -> None:
     if not 0 < args.rate <= args.fps or not 0 <= args.fade < 1:
         sys.exit(f"--rate musí být v rozsahu (0, {args.fps}] a --fade v rozsahu 0–0.99")
     w, h = (int(v) for v in args.size.lower().split("x"))
-    order = args.order or ("style" if args.run else "tour")
+    order = args.order or ("style" if args.run or args.grid else "tour")
+    if args.grid and order != "style":
+        sys.exit("--grid skládá modely jednoho stylu, jde jen s --order style")
     if order == "tour" and args.run:
         sys.exit("--order tour potřebuje pack mapy (--set); z běhu labu jde jen --order style")
 
@@ -284,6 +402,44 @@ def main() -> None:
     else:
         pics = tour_order(pics, args.set, items, replan=bool(where) and not args.no_replan)
 
+    # A slide is what one stretch of the video shows: one picture, or with
+    # --grid one style with every model.
+    if args.grid:
+        slots = list(dict.fromkeys(p.model for p in pics))
+        groups: dict[tuple, dict[str, Pic]] = {}
+        for p in pics:
+            groups.setdefault((p.prompt, p.style, p.flow), {})[p.model] = p
+        flows = {p.flow for p in pics}
+        slides = [[g.get(m) for m in slots] for g in groups.values()]
+        if args.max_seconds and len(slides) / args.rate > args.max_seconds:
+            keep = max(1, int(args.max_seconds * args.rate))
+            slides = [slides[round(i * (len(slides) - 1) / max(1, keep - 1))] for i in range(keep)]
+        first = next(p for p in pics)
+        with Image.open(first.path) as im0:
+            aspect = im0.width / im0.height
+        pad = round(w * 0.02)
+        cap = (font(round(w * 0.026)).getbbox("ÁÝgjy")[3] + pad // 2) if args.label else 0
+        title_h = (2 * font(round(w * 0.042)).getbbox("ÁÝgjy")[3] + round(pad * 0.4) + 3 * pad
+                   if args.label else 0)
+        layout = grid_layout(len(slots), aspect, w - pad,
+                             round(h * 0.88) - round(h * 0.085) - title_h, cap + pad)
+
+        def slide_title(sl: list[Pic | None]) -> str:
+            p = next(x for x in sl if x is not None)
+            return f"{p.label} · {p.flow}" if len(flows) > 1 else p.label
+
+        def frame(i: int) -> np.ndarray:
+            return grid_frame(slides[i], slots, w, h,
+                              slide_title(slides[i]) if args.label else "", args.label, layout, aspect)
+
+        hold = args.fps / args.rate
+        total = round(hold * len(slides))
+        print(f"{len(slides)} stylů × {len(slots)} modelů ({layout[0]}×{layout[1]}) · "
+              f"{args.rate:g}/s · prolínačka {args.fade:g} · {total / args.fps:.1f} s · {w}×{h}",
+              flush=True)
+        render(args, w, h, total, hold, len(slides), frame)
+        return
+
     if args.max_seconds and len(pics) / args.rate > args.max_seconds:
         keep = max(1, int(args.max_seconds * args.rate))
         if order == "style":
@@ -307,38 +463,10 @@ def main() -> None:
           f"{total / args.fps:.1f} s · {w}×{h}"
           + (f" · {soft} jen z 384px náhledů" if soft else ""), flush=True)
 
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",
-           "-s", f"{w}x{h}", "-r", str(args.fps), "-i", "-"]
-    if args.audio:
-        cmd += ["-i", str(args.audio), "-map", "0:v", "-map", "1:a", "-c:a", "aac",
-                "-b:a", "192k", "-shortest"]
-    cmd += ["-c:v", "libx264", "-preset", "medium", "-crf", str(args.crf),
-            "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(args.out)]
-    ff = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-
     def frame(i: int) -> np.ndarray:
         return frame_of(pics[i], w, h, args.fit, label_of(pics[i]))
 
-    t0 = time.time()
-    cur = nxt = None
-    for k in range(total):
-        i = min(int(k / hold), len(pics) - 1)
-        if k == 0 or int((k - 1) / hold) != i:  # a new picture starts
-            cur = nxt if nxt is not None else frame(i)
-            nxt = frame(i + 1) if i + 1 < len(pics) else None
-        out = cur
-        phase = (k - i * hold) / hold  # 0..1 within this picture
-        if nxt is not None and args.fade > 0 and phase > 1 - args.fade:
-            a = (phase - (1 - args.fade)) / args.fade
-            out = (cur * (1 - a) + nxt * a).astype(np.uint8)
-        ff.stdin.write(np.ascontiguousarray(out).tobytes())
-        if k and k % (args.fps * 10) == 0:
-            print(f"  {k / total:4.0%}  ({time.time() - t0:.0f} s)", flush=True)
-    ff.stdin.close()
-    if ff.wait() != 0:
-        sys.exit("ffmpeg skončil chybou")
-    print(f"hotovo → {args.out}  ({time.time() - t0:.0f} s)")
+    render(args, w, h, total, hold, len(pics), frame)
 
 
 if __name__ == "__main__":
