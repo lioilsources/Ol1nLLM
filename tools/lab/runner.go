@@ -400,23 +400,62 @@ func (r *Run) Generate() {
 }
 
 // generationOrder groups cells by model, so each checkpoint loads once
-// instead of once per style, and within a model by flow. ComfyUI keeps the outputs of the previous
-// prompt only, and the flows prepare the reference differently (img2img
-// reads the photo as it is, repose fits it to the latent first), so the
-// manifest's order — img2img and repose of one style side by side — threw
-// the depth map away on every cell. Measured 2026-11-23 on run
-// 20261123-160559 (cyberrealistic-xl, 1536×2048 reference): 8.7 s of
-// DepthAnything per cell when alternating, none when grouped; 104 s per
-// img2img+repose pair down to 86 s. The images are the same.
+// instead of once per style, and within a model runs the flows in blocks of
+// flowBlock cells each, taking turns.
+//
+// ComfyUI keeps the outputs of the previous prompt only, and the flows prepare
+// the reference differently (img2img reads the photo as it is, repose fits it
+// to the latent first), so the manifest's order — img2img and repose of one
+// style side by side — threw the depth map away on every cell: 8.7 s of
+// DepthAnything per cell (run 20261123-160559, cyberrealistic-xl, 1536×2048
+// reference). One block per flow saves all of it but shows the second flow
+// only hours into the run; blocks of 20 pay the depth map once per block and
+// put both flows on screen from the start. LAB_FLOW_BLOCK sets the size, 0 is
+// a whole flow at a time. The images are the same in any order.
 func generationOrder(in []ManifestCell) []ManifestCell {
+	return generationOrderBlocks(in, flowBlock())
+}
+
+func flowBlock() int {
+	if v, err := strconv.Atoi(os.Getenv("LAB_FLOW_BLOCK")); err == nil && v >= 0 {
+		return v
+	}
+	return 20
+}
+
+func generationOrderBlocks(in []ManifestCell, block int) []ManifestCell {
 	cells := append([]ManifestCell{}, in...)
-	sort.SliceStable(cells, func(i, j int) bool {
-		if cells[i].Model != cells[j].Model {
-			return cells[i].Model < cells[j].Model
+	sort.SliceStable(cells, func(i, j int) bool { return cells[i].Model < cells[j].Model })
+	out := make([]ManifestCell, 0, len(cells))
+	for start := 0; start < len(cells); {
+		end := start
+		for end < len(cells) && cells[end].Model == cells[start].Model {
+			end++
 		}
-		return cells[i].Flow < cells[j].Flow
-	})
-	return cells
+		// Flows in order of first appearance, each keeping the manifest's order.
+		var flows []string
+		byFlow := map[string][]ManifestCell{}
+		for _, c := range cells[start:end] {
+			if _, ok := byFlow[c.Flow]; !ok {
+				flows = append(flows, c.Flow)
+			}
+			byFlow[c.Flow] = append(byFlow[c.Flow], c)
+		}
+		for left := end - start; left > 0; {
+			for _, f := range flows {
+				q := byFlow[f]
+				n := len(q)
+				if block > 0 && n > block {
+					n = block
+				}
+				out = append(out, q[:n]...)
+				byFlow[f] = q[n:]
+				left -= n
+			}
+		}
+		start = end
+	}
+	return out
 }
 
 // fluxToCheckpoint rewrites a split FLUX graph (UNETLoader + DualCLIPLoader +

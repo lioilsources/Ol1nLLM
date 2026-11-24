@@ -23,6 +23,8 @@ import 'package:ol1n_llm/models/image_model.dart';
 import 'package:ol1n_llm/models/latent_bucket.dart';
 import 'package:ol1n_llm/models/pose_template.dart';
 import 'package:ol1n_llm/models/style_preset.dart';
+import 'package:ol1n_llm/providers/image_studio_provider.dart'
+    show effectiveEditDenoise;
 import 'package:ol1n_llm/services/comfyui_service.dart';
 import 'package:ol1n_llm/services/flux_nim_service.dart';
 import 'package:ol1n_llm/services/image_backend.dart';
@@ -346,6 +348,16 @@ void main() {
                   : double.parse(env['EDIT_DENOISE']!);
               if (params['editDenoise'] is num) {
                 editDenoise = (params['editDenoise'] as num).toDouble();
+              }
+              // What the app sends: with no strength picked, a styled img2img
+              // round gets kStyleEditDenoise (0.9) and an unstyled one the
+              // preset's. The lab used the preset for both, so styled img2img
+              // cells ran at 0.72 — the strength the app abandoned because a
+              // style barely gets through it (run 20261123-160559: 311 styles,
+              // near-identical pictures). Other flows ignore the value.
+              if (flow == 'img2img') {
+                editDenoise =
+                    effectiveEditDenoise(editDenoise, styled: style != null);
               }
               var cellSeed = seed;
               if (params['seed'] is int) cellSeed = params['seed'] as int;
