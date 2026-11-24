@@ -441,29 +441,44 @@ func TestExportHangsARestyleOffItsPhoto(t *testing.T) {
 	}
 }
 
-// Within a model the flows run in blocks, not interleaved per style as the
-// manifest lists them: each flow prepares the reference differently and
-// ComfyUI caches only the previous prompt, so alternating recomputed the
-// depth map on every cell. Order inside a flow stays the manifest's.
-func TestGenerationOrderGroupsFlowsWithinModel(t *testing.T) {
+// Within a model the flows take turns in blocks, not interleaved per style as
+// the manifest lists them: each flow prepares the reference differently and
+// ComfyUI caches only the previous prompt, so alternating recomputed the depth
+// map on every cell. Order inside a flow stays the manifest's.
+func TestGenerationOrderTakesTurnsInBlocks(t *testing.T) {
 	in := []ManifestCell{
 		{ID: "img2img__b__x", Flow: "img2img", Model: "b"},
 		{ID: "repose__b__x", Flow: "repose", Model: "b"},
-		{ID: "img2img__a__y", Flow: "img2img", Model: "a"},
-		{ID: "repose__a__y", Flow: "repose", Model: "a"},
-		{ID: "img2img__a__x", Flow: "img2img", Model: "a"},
-		{ID: "repose__a__x", Flow: "repose", Model: "a"},
+		{ID: "img2img__a__1", Flow: "img2img", Model: "a"},
+		{ID: "repose__a__1", Flow: "repose", Model: "a"},
+		{ID: "img2img__a__2", Flow: "img2img", Model: "a"},
+		{ID: "repose__a__2", Flow: "repose", Model: "a"},
+		{ID: "img2img__a__3", Flow: "img2img", Model: "a"},
+		{ID: "repose__a__3", Flow: "repose", Model: "a"},
 	}
-	var got []string
-	for _, c := range generationOrder(in) {
-		got = append(got, c.ID)
+	ids := func(cs []ManifestCell) string {
+		var s []string
+		for _, c := range cs {
+			s = append(s, c.ID)
+		}
+		return strings.Join(s, " ")
 	}
-	want := []string{"img2img__a__y", "img2img__a__x", "repose__a__y", "repose__a__x",
-		"img2img__b__x", "repose__b__x"}
-	if strings.Join(got, " ") != strings.Join(want, " ") {
-		t.Fatalf("pořadí\n got %v\nwant %v", got, want)
+	for _, tc := range []struct {
+		block int
+		want  string
+	}{
+		{2, "img2img__a__1 img2img__a__2 repose__a__1 repose__a__2 img2img__a__3 repose__a__3 img2img__b__x repose__b__x"},
+		{0, "img2img__a__1 img2img__a__2 img2img__a__3 repose__a__1 repose__a__2 repose__a__3 img2img__b__x repose__b__x"},
+		{1, "img2img__a__1 repose__a__1 img2img__a__2 repose__a__2 img2img__a__3 repose__a__3 img2img__b__x repose__b__x"},
+	} {
+		if got := ids(generationOrderBlocks(in, tc.block)); got != tc.want {
+			t.Fatalf("blok %d\n got %s\nwant %s", tc.block, got, tc.want)
+		}
 	}
 	if in[0].ID != "img2img__b__x" {
 		t.Fatal("vstup se nesmí přeskládat na místě")
+	}
+	if len(generationOrderBlocks(in, 3)) != len(in) {
+		t.Fatal("žádná buňka se nesmí ztratit")
 	}
 }
