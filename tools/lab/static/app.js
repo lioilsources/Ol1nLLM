@@ -547,7 +547,74 @@ function spec() {
 }
 
 let estTimer;
+// Why a sweep option cannot do anything with the current setup, or null when
+// it can. A sweep on a knob that is not in the graph either fails every cell
+// or makes identical ones under different labels, so the option is greyed out
+// instead of being offered. The server still refuses what slips through.
+function sweepBlocked(target) {
+  const flows = state.flows;
+  const models = (state.config?.models || []).filter((m) => state.models.has(m.id));
+  const graph = models.filter((m) => (m.backend || 'comfyui') === 'comfyui');
+  const sdxl = graph.some((m) => m.ckptName);
+  const flux = graph.some((m) => m.id.startsWith('flux'));
+  const face = state.faceIdentity !== 'none';
+  const depthFlow = flows.has('repose') || flows.has('restyle')
+    || (flows.has('img2img') && (sdxl || state.poseMode !== 'none'));
+  switch (target) {
+    case '__cn_apply__.strength':
+    case '__cn_apply__.end_percent':
+      return depthFlow || state.poseMode !== 'none' ? null
+        : 'ControlNet je jen v „zachovej pózu“, restylu, img2img na SDXL nebo s pózou';
+    case 'param.editDenoise':
+      return flows.has('img2img') ? null : 'síla úpravy platí jen pro img2img';
+    case 'param.hint':
+      return flows.has('restyle') ? null : 'hint platí jen pro „pozice → restyle“';
+    case 'param.loraStrength':
+      return state.lora ? null : 'není vybraná LoRA';
+    case '__face_apply__.ip_weight':
+    case '__face_apply__.cn_strength':
+      if (!face) return 'zachovat tvář je vypnuté';
+      if (state.faceIdentity === 'faceid') return 'jen pro InstantID (vybrané je FaceID)';
+      return sdxl ? null : 'InstantID je jen na SDXL modelech';
+    case '__face_apply__.weight':
+      if (!face) return 'zachovat tvář je vypnuté';
+      return flux ? null : 'PuLID je jen na FLUX modelech';
+    case '__face_detail__.denoise':
+      if (!face) return 'zachovat tvář je vypnuté';
+      return state.faceDetail ? null : 'dotažení tváře je vypnuté';
+    case 'KSampler.cfg':
+    case 'KSampler.steps':
+      return graph.length || !models.length ? null : 'vybrané modely nemají graf (gen-queue)';
+    default:
+      return null;
+  }
+}
+
+function updateSweepOptions() {
+  // The LoRA strength means nothing without a LoRA; grey it like the face
+  // detail checkbox without an identity.
+  const noLora = !state.lora;
+  $('loraStrength').disabled = noLora;
+  $('loraStrength').closest('label').classList.toggle('off', noLora);
+  const sel = $('sweepTarget');
+  for (const opt of sel.options) {
+    if (!opt.value) continue;
+    opt.dataset.label ??= opt.textContent;
+    const why = sweepBlocked(opt.value);
+    opt.disabled = !!why;
+    opt.textContent = why ? `${opt.dataset.label} — nejde: ${why}` : opt.dataset.label;
+  }
+  const cur = sel.selectedOptions[0];
+  if (cur && cur.disabled) {
+    const label = cur.dataset.label;
+    sel.value = '';
+    $('sweephint').innerHTML =
+      `<span class="warnline">Sweep „${esc(label)}“ zrušen: ${esc(sweepBlocked(cur.value))}.</span>`;
+  }
+}
+
 function estimate() {
+  updateSweepOptions();
   clearTimeout(estTimer);
   estTimer = setTimeout(async () => {
     try {
