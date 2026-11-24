@@ -49,6 +49,10 @@ pouštějí znovu.
   rychlostí. Mapa i přehrávač jedou na jedné třídě `StyleMapPlayback`
   (`playback.dart`), která o widgetech neví: čekání na náhled a přednačítání
   (aspoň osm snímků, při vyšší rychlosti třetinu vteřiny) jsou tak jen jednou.
+- **Video**: totéž přehrávání do MP4 na výšku (TikTok/Reels) dělá
+  `make stylemap-video` na Macu — rychlost, prolínačka, filtr jako v appce,
+  s filtrem trasa přeplánovaná jen přes vybrané obrázky
+  (`tools/stylemap/README.md`, „Video na výšku“). Appka video nerenderuje.
 - **Režimy** (`StyleMapMode`, ikony v rohu náhledu): tytéž obrázky jinak
   rozložené. *Mapa* je mozaika. *Osy* (`pad.dart`) je bodový graf dvou
   měřených vlastností (osy se vybírají z `axes[]` packu) a prst dostane

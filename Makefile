@@ -1,4 +1,4 @@
-.PHONY: run debug build-ios build-android lab lab-dry lab-check lab-arcface lab-wd14 lab-resume lab-score lab-complete stylemap-env stylemap stylemap-tags stylemap-serve stylemap-publish
+.PHONY: run debug build-ios build-android lab lab-dry lab-check lab-arcface lab-wd14 lab-resume lab-score lab-complete stylemap-env stylemap stylemap-tags stylemap-serve stylemap-video stylemap-publish
 
 -include .env.local
 
@@ -121,6 +121,18 @@ stylemap-tags:
 	$(STYLEMAP_PY) tools/stylemap/build_map.py --set build/stylemap/$(SET) \
 		--title "$$(python3 -c "import json;print(json.load(open('build/stylemap/$(SET)/map.json'))['title'])")"
 	$(STYLEMAP_PY) tools/stylemap/make_thumbs.py --set build/stylemap/$(SET)
+
+# Slideshow of a pack as a vertical MP4 for TikTok/Reels (make_video.py): the
+# pack's LPIPS route, re-planned over a filtered subset. WHERE filters like the
+# app (model=…, medium=…, flow=repose), RATE = pictures per second, FADE = share
+# of each picture spent crossfading (0 = cut). VIDEO_ARGS passes the rest
+# (--fit cover, --max-seconds 60, --audio song.mp3, --size 1080x1350).
+#   make stylemap-video SET=muj-beh NAME=noobai-4fps WHERE="model=noobai-xl" RATE=4
+stylemap-video:
+	$(STYLEMAP_PY) tools/stylemap/make_video.py --set build/stylemap/$(SET) \
+		--out build/stylemap/$(SET)/video/$(or $(NAME),$(SET)).mp4 \
+		$(foreach w,$(WHERE),--where $(w)) $(if $(RATE),--rate $(RATE),) \
+		$(if $(FADE),--fade $(FADE),) $(VIDEO_ARGS)
 
 # Serves the packs to a phone on the LAN (STYLEMAP_URL=http://<mac-ip>:8770,
 # `make debug` only — cleartext). Generated pictures, no credentials.
