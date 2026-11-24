@@ -16,6 +16,7 @@ make stylemap-tags SET=<jméno sady>     # VLM tagy (jen v okně modelu, viz ní
 make stylemap-serve                     # packy pro telefon na LAN, port 8770
 make stylemap-publish                   # packy na NAS, galerie je servíruje na /stylemaps/
 make stylemap-video SET=<sada> NAME=… WHERE="model=…" RATE=4 FADE=0.4   # MP4 na výšku
+make stylemap-video RUN=<běh labu> NAME=… RATE=3 LABEL=1                 # styl po stylu přes modely
 ```
 
 Výstup jde do `build/stylemap/<SET>/`. Sada má dva možné zdroje:
@@ -202,9 +203,11 @@ působí na telefonu, z nich neplyne.
 
 ## Video na výšku (`make stylemap-video`, `make_video.py`)
 
-Slideshow packu jako MP4 1080×1920 (H.264, 30 fps) pro TikTok, Reels a Shorts —
-totéž, co přehrávač v appce, ale do souboru. Výstup jde do
-`build/stylemap/<SET>/video/<NAME>.mp4`.
+Slideshow jako MP4 1080×1920 (H.264, 30 fps) pro TikTok, Reels a Shorts. Zdroj
+je pack (`SET=…`, totéž co přehrávač v appce, jen do souboru) nebo rovnou běh
+labu (`RUN=…`, bez stavby mapy — stačí numpy a Pillow, bez venvu jede
+`python3`). Výstup jde do `build/stylemap/<SET>/video/<NAME>.mp4`, resp.
+`build/lab/<RUN>/video/<NAME>.mp4`.
 
 ```bash
 make stylemap-video SET=muj-beh NAME=vse-12 RATE=12 FADE=0
@@ -213,7 +216,14 @@ make stylemap-video SET=muj-beh NAME=repose WHERE="flow=repose" \
      VIDEO_ARGS="--max-seconds 60 --audio song.mp3 --fit cover"
 ```
 
-- **Pořadí** je trasa `tour` (nejmenší kroky v LPIPS), jako v appce. S filtrem
+- **`ORDER=style`** (u `RUN` výchozí): styl po stylu přes všechny modely —
+  prompt → styl → flow → model. Styly jdou v pořadí pickeru appky (manifest
+  běhu, baseline první), u packu v pořadí, v jakém je potká trasa. Pořadí
+  modelů uvnitř stylu je pořadí běhu, nebo `VIDEO_ARGS="--model-order a,b,c"`.
+  `--max-seconds` tu bere **celé styly**, aby žádný nebyl bez některého modelu.
+- **`LABEL=1`** vypálí popisek: styl (zalomený) a pod ním model, tmavý box
+  v horní části — pod záložkami, které TikTok a Shorts kreslí nahoře.
+- **Pořadí `tour`** (u `SET` výchozí) je trasa (nejmenší kroky v LPIPS), jako v appce. S filtrem
   (`WHERE`) se trasa **naplánuje znovu** jen přes vybrané obrázky (`tour()`
   z `build_map.py` nad podmaticí `lpips.npy`): globální trasa by mezi nimi
   skákala přes ty vyřazené. `--no-replan` vrátí pořadí appky.
