@@ -107,7 +107,9 @@ def from_run(run: Path) -> tuple[list[Pic], list[str], list[str]]:
     pics = []
     for c in man["cells"]:
         path = run / "img" / f"{c['id']}.png"
-        if not path.exists():
+        # A 0-byte file is a failed download the lab used to keep; it is a
+        # missing picture, not a crash halfway through the render.
+        if not path.exists() or path.stat().st_size == 0:
             continue
         style = c.get("style") or BASELINE
         pics.append(Pic(
