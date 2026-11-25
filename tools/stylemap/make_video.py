@@ -52,7 +52,8 @@ class Pic:
     model: str
     style: str
     flow: str
-    prompt: int = 0
+    prompt: int = 0  # order of the prompt (rank across merged runs)
+    prompt_key: str = ""  # identity of the prompt: the prompt file's entry id, else its index
     label: str = ""  # style as a person reads it
     model_label: str = ""
     extra: dict = dfield(default_factory=dict)  # pack fields and tags, for --where
@@ -112,12 +113,69 @@ def from_run(run: Path) -> tuple[list[Pic], list[str], list[str]]:
         pics.append(Pic(
             id=c["id"], path=path, model=c["model"], style=style, flow=c.get("flow", ""),
             prompt=int(c.get("promptIndex") or 0),
+            prompt_key=str(c.get("promptBody") or f"#{int(c.get('promptIndex') or 0)}"),
             label="bez stylu" if style == BASELINE else (c.get("styleLabel") or style),
             model_label=c.get("modelLabel") or c["model"],
         ))
     styles = [s["id"] if isinstance(s, dict) else s for s in man.get("styles") or []]
     models = [m["id"] if isinstance(m, dict) else m for m in man.get("models") or []]
     return pics, styles, models
+
+
+def from_runs(runs: list[Path]) -> tuple[list[Pic], list[str], list[str]]:
+    """Several lab runs as one collection. A prompt is the same prompt when
+    its id from the prompt file (`promptBody`) matches — its text may differ
+    run to run, written for each model family. A model drawn in several runs
+    pools its styles; a picture that exists twice (same prompt, style, flow,
+    model) is taken from the first run named."""
+    pics: list[Pic] = []
+    styles: list[str] = []
+    models: list[str] = []
+    seen: set[tuple] = set()
+    order: dict[str, int] = {}
+    for run in runs:
+        ps, st, ms = from_run(run)
+        styles += st
+        models += ms
+        for p in ps:
+            key = (p.prompt_key, p.style, p.flow, p.model)
+            if key in seen:
+                continue
+            seen.add(key)
+            order[p.prompt_key] = min(order.get(p.prompt_key, p.prompt), p.prompt)
+            pics.append(p)
+    if len(runs) > 1:
+        keys = {p.prompt_key for p in pics}
+        if not any(not k.startswith("#") for k in keys):
+            print("pozor: běhy nemají id promptů (promptBody), spojuji podle pořadí — "
+                  "sedí jen tehdy, když mají tytéž prompty ve stejném pořadí", flush=True)
+        rank = {k: i for i, k in enumerate(sorted(order, key=lambda k: (order[k], k)))}
+        for p in pics:
+            p.prompt = rank[p.prompt_key]
+    return pics, list(dict.fromkeys(styles)), list(dict.fromkeys(models))
+
+
+def mix_slides(pics: list[Pic], slots: list[str]) -> list[list[Pic | None]]:
+    """Same prompt, every model, each in its own style. Per prompt, the
+    styles every model has (at least the baseline) come first, side by side;
+    then each model goes on through the rest of its styles in picker order,
+    tile by tile — so neighbours share the prompt, not the style. `pics`
+    must already be in style order."""
+    by_prompt: dict[int, dict[str, list[Pic]]] = {}
+    for p in pics:
+        by_prompt.setdefault(p.prompt, {}).setdefault(p.model, []).append(p)
+    slides: list[list[Pic | None]] = []
+    for pr in sorted(by_prompt):
+        per = by_prompt[pr]
+        keyed = {m: {(p.style, p.flow): p for p in per.get(m, [])} for m in slots}
+        common = [k for k in (dict.fromkeys((p.style, p.flow) for m in slots for p in per.get(m, [])))
+                  if all(k in keyed[m] for m in slots)]
+        for k in common:
+            slides.append([keyed[m][k] for m in slots])
+        rest = {m: [p for p in per.get(m, []) if (p.style, p.flow) not in common] for m in slots}
+        for i in range(max((len(v) for v in rest.values()), default=0)):
+            slides.append([rest[m][i] if i < len(rest[m]) else None for m in slots])
+    return slides
 
 
 def tour_order(pics: list[Pic], set_dir: Path, items: list[dict], replan: bool) -> list[Pic]:
@@ -245,7 +303,8 @@ def grid_layout(n: int, aspect: float, rw: int, rh: int, caption: int) -> tuple[
 
 
 def grid_frame(slide: list[Pic | None], slots: list[str], w: int, h: int,
-               title: str, names: bool, layout: tuple[int, int], aspect: float) -> np.ndarray:
+               title: str, captions: list[str] | None, cap_lines: int,
+               layout: tuple[int, int], aspect: float) -> np.ndarray:
     """All models of one style on one frame. A model keeps its tile for the
     whole video (an empty tile where its picture is missing), so the eye
     compares styles, not positions. Title in a box below the TikTok/Shorts
@@ -277,7 +336,8 @@ def grid_frame(slide: list[Pic | None], slots: list[str], w: int, h: int,
     bottom = round(h * 0.88)
     cols, rows = layout
     small = font(round(w * 0.026))
-    cap = small.getbbox("ÁÝgjy")[3] + pad // 2 if names else 0
+    line_h = small.getbbox("ÁÝgjy")[3]
+    cap = (line_h * cap_lines + pad // 2) if captions else 0
     tw, th = (w - pad) / cols, (bottom - top) / rows
     # Every picture gets the same box (the run's aspect), the name right
     # under it, and the whole grid is centred in the free region.
@@ -297,14 +357,18 @@ def grid_frame(slide: list[Pic | None], slots: list[str], w: int, h: int,
             canvas.paste(im, (round(x + (pw - im.width) / 2), round(y + (ph - im.height) / 2)))
         else:
             d.rectangle((x, y, x + pw, y + ph), outline=(60, 60, 64), width=2)
-        if names:
-            name = p.model_label if p is not None else model
-            f, size = small, round(w * 0.026)
-            while d.textlength(name, font=f) > tw - pad / 2 and size > 12:
-                size -= 1
+        if captions:
+            for j, name in enumerate(captions[k].split("\n")[:cap_lines]):
+                # Model name full size, the style under it a step smaller.
+                size = round(w * (0.026 if j == 0 else 0.021))
                 f = font(size)
-            d.text((pad / 2 + c * tw + (tw - d.textlength(name, font=f)) / 2, y + ph + pad / 4),
-                   name, font=f, fill=(210, 210, 210) if p is not None else (110, 110, 110))
+                while d.textlength(name, font=f) > tw - pad / 2 and size > 12:
+                    size -= 1
+                    f = font(size)
+                d.text((pad / 2 + c * tw + (tw - d.textlength(name, font=f)) / 2,
+                        y + ph + pad / 4 + j * line_h), name, font=f,
+                       fill=((210, 210, 210) if j == 0 else (160, 160, 160)) if p is not None
+                       else (110, 110, 110))
     return np.asarray(canvas)
 
 
@@ -384,7 +448,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument("--set", type=Path, help="adresář packu (map.json)")
-    src.add_argument("--run", type=Path, help="adresář běhu labu (build/lab/<id>)")
+    src.add_argument("--run", type=Path, nargs="+",
+                     help="adresář běhu labu (build/lab/<id>); víc běhů se spojí podle id promptu")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--where", action="append", default=[], help="key=value, opakovatelné")
     ap.add_argument("--order", choices=["tour", "style"],
@@ -398,6 +463,8 @@ def main() -> None:
     ap.add_argument("--label", action="store_true", help="vypálit popisek „styl · model“")
     ap.add_argument("--grid", action="store_true",
                     help="jeden snímek na styl: obrázky všech modelů v mřížce (--rate = stylů/s)")
+    ap.add_argument("--mix", action="store_true",
+                    help="u --grid: stejný prompt, každý model ve svém stylu (běhy s jinými styly)")
     ap.add_argument("--cols", type=int, default=0,
                     help="sloupců mřížky (řádky se dopočítají); 0 = vybrat podle velikosti obrázků")
     ap.add_argument("--complete", action="store_true",
@@ -429,11 +496,13 @@ def main() -> None:
     order = args.order or ("style" if args.run or args.grid else "tour")
     if args.grid and order != "style":
         sys.exit("--grid skládá modely jednoho stylu, jde jen s --order style")
+    if args.mix and (not args.grid or args.outer != "prompt"):
+        sys.exit("--mix (stejný prompt, každý model ve svém stylu) jde jen s --grid a --outer prompt")
     if order == "tour" and args.run:
         sys.exit("--order tour potřebuje pack mapy (--set); z běhu labu jde jen --order style")
 
     if args.run:
-        pics, styles, models = from_run(args.run)
+        pics, styles, models = from_runs(args.run)
         items: list = []
     else:
         pics, styles, items = from_pack(args.set)
@@ -461,7 +530,8 @@ def main() -> None:
         for p in pics:
             groups.setdefault((p.prompt, p.style, p.flow), {})[p.model] = p
         flows = {p.flow for p in pics}
-        slides = [[g.get(m) for m in slots] for g in groups.values()]
+        slides = ([[g.get(m) for m in slots] for g in groups.values()] if not args.mix
+                  else mix_slides(pics, slots))
         if args.complete:
             full = [sl for sl in slides if all(x is not None for x in sl)]
             print(f"vynecháno {len(slides) - len(full)} neúplných snímků", flush=True)
@@ -475,7 +545,8 @@ def main() -> None:
         with Image.open(first.path) as im0:
             aspect = im0.width / im0.height
         pad = round(w * 0.02)
-        cap = (font(round(w * 0.026)).getbbox("ÁÝgjy")[3] + pad // 2) if args.label else 0
+        cap_lines = 2 if args.mix else 1
+        cap = (font(round(w * 0.026)).getbbox("ÁÝgjy")[3] * cap_lines + pad // 2) if args.label else 0
         title_h = (2 * font(round(w * 0.042)).getbbox("ÁÝgjy")[3] + round(pad * 0.4) + 3 * pad
                    if args.label else 0)
         if args.cols > 0:
@@ -485,15 +556,32 @@ def main() -> None:
             layout = grid_layout(len(slots), aspect, w - pad,
                                  round(h * 0.88) - round(h * 0.085) - title_h, cap + pad)
 
+        labels = {p.model: p.model_label for p in pics}
+        same_style = not args.mix
+
         def slide_title(sl: list[Pic | None]) -> str:
             p = next(x for x in sl if x is not None)
+            if not same_style:  # tiles differ in style: the shared thing is the prompt
+                return p.prompt_key if not p.prompt_key.startswith("#") else f"prompt {p.prompt + 1}"
             return f"{p.label} · {p.flow}" if len(flows) > 1 else p.label
+
+        def captions(sl: list[Pic | None]) -> list[str]:
+            out = []
+            for m, p in zip(slots, sl):
+                if p is None:
+                    out.append(labels.get(m, m))
+                elif same_style:
+                    out.append(p.model_label)
+                else:
+                    out.append(f"{p.model_label}\n{p.label}")
+            return out
 
         def frame(i: int) -> np.ndarray:
             return grid_frame(slides[i], slots, w, h,
-                              slide_title(slides[i]) if args.label else "", args.label, layout, aspect)
+                              slide_title(slides[i]) if args.label else "",
+                              captions(slides[i]) if args.label else None, cap_lines, layout, aspect)
 
-        print(f"{len(slides)} stylů × {len(slots)} modelů ({layout[0]}×{layout[1]}) · "
+        print(f"{len(slides)} snímků × {len(slots)} modelů ({layout[0]}×{layout[1]}) · "
               f"{args.rate:g}/s · prolínačka {args.fade:g} · {len(slides) / args.rate:.1f} s · "
               f"{w}×{h}", flush=True)
         def key(p: Pic):
