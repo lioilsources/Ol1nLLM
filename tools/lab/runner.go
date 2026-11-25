@@ -320,7 +320,7 @@ func (r *Run) Generate() {
 			if aborted.Load() {
 				break
 			}
-			if _, err := os.Stat(r.imgPath(c.ID)); err == nil {
+			if hasImage(r.imgPath(c.ID)) {
 				r.update(func(s *RunState) { r.markDone(s, c.ID, 0, false) })
 				continue
 			}
@@ -576,7 +576,7 @@ func (r *Run) generateCell(ctx context.Context, c ManifestCell) error {
 	// photo has nothing to be drawn over, and saying which photo is missing is
 	// more use than whatever ComfyUI makes of a file name that does not exist.
 	if c.DependsOn != "" {
-		if _, err := os.Stat(r.imgPath(c.DependsOn)); err != nil {
+		if !hasImage(r.imgPath(c.DependsOn)) {
 			return fmt.Errorf("fotka pozice %s se nevygenerovala", c.DependsOn)
 		}
 	}
@@ -854,14 +854,26 @@ func (r *Run) generateNimCell(ctx context.Context, c ManifestCell) error {
 }
 
 func (r *Run) saveImage(id string, data []byte) error {
+	// Decode before writing: an empty or broken download used to land on
+	// disk first and fail at the thumbnail, and the file's mere existence then
+	// counted as a finished cell — resume never redid it (seven 0-byte PNGs in
+	// 20261114-031858).
+	thumb, err := Thumbnail(data, thumbMax)
+	if err != nil {
+		return fmt.Errorf("obrázek nejde přečíst (%d B): %w", len(data), err)
+	}
 	if err := writeFile(r.imgPath(id), data); err != nil {
 		return err
 	}
-	thumb, err := Thumbnail(data, thumbMax)
-	if err != nil {
-		return err
-	}
 	return writeFile(r.thumbPath(id), thumb)
+}
+
+// hasImage: the cell's picture is on disk and not empty. A 0-byte file is a
+// failed download from before saveImage decoded first; treat it as missing so
+// resume redoes the cell.
+func hasImage(path string) bool {
+	st, err := os.Stat(path)
+	return err == nil && st.Size() > 0
 }
 
 func (r *Run) computeMetrics() {
@@ -909,7 +921,7 @@ func (r *Run) Reconcile() {
 		s.Done, s.Failed = 0, 0
 		s.Total = len(man.Cells)
 		for _, c := range man.Cells {
-			if _, err := os.Stat(r.imgPath(c.ID)); err == nil {
+			if hasImage(r.imgPath(c.ID)) {
 				s.Cells[c.ID] = CellState{ID: c.ID, Status: CellDone}
 				s.Done++
 			} else {

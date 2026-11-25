@@ -247,7 +247,7 @@ func countImages(run *Run) int {
 	n := 0
 	if man := run.Manifest(); man != nil {
 		for _, c := range man.Cells {
-			if _, err := os.Stat(run.imgPath(c.ID)); err == nil {
+			if hasImage(run.imgPath(c.ID)) {
 				n++
 			}
 		}

@@ -226,23 +226,27 @@ make stylemap-video RUN=<běh> NAME=pod-sebou GRID=1 COLS=1 COMPLETE=1 SPLIT=60 
 # běh labu → styl → všechny prompty, minutová videa po stylech
 make stylemap-video RUN=<běh> NAME=styl-prompty OUTER=style SPLIT=60 RATE=4
 
+# víc běhů se stejnými prompty, jiné modely i styly → stejný prompt, každý model ve svém stylu
+make stylemap-video RUN="20261112-204624 20261114-031858 20261115-005933 20261116-011614" \
+     NAME=mix GRID=1 MIX=1 COMPLETE=1 SPLIT=60 RATE=2 LABEL=1
+
 # mapa stylů (pack) → slideshow po LPIPS trase jako v appce
 make stylemap-video SET=<sada> NAME=mapa RATE=8 FADE=0.3
 ```
 
-Výstup: `build/lab/<RUN>/video/<NAME>.mp4`, resp.
+Výstup: `build/lab/<RUN>/video/<NAME>.mp4` (víc běhů: `build/lab/_merged/video/`), resp.
 `build/stylemap/<SET>/video/<NAME>.mp4` (se `SPLIT` → `<NAME>-01.mp4`, `-02` …).
 Ve Finderu: `open build/lab/<RUN>/video/`, do telefonu AirDropem.
 
 ### Jak to celé funguje
 
 ```
-  ZDROJ                 FILTR          POŘADÍ               SNÍMEK            ČAS / SOUBORY
+  ZDROJ (1 i víc běhů)  FILTR          POŘADÍ               SNÍMEK            ČAS / SOUBORY
   ─────                 ─────          ──────               ──────            ─────────────
-  RUN=<běh labu>  ┐                    ORDER=style ┐        1 obrázek    ┐    RATE, FADE
+  RUN="a b …"     ┐                    ORDER=style ┐        1 obrázek    ┐    RATE, FADE
    (img/ + manifest)│→  WHERE=…   →     (u RUN)    │→       (výchozí)    │→   SPLIT=60 → -01,-02…
   SET=<mapa stylů>┘    COMPLETE=1      ORDER=tour  ┘        GRID=1 mřížka┘    --max-seconds
-   (map.json+lpips)                     (u SET)              COLS, LABEL       --audio
+   (map.json+lpips)                     (u SET)              COLS, MIX, LABEL  --audio
 ```
 
 ### 1. Zdroj: `RUN=` nebo `SET=`
@@ -255,6 +259,40 @@ Ve Finderu: `open build/lab/<RUN>/video/`, do telefonu AirDropem.
 | Výchozí pořadí | `style` | `tour` |
 
 Nedoběhlý (zrušený) běh nevadí — bere se, co je na disku.
+
+### 1b. Víc běhů najednou: `RUN="a b c"` a `MIX=1`
+
+Běhy se spojí do jedné kolekce **podle id promptu** (`promptBody` — položka
+souboru promptů; text se může běh od běhu lišit, protože je psaný pro rodinu
+modelu). Model z víc běhů sloučí své styly; obrázek, který je dvakrát (stejný
+prompt, styl, flow, model), se vezme z prvního uvedeného běhu. Běh bez id
+promptů se spojuje podle pořadí promptu a skript na to upozorní.
+
+Co pak jde na jeden snímek mřížky:
+
+```
+GRID=1 (bez MIX) — stejný styl, všechny modely      GRID=1 MIX=1 — stejný prompt, každý model svůj styl
+┌──────────────────────────────┐                    ┌──────────────────────────────┐
+│ [ Bauhaus plakát (1923) ]    │ ← styl             │ [ Portrét v kavárně ]        │ ← prompt
+│ ┌──────┐ ┌──────┐ ┌──────┐   │                    │ ┌──────┐ ┌──────┐ ┌──────┐   │
+│ │      │ │  ░░  │ │  ░░  │   │                    │ │      │ │      │ │      │   │
+│ └──────┘ └──────┘ └──────┘   │                    │ └──────┘ └──────┘ └──────┘   │
+│ animagine  pony    wai       │                    │ animagine  pony    wai       │
+│            chybí   chybí     │                    │ Bauhaus   Čapek   Čapek      │ ← styl dlaždice
+└──────────────────────────────┘                    └──────────────────────────────┘
+ sedí, jen když běhy mají stejné styly               pro běhy se stejnými prompty, ale jinými styly
+```
+
+`MIX=1` u každého promptu nejdřív ukáže styly, které mají **všechny** vybrané
+modely (aspoň „bez stylu“), vedle sebe, a pak jde každý model dál svými
+zbylými styly v pořadí pickeru. Modely ze stejného běhu tak sdílejí styl,
+modely z jiných běhů ne. Model s víc styly než ostatní na konci promptu
+zůstane sám — `COMPLETE=1` takové snímky vynechá. `MIX` jde jen s `GRID=1`
+a pořadím prompt → styly (ne `OUTER=style`); `SPLIT` dělí mezi prompty.
+
+Které běhy jdou spojit (stejné prompty, jiné modely): stačí, aby měly stejný
+soubor promptů — `promptBody` v `wf/manifest.json`. Výběr modelů do mřížky:
+`WHERE="model=a model=b …"`, pořadí dlaždic `VIDEO_ARGS="--model-order …"`.
 
 ### 2. Filtr: `WHERE=` a `COMPLETE=1`
 
