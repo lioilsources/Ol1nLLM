@@ -258,6 +258,12 @@ void main() {
         'styleText': null,
         'promptIndex': pi,
         'promptBody': prompts[pi].body?.id,
+        // Prefix and character on their own: the video studio needs
+        // them apart from the column label.
+        if (prompts[pi].prefix.isNotEmpty)
+          'promptPrefix': prompts[pi].prefix,
+        if (prompts[pi].character.isNotEmpty)
+          'character': prompts[pi].character,
         'prompt': prompt,
         'negative': sentNegative,
         'variant': null,
@@ -636,6 +642,12 @@ void main() {
                 // Which entry of the prompt file this column came from; null
                 // when the prompt box was the whole axis.
                 'promptBody': prompts[pi].body?.id,
+                // Prefix and character on their own: the video studio needs
+                // them apart from the column label.
+                if (prompts[pi].prefix.isNotEmpty)
+                  'promptPrefix': prompts[pi].prefix,
+                if (prompts[pi].character.isNotEmpty)
+                  'character': prompts[pi].character,
                 // Read back out of the graph, so the table can never show a
                 // prompt that differs from the one that was sent.
                 'prompt': _encodedText(wf, positive: true),
@@ -827,6 +839,12 @@ void main() {
                 'styleText': style?.blockFor(dialect),
                 'promptIndex': pi,
                 'promptBody': prompts[pi].body?.id,
+                // Prefix and character on their own: the video studio needs
+                // them apart from the column label.
+                if (prompts[pi].prefix.isNotEmpty)
+                  'promptPrefix': prompts[pi].prefix,
+                if (prompts[pi].character.isNotEmpty)
+                  'character': prompts[pi].character,
                 // Read back out of the request, for the reason the ComfyUI path
                 // reads it back out of the graph: the table must show the text
                 // that was sent, never the one we meant to send.

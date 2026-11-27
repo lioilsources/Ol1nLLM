@@ -15,8 +15,19 @@ Sepsáno 2026-11-26 po průzkumu kódu a po sérii videí vyrobených ručně
 24.–25. 11. (PR #74–#77). **[V]** = ověřeno proti kódu nebo datům na disku,
 **[I]** = návrh nebo odhad, který má implementace potvrdit, nebo opravit.
 
-> **Stav:** nezačato. Po každém milníku sem dopiš, co je hotové a co vyšlo
-> jinak, než plán čekal (vzor: `docs/plan-voice-rhythm.md`).
+> **Stav:** M0 hotové (2026-11-27). Co vyšlo jinak, než plán čekal:
+> 1. **Postava není osa, když je v běhu jediná.** Běhy rodiny 64 scén mají
+>    každý jednu postavu, ale pokaždé jinak napsanou (pro jinou rodinu
+>    modelů). Jako osa by žádné dva běhy nespárovala; teď jde do otisku
+>    nastavení a osou je jen tam, kde v jednom běhu rozlišuje sloupce.
+> 2. **Rodina se počítá z naplánovaných promptů**, ne z obrázků — jinak se
+>    přerušené běhy rozpadly do vlastních „rodin“. Rodina 64 scén má teď
+>    32 běhů a 14 modelů.
+> 3. **Studený index trvá ~25 s** (584 MB manifestů, disk), teplý ~1 s.
+> 4. Paritní čísla sedí: šest modelů čtyř běhů volně 1 542, striktně 51
+>    (s baseline). Návrhy ze skriptu 25. 11. vyšly o 4 a 1 nižší
+>    (548 → 544, 422 → 421): skript počítal pět 0bajtových souborů
+>    v `20261109-175450` jako obrázky.
 
 ## Shrnutí
 
