@@ -35,6 +35,8 @@ func videoCLI(env *Env, args []string) error {
 		return videoPlanCLI(labDir, args[1:])
 	case "render":
 		return videoRenderCLI(labDir, args[1:])
+	case "beats":
+		return videoBeatsCLI(labDir, args[1:])
 	default:
 		videoUsage()
 		return fmt.Errorf("neznámý příkaz lab video %s", args[0])
@@ -60,6 +62,8 @@ func videoUsage() {
   lab video render recept.yaml [--only jméno-01,jméno-02] [--out DIR] [--draft]
         MP4 do build/lab/_video/<jméno>/ (s receptem a souhrnem scénáře);
         --draft kreslí z náhledů 320 px — rychlý koncept, ne výsledek
+  lab video beats skladba.mp3 [--bpm 126] [--json]
+        tempo, beaty a breakdowny skladby — to, na co time.sync stříhá
 `)
 }
 
@@ -425,7 +429,7 @@ func videoPlanCLI(labDir string, args []string) error {
 		return err
 	}
 	for _, r := range recipes {
-		sb, err := video.Plan(col, r)
+		sb, err := video.PlanSynced(context.Background(), col, r, labDir, "")
 		if err != nil {
 			return fmt.Errorf("%s:\n  %w", r.Name, err)
 		}
@@ -451,8 +455,11 @@ func printStoryboard(sb *video.Storyboard, withSlides bool) {
 		frame = fmt.Sprintf("%d dlaždic %s (%d×%d, obrázek %d px)", len(sb.Tiles), video.AxisName(r.Frame.Tiles),
 			l.Cols, l.Rows, l.TileW)
 	}
-	fmt.Printf("\n%s · %d snímků · %s · %g/s · %s celkem\n", r.Name, sb.Stats.Slides, frame, r.Time.Rate,
-		clock(sb.Stats.Seconds))
+	pace := fmt.Sprintf("%g/s", r.Time.Rate)
+	if r.Time.Sync != nil {
+		pace = "do hudby"
+	}
+	fmt.Printf("\n%s · %d snímků · %s · %s · %s celkem\n", r.Name, sb.Stats.Slides, frame, pace, clock(sb.Stats.Seconds))
 	var axes []string
 	for _, a := range r.Time.Axes {
 		n := video.AxisName(a)
@@ -470,6 +477,10 @@ func printStoryboard(sb *video.Storyboard, withSlides bool) {
 		fmt.Printf(" · video na %s", strings.Join(per, ", "))
 	}
 	fmt.Println()
+	if sy := sb.Sync; sy != nil {
+		fmt.Printf("  hudba: %s · %.1f BPM · %s · střih každých %g dob, v breakdownu %g\n", filepath.Base(sy.Audio),
+			sy.BPM, clock(sy.Duration), r.Time.Sync.Every, *r.Time.Sync.Breakdown)
+	}
 	d := sb.Stats.Dropped
 	fmt.Printf("  obrázků ve výběru %d · vyřazeno: neúplné snímky %d, prázdné soubory %d, kolize %d, filtr %d",
 		sb.Stats.Pictures, d["incomplete"], d["empty_file"], d["collision"], d["filtered"])
@@ -563,7 +574,7 @@ func videoRenderCLI(labDir string, args []string) error {
 	}
 	rendered := 0
 	for _, r := range recipes {
-		sb, err := video.Plan(col, r)
+		sb, err := video.PlanSynced(context.Background(), col, r, labDir, "")
 		if err != nil {
 			return fmt.Errorf("%s:\n  %w", r.Name, err)
 		}
@@ -610,5 +621,44 @@ func videoRenderCLI(labDir string, args []string) error {
 	if rendered == 0 {
 		return fmt.Errorf("žádný recept nemá díl %s", strings.Join(onlyList, ", "))
 	}
+	return nil
+}
+
+func videoBeatsCLI(labDir string, args []string) error {
+	fs := flag.NewFlagSet("lab video beats", flag.ExitOnError)
+	bpm := fs.Float64("bpm", 0, "nápověda tempa (±4 %)")
+	asJSON := fs.Bool("json", false, "JSON")
+	pos := parseArgs(fs, args)
+	if len(pos) != 1 {
+		return fmt.Errorf("lab video beats skladba.mp3")
+	}
+	path := video.ResolvePath(labDir, pos[0])
+	b, err := video.LoadBeats(context.Background(), "", labDir, path, *bpm)
+	if err != nil {
+		return err
+	}
+	if *asJSON {
+		return json.NewEncoder(os.Stdout).Encode(b)
+	}
+	fmt.Printf("%s · %s · %.2f BPM · %d dob · první doba %.3f s · takty od doby %d\n", filepath.Base(path),
+		clock(b.Duration), b.BPM, len(b.Times), b.Times[0], b.Bar)
+	for i := 0; i < len(b.Breakdown); i++ {
+		if !b.Breakdown[i] {
+			continue
+		}
+		j := i
+		for j < len(b.Breakdown) && b.Breakdown[j] {
+			j++
+		}
+		fmt.Printf("  breakdown %s–%s (%d dob)\n", clock(b.Times[i]), clock(b.Times[j-1]+60/b.BPM), j-i)
+		i = j
+	}
+	// Kick strength per bar as a strip: where the track breathes.
+	var strip strings.Builder
+	for i := 0; i+3 < len(b.Strength); i += 4 {
+		s := (b.Strength[i] + b.Strength[i+1] + b.Strength[i+2] + b.Strength[i+3]) / 4
+		strip.WriteRune([]rune(" ▁▂▃▄▅▆▇█")[min(8, int(s*5))])
+	}
+	fmt.Printf("  kopák po taktech: %s\n", strip.String())
 	return nil
 }

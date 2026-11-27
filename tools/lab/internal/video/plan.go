@@ -21,6 +21,7 @@ type Storyboard struct {
 	Videos   []VideoPart           `json:"videos"`
 	Stats    Stats                 `json:"stats"`
 	Warnings []string              `json:"warnings,omitempty"`
+	Sync     *SyncInfo             `json:"sync,omitempty"`
 }
 
 // Slide is one stretch of the video: one picture, or one tile per tile value.
@@ -53,6 +54,11 @@ type VideoPart struct {
 	To      int               `json:"to"`
 	Seconds float64           `json:"seconds"`
 	Groups  []string          `json:"groups,omitempty"`
+	// With time.sync: Times[k] is when slide From+k starts (seconds from the
+	// part start, len To-From+1, last = end); Fades[k] its crossfade share.
+	Times      []float64 `json:"times,omitempty"`
+	Fades      []float64 `json:"fades,omitempty"`
+	AudioStart float64   `json:"audioStart,omitempty"`
 }
 
 type Stats struct {
@@ -209,6 +215,9 @@ func Plan(col *Collection, r Recipe) (*Storyboard, error) {
 			splitAt = strictAxes[0]
 		}
 		sb.Recipe.Output.Split.At = splitAt
+	} else if r.Time.Sync != nil && len(strictAxes) > 0 {
+		// Music cuts the video into parts too; keep the outer axis whole.
+		splitAt = strictAxes[0]
 	}
 
 	// Tiles: fixed slots for the whole video, in the axis' order.
@@ -893,7 +902,7 @@ func parts(name string, per map[string]string, slides []Slide, from, to int, r R
 		}
 		return g
 	}
-	if r.Output.Split == nil {
+	if r.Output.Split == nil || r.Time.Sync != nil { // sync: ApplySync cuts
 		return []VideoPart{{Name: name, Per: per, From: from, To: to, Seconds: secs(from, to), Groups: groupsIn(from, to)}}
 	}
 	keys := make([]string, 0, to-from)

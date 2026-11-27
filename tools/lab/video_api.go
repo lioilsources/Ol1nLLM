@@ -445,7 +445,7 @@ func (a *videoAPI) handlePlan(w http.ResponseWriter, r *http.Request) {
 		apiErr(w, 500, err)
 		return
 	}
-	sb, err := video.Plan(col, rec)
+	sb, err := video.PlanSynced(r.Context(), col, rec, a.labDir, "")
 	if err != nil {
 		apiErr(w, 422, err)
 		return
@@ -618,7 +618,7 @@ func (a *videoAPI) handleRender(w http.ResponseWriter, r *http.Request) {
 		apiErr(w, 500, err)
 		return
 	}
-	sb, err := video.Plan(col, rec)
+	sb, err := video.PlanSynced(r.Context(), col, rec, a.labDir, "")
 	if err != nil {
 		apiErr(w, 422, err)
 		return
