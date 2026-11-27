@@ -1,0 +1,41 @@
+# Ukázkové recepty videí (lab video plan / render). Id běhů jsou vymyšlená —
+# vlastní kostru vyrobí: lab video new --runs <běh> --template platno
+# Návod: tools/lab/README.md („Video napříč běhy“).
+
+# Průlet jedním modelem: prompt → styly, minutová videa, řez jen mezi prompty.
+name: prulet
+source: {runs: [20990101-000000]}
+time: {axes: [prompt, style], rate: 4, fade: 0.2}
+output: {split: {seconds: 60, at: prompt}}
+---
+# Totéž obráceně: styl → prompty, řez mezi styly.
+name: styl-prompty
+source: {runs: [20990101-000000]}
+time: {axes: [style, prompt], rate: 4, fade: 0.2}
+output: {split: {seconds: 60, at: style}}
+---
+# Video na každý model a stroboskop přes všechny modely.
+name: na-model
+source: {runs: [20990101-000001]}
+time: {axes: [style], rate: 6, fade: 0.3}
+output: {per: [model]}
+---
+name: stroboskop
+source: {runs: [20990101-000001]}
+time: {axes: [style, model], rate: 30, fade: 0}
+---
+# Plátno: tři modely vedle sebe přes styly, zvlášť video pro každou flow.
+name: platno
+source: {runs: [20990101-000002]}
+select: {model: [model-a, model-b, model-c]}
+frame: {tiles: model, cols: 3, title: auto}
+time: {axes: [style], rate: 2, fade: 0.2}
+output: {per: [flow]}
+---
+# Mix: běhy se stejnými prompty a jinými styly — stejný prompt, každý model
+# svůj styl, stejný druh stylu (kultura / umělec / médium) k sobě.
+name: mix
+source: {runs: [20990101-000003, 20990101-000004, 20990101-000005]}
+frame: {tiles: model, title: prompt, captions: [model, style]}
+time: {axes: [prompt, style], loose: [style], pair: kind, rate: 2, fade: 0.2}
+output: {split: {seconds: 60}}

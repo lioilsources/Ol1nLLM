@@ -15,7 +15,10 @@ Sepsáno 2026-11-26 po průzkumu kódu a po sérii videí vyrobených ručně
 24.–25. 11. (PR #74–#77). **[V]** = ověřeno proti kódu nebo datům na disku,
 **[I]** = návrh nebo odhad, který má implementace potvrdit, nebo opravit.
 
-> **Stav:** M0 hotové (2026-11-27). Co vyšlo jinak, než plán čekal:
+> **Stav:** M0 a M1 hotové (2026-11-27); z M4 je hotový žebřík párování
+> (`pair: exact | kind | order`) i skóre shody — byl potřeba už pro paritu.
+> Paritní čísla §12 plán reprodukuje všechna (počty snímků, videí i délky).
+> Co vyšlo jinak, než plán čekal:
 > 1. **Postava není osa, když je v běhu jediná.** Běhy rodiny 64 scén mají
 >    každý jednu postavu, ale pokaždé jinak napsanou (pro jinou rodinu
 >    modelů). Jako osa by žádné dva běhy nespárovala; teď jde do otisku

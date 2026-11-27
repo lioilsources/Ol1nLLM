@@ -26,6 +26,10 @@ func videoCLI(env *Env, args []string) error {
 		return videoCoverageCLI(labDir, args[1:])
 	case "suggest":
 		return videoSuggestCLI(labDir, args[1:])
+	case "new":
+		return videoNewCLI(labDir, args[1:])
+	case "plan":
+		return videoPlanCLI(labDir, args[1:])
 	default:
 		videoUsage()
 		return fmt.Errorf("neznámý příkaz lab video %s", args[0])
@@ -44,6 +48,10 @@ func videoUsage() {
         [--where osa=hodnota …] [--json]
         které modely dát vedle sebe: úplné snímky striktně (stejný prompt i styl)
         a volně (stejný prompt, každý model svůj styl)
+  lab video new (--runs a,b | --family BĚH) --template stroboskop|prulet|platno|mix [--name N] > recept.yaml
+        kostra receptu se všemi osami, které běhy mají
+  lab video plan recept.yaml [--slides] [--json]
+        scénář: snímky, videa, délky, co vypadlo a proč — nic nerenderuje
 `)
 }
 
@@ -315,4 +323,175 @@ func printJSON(v any) error {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", " ")
 	return enc.Encode(v)
+}
+
+func videoNewCLI(labDir string, args []string) error {
+	fs := flag.NewFlagSet("video new", flag.ExitOnError)
+	pf := addPoolFlags(fs)
+	tmpl := fs.String("template", "platno", "stroboskop | prulet | platno | mix")
+	name := fs.String("name", "", "jméno videa (výchozí podle šablony)")
+	_ = fs.Parse(args)
+	id, err := video.TemplateID(*tmpl)
+	if err != nil {
+		return err
+	}
+	pool, err := pf.pool(labDir)
+	if err != nil {
+		return err
+	}
+	src := video.Source{PromptIdentity: *pf.identity}
+	if *pf.prefer != "first" {
+		src.Prefer = *pf.prefer
+	}
+	if *pf.family != "" {
+		src.Family = *pf.family
+	} else {
+		for _, r := range strings.Split(*pf.runs, ",") {
+			src.Runs = append(src.Runs, strings.TrimSpace(r))
+		}
+	}
+	n := *name
+	if n == "" {
+		n = id
+	}
+	r, notes := video.FromTemplate(id, n, src, pool)
+	// --where narrows the pool; keep it in the recipe.
+	if sel, err := video.ParseWhere(pf.where); err == nil {
+		for axis, vals := range sel.Only {
+			if r.Select == nil {
+				r.Select = video.SelectSpec{}
+			}
+			r.Select[axis] = video.AxisFilter{Only: vals}
+		}
+	}
+	text, err := video.TemplateYAML(r, pool, notes)
+	if err != nil {
+		return err
+	}
+	fmt.Print(text)
+	return nil
+}
+
+func videoPlanCLI(labDir string, args []string) error {
+	fs := flag.NewFlagSet("video plan", flag.ExitOnError)
+	slides := fs.Bool("slides", false, "vypsat i snímky")
+	asJSON := fs.Bool("json", false, "JSON")
+	_ = fs.Parse(args)
+	if fs.NArg() != 1 {
+		return fmt.Errorf("lab video plan recept.yaml")
+	}
+	data, err := os.ReadFile(fs.Arg(0))
+	if err != nil {
+		return err
+	}
+	recipes, err := video.ParseRecipes(data)
+	if err != nil {
+		return err
+	}
+	col, err := video.Load(labDir)
+	if err != nil {
+		return err
+	}
+	for _, r := range recipes {
+		sb, err := video.Plan(col, r)
+		if err != nil {
+			return fmt.Errorf("%s:\n  %w", r.Name, err)
+		}
+		if *asJSON {
+			if !*slides {
+				sb.Slides = nil
+			}
+			if err := printJSON(sb); err != nil {
+				return err
+			}
+			continue
+		}
+		printStoryboard(sb, *slides)
+	}
+	return nil
+}
+
+func printStoryboard(sb *video.Storyboard, withSlides bool) {
+	r := sb.Recipe
+	l := sb.Layout
+	frame := "jeden obrázek"
+	if r.Frame.Tiles != "" && l != nil {
+		frame = fmt.Sprintf("%d dlaždic %s (%d×%d, obrázek %d px)", len(sb.Tiles), video.AxisName(r.Frame.Tiles),
+			l.Cols, l.Rows, l.TileW)
+	}
+	fmt.Printf("\n%s · %d snímků · %s · %g/s · %s celkem\n", r.Name, sb.Stats.Slides, frame, r.Time.Rate,
+		clock(sb.Stats.Seconds))
+	var axes []string
+	for _, a := range r.Time.Axes {
+		n := video.AxisName(a)
+		if hasString(r.Time.Loose, a) {
+			n += " (volně)"
+		}
+		axes = append(axes, n)
+	}
+	fmt.Printf("  čas: %s", strings.Join(axes, " → "))
+	if len(r.Output.Per) > 0 {
+		var per []string
+		for _, a := range r.Output.Per {
+			per = append(per, video.AxisName(a))
+		}
+		fmt.Printf(" · video na %s", strings.Join(per, ", "))
+	}
+	fmt.Println()
+	d := sb.Stats.Dropped
+	fmt.Printf("  obrázků ve výběru %d · vyřazeno: neúplné snímky %d, prázdné soubory %d, kolize %d, filtr %d\n",
+		sb.Stats.Pictures, d["incomplete"], d["empty_file"], d["collision"], d["filtered"])
+	if m := sb.Stats.Match; len(m) > 0 {
+		total := m["exact"] + m["kind"] + m["order"]
+		fmt.Printf("  shoda volné osy: přesná %d %%, stejný druh %d %%, jiná %d %%\n",
+			pct(m["exact"], total), pct(m["kind"], total), pct(m["order"], total))
+	}
+	fmt.Printf("  videa (%d):\n", len(sb.Videos))
+	for _, v := range sb.Videos {
+		groups := ""
+		if len(v.Groups) > 0 {
+			groups = fmt.Sprintf("  %d× %s", len(v.Groups), video.AxisName(r.Output.Split.At))
+		}
+		fmt.Printf("    %-36s %7s  %5d snímků%s\n", v.Name+".mp4", clock(v.Seconds), v.To-v.From, groups)
+	}
+	for _, w := range sb.Warnings {
+		fmt.Println("  ⚠", w)
+	}
+	if withSlides {
+		for i, s := range sb.Slides {
+			var tiles []string
+			for _, t := range s.Tiles {
+				if t == nil {
+					tiles = append(tiles, "—")
+				} else {
+					tiles = append(tiles, t.Model+"/"+t.Style)
+				}
+			}
+			fmt.Printf("    %5d  %-6s %-30s %s\n", i, s.Match, truncate(s.Title, 30), strings.Join(tiles, "  "))
+		}
+	}
+}
+
+func pct(a, total int) int {
+	if total == 0 {
+		return 0
+	}
+	return int(float64(a)*100/float64(total) + 0.5)
+}
+
+func clock(sec float64) string {
+	s := int(sec + 0.5)
+	if s < 60 {
+		return fmt.Sprintf("%d s", s)
+	}
+	return fmt.Sprintf("%d:%02d", s/60, s%60)
+}
+
+func hasString(list []string, s string) bool {
+	for _, x := range list {
+		if x == s {
+			return true
+		}
+	}
+	return false
 }
