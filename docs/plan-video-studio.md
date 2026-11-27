@@ -15,10 +15,17 @@ Sepsáno 2026-11-26 po průzkumu kódu a po sérii videí vyrobených ručně
 24.–25. 11. (PR #74–#77). **[V]** = ověřeno proti kódu nebo datům na disku,
 **[I]** = návrh nebo odhad, který má implementace potvrdit, nebo opravit.
 
-> **Stav:** M0 a M1 hotové (2026-11-27); z M4 je hotový žebřík párování
+> **Stav:** M0, M1 a M2 hotové (2026-11-27); z M4 je hotový žebřík párování
 > (`pair: exact | kind | order`) i skóre shody — byl potřeba už pro paritu.
-> Paritní čísla §12 plán reprodukuje všechna (počty snímků, videí i délky).
-> Co vyšlo jinak, než plán čekal:
+> Paritní čísla §12 plán reprodukuje všechna (počty snímků, videí i délky);
+> `make_video.py` a `make stylemap-video` jsou pryč. Co vyšlo jinak, než plán
+> čekal:
+> 0. **Výkon (§8) jen zčásti.** Plátno 6 modelů × 311 stylů: Go 65 s, Python
+>    114 s (1,75×). Stroboskop 1 866 obrázků při 30/s: Go 114–117 s, Python
+>    144 s. Měřeno na vytíženém stroji (load 5–12). Brzdou bylo čtení souborů:
+>    dekodér PNG čte po 4 KB a systémová volání stála 68 % CPU — teď se
+>    soubor čte celý. Zbývá dekódování PNG v Go (~36 ms na 1024², PIL zhruba
+>    třetinu); `output.encoder: videotoolbox` uvolní procesor kódování.
 > 1. **Postava není osa, když je v běhu jediná.** Běhy rodiny 64 scén mají
 >    každý jednu postavu, ale pokaždé jinak napsanou (pro jinou rodinu
 >    modelů). Jako osa by žádné dva běhy nespárovala; teď jde do otisku

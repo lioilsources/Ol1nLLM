@@ -1,4 +1,4 @@
-.PHONY: run debug build-ios build-android lab lab-dry lab-check lab-arcface lab-wd14 lab-resume lab-score lab-complete stylemap-env stylemap stylemap-tags stylemap-serve stylemap-video stylemap-publish
+.PHONY: run debug build-ios build-android lab lab-dry lab-check lab-arcface lab-wd14 lab-video lab-resume lab-score lab-complete stylemap-env stylemap stylemap-tags stylemap-serve stylemap-publish
 
 -include .env.local
 
@@ -71,6 +71,13 @@ lab-arcface:
 	mkdir -p $(HOME)/.insightface/models
 	rsync -a spark:Code/ComfyUI/models/insightface/models/antelopev2 $(HOME)/.insightface/models/
 
+# Videos across lab runs (tools/lab/internal/video, docs/plan-video-studio.md):
+# a recipe in YAML → MP4 in build/lab/_video/<name>/. Skeleton of a recipe:
+#   cd tools/lab && go run . video new --runs <běh> --template platno > recept.yaml
+#   make lab-video RECIPE=recept.yaml [ONLY=jméno-01]
+lab-video:
+	cd tools/lab && go run . video render $(abspath $(RECIPE)) $(if $(ONLY),--only $(ONLY),)
+
 # WD14 tags of the reference for the lab (tools/lab/wd14.py, `--ref-tags` /
 # „tagy z předlohy“): the same tagger as the FINETUNE gallery sidecar, run on
 # CPU in the lab venv. Model ~450 MB from Hugging Face, downloaded once.
@@ -121,38 +128,6 @@ stylemap-tags:
 	$(STYLEMAP_PY) tools/stylemap/build_map.py --set build/stylemap/$(SET) \
 		--title "$$(python3 -c "import json;print(json.load(open('build/stylemap/$(SET)/map.json'))['title'])")"
 	$(STYLEMAP_PY) tools/stylemap/make_thumbs.py --set build/stylemap/$(SET)
-
-# Slideshow as a vertical MP4 for TikTok/Reels/Shorts (make_video.py), from a
-# pack (SET=…, the LPIPS route, re-planned over a filtered subset) or straight
-# from a lab run (RUN=…, no pack needed). ORDER=style plays one style at a time
-# across all models (default for RUN), LABEL=1 burns in "style · model",
-# GRID=1 puts every model of one style on one frame (RATE = styles per second),
-# COLS=3 fixes its columns (rows follow; default picks the largest pictures),
-# RUN="a b c" merges runs by prompt id; MIX=1 (with GRID=1) shows every model on
-# the same prompt, each in its own style, for runs whose styles differ.
-# COMPLETE=1 drops grid frames where a model has no picture. OUTER=style plays
-# style → prompts instead of prompt → styles. SPLIT=60 cuts the output into
-# videos of at most 60 s, only between prompts (or styles) (NAME-01.mp4 …).
-# WHERE filters like the app (model=…, style=…, flow=repose), RATE = pictures
-# per second, FADE = share of each picture spent crossfading (0 = cut).
-# VIDEO_ARGS passes the rest (--fit cover, --max-seconds 60, --audio song.mp3,
-# --model-order a,b,c, --size 1080x1350).
-#   make stylemap-video SET=muj-beh NAME=noobai-4fps WHERE="model=noobai-xl" RATE=4
-#   make stylemap-video RUN=20261124-112650 NAME=po-stylech RATE=3 LABEL=1
-#   make stylemap-video RUN=20261124-112650 NAME=mrizka GRID=1 RATE=2 LABEL=1
-# A run needs only numpy and Pillow, so without the stylemap venv it uses python3.
-VIDEO_PY = $(if $(wildcard $(STYLEMAP_PY)),$(STYLEMAP_PY),python3)
-# One run writes next to it; several runs (RUN="a b c") into build/lab/_merged.
-VIDEO_DIR = $(if $(RUN),$(if $(word 2,$(RUN)),build/lab/_merged/video,build/lab/$(RUN)/video),build/stylemap/$(SET)/video)
-stylemap-video:
-	$(VIDEO_PY) tools/stylemap/make_video.py \
-		$(if $(RUN),--run $(addprefix build/lab/,$(RUN)),--set build/stylemap/$(SET)) \
-		--out $(VIDEO_DIR)/$(or $(NAME),$(SET),$(firstword $(RUN))).mp4 \
-		$(foreach w,$(WHERE),--where $(w)) $(if $(RATE),--rate $(RATE),) \
-		$(if $(FADE),--fade $(FADE),) $(if $(ORDER),--order $(ORDER),) $(if $(OUTER),--outer $(OUTER),) \
-		$(if $(LABEL),--label,) $(if $(GRID),--grid,) \
-		$(if $(COLS),--cols $(COLS),) $(if $(COMPLETE),--complete,) $(if $(MIX),--mix,) \
-		$(if $(SPLIT),--split $(SPLIT),) $(VIDEO_ARGS)
 
 # Serves the packs to a phone on the LAN (STYLEMAP_URL=http://<mac-ip>:8770,
 # `make debug` only — cleartext). Generated pictures, no credentials.

@@ -675,81 +675,173 @@ spočítá jen nové buňky. Starší běh dostane čísla přes `lab score <adr
 
 ## Video napříč běhy (`lab video`)
 
-Plán a slovník: [`docs/plan-video-studio.md`](../../docs/plan-video-studio.md).
-Kód je v `internal/video` (bez HTTP a `Env`), příkazy v `video_cli.go`.
-Hotové **M0** (kolekce, rodiny, pokrytí, návrhy) a **M1** (recept, scénář).
-Render zatím dál dělá `make stylemap-video` (`tools/stylemap/README.md`,
-„Video na výšku“).
+Videa na výšku (1080×1920, H.264, 30 fps — TikTok, YouTube Shorts, Instagram
+Reels) z obrázků jednoho nebo víc běhů. Recept v YAML, plán bez renderu,
+render v Go (ffmpeg jen kóduje). Všechno lokálně, nic se nikam neposílá.
+Plán a zdůvodnění: [`docs/plan-video-studio.md`](../../docs/plan-video-studio.md);
+kód `internal/video` (bez HTTP a `Env`), příkazy `video_cli.go`.
+
+### Tahák
 
 ```bash
-lab video index [--min 50] [--refresh]                 # rodiny běhů, modely, počty
-lab video coverage --family <běh> --where flow=txt2img # model × styl, u kolika promptů
-lab video suggest  --runs a,b,c --tiles model --loose style --k 6
-lab video new --runs a,b --template mix > recept.yaml  # kostra receptu
-lab video plan recept.yaml [--slides]                  # snímky, videa, délky, co vypadlo
+lab video index                                        # rodiny běhů (stejné prompty), modely, počty
+lab video suggest  --family <běh> --where flow=txt2img # které modely dát vedle sebe
+lab video coverage --runs a,b                          # model × styl: u kolika promptů je obrázek
+lab video new --runs a,b --template mix > r.yaml       # kostra receptu (stroboskop|prulet|platno|mix)
+lab video plan   r.yaml [--slides]                     # snímky, videa, délky, co vypadlo a proč
+lab video render r.yaml [--only jméno-03] [--draft]    # MP4 do build/lab/_video/<jméno>/
+make lab-video RECIPE=r.yaml                           # totéž z kořene repa
 ```
 
-### Recept
+Přepínače smí stát i za souborem. `--draft` kreslí z náhledů 320 px (rychlý
+koncept). Vedle videí se uloží `recipe.yaml` a `storyboard.json` (souhrn
+plánu) — z čeho video vzniklo, zůstane u něj. Ukázky receptů:
+`candidates/video-examples.yaml`. Ve Finderu: `open build/lab/_video/<jméno>`,
+do telefonu AirDropem.
 
-YAML, klíče jako v `candidates/video-examples.yaml`; neznámý klíč je chyba
-s číslem řádku, víc receptů v jednom souboru odděluje `---`. Šablony
-`stroboskop`, `prulet`, `platno`, `mix` (`lab video new`).
+### Jak to funguje
+
+```
+  ZDROJ             VÝBĚR            ROLE OS                 SNÍMEK              ČAS A SOUBORY
+  source.runs  ──→  select     ──→   frame.tiles  (dlaždice) ──→ 1 obrázek  ──→  time.rate, fade
+  source.family     model, styl,     time.axes    (čas)          nebo mřížka     output.split
+  (stejné prompty)  flow, prompt…    output.per   (video na…)    title,          output.per → víc videí
+                                     time.loose   (volně)        captions        max_seconds
+```
+
+**Pravidlo rolí** — jediné, které je potřeba si pamatovat: každá osa, která má
+po výběru víc hodnot, má právě jednu roli. Osy jsou `model`, `style`,
+`prompt`, `character` (postava), `prefix`, `flow`, `variant` (hodnota sweepu).
+Když roli nemá, `plan` řekne hodnoty a tři opravy (do času, video na každou
+hodnotu, nebo vybrat jednu). Bez `time.axes` se čas doplní sám: prompt,
+postava, prefix, styl, flow, sweep, model — co z toho nemá jinou roli.
 
 ```yaml
-name: mix                         # jméno výstupu (díly: mix-01, mix-02 …)
-source: {runs: [a, b, c]}         # nebo {family: a}; prompt_identity, prefer
-select: {model: [m1, m2], flow: txt2img, style: {not: [x]}}   # pořadí = pořadí dlaždic
-frame:  {tiles: model, cols: auto, title: prompt, captions: [model, style], fit: contain}
-time:   {axes: [prompt, style], loose: [style], pair: kind, complete: true, rate: 2, fade: 0.2}
-output: {per: [flow], split: {seconds: 60, at: prompt}, max_seconds: 170, size: 1080x1920}
+name: mix                         # jméno; díly mix-01, mix-02…, s per mix-<hodnota>
+source: {runs: [a, b, c]}         # nebo {family: a}
+select: {model: [m1, m2, m3], flow: txt2img}     # pořadí = pořadí dlaždic
+frame:  {tiles: model, title: prompt, captions: [model, style]}
+time:   {axes: [prompt, style], loose: [style], pair: kind, rate: 2, fade: 0.2}
+output: {split: {seconds: 60, at: prompt}}
 ```
 
-**Pravidlo rolí**: každá osa obsahu, která má po `select` víc hodnot, má
-právě jednu roli — dlaždice (`frame.tiles`), čas (`time.axes`, vnější →
-vnitřní) nebo samostatné video na hodnotu (`output.per`). Chybí-li
-`time.axes`, doplní se osy bez role v pořadí prompt, postava, prefix, styl,
-flow, sweep, model. Osa bez role je chyba, která řekne hodnoty a opravy.
+### Zdroj a výběr
 
-**Volné osy** (`time.loose`, vnitřní konec `time.axes`, jen s dlaždicemi):
-mezi dlaždicemi se smí lišit. Žebřík `pair`: `exact` (jen co mají všechny
-dlaždice), `kind` (navíc stejný druh stylu — kultura, umělec, médium — s
-nejbližším rokem), `order` (navíc zbytek v pořadí pickeru). Plán vypíše
-podíl snímků z každé příčky: tak se pozná, jestli jsou dlaždice „aspoň trochu
-podobné“, dřív než se renderuje.
+- **Prompt je scéna, ne text.** Běhy s promptovým souborem se spojí podle id
+  položky (`promptBody`), i když je text pro každou rodinu modelů jiný. Postava
+  a prefix jsou osa jen tam, kde v jednom běhu rozlišují sloupce; jediná
+  postava běhu patří k jeho nastavení. `source.prompt_identity: column` spojuje
+  podle celého popisku sloupce.
+- **Stejný obrázek ve dvou bězích** (stejný model, prompt, styl…): bere se
+  `source.prefer: first | newest | error`. Liší-li se nastavení (seed, postava,
+  síla úpravy), plán to vypíše — jsou to jiné obrázky.
+- **Výběr**: `select.<osa>` je hodnota, seznam (pořadí = pořadí dlaždic/času)
+  nebo `{only: […], not: […]}`; u stylů navíc `{kind: [culture | artist | medium]}`.
+- 0bajtový soubor (nedostažený obrázek starších běhů) je chybějící obrázek.
 
-`complete: true` (výchozí) zahodí snímky s prázdnou dlaždicí. `split` řeže jen
-na hranici osy `at` (výchozí vnější osa času). `max_seconds` vybírá
-rovnoměrně celé jednotky (u `[styl, model]` celé styly). Geometrii snímku
-(`layout`) počítá plán; náhled i render ji jen kreslí.
+### Pořadí (`time.axes`, `time.order`)
 
-- **Kolekce** = obrázky všech běhů v `build/lab` (adresáře s `_` jsou labu).
-  Obrázek je buňka manifestu s neprázdným souborem; 0bajtový soubor je
-  chybějící obrázek a `index` ho u běhu vypíše. Fotka pozice restylu
-  (`flow: position`) do matice nepatří.
-- **Osy**: `model`, `style` (`__baseline` = bez stylu), `prompt`, `character`,
-  `prefix`, `flow`, `variant` (hodnota sweepu); původ `run` a `setup`.
-- **Identita promptu**: s promptovým souborem id scény (`promptBody`) — text
-  je pro každou rodinu modelů jiný, scéna táž; bez něj celý popisek sloupce.
-  **Postava a prefix jsou osa jen tam, kde v jednom běhu rozlišují sloupce.**
-  Běh s jedinou postavou ji napsal pro svou rodinu modelů jako prompt, takže
-  jde do otisku nastavení (`setup`) a běhy s jinak napsanou postavou se dál
-  spárují podle scény.
-- **Rodina** = běhy se stejnou sadou naplánovaných promptů (i přerušené).
-- **Kolize**: stejný obrázek (všechny osy obsahu) ve dvou bězích. `--prefer
-  first|newest|error`; když se liší nastavení (seed, postava, síla úpravy…),
-  příkaz to vypíše — jsou to jiné obrázky.
-- **Pokrytí** u stylů nad 16 sloupců sčítá po druzích (kultury, umělci,
-  média): procento dvojic (styl, prompt), které mají obrázek. `--json` dá
-  celou matici.
-- **Návrhy**: pro každý počet dlaždic nejlepší kombinace se dvěma čísly —
-  *striktně* úplné snímky (stejný prompt i styl) a *volně* úplné (osy z
-  `--loose` se mezi dlaždicemi smí lišit; tolik snímků dá video `MIX=1`
-  s `COMPLETE=1`). Nad 16 hodnot bere těch 16 s nejvíc obrázky.
-- **Cache** indexu: `build/lab/_video/.index/<běh>.json`, platí podle velikosti
-  a času manifestu; které obrázky existují, se čte pokaždé (běžící běh je
-  vidět hned). Studený průchod ~25 s (manifesty mají stovky MB), teplý ~1 s.
-- Nové běhy nesou `promptPrefix` a `character` v buňce (`dump.dart`); u starých
-  se odvozují z popisku sloupce.
+```
+time.axes: [prompt, style]               time.axes: [style, prompt]
+prompt 1 ─┬─ bez stylu                   bez stylu ─┬─ prompt 1
+          ├─ Lascaux                                ├─ prompt 2
+          └─ …                                      └─ …
+prompt 2 ─┬─ bez stylu                   Lascaux ───┬─ prompt 1
+          └─ …                                      └─ …
+split řeže mezi prompty                  split řeže mezi styly (split.at)
+```
+
+Styly jdou v pořadí pickeru appky (baseline „bez stylu“ první); `time.order:
+{style: year}` podle roku, `{style: label}` abecedně. `[style, model]` bez
+dlaždic je stroboskop: u každého stylu všechny modely po sobě.
+
+### Snímek: jeden obrázek, nebo mřížka
+
+```
+ bez dlaždic              tiles: model (auto)     tiles: model, cols: 3   tiles: model, cols: 1
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐    ┌──────────────────┐
+│░░[ titulek ]░░░░░│     │ [   titulek    ] │     │ [   titulek    ] │    │                  │
+│░░ ┌ styl ┐ ░░░░░░│     │┌───────┐┌───────┐│     │┌────┐┌────┐┌────┐│    │  ┌────────────┐  │
+│░░ └model ┘ ░░░░░░│     ││   A   ││   B   ││     ││ A  ││ B  ││ C  ││    │  │     A      │  │
+│░┌──────────────┐░│     │└───────┘└───────┘│     │└────┘└────┘└────┘│    │  └────────────┘  │
+│░│   obrázek    │░│     │┌───────┐┌───────┐│     │┌────┐┌────┐┌────┐│    │  ┌────────────┐  │
+│░│  (contain)   │░│     ││   C   ││   D   ││     ││ D  ││ E  ││ F  ││    │  │     B      │  │
+│░└──────────────┘░│     │└───────┘└───────┘│     │└────┘└────┘└────┘│    │  └────────────┘  │
+│░ rozmazané pozadí│     │  …               │     │                  │    │                  │
+└──────────────────┘     └──────────────────┘     └──────────────────┘    └──────────────────┘
+```
+
+- **Bez dlaždic**: `frame.fit: contain` (výchozí) ukáže celý obrázek na jeho
+  rozmazané ztmavené kopii, `cover` ořízne na výšku.
+- **`frame.tiles`**: jeden snímek = jedna hodnota časových os, v něm dlaždice
+  pro každou hodnotu osy dlaždic. Model má po celé video stejnou dlaždici,
+  chybějící obrázek je prázdný rámeček — nebo se snímek zahodí
+  (`time.complete: true`, výchozí). `frame.cols: auto` vybere rozložení
+  s největšími obrázky; `cols: 1` pod sebou, `cols: N` vedle sebe.
+  `time.rate` je pak snímků (stylů) za vteřinu.
+- **Popisky**: `frame.title` (none | auto | osa) je pruh nahoře, vždy dva
+  řádky vysoký, aby mřížka neposkakovala. `frame.captions` (none | auto |
+  [osy]) jsou řádky pod dlaždicí; bez dlaždic box „styl / model“. Text sedí
+  pod záložkami, které TikTok a Shorts kreslí nahoře, mřížka končí nad místem
+  pro jejich titulek dole. Písmo je Go font zabudovaný v binárce.
+- **Geometrii** (`layout`) počítá plán; render (a náhled ve studiu) ji jen
+  kreslí. `plan` varuje, když jsou dlaždice pod 220 px.
+
+### Stejný prompt, jiné styly (`time.loose`, `time.pair`)
+
+Pro běhy se stejnými prompty a jinými styly: dlaždice sdílí prompt a styl se
+mezi nimi smí lišit. Párování po příčkách:
+
+```
+pair: exact   jen styly, které mají všechny dlaždice (aspoň „bez stylu“)
+pair: kind    + stejný druh stylu (kultura / umělec / médium) s nejbližším rokem
+pair: order   + zbytek v pořadí pickeru
+```
+
+`plan` vypíše, kolik snímků vzniklo na které příčce („shoda volné osy:
+přesná 3 %, stejný druh 97 %“) — tak se pozná, jestli jsou dlaždice aspoň
+trochu podobné, dřív než se cokoli vyrenderuje. Co dát vedle sebe, řekne
+`lab video suggest` (úplné snímky striktně i volně pro každou kombinaci).
+
+### Čas a soubory
+
+```
+rate: 2, fade: 0.25          (snímek = 1/rate s = 0,5 s)
+ snímek 1           snímek 2           snímek 3
+├──────────────╱╲──────────────╱╲──────────────┤
+               └┘ prolínačka = fade × 0,5 s     fade: 0 = tvrdý střih
+
+output.split: {seconds: 60, at: prompt}
+ prompt 1 │ prompt 2 │ prompt 3 ║ prompt 4 │ prompt 5 ║ prompt 6 …
+ └────── jméno-01.mp4 ≤ 60 s ──┘└── jméno-02.mp4 ───┘└─ jméno-03 …
+```
+
+- `time.rate` 0–`output.fps`; obrázek přes celou obrazovku snese 4–8/s,
+  mřížka šesti modelů 1–2/s. Délka ≈ snímků ÷ rate.
+- `output.split` řeže jen mezi hodnotami osy `at` (výchozí vnější osa času);
+  skupina delší než limit dostane video sama. `output.per: [model]` udělá
+  samostatnou sadu na každou hodnotu. `output.max_seconds` zkrátí rovnoměrným
+  výběrem (u stroboskopu po celých stylech).
+- `output.crf` (18; 23 ≈ poloviční soubor), `output.audio` (zvuková stopa,
+  ořízne se), `output.size` (`1080x1350` pro 4:5), `output.encoder:
+  videotoolbox` (hardwarové kódování na Macu: šetří procesor, větší soubor).
+- Díl se zapisuje do `.part.mp4` a přejmenuje až hotový; Ctrl+C render
+  zruší a rozdělaný soubor smaže.
+
+| Limity platforem | TikTok | YouTube Shorts | Instagram Reels |
+|---|---|---|---|
+| Délka | do 10 min | **do 3 min** (delší = běžné video) | do 3 min |
+| Nahota | stáhne | stáhne | stáhne |
+
+`plan` varuje u dílu nad 180 s.
+
+### Index a cache
+
+`build/lab/_video/.index/<běh>.json`, platí podle velikosti a času manifestu;
+které obrázky existují, se čte pokaždé (běžící běh je vidět hned). Studený
+průchod ~25 s (manifesty mají stovky MB), teplý ~1 s; `lab video index
+--refresh` cache zahodí. Nové běhy nesou `promptPrefix` a `character` v buňce
+(`dump.dart`), u starých se odvozují z popisku sloupce.
 
 ## Kompletní matice z jedné fotky (`complete.sh`)
 

@@ -15,9 +15,6 @@ make stylemap SET=<jméno sady> SESSIONS="<id> <id>" TITLE="…" TAG_REGEX='arti
 make stylemap-tags SET=<jméno sady>     # VLM tagy (jen v okně modelu, viz níž)
 make stylemap-serve                     # packy pro telefon na LAN, port 8770
 make stylemap-publish                   # packy na NAS, galerie je servíruje na /stylemaps/
-make stylemap-video SET=<sada> NAME=… WHERE="model=…" RATE=4 FADE=0.4   # MP4 na výšku
-make stylemap-video RUN=<běh labu> NAME=… RATE=3 LABEL=1                 # styl po stylu přes modely
-make stylemap-video RUN=<běh labu> NAME=… GRID=1 RATE=2 LABEL=1          # všechny modely stylu na jednom snímku
 ```
 
 Výstup jde do `build/stylemap/<SET>/`. Sada má dva možné zdroje:
@@ -202,225 +199,12 @@ působí na telefonu, z nich neplyne.
 | `curly-redhead` | 224 | 0,48 | 0,368 → 0,326 | 0,325 → 0,227 |
 | `naked-woman` | 208 | 0,51 | 0,338 → 0,300 | 0,305 → 0,226 |
 
-## Video na výšku (`make stylemap-video`, `make_video.py`)
+## Video
 
-Slideshow jako **MP4 1080×1920** (9:16, H.264, 30 fps, yuv420p, faststart),
-tedy formát, který TikTok, YouTube Shorts i Instagram Reels berou bez
-přepočítávání. Renderuje se **lokálně na Macu** (ffmpeg), nic nikam neposílá.
-
-### Rychlý tahák
-
-```bash
-# běh labu → videa podle modelu
-make stylemap-video RUN=<běh> NAME=noobai WHERE="model=noobai-xl" RATE=6 FADE=0.3
-
-# běh labu → styl po stylu přes všechny modely, s popisky
-make stylemap-video RUN=<běh> NAME=styly RATE=3 LABEL=1
-
-# běh labu → všechny modely stylu na jednom snímku (mřížka)
-make stylemap-video RUN=<běh> NAME=mrizka GRID=1 RATE=2 LABEL=1
-
-# běh labu → 2 modely pod sebou, jen úplné snímky, minutová videa po promptech
-make stylemap-video RUN=<běh> NAME=pod-sebou GRID=1 COLS=1 COMPLETE=1 SPLIT=60 RATE=3
-
-# běh labu → styl → všechny prompty, minutová videa po stylech
-make stylemap-video RUN=<běh> NAME=styl-prompty OUTER=style SPLIT=60 RATE=4
-
-# víc běhů se stejnými prompty, jiné modely i styly → stejný prompt, každý model ve svém stylu
-make stylemap-video RUN="20261112-204624 20261114-031858 20261115-005933 20261116-011614" \
-     NAME=mix GRID=1 MIX=1 COMPLETE=1 SPLIT=60 RATE=2 LABEL=1
-
-# mapa stylů (pack) → slideshow po LPIPS trase jako v appce
-make stylemap-video SET=<sada> NAME=mapa RATE=8 FADE=0.3
-```
-
-Výstup: `build/lab/<RUN>/video/<NAME>.mp4` (víc běhů: `build/lab/_merged/video/`), resp.
-`build/stylemap/<SET>/video/<NAME>.mp4` (se `SPLIT` → `<NAME>-01.mp4`, `-02` …).
-Ve Finderu: `open build/lab/<RUN>/video/`, do telefonu AirDropem.
-
-### Jak to celé funguje
-
-```
-  ZDROJ (1 i víc běhů)  FILTR          POŘADÍ               SNÍMEK            ČAS / SOUBORY
-  ─────                 ─────          ──────               ──────            ─────────────
-  RUN="a b …"     ┐                    ORDER=style ┐        1 obrázek    ┐    RATE, FADE
-   (img/ + manifest)│→  WHERE=…   →     (u RUN)    │→       (výchozí)    │→   SPLIT=60 → -01,-02…
-  SET=<mapa stylů>┘    COMPLETE=1      ORDER=tour  ┘        GRID=1 mřížka┘    --max-seconds
-   (map.json+lpips)                     (u SET)              COLS, MIX, LABEL  --audio
-```
-
-### 1. Zdroj: `RUN=` nebo `SET=`
-
-| | `RUN=<běh labu>` | `SET=<mapa stylů>` |
-|---|---|---|
-| Čte | `build/lab/<RUN>/img/*.png` + `wf/manifest.json` | `build/stylemap/<SET>/` (map.json, items.json, lpips.npy) |
-| Potřebuje | jen numpy + Pillow (jede systémový `python3`) | postavenou mapu (`make stylemap`, venv s torch) |
-| Ví o obrázku | model, styl, flow, **prompt**, popisky z appky | model, styl, médium, VLM tagy, pozice na trase |
-| Výchozí pořadí | `style` | `tour` |
-
-Nedoběhlý (zrušený) běh nevadí — bere se, co je na disku.
-
-### 1b. Víc běhů najednou: `RUN="a b c"` a `MIX=1`
-
-Běhy se spojí do jedné kolekce **podle id promptu** (`promptBody` — položka
-souboru promptů; text se může běh od běhu lišit, protože je psaný pro rodinu
-modelu). Model z víc běhů sloučí své styly; obrázek, který je dvakrát (stejný
-prompt, styl, flow, model), se vezme z prvního uvedeného běhu. Běh bez id
-promptů se spojuje podle pořadí promptu a skript na to upozorní.
-
-Co pak jde na jeden snímek mřížky:
-
-```
-GRID=1 (bez MIX) — stejný styl, všechny modely      GRID=1 MIX=1 — stejný prompt, každý model svůj styl
-┌──────────────────────────────┐                    ┌──────────────────────────────┐
-│ [ Bauhaus plakát (1923) ]    │ ← styl             │ [ Portrét v kavárně ]        │ ← prompt
-│ ┌──────┐ ┌──────┐ ┌──────┐   │                    │ ┌──────┐ ┌──────┐ ┌──────┐   │
-│ │      │ │  ░░  │ │  ░░  │   │                    │ │      │ │      │ │      │   │
-│ └──────┘ └──────┘ └──────┘   │                    │ └──────┘ └──────┘ └──────┘   │
-│ animagine  pony    wai       │                    │ animagine  pony    wai       │
-│            chybí   chybí     │                    │ Bauhaus   Čapek   Čapek      │ ← styl dlaždice
-└──────────────────────────────┘                    └──────────────────────────────┘
- sedí, jen když běhy mají stejné styly               pro běhy se stejnými prompty, ale jinými styly
-```
-
-`MIX=1` u každého promptu nejdřív ukáže styly, které mají **všechny** vybrané
-modely (aspoň „bez stylu“), vedle sebe, a pak jde každý model dál svými
-zbylými styly v pořadí pickeru. Modely ze stejného běhu tak sdílejí styl,
-modely z jiných běhů ne. Model s víc styly než ostatní na konci promptu
-zůstane sám — `COMPLETE=1` takové snímky vynechá. `MIX` jde jen s `GRID=1`
-a pořadím prompt → styly (ne `OUTER=style`); `SPLIT` dělí mezi prompty.
-
-Které běhy jdou spojit (stejné prompty, jiné modely): stačí, aby měly stejný
-soubor promptů — `promptBody` v `wf/manifest.json`. Výběr modelů do mřížky:
-`WHERE="model=a model=b …"`, pořadí dlaždic `VIDEO_ARGS="--model-order …"`.
-
-### 2. Filtr: `WHERE=` a `COMPLETE=1`
-
-```
-WHERE="model=noobai-xl model=pony flow=repose"
-        └──── nebo ─────┘          a zároveň
-```
-Hodnoty **stejného** klíče jsou alternativy, **různé** klíče musí platit
-všechny (jako filtr v appce). Klíče: `model`, `style`, `flow`; u mapy i
-`medium` a VLM tagy.
-
-`COMPLETE=1` (jen s `GRID=1`) zahodí snímky, kde některému modelu obrázek
-chybí — místo prázdné dlaždice:
-
-```
-  bez COMPLETE                 s COMPLETE=1
-  ┌──────┬──────┐              (snímek vynechán,
-  │ pony │  ░░  │  ← lustify    video jde rovnou
-  │      │ chybí│     nedoběhl  na další styl)
-  └──────┴──────┘
-```
-
-### 3. Pořadí: `ORDER=style` nebo `ORDER=tour`
-
-```
-ORDER=style  (výchozí u RUN)                 ORDER=tour  (výchozí u SET)
-prompt 1 ─┬─ bez stylu ─ model A, B, C      obrázky po LPIPS trase: každý další
-          ├─ Lascaux   ─ model A, B, C      se od předchozího liší co nejmíň
-          ├─ Bauhaus   ─ model A, B, C      (stejné pořadí jako přehrávač v appce)
-          └─ …                              S WHERE se trasa naplánuje znovu jen
-prompt 2 ─┬─ bez stylu ─ model A, B, C      přes vybrané obrázky (--no-replan =
-          └─ …                              pořadí celé mapy)
-```
-- **Styly** jdou v pořadí pickeru appky (kultury podle doby, umělci podle roku
-  narození, média A–Z), baseline „bez stylu“ vždy první.
-- **Modely** v pořadí běhu, nebo vlastní: `VIDEO_ARGS="--model-order a,b,c"`
-  (neuvedené modely jdou za ně).
-- Víc flow (repose + img2img) se střídá uvnitř stylu; jednu vybereš
-  `WHERE="flow=repose"`.
-- **`OUTER=style`** otočí vnější úroveň: styl → všechny prompty, pak další
-  styl. `SPLIT` pak dělí **mezi styly** (styl nikdy nepřeteče do dalšího
-  videa).
-
-```
-OUTER=prompt (výchozí)                  OUTER=style
-prompt 1 ─┬─ bez stylu                 bez stylu ─┬─ prompt 1
-          ├─ Lascaux                              ├─ prompt 2
-          └─ …                                    └─ …
-prompt 2 ─┬─ bez stylu                 Lascaux ───┬─ prompt 1
-          └─ …                                    └─ …
-SPLIT řeže mezi prompty                 SPLIT řeže mezi styly
-```
-
-### 4. Snímek: jeden obrázek, nebo mřížka (`GRID=1`, `COLS=`, `LABEL=1`)
-
-```
- bez GRID (1 obrázek)     GRID=1 auto (6 čtverců)  GRID=1 COLS=3      GRID=1 COLS=1 (2 modely)
-┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐ ┌──────────────────┐
-│░░░░░░░░░░░░░░░░░░│     │ [Lascaux (…)]    │     │ [Bauhaus (1919)] │ │                  │
-│░┌──────────────┐░│     │┌───────┐┌───────┐│     │┌────┐┌────┐┌────┐│ │  ┌────────────┐  │
-│░│              │░│     ││   A   ││   B   ││     ││ A  ││ B  ││ C  ││ │  │     A      │  │
-│░│   obrázek    │░│     │└───────┘└───────┘│     │└────┘└────┘└────┘│ │  │            │  │
-│░│  (contain)   │░│     │┌───────┐┌───────┐│     │┌────┐┌────┐┌────┐│ │  └────────────┘  │
-│░│              │░│     ││   C   ││   D   ││     ││ D  ││ E  ││ F  ││ │  ┌────────────┐  │
-│░└──────────────┘░│     │└───────┘└───────┘│     │└────┘└────┘└────┘│ │  │     B      │  │
-│░ rozmazané pozadí│     │┌───────┐┌───────┐│     │                  │ │  │            │  │
-│░░░░░░░░░░░░░░░░░░│     ││   E   ││   F   ││     │                  │ │  └────────────┘  │
-└──────────────────┘     │└───────┘└───────┘│     └──────────────────┘ └──────────────────┘
-                         └──────────────────┘
-```
-- **Bez GRID** je na snímku jeden obrázek. `--fit contain` (výchozí) ho ukáže
-  celý na jeho rozmazané ztmavené kopii, `VIDEO_ARGS="--fit cover"` ořízne
-  na výšku (z 2:3 uteče ~15 % šířky z každé strany).
-- **`GRID=1`**: jeden snímek = jeden styl (prompt, flow) a **všechny modely**.
-  Rozložení se samo vybere tak, aby obrázky byly co největší; `COLS=N`
-  vnutí N sloupců (`COLS=1` pod sebou, `COLS=2` vedle sebe). Model má po celé
-  video stejnou dlaždici. `RATE` tu znamená **stylů** za vteřinu.
-- **`LABEL=1`** vypálí popisky. Bez mřížky: box „styl / model“ nahoře. V mřížce:
-  název stylu nahoře (pruh má vždy výšku dvou řádků, aby mřížka neposkakovala)
-  a jméno modelu pod každým obrázkem. Popisky sedí pod záložkami, které TikTok
-  a Shorts kreslí nahoře, a mřížka končí nad místem pro jejich titulek dole.
-
-### 5. Čas: `RATE`, `FADE`, `SPLIT`, `--max-seconds`
-
-```
-RATE=2, FADE=0.25        (jeden snímek = 1/RATE s = 0,5 s)
- obrázek 1          obrázek 2          obrázek 3
-├──────────────╱╲──────────────╱╲──────────────┤
-               └┘ prolínačka = FADE × 0,5 s     FADE=0 → tvrdý střih
-
-SPLIT=60 (vteřin), dělí se jen mezi prompty:
- prompt 1 │ prompt 2 │ prompt 3 ║ prompt 4 │ prompt 5 │ prompt 6 ║ prompt 7 …
- └──────── NAME-01.mp4 ≤ 60 s ─┘└──────── NAME-02.mp4 ≤ 60 s ─┘└─ NAME-03 …
-```
-- **`RATE`** obrázků (u mřížky stylů) za vteřinu, 0–30. Jeden obrázek přes
-  celou obrazovku snese 4–8/s, mřížka se šesti modely 1–2/s.
-- **`FADE`** podíl času snímku na prolínačku (výchozí 0.4, `0` = střih). Při
-  vysoké rychlosti je čistší střih.
-- **`SPLIT=N`** rozseká výstup na víc videí po nejvýš N vteřinách, **jen mezi
-  prompty** (s `OUTER=style` mezi styly) — skupina nikdy nepřeteče do dalšího
-  videa; skupina delší než N dostane video sama.
-- **`VIDEO_ARGS="--max-seconds N"`** naopak **zkrátí** jedno video rovnoměrným
-  výběrem (u `ORDER=style` po celých stylech). Se `SPLIT` se nejdřív zkrátí
-  a pak rozdělí — obvykle chceš jen jedno z nich.
-
-Délka videa ≈ počet snímků ÷ `RATE`. Příklad: 62 stylů na prompt při `RATE=4`
-= 15,5 s na prompt → `SPLIT=60` dá 3 prompty na video.
-
-### 6. Ostatní (`VIDEO_ARGS="…"`)
-
-| Volba | Co dělá |
-|---|---|
-| `--audio song.mp3` | zvuková stopa (AAC), ořízne se na délku videa. Hudbu radši až v TikToku/YouTube — mají licence. |
-| `--size 1080x1350` | jiný rozměr (4:5 pro Instagram feed) |
-| `--crf 23` | menší soubor (výchozí 18 = vysoká kvalita; 23 ≈ poloviční velikost, v telefonu bez rozdílu) |
-| `--fps 30` | snímků videa za vteřinu (strop pro `RATE`) |
-| `--no-replan` | u `SET` s filtrem hrát v pořadí celé mapy |
-
-### Limity platforem
-
-| | TikTok | YouTube Shorts | Instagram Reels |
-|---|---|---|---|
-| Formát | 9:16, 1080×1920 ✓ | 9:16 ✓ | 9:16 ✓ |
-| Délka | do 10 min | **do 3 min** (delší = běžné video) | do 3 min |
-| Nahota | stáhne | stáhne | stáhne |
-
-Na Shorts tedy `SPLIT=170` nebo kratší; nejlíp fungují desítky vteřin
-(`SPLIT=60`).
+Videa na výšku (TikTok, Shorts, Reels) dělá lab: `lab video` / `make lab-video`
+nad běhy labu, recept v YAML, render v Go — návod v `tools/lab/README.md`
+(„Video napříč běhy“). Dřívější `make stylemap-video` (Python) je pryč; pack
+mapy jako zdroj videa se nepřenesl (plán `docs/plan-video-studio.md` §14).
 
 ## Co kam jde (síť, NAS, telefon)
 
@@ -429,7 +213,7 @@ Na Shorts tedy `SPLIT=170` nebo kratší; nejlíp fungují desítky vteřin
 | `make stylemap SESSIONS=…` | FINETUNE gallery (`/api/images`, náhledy nebo `FULL=1` originály) | `build/stylemap/<SET>/` | **ano** — `finetune.ol1n.com`, CF Access |
 | `make stylemap RUN=…` | `build/lab/<RUN>/` | `build/stylemap/<SET>/` | ne |
 | `make stylemap-tags` | pack | `tags.json` v packu | **ano** — VLM na SPARKu, v okně modelu |
-| `make stylemap-video` | pack (`SET`) nebo běh labu (`RUN`) z disku | `build/stylemap/<SET>/video/` nebo `build/lab/<RUN>/video/` | **ne** — jen lokální ffmpeg |
+| `make lab-video` (lab) | běhy labu z disku | `build/lab/_video/<jméno>/` | **ne** — jen lokální ffmpeg |
 | `make stylemap-publish` | `build/stylemap/` | NAS `joda:…/FineTuneGallery/stylemaps` (rsync) | **ano** — LAN/ssh na JODU |
 | `make stylemap-serve` | `build/stylemap/` | — (HTTP na :8770 pro telefon v LAN) | jen LAN |
 

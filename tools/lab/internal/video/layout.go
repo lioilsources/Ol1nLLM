@@ -80,6 +80,9 @@ func ComputeLayout(w, h, n, cols int, aspect float64, title bool, captionLines i
 	if !tiles || n == 0 {
 		l.Single, l.Cols, l.Rows = true, 1, 1
 		l.CaptionTop = int(math.Round(float64(h) * 0.12))
+		if l.Title != nil {
+			l.CaptionTop = max(l.CaptionTop, l.Title.Y+l.Title.H+pad)
+		}
 		l.Tiles = []TileBox{{Pic: Rect{0, 0, w, h}}}
 		l.TileW, l.TileH = w, h
 		return l

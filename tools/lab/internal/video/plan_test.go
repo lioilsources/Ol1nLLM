@@ -259,6 +259,9 @@ func TestLayout(t *testing.T) {
 	if l := ComputeLayout(1080, 1920, 0, 0, 1, false, 0, false); !l.Single {
 		t.Fatal("bez dlaždic je jeden obrázek")
 	}
+	if l := ComputeLayout(1080, 1920, 0, 0, 1, true, 0, false); l.CaptionTop < l.Title.Y+l.Title.H {
+		t.Fatal("popisek jednoho obrázku má být pod titulkem")
+	}
 }
 
 func overlaps(a, b Rect) bool {
