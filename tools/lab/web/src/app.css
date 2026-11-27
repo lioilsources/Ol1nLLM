@@ -129,6 +129,8 @@ main > * { padding: 12px 14px; border-right: 1px solid var(--line); overflow: au
 
 /* render */
 .render { padding: 12px 14px 30px; border-top: 1px solid var(--line); }
+.variants { display: inline-flex; gap: 4px; }
+.variants input { width: 70px; }
 .job { display: flex; gap: 8px; align-items: center; margin: 6px 0; font-family: var(--sans); flex-wrap: wrap; }
 .job progress { width: 200px; accent-color: var(--accent); }
 .outputs { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; margin-top: 10px; }

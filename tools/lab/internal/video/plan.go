@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -100,6 +101,31 @@ func Plan(col *Collection, r Recipe) (*Storyboard, error) {
 	sb := &Storyboard{Recipe: r, Axes: map[string][]Labelled{},
 		Stats: Stats{Pictures: len(pool.Pics), Dropped: map[string]int{}, Match: map[string]int{}}}
 	sb.Stats.Dropped["filtered"] = before - len(pool.Pics)
+	if f, ok := r.Select[MinReaction]; ok {
+		min, _ := f.MinValue()
+		kept := pool.Pics[:0:0]
+		unscored := map[string]bool{}
+		for _, p := range pool.Pics {
+			switch {
+			case p.Style == Baseline:
+			case p.Reaction == nil:
+				unscored[p.Run] = true
+			case *p.Reaction < min:
+				sb.Stats.Dropped["reaction"]++
+				continue
+			}
+			kept = append(kept, p)
+		}
+		pool.Pics = kept
+		for run := range unscored {
+			sb.Warnings = append(sb.Warnings, fmt.Sprintf(
+				"běh %s nemá metriky (lab score %s) — min_reaction jeho obrázky nefiltruje", run, run))
+		}
+		sort.Strings(sb.Warnings)
+		if len(pool.Pics) == 0 {
+			return nil, fmt.Errorf("min_reaction %g vyřadil všechny obrázky", min)
+		}
+	}
 	sb.Stats.Dropped["empty_file"] = pool.Empty
 	sb.Stats.Dropped["collision"] = len(pool.Collisions)
 
@@ -190,7 +216,11 @@ func Plan(col *Collection, r Recipe) (*Storyboard, error) {
 	if r.Frame.Tiles != "" {
 		slots = ord.sorted(r.Frame.Tiles, pool.Values(r.Frame.Tiles))
 		sb.Tiles = pool.labelled(r.Frame.Tiles, slots)
+		if r.Frame.Reference {
+			sb.Tiles = append([]Labelled{{ID: refSlot, Label: "předloha"}}, sb.Tiles...)
+		}
 	}
+	refs := refFinder(col, pool)
 	sb.Aspect = commonAspect(col, pool)
 
 	// One video (set) per value of the output.per axes.
@@ -203,12 +233,20 @@ func Plan(col *Collection, r Recipe) (*Storyboard, error) {
 			slides = singleSlides(pool, ord, pics, timeAxes)
 		} else {
 			slides = tileSlides(pool, ord, pics, r, slots, strictAxes, r.Time.Loose)
+			if r.Frame.Reference {
+				for i := range slides {
+					slides[i].Tiles = append([]*TileRef{refs(slides[i].Tiles)}, slides[i].Tiles...)
+				}
+			}
 		}
 		if *r.Time.Complete && r.Frame.Tiles != "" {
 			kept := slides[:0]
 			for _, s := range slides {
 				full := true
-				for _, t := range s.Tiles {
+				for k, t := range s.Tiles {
+					if k == 0 && r.Frame.Reference {
+						continue // a missing reference does not make a slide incomplete
+					}
 					full = full && t != nil
 				}
 				if full {
@@ -266,7 +304,7 @@ func Plan(col *Collection, r Recipe) (*Storyboard, error) {
 		}
 	}
 	if w, h, err := ParseSize(r.Output.Size); err == nil {
-		l := ComputeLayout(w, h, len(slots), int(r.Frame.Cols), sb.Aspect, r.Frame.Title != "none",
+		l := ComputeLayout(w, h, len(sb.Tiles), int(r.Frame.Cols), sb.Aspect, r.Frame.Title != "none",
 			captionLines(sb), r.Frame.Tiles != "")
 		sb.Layout = &l
 		if len(slots) > 0 && l.TileW < 220 {
@@ -275,6 +313,43 @@ func Plan(col *Collection, r Recipe) (*Storyboard, error) {
 		}
 	}
 	return sb, nil
+}
+
+// refSlot marks the reference tile (frame.reference).
+const refSlot = "__reference"
+
+// refFinder returns the reference picture of a slide: the position photo a
+// restyle was drawn over, or the run's reference picture — of the slide's
+// first picture that has one. Paths are relative to the lab directory.
+func refFinder(col *Collection, p *Pool) func([]*TileRef) *TileRef {
+	byCell := map[string]Pic{}
+	for _, pic := range p.Pics {
+		byCell[pic.Run+"/"+pic.Cell] = pic
+	}
+	return func(tiles []*TileRef) *TileRef {
+		for _, t := range tiles {
+			if t == nil {
+				continue
+			}
+			pic, ok := byCell[t.Run+"/"+t.Cell]
+			if !ok {
+				continue
+			}
+			rel := ""
+			if pic.RefCell != "" {
+				rel = path.Join(pic.Run, "img", pic.RefCell+".png")
+			} else if run := col.Run(pic.Run); run != nil && run.RefFile != "" {
+				lab := filepath.Dir(run.Dir)
+				if r, err := filepath.Rel(lab, run.RefFile); err == nil && !strings.HasPrefix(r, "..") {
+					rel = filepath.ToSlash(r)
+				}
+			}
+			if rel != "" {
+				return &TileRef{Run: pic.Run, Model: refSlot, Img: rel, Thumb: rel}
+			}
+		}
+		return nil
+	}
 }
 
 func preview(p *Pool, axis string, vals []string) string {
@@ -315,6 +390,9 @@ func sourceRuns(col *Collection, s Source) ([]*Run, error) {
 func selection(s SelectSpec) Selection {
 	sel := Selection{Only: map[string][]string{}, Not: map[string][]string{}}
 	for axis, f := range s {
+		if axis == MinReaction {
+			continue
+		}
 		if len(f.Only) > 0 {
 			sel.Only[axis] = f.Only
 		}
@@ -725,6 +803,10 @@ func titleCaptions(p *Pool, r *Recipe, s *Slide, timeAxes []string) {
 	s.Captions = make([][]string, len(s.Tiles))
 	for i, t := range s.Tiles {
 		if t == nil {
+			continue
+		}
+		if t.Model == refSlot {
+			s.Captions[i] = []string{"předloha"}
 			continue
 		}
 		pic := Pic{Run: t.Run, Model: t.Model, Style: t.Style}

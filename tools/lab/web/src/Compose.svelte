@@ -77,6 +77,13 @@
   });
 
   const rates = [0.5, 1, 1.5, 2, 3, 4, 6, 8, 12, 15, 24, 30];
+
+  // select.min_reaction travels like any select value: {only: ["0.15"]}.
+  const minReaction = $derived(+(r.select.min_reaction?.only?.[0] || 0));
+  function setMinReaction(v) {
+    if (v > 0) st.recipe.select.min_reaction = { only: [String(v)] };
+    else delete st.recipe.select.min_reaction;
+  }
 </script>
 
 <section class="panel">
@@ -119,6 +126,9 @@
           <option value={0}>auto</option>
           {#each [1, 2, 3, 4, 5, 6] as c}<option value={c}>{c}</option>{/each}
         </select>
+        <label title="předloha běhu nebo fotka pozice restylu jako první dlaždice">
+          <input type="checkbox" bind:checked={st.recipe.frame.reference} /> předloha
+        </label>
         {#if sb?.layout}<span class="dim">{sb.layout.cols}×{sb.layout.rows}, obrázek {sb.layout.tileW} px</span>{/if}
       {:else}
         <select bind:value={st.recipe.frame.fit}>
@@ -180,6 +190,19 @@
         <label><input type="checkbox" bind:checked={st.recipe.time.complete} /> vynechat snímky s prázdnou dlaždicí</label>
       </div>
     {/if}
+
+    <span class="lbl">reakce</span>
+    <div class="ctl">
+      <label title="vynechat obrázky, kde styl skoro nic nezměnil (barevná vzdálenost od obrázku bez stylu, metrics.json)">
+        <input type="checkbox" checked={!!minReaction} onchange={(e) => setMinReaction(e.currentTarget.checked ? 0.15 : 0)} />
+        jen kde styl něco udělal
+      </label>
+      {#if minReaction}
+        ≥ <input type="number" min="0" max="1" step="0.05" value={minReaction} style="width:70px"
+          onchange={(e) => setMinReaction(+e.currentTarget.value)} />
+        {#if sb?.stats?.dropped?.reaction}<span class="dim">vyřazeno {sb.stats.dropped.reaction}</span>{/if}
+      {/if}
+    </div>
 
     <span class="lbl">tempo</span>
     <div class="ctl">

@@ -100,8 +100,9 @@ func TestVideoAPIIndexPlanAndMissingRoles(t *testing.T) {
 	if code != 200 || len(sl["slides"].([]any)) != 2 {
 		t.Fatalf("stránka snímků: %d %v", code, sl)
 	}
-	code, cov := call(t, srv, "POST", "/api/video/coverage", map[string]any{"source": src})
-	if code != 200 || cov["coverage"] == nil {
+	code, cov := call(t, srv, "POST", "/api/video/coverage", map[string]any{"source": src,
+		"select": map[string]any{"min_reaction": map[string]any{"only": []string{"0.2"}}}})
+	if code != 200 || cov["coverage"] == nil || cov["pictures"].(float64) != 8 {
 		t.Fatalf("pokrytí: %d %v", code, cov)
 	}
 	code, tm := call(t, srv, "POST", "/api/video/template", map[string]any{"source": src, "template": "mix"})

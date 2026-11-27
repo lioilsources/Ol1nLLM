@@ -471,8 +471,12 @@ func printStoryboard(sb *video.Storyboard, withSlides bool) {
 	}
 	fmt.Println()
 	d := sb.Stats.Dropped
-	fmt.Printf("  obrázků ve výběru %d · vyřazeno: neúplné snímky %d, prázdné soubory %d, kolize %d, filtr %d\n",
+	fmt.Printf("  obrázků ve výběru %d · vyřazeno: neúplné snímky %d, prázdné soubory %d, kolize %d, filtr %d",
 		sb.Stats.Pictures, d["incomplete"], d["empty_file"], d["collision"], d["filtered"])
+	if d["reaction"] > 0 {
+		fmt.Printf(", slabá reakce na styl %d", d["reaction"])
+	}
+	fmt.Println()
 	if m := sb.Stats.Match; len(m) > 0 {
 		total := m["exact"] + m["kind"] + m["order"]
 		fmt.Printf("  shoda volné osy: přesná %d %%, stejný druh %d %%, jiná %d %%\n",

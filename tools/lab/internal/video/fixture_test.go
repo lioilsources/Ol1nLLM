@@ -19,7 +19,10 @@ type fakeCell struct {
 	scene              string // promptBody; "" = typed prompt
 	character          string
 	seed               int
-	missing, empty     bool // no picture / a 0-byte file
+	missing, empty     bool   // no picture / a 0-byte file
+	dependsOn          string // the cell this one was drawn over (restyle)
+	id                 string // explicit cell id (default: built from the axes)
+	reaction           *float64
 }
 
 // fakeRun is what writeRun puts on disk: a manifest, state, spec and small
@@ -31,6 +34,7 @@ type fakeRun struct {
 	columns []string // manifest.prompts; derived from cells when nil
 	styles  []StyleMeta
 	cells   []fakeCell
+	ref     string // reference picture, relative to the lab directory
 }
 
 func writeRun(t *testing.T, labDir string, r fakeRun) string {
@@ -43,6 +47,7 @@ func writeRun(t *testing.T, labDir string, r fakeRun) string {
 	}
 	type mcell map[string]any
 	var cells []mcell
+	reactions := map[string]any{}
 	columns := r.columns
 	models := []map[string]string{}
 	seenModel := map[string]bool{}
@@ -78,10 +83,19 @@ func writeRun(t *testing.T, labDir string, r fakeRun) string {
 		if c.character != "" {
 			id += "__" + c.character
 		}
+		if c.id != "" {
+			id = c.id
+		}
+		if c.reaction != nil {
+			reactions[id] = map[string]any{"reaction": *c.reaction}
+		}
 		cell := mcell{
 			"id": id, "flow": flow, "model": c.model, "modelLabel": "M " + c.model,
 			"style": style, "promptIndex": c.prompt, "promptBody": c.scene,
 			"params": map[string]any{"seed": c.seed, "refName": "x.png"},
+		}
+		if c.dependsOn != "" {
+			cell["dependsOn"] = c.dependsOn
 		}
 		cells = append(cells, cell)
 		if !seenModel[c.model] {
@@ -112,7 +126,20 @@ func writeRun(t *testing.T, labDir string, r fakeRun) string {
 		status = "done"
 	}
 	writeJSON(t, filepath.Join(dir, "state.json"), map[string]any{"status": status, "dry": r.dry, "title": r.id})
-	writeJSON(t, filepath.Join(dir, "spec.json"), map[string]any{"negative": "", "dry": r.dry})
+	refFile := ""
+	if r.ref != "" {
+		refFile = filepath.Join(labDir, r.ref)
+		if err := os.MkdirAll(filepath.Dir(refFile), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(refFile, tinyPNG(t), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeJSON(t, filepath.Join(dir, "spec.json"), map[string]any{"negative": "", "dry": r.dry, "refFile": refFile})
+	if len(reactions) > 0 {
+		writeJSON(t, filepath.Join(dir, "metrics.json"), map[string]any{"cells": reactions})
+	}
 	return dir
 }
 

@@ -703,6 +703,8 @@ kód `internal/video` (bez HTTP a `Env`), příkazy `video_cli.go`.
 
 - Každá změna receptu se hned naplánuje (bez čtení obrázků), náhled
   i souhrn (snímků, délka, shoda stylu, varování) se přepočítají.
+- **Varianty tempa**: do pole napiš třeba `1, 4` — tentýž recept se
+  vyrenderuje i v těchto tempech jako sady `<jméno>-1fps`, `<jméno>-4fps`.
 - **Uložit** zapíše `build/lab/_video/<jméno>/recipe.yaml`; **YAML** ukáže
   a dovolí upravit recept jako text. Render ve frontě (jeden naráz), průběh
   živě; **Koncept** kreslí z náhledů 320 px.
@@ -768,6 +770,10 @@ output: {split: {seconds: 60, at: prompt}}
   síla úpravy), plán to vypíše — jsou to jiné obrázky.
 - **Výběr**: `select.<osa>` je hodnota, seznam (pořadí = pořadí dlaždic/času)
   nebo `{only: […], not: […]}`; u stylů navíc `{kind: [culture | artist | medium]}`.
+- `select.min_reaction: 0.15` nechá jen obrázky, kde styl něco udělal —
+  barevná vzdálenost od obrázku bez stylu z `metrics.json` (`lab score`).
+  Baseline zůstává; běh bez metrik se nefiltruje a plán to řekne. Metrika
+  měří barvu, ne převzetí stylu: je to předvýběr, ne verdikt.
 - 0bajtový soubor (nedostažený obrázek starších běhů) je chybějící obrázek.
 
 ### Pořadí (`time.axes`, `time.order`)
@@ -810,6 +816,9 @@ dlaždic je stroboskop: u každého stylu všechny modely po sobě.
   (`time.complete: true`, výchozí). `frame.cols: auto` vybere rozložení
   s největšími obrázky; `cols: 1` pod sebou, `cols: N` vedle sebe.
   `time.rate` je pak snímků (stylů) za vteřinu.
+- **`frame.reference: true`**: první dlaždice je předloha — u repose
+  a img2img referenční fotka běhu, u restylu fotka pozice, ze které obrázek
+  vznikl. Chybějící předloha snímek neúplným nedělá.
 - **Popisky**: `frame.title` (none | auto | osa) je pruh nahoře, vždy dva
   řádky vysoký, aby mřížka neposkakovala. `frame.captions` (none | auto |
   [osy]) jsou řádky pod dlaždicí; bez dlaždic box „styl / model“. Text sedí

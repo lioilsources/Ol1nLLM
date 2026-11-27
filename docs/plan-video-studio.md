@@ -15,7 +15,9 @@ Sepsáno 2026-11-26 po průzkumu kódu a po sérii videí vyrobených ručně
 24.–25. 11. (PR #74–#77). **[V]** = ověřeno proti kódu nebo datům na disku,
 **[I]** = návrh nebo odhad, který má implementace potvrdit, nebo opravit.
 
-> **Stav:** M0–M3 hotové (2026-11-27); studio na `/video/` (Svelte, API
+> **Stav:** M0–M4 hotové (2026-11-27); M5 (plynulé pořadí, „Doplň díry“)
+> čeká na domluvu. M4: předloha jako dlaždice (`frame.reference`),
+> `select.min_reaction`, varianty tempa ve studiu; studio na `/video/` (Svelte, API
 > `video_api.go`), zkratka `/video/#run=…&template=…`; z M4 je hotový žebřík párování
 > (`pair: exact | kind | order`) i skóre shody — byl potřeba už pro paritu.
 > Paritní čísla §12 plán reprodukuje všechna (počty snímků, videí i délky);

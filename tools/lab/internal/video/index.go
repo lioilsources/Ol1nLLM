@@ -23,7 +23,7 @@ import (
 const Baseline = "__baseline"
 
 // cacheVersion invalidates every cached run when the cached shape changes.
-const cacheVersion = 3
+const cacheVersion = 4
 
 // Pic is one picture of one run: a manifest cell whose image is on disk and
 // not empty. Everything the studio needs about it, nothing it does not — the
@@ -45,6 +45,12 @@ type Pic struct {
 	Variant   string `json:"variant,omitempty"`
 	// VariantOrder keeps a sweep in its own order (0.5 before 0.75).
 	VariantOrder int `json:"variantOrder,omitempty"`
+	// RefCell is the picture this one was drawn over (a restyle's position
+	// photo); empty otherwise.
+	RefCell string `json:"refCell,omitempty"`
+	// Reaction is the colour distance from the style-less baseline
+	// (metrics.json); nil where the run was not scored or for the baseline.
+	Reaction *float64 `json:"reaction,omitempty"`
 	// Setup fingerprints the settings that change a picture besides the axes:
 	// seed, LoRA, face identity, denoise, negative… Two runs with the same
 	// setup drew the same thing; with different ones they did not.
@@ -89,6 +95,10 @@ type Run struct {
 	Family string `json:"family"`
 	// Placeholder: a dry run, its pictures are hatched stand-ins.
 	Placeholder bool `json:"placeholder,omitempty"`
+	// RefFile is the run's reference picture (repose, img2img), absolute;
+	// Scored whether metrics.json exists.
+	RefFile string `json:"-"`
+	Scored  bool   `json:"scored"`
 
 	styleCount map[string]bool
 }
@@ -167,6 +177,7 @@ type cached struct {
 	Scenes    bool        `json:"scenes"`
 	Title     string      `json:"title"`
 	Positions int         `json:"positions"`
+	RefFile   string      `json:"refFile"`
 }
 
 // LoadRun reads one run directory. cacheDir may be empty (no cache).
@@ -207,8 +218,17 @@ func LoadRun(dir, cacheDir string) (*Run, error) {
 			run.Created = t
 		}
 	}
+	run.RefFile = c.RefFile
+	reaction := readReactions(filepath.Join(dir, "metrics.json"))
+	run.Scored = reaction != nil
 	sizes := imageSizes(filepath.Join(dir, "img"))
 	for _, p := range c.Cells {
+		if r, ok := reaction[p.Cell]; ok {
+			p.Reaction = r
+		}
+		if p.RefCell != "" && sizes[p.RefCell+".png"] == 0 {
+			p.RefCell = "" // the position photo is not on disk
+		}
 		size, ok := sizes[p.Cell+".png"]
 		switch {
 		case !ok:
@@ -227,6 +247,30 @@ func LoadRun(dir, cacheDir string) (*Run, error) {
 		run.styleCount[p.Style] = true
 	}
 	return run, nil
+}
+
+// readReactions reads the per-cell style reaction the lab scored; nil when
+// the run has no metrics.
+func readReactions(path string) map[string]*float64 {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var m struct {
+		Cells map[string]struct {
+			Reaction *float64 `json:"reaction"`
+		} `json:"cells"`
+	}
+	if json.Unmarshal(data, &m) != nil {
+		return nil
+	}
+	out := make(map[string]*float64, len(m.Cells))
+	for id, c := range m.Cells {
+		if c.Reaction != nil {
+			out[id] = c.Reaction
+		}
+	}
+	return out
 }
 
 func imageSizes(dir string) map[string]int64 {
@@ -343,6 +387,7 @@ func parseRun(dir string, st os.FileInfo) (*cached, error) {
 			c.Scenes = false
 		}
 		p.Setup = setupHash(cell.Params, runSetup, cell.Negative)
+		p.RefCell = cell.DependsOn
 		c.Cells = append(c.Cells, p)
 		// Older manifests list only what the run picked; keep a label for
 		// every model and style a cell names.
@@ -383,6 +428,7 @@ func parseRun(dir string, st os.FileInfo) (*cached, error) {
 		}
 	}
 	c.Title = filepath.Base(dir)
+	c.RefFile = spec.RefFile
 	return c, nil
 }
 

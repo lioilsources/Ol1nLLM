@@ -7,7 +7,7 @@ export function defaultRecipe() {
     name: 'video',
     source: { runs: [] },
     select: {},
-    frame: { tiles: '', cols: 0, fit: 'contain', title: 'none', captions: { mode: 'none' } },
+    frame: { tiles: '', cols: 0, fit: 'contain', title: 'none', captions: { mode: 'none' }, reference: false },
     time: { axes: [], loose: [], pair: 'order', complete: true, rate: 4, fade: 0.4 },
     output: { size: '1080x1920', fps: 30, per: [], crf: 18 },
   };
