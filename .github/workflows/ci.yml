@@ -63,6 +63,27 @@ jobs:
       - name: Test
         run: go test ./...
 
+  lab-web:
+    name: Lab studio (Svelte)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/lab/web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tools/lab/web/package-lock.json
+
+      - name: Build
+        run: npm ci --no-audit --no-fund && npm run build
+
   build-android-debug:
     name: Android Debug Build
     runs-on: ubuntu-latest

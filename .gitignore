@@ -69,3 +69,8 @@ CLAUDE.local.md
 build/
 .flutter-plugins
 lib/**/secrets.dart
+
+# lab: sestavené video studio (make lab-web); v gitu jen .keep
+tools/lab/webdist/*
+!tools/lab/webdist/.keep
+tools/lab/web/node_modules/

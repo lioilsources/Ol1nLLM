@@ -1,4 +1,4 @@
-.PHONY: run debug build-ios build-android lab lab-dry lab-check lab-arcface lab-wd14 lab-video lab-resume lab-score lab-complete stylemap-env stylemap stylemap-tags stylemap-serve stylemap-publish
+.PHONY: run debug build-ios build-android lab lab-dry lab-check lab-arcface lab-wd14 lab-video lab-web lab-web-if-changed lab-resume lab-score lab-complete stylemap-env stylemap stylemap-tags stylemap-serve stylemap-publish
 
 -include .env.local
 
@@ -34,11 +34,24 @@ build-android:
 
 # The lab is its own Go module, so it runs from its own directory; it walks up
 # to the package root itself (pubspec.yaml) for assets and build/lab.
-lab:
+lab: lab-web-if-changed
 	cd tools/lab && go run . serve --port 8765 --open
 
-lab-dry:
+lab-dry: lab-web-if-changed
 	cd tools/lab && go run . serve --port 8765 --open --force-dry
+
+# The video studio (/video/ on the lab server) is a Svelte app compiled into
+# the lab binary. lab-web builds it; `make lab` rebuilds it only when its
+# sources are newer than the build, and without node the lab runs on (the
+# page then says how to build it).
+LAB_WEB_SRC = $(shell find tools/lab/web/src tools/lab/web/index.html tools/lab/web/package.json tools/lab/web/vite.config.js -type f 2>/dev/null)
+lab-web:
+	cd tools/lab/web && npm ci --no-audit --no-fund && npm run build
+
+lab-web-if-changed: tools/lab/webdist/app/index.html
+tools/lab/webdist/app/index.html: $(LAB_WEB_SRC)
+	@if command -v npm >/dev/null 2>&1; then $(MAKE) lab-web; \
+	else echo "npm chybí — video studio (/video/) nebude sestavené; lab běží dál"; fi
 
 lab-check:
 	cd tools/lab && go run . check

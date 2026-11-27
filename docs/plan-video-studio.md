@@ -15,7 +15,8 @@ Sepsáno 2026-11-26 po průzkumu kódu a po sérii videí vyrobených ručně
 24.–25. 11. (PR #74–#77). **[V]** = ověřeno proti kódu nebo datům na disku,
 **[I]** = návrh nebo odhad, který má implementace potvrdit, nebo opravit.
 
-> **Stav:** M0, M1 a M2 hotové (2026-11-27); z M4 je hotový žebřík párování
+> **Stav:** M0–M3 hotové (2026-11-27); studio na `/video/` (Svelte, API
+> `video_api.go`), zkratka `/video/#run=…&template=…`; z M4 je hotový žebřík párování
 > (`pair: exact | kind | order`) i skóre shody — byl potřeba už pro paritu.
 > Paritní čísla §12 plán reprodukuje všechna (počty snímků, videí i délky);
 > `make_video.py` a `make stylemap-video` jsou pryč. Co vyšlo jinak, než plán

@@ -43,6 +43,8 @@ header {
   background: var(--panel); position: sticky; top: 0; z-index: 20;
 }
 .brand { font-weight: 600; letter-spacing: .18em; text-transform: uppercase; }
+.studio-link { color: var(--flow-restyle); text-decoration: none; letter-spacing: .08em; margin-left: 12px; font-size: 11px; }
+.studio-link:hover { text-decoration: underline; }
 .brand span { color: var(--dim); letter-spacing: 0; text-transform: none; font-weight: 400; }
 .lamps { display: flex; gap: 14px; margin-left: auto; align-items: center; }
 .lamp { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11.5px; }
