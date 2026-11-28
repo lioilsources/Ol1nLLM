@@ -125,7 +125,16 @@
 
 <h2>4 Náhled</h2>
 {#if !sb || !layout}
-  <p class="hint">Náhled se ukáže, jakmile jde recept naplánovat.</p>
+  {#if st.planning}
+    <p class="hint">plánuji…</p>
+  {:else if st.planError}
+    <p class="hint warn">Recept zatím nejde naplánovat — co chybí, je ve žlutém rámečku ve 3 Skladba
+      (každá osa s víc hodnotami potřebuje roli), nebo zkus šablonu nahoře.</p>
+  {:else if !st.recipe.source.runs.length && !st.recipe.source.family}
+    <p class="hint">Vyber vlevo běhy; náhled se ukáže, jakmile jde recept naplánovat.</p>
+  {:else}
+    <p class="hint">Náhled se ukáže, jakmile jde recept naplánovat.</p>
+  {/if}
 {:else}
   <div class="frame" style="width:{W}px;height:{layout.h * k}px">
     {#each prev >= 0 && prev !== idx ? [prev, idx] : [idx] as i (i)}

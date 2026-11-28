@@ -76,6 +76,20 @@
     return s;
   });
 
+  // time.order per axis; smooth = smallest jumps in colour (thumbnail histograms).
+  function orderChoices(a) {
+    const base = a === 'style'
+      ? [['', 'picker'], ['year', 'rok'], ['label', 'abeceda']]
+      : [['', 'běh'], ['label', 'abeceda']];
+    return [...base, ['smooth', 'plynule']];
+  }
+  function setOrder(a, v) {
+    const o = { ...(r.time.order || {}) };
+    if (v) o[a] = v;
+    else delete o[a];
+    st.recipe.time.order = Object.keys(o).length ? o : undefined;
+  }
+
   const rates = [0.5, 1, 1.5, 2, 3, 4, 6, 8, 12, 15, 24, 30];
 
   // time.sync: cuts on the kick of a track from build/lab/_video/_audio.
@@ -125,6 +139,8 @@
             </select>
           </div>
         {/each}
+        <p class="hint">Role za tebe vyplní šablona nahoře:
+          {#each st.index?.templates || [] as t, i}{i ? ' · ' : ''}<b>{t.Name}</b> = {t.What}{/each}.</p>
       {:else}
         <pre class="bad">{st.planError.error}</pre>
       {/if}
@@ -192,6 +208,22 @@
         {#each freeAxes as a}<option value={a}>{axisName(a)}{multi.includes(a) ? '' : ' (1 hodnota)'}</option>{/each}
       </select>
     </div>
+
+    {#if effAxes.length}
+      <span class="lbl">pořadí</span>
+      <div class="ctl">
+        {#each effAxes as a}
+          {axisName(a)}
+          <select value={r.time.order?.[a] || ''} onchange={(e) => setOrder(a, e.currentTarget.value)}>
+            {#each orderChoices(a) as [v, l]}<option value={v}>{l}</option>{/each}
+          </select>
+        {/each}
+        {#each Object.entries(sb?.smooth || {}) as [a, s]}
+          <span class="dim" title="průměrná barevná vzdálenost sousedů (0 = stejné, 1 = nic společného)">
+            {axisName(a)} plynule: skok {s.before.toFixed(2)} → {s.after.toFixed(2)}</span>
+        {/each}
+      </div>
+    {/if}
 
     {#if r.time.loose.length}
       <span class="lbl">párování</span>

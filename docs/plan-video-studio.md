@@ -15,8 +15,10 @@ Sepsáno 2026-11-26 po průzkumu kódu a po sérii videí vyrobených ručně
 24.–25. 11. (PR #74–#77). **[V]** = ověřeno proti kódu nebo datům na disku,
 **[I]** = návrh nebo odhad, který má implementace potvrdit, nebo opravit.
 
-> **Stav:** M0–M4 hotové (2026-11-27); M5 (plynulé pořadí, „Doplň díry“)
-> čeká na domluvu. M4: předloha jako dlaždice (`frame.reference`),
+> **Stav:** M0–M4 hotové (2026-11-27), M6 (`time.sync`, střih na kopák
+> skladby) 2026-11-28, z M5 `order: smooth` 2026-11-28 (trasa je otevřená
+> cesta, ne rozstřižený cyklus jako v `build_map.py` — ten u přechodových
+> dat dával cestu tam a zpátky). „Doplň díry“ čeká na domluvu. M4: předloha jako dlaždice (`frame.reference`),
 > `select.min_reaction`, varianty tempa ve studiu; studio na `/video/` (Svelte, API
 > `video_api.go`), zkratka `/video/#run=…&template=…`; z M4 je hotový žebřík párování
 > (`pair: exact | kind | order`) i skóre shody — byl potřeba už pro paritu.

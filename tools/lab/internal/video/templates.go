@@ -109,7 +109,7 @@ func TemplateYAML(r Recipe, p *Pool, notes []string) (string, error) {
 		fmt.Fprintf(&b, "# pozn.: %s\n", n)
 	}
 	b.WriteString("#\n# Klíče navíc: select.<osa>: [hodnoty] | {not: […]} | {kind: [artist]};\n")
-	b.WriteString("# frame.cols: auto | N; frame.captions: none | auto | [osy]; time.order: {style: picker | year | label};\n")
+	b.WriteString("# frame.cols: auto | N; frame.captions: none | auto | [osy]; time.order: {style: picker | year | label | smooth};\n")
 	b.WriteString("# output: {per: [osa], split: {seconds: 60}, max_seconds: 170, crf: 23, audio: hudba.mp3}\n\n")
 	b.Write(data)
 	return b.String(), nil

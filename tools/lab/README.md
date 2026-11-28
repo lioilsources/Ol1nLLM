@@ -704,6 +704,11 @@ kód `internal/video` (bez HTTP a `Env`), příkazy `video_cli.go`.
 
 - Každá změna receptu se hned naplánuje (bez čtení obrázků), náhled
   i souhrn (snímků, délka, shoda stylu, varování) se přepočítají.
+- Bez vybraného běhu jsou **Uložit** a **YAML** zašedlé a nahoře je návod;
+  když recept nejde naplánovat, náhled řekne proč a žlutý rámeček ve
+  *3 Skladba* nabídne role os i šablony s popisem.
+- **Pořadí**: řádek *pořadí* u každé osy času (picker / rok / abeceda /
+  běh / **plynule**) a u plynulého pořadí o kolik klesl skok mezi snímky.
 - **Do hudby**: v řádku *tempo* místo „pevné tempo“ vyber skladbu
   z `build/lab/_video/_audio/` (viz `time.sync` níž). Objeví se řádek
   *do hudby* (snímek na dobu / osminu / takt, od kolikáté sekundy, breakdown,
@@ -798,6 +803,17 @@ split řeže mezi prompty                  split řeže mezi styly (split.at)
 Styly jdou v pořadí pickeru appky (baseline „bez stylu“ první); `time.order:
 {style: year}` podle roku, `{style: label}` abecedně. `[style, model]` bez
 dlaždic je stroboskop: u každého stylu všechny modely po sobě.
+
+**`order: {style: smooth}`** (jde u každé osy) seřadí hodnoty tak, aby
+sousední snímky byly barevně co nejblíž — průlet a stroboskop pak plynou
+místo přeskakování. Každá hodnota = průměrný barevný histogram jejích
+náhledů (512 košů, tatáž míra jako `metrics.json`), vzdálenost kosinová,
+trasa nejbližší soused + 2-opt jako otevřená cesta (`internal/video/smooth.go`).
+Pořadí je jedno pro celý recept (u `per: [model]` mají všechna videa stejné).
+„Bez stylu“ zůstane první. `plan` i studio ukážou průměrný skok mezi sousedy
+před a po (např. 310 stylů: 0,68 → 0,23). Histogramy se kešují v
+`build/lab/_video/.index/hist-<běh>.gob`; první plán nad 1 866 obrázky ~10 s,
+další ~1 s.
 
 ### Snímek: jeden obrázek, nebo mřížka
 
