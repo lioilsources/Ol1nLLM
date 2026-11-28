@@ -62,9 +62,18 @@ type Stats struct {
 	Match    map[string]int `json:"match,omitempty"`
 }
 
-// PlanError is a recipe that cannot be planned; Fixes are ready answers.
+// PlanError is a recipe that cannot be planned. Missing lists the axes
+// without a role, so a UI can offer the fixes as buttons.
 type PlanError struct {
-	Problems []string
+	Problems []string      `json:"problems"`
+	Missing  []MissingRole `json:"missing,omitempty"`
+}
+
+// MissingRole: an axis with several values and no role.
+type MissingRole struct {
+	Axis   string     `json:"axis"`
+	Name   string     `json:"name"`
+	Values []Labelled `json:"values"`
 }
 
 func (e *PlanError) Error() string { return strings.Join(e.Problems, "\n  ") }
@@ -133,16 +142,17 @@ func Plan(col *Collection, r Recipe) (*Storyboard, error) {
 		}
 		sb.Recipe.Time.Axes = timeAxes
 	}
-	var problems []string
+	pe := &PlanError{}
 	for _, a := range ContentAxes {
 		if vals := multi[a]; len(vals) > 1 && !hasRole[a] {
-			problems = append(problems, fmt.Sprintf(
+			pe.Problems = append(pe.Problems, fmt.Sprintf(
 				"osa %s má %d hodnot (%s) a nemá roli: přidej ji do time.axes, do output.per, nebo vyber jednu v select.%s",
 				AxisName(a), len(vals), preview(pool, a, vals), a))
+			pe.Missing = append(pe.Missing, MissingRole{Axis: a, Name: AxisName(a), Values: pool.labelled(a, vals)})
 		}
 	}
-	if len(problems) > 0 {
-		return nil, &PlanError{Problems: problems}
+	if len(pe.Problems) > 0 {
+		return nil, pe
 	}
 	for _, a := range []string{AxRun, AxSetup} {
 		if hasRole[a] {

@@ -61,6 +61,8 @@ func serve(env *Env, port int, open, forceDry bool) error {
 	mux.HandleFunc("/api/runs", s.guard(s.handleRuns))
 	mux.HandleFunc("/api/runs/", s.guard(s.handleRun))
 	mux.HandleFunc("/media/", s.guard(s.handleMedia))
+	mux.HandleFunc("/video/", s.guard(s.handleStudio))
+	newVideoAPI(filepath.Join(env.RepoRoot, "build", "lab")).routes(mux, s.guard)
 
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	ln, err := net.Listen("tcp", addr)

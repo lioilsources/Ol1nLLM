@@ -681,6 +681,37 @@ render v Go (ffmpeg jen kóduje). Všechno lokálně, nic se nikam neposílá.
 Plán a zdůvodnění: [`docs/plan-video-studio.md`](../../docs/plan-video-studio.md);
 kód `internal/video` (bez HTTP a `Env`), příkazy `video_cli.go`.
 
+### Studio (`/video/`)
+
+`make lab` → odkaz **video →** v hlavičce labu, nebo rovnou
+`http://127.0.0.1:8765/video/`. Totéž co terminál, jen s náhledem:
+
+```
+┌ lab · video ─ [Stroboskop] [Průlet] [Plátno] [Mix] ─── jméno  otevřít…  Uložit  YAML ───────┐
+├─ 1 ZDROJ ─────────────┬─ 2 POKRYTÍ ───────────────────────────────┬─ 4 NÁHLED ──────────────┤
+│ rodiny běhů (stejné   │ model × styl: teplotní pruh u kolika      │ rám 9:16 z náhledů běhu │
+│ prompty), zaškrtnout  │ promptů je obrázek; odškrtnutý model      │ podle téže geometrie    │
+│ běhy, přepnout flow   │ vypadne z dlaždic; „Navrhni kombinace“    │ jako render; ▶ v tempu  │
+│                       ├─ 3 SKLADBA ───────────────────────────────┤ s prolínačkou, rysky    │
+│                       │ obrázek / mřížka, popisky, osy času       │ dílů, bezpečné zóny     │
+│                       │ (‹ › pořadí, ~ volně), tempo, dělení;     │                         │
+│                       │ chybějící role = tlačítka s opravou       │                         │
+├───────────────────────┴───────────────────────────────────────────┴─────────────────────────┤
+│ 5 RENDER  [Renderovat] [Koncept]  průběh po dílech · Zrušit · videa ▶ · Ve Finderu          │
+└─────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- Každá změna receptu se hned naplánuje (bez čtení obrázků), náhled
+  i souhrn (snímků, délka, shoda stylu, varování) se přepočítají.
+- **Uložit** zapíše `build/lab/_video/<jméno>/recipe.yaml`; **YAML** ukáže
+  a dovolí upravit recept jako text. Render ve frontě (jeden naráz), průběh
+  živě; **Koncept** kreslí z náhledů 320 px.
+- Zkratka: `/video/#run=<běh>[,<běh>…]&template=platno` otevře studio
+  s vybranými běhy a šablonou.
+- UI je Svelte (`web/`), sestavené do `webdist/app` a zkompilované do
+  binárky; `make lab` ho přestaví, když se zdroje změnily (`make lab-web`
+  ručně). Bez `node` lab běží dál a `/video/` řekne, jak studio sestavit.
+
 ### Tahák
 
 ```bash

@@ -171,7 +171,8 @@ poslouchá jen na loopbacku a mutující požadavky chtějí `X-Lab-Token`.
 a návrhy, které modely dát vedle sebe. Plán `docs/plan-video-studio.md`,
 návod `tools/lab/README.md`. Recept v YAML, `lab video plan` (scénář bez
 renderu), `lab video render` / `make lab-video` (Go + ffmpeg, výstup
-`build/lab/_video/<jméno>/`). Studio ve Svelte přijde v dalším milníku.
+`build/lab/_video/<jméno>/`). Studio ve Svelte na `/video/` (odkaz „video →“
+v hlavičce labu): rodiny běhů, pokrytí, skladba, náhled a render bez terminálu.
 
 **Kompletní matice z jedné fotky** (`make lab-complete REF=…`,
 `tools/lab/complete.sh`): repose s tváří přes všechny SDXL modely × všechny
