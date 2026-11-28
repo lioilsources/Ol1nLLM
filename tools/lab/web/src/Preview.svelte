@@ -1,4 +1,5 @@
 <script>
+  import { untrack } from 'svelte';
   import { api, clock } from './lib/api.js';
   import { st } from './lib/state.svelte.js';
 
@@ -45,7 +46,16 @@
   });
 
   const slide = (i) => cache[i];
-  const fadeMs = $derived(Math.round((1000 * (st.recipe.time.fade || 0)) / Math.max(0.5, Math.min(st.recipe.time.rate, 12))));
+  const partOf = (i) => sb?.videos?.find((v) => i >= v.from && i < v.to);
+  // With time.sync each slide has its own length and crossfade (part.times/fades).
+  const fadeMs = $derived.by(() => {
+    const p = partOf(idx);
+    if (p?.times) {
+      const k = idx - p.from;
+      return Math.round(1000 * (p.fades?.[k] || 0) * (p.times[k + 1] - p.times[k]));
+    }
+    return Math.round((1000 * (st.recipe.time.fade || 0)) / Math.max(0.5, Math.min(st.recipe.time.rate, 12)));
+  });
 
   function go(i) {
     i = Math.max(0, Math.min(n - 1, i));
@@ -54,9 +64,51 @@
     idx = i;
   }
 
+  // With music the track is the clock: the slide is whichever the audio time
+  // falls into, so the preview cuts where the render will.
+  let audio = $state();
+  let muted = $state(false);
+  const synced = $derived(!!(sb?.sync?.url && sb.videos?.[0]?.times));
+  function slideAt(p, t) {
+    let k = 0;
+    while (k < p.to - p.from - 1 && p.times[k + 1] <= t) k++;
+    return p.from + k;
+  }
+  $effect(() => {
+    if (!playing || !synced || !audio) return;
+    // Only the play button restarts this, not the slides it moves.
+    let p = untrack(() => partOf(idx));
+    if (!p) return;
+    audio.currentTime = p.audioStart + p.times[untrack(() => idx) - p.from];
+    audio.play().catch(() => (playing = false));
+    let raf;
+    const tick = () => {
+      const t = audio.currentTime - p.audioStart;
+      if (t >= p.times[p.to - p.from] || audio.ended) {
+        const next = sb.videos.find((v) => v.from === p.to);
+        if (!next) {
+          playing = false;
+          return;
+        }
+        p = next;
+        go(p.from);
+        audio.currentTime = p.audioStart;
+      } else {
+        const i = slideAt(p, t);
+        if (i !== idx) go(i);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      audio.pause();
+    };
+  });
+
   // Real pace, capped at 12/s (a browser cannot keep up with 30 thumbnails a second).
   $effect(() => {
-    if (!playing) return;
+    if (!playing || synced) return;
     const rate = Math.max(0.5, Math.min(st.recipe.time.rate, 12));
     const t = setInterval(() => {
       if (idx >= n - 1) playing = false;
@@ -65,7 +117,7 @@
     return () => clearInterval(t);
   });
 
-  const part = $derived(sb?.videos?.find((v) => idx >= v.from && idx < v.to));
+  const part = $derived(partOf(idx));
   const media = (p) => '/media/' + p;
   const px = (v) => `${v * k}px`;
   const box = (r) => `left:${px(r.x)};top:${px(r.y)};width:${px(r.w)};height:${px(r.h)}`;
@@ -134,7 +186,12 @@
     <button onclick={() => go(idx - 1)}>‹</button>
     <button onclick={() => go(idx + 1)}>›</button>
     <span class="num">{idx + 1}/{n}</span>
+    {#if synced}
+      <button class="mini" class:on={!muted} onclick={() => (muted = !muted)} title="zvuk náhledu">{muted ? '🔇' : '♪'}</button>
+      <span class="dim">{sb.sync.bpm} BPM</span>
+    {/if}
   </div>
+  {#if synced}<audio bind:this={audio} src={sb.sync.url} preload="auto" {muted}></audio>{/if}
   <div class="scrub">
     <input type="range" min="0" max={Math.max(0, n - 1)} value={idx} oninput={(e) => go(+e.currentTarget.value)} />
     <div class="ticks">
@@ -144,7 +201,8 @@
     </div>
   </div>
   {#if part}
-    <p class="dim">{part.name}.mp4 · {clock(part.seconds)} · snímek {idx - part.from + 1}/{part.to - part.from}</p>
+    <p class="dim">{part.name}.mp4 · {clock(part.seconds)} · snímek {idx - part.from + 1}/{part.to - part.from}
+      {#if part.times}· {(part.times[idx - part.from + 1] - part.times[idx - part.from]).toFixed(2)} s{/if}</p>
   {/if}
   <label class="dim"><input type="checkbox" bind:checked={safe} /> bezpečné zóny TikToku / Shorts</label>
   {#if picked}

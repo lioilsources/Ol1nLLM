@@ -78,6 +78,26 @@
 
   const rates = [0.5, 1, 1.5, 2, 3, 4, 6, 8, 12, 15, 24, 30];
 
+  // time.sync: cuts on the kick of a track from build/lab/_video/_audio.
+  const tracks = $derived(st.index?.audio || []);
+  const sync = $derived(r.time.sync);
+  function setTrack(path) {
+    if (!path) {
+      delete st.recipe.time.sync;
+      return;
+    }
+    st.recipe.time.sync = { every: 1, start: 0, breakdown: 2, ...(r.time.sync || {}), audio: path };
+    st.recipe.time.fade = 0; // on the kick a hard cut
+    delete st.recipe.output.maxSeconds;
+  }
+  const everies = [
+    [0.25, 'šestnáctina'],
+    [0.5, 'osmina'],
+    [1, 'doba'],
+    [2, 'půl taktu'],
+    [4, 'takt'],
+  ];
+
   // select.min_reaction travels like any select value: {only: ["0.15"]}.
   const minReaction = $derived(+(r.select.min_reaction?.only?.[0] || 0));
   function setMinReaction(v) {
@@ -206,21 +226,53 @@
 
     <span class="lbl">tempo</span>
     <div class="ctl">
-      <select bind:value={st.recipe.time.rate}>
-        {#each rates as v}<option value={v}>{v}/s</option>{/each}
+      <select value={sync?.audio || ''} onchange={(e) => setTrack(e.currentTarget.value)}
+        title="střih na kopák skladby z build/lab/_video/_audio">
+        <option value="">pevné tempo</option>
+        {#each tracks as t}<option value={t.path}>♪ {t.name}</option>{/each}
+        {#if sync?.audio && !tracks.some((t) => t.path === sync.audio)}<option value={sync.audio}>♪ {sync.audio}</option>{/if}
       </select>
+      {#if !sync}
+        <select bind:value={st.recipe.time.rate}>
+          {#each rates as v}<option value={v}>{v}/s</option>{/each}
+        </select>
+      {/if}
       prolínačka
       <input type="range" min="0" max="0.9" step="0.05" bind:value={st.recipe.time.fade} />
       <span class="num">{(+r.time.fade).toFixed(2)}</span>
-      <span class="dim">{outerInfo}</span>
+      {#if !sync}<span class="dim">{outerInfo}</span>{/if}
     </div>
+
+    {#if sync}
+      <span class="lbl">do hudby</span>
+      <div class="ctl">
+        snímek na
+        <select bind:value={st.recipe.time.sync.every}>
+          {#each everies as [v, l]}<option value={v}>{l}</option>{/each}
+        </select>
+        od
+        <input type="number" min="0" step="1" style="width:64px" bind:value={st.recipe.time.sync.start} /> s
+        <span title="kde kopák zmizí: snímek drží déle a prolíná se">breakdown</span>
+        <select bind:value={st.recipe.time.sync.breakdown}>
+          <option value={0}>beze změny</option>
+          {#each [1, 2, 4, 8] as b}<option value={b}>{b} {b === 1 ? 'doba' : b < 5 ? 'doby' : 'dob'}</option>{/each}
+        </select>
+        posun
+        <input type="number" step="0.01" style="width:64px" bind:value={st.recipe.time.sync.offset}
+          title="posune všechny střihy o sekundy (+ později), kdyby oko nesouhlasilo" /> s
+        {#if sb?.sync}
+          <span class="dim">{sb.sync.bpm} BPM · {clock(sb.sync.duration)}{sb.sync.breakdowns?.length
+            ? ' · breakdown ' + sb.sync.breakdowns.map((b) => clock(b[0])).join(', ') : ''}</span>
+        {/if}
+      </div>
+    {/if}
 
     <span class="lbl">výstup</span>
     <div class="ctl">
       dělit po
       <select value={split} onchange={(e) => setSplit(e.currentTarget.value)}>
         <option value={0}>— (jedno video)</option>
-        {#each [30, 45, 60, 90, 170] as s}<option value={s}>{s} s</option>{/each}
+        {#each [15, 30, 45, 60, 90, 170] as s}<option value={s}>{s} s</option>{/each}
       </select>
       {#if split}
         na

@@ -107,9 +107,9 @@
     <button class="primary" disabled={!sb} onclick={() => render(false)}>Renderovat</button>
     <button disabled={!sb} onclick={() => render(true)} title="z náhledů 320 px — rychlý koncept">Koncept</button>
     <button onclick={copyCommand}>{copied ? 'zkopírováno' : 'Kopírovat příkaz'}</button>
-    <span class="variants">
-      <input bind:value={variants} placeholder="1, 4" title="další tempa (snímků za vteřinu), čárkami" />
-      <button disabled={!sb || !variants.trim()} onclick={renderVariants}>Varianty tempa</button>
+    <span class="variants" title={st.recipe.time.sync ? 'do hudby určuje tempo skladba' : ''}>
+      <input bind:value={variants} placeholder="1, 4" title="další tempa (snímků za vteřinu), čárkami" disabled={!!st.recipe.time.sync} />
+      <button disabled={!sb || !variants.trim() || !!st.recipe.time.sync} onclick={renderVariants}>Varianty tempa</button>
     </span>
     <span class="hint">výstup: build/lab/_video/{st.recipe.name}/</span>
   </div>

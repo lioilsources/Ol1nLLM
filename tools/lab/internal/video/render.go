@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"image"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -127,19 +128,43 @@ func renderPart(ctx context.Context, ff string, comp *Composer, sb *Storyboard, 
 	r := sb.Recipe
 	l := sb.Layout
 	fps := r.Output.FPS
-	hold := float64(fps) / r.Time.Rate // video frames per slide
 	n := v.To - v.From
-	total := int(hold*float64(n) + 0.5)
-	if total < 1 {
-		total = 1
+	// starts[i]: the first video frame of slide i; starts[n] = total. With
+	// time.sync each cut is the frame nearest its beat (never accumulating
+	// rounding), otherwise every slide holds fps/rate frames.
+	starts := make([]int, n+1)
+	for i := 0; i <= n; i++ {
+		if len(v.Times) == n+1 {
+			starts[i] = int(math.Round(v.Times[i] * float64(fps)))
+		} else {
+			starts[i] = int(math.Round(float64(i) * float64(fps) / r.Time.Rate))
+		}
+	}
+	total := max(1, starts[n])
+	fades := v.Fades
+	if len(fades) != n {
+		fades = nil
 	}
 	final := filepath.Join(dir, v.Name+".mp4")
 	part := filepath.Join(dir, v.Name+".part.mp4")
 
 	args := []string{"-y", "-loglevel", "error",
 		"-f", "rawvideo", "-pix_fmt", "rgb24", "-s", fmt.Sprintf("%dx%d", l.W, l.H), "-r", strconv.Itoa(fps), "-i", "-"}
-	if r.Output.Audio != "" {
-		args = append(args, "-i", r.Output.Audio, "-map", "0:v", "-map", "1:a", "-c:a", "aac", "-b:a", "192k", "-shortest")
+	audio := r.Output.Audio
+	if r.Time.Sync != nil {
+		audio = r.Time.Sync.Audio
+	}
+	if audio != "" {
+		secs := float64(total) / float64(fps)
+		if v.AudioStart > 0 {
+			args = append(args, "-ss", strconv.FormatFloat(v.AudioStart, 'f', 3, 64))
+		}
+		args = append(args, "-i", ResolvePath(comp.LabDir, audio), "-map", "0:v", "-map", "1:a",
+			"-c:a", "aac", "-b:a", "192k", "-shortest")
+		if r.Time.Sync != nil && secs > 3 {
+			// The video ends before the track: fade the music out over the last second.
+			args = append(args, "-af", fmt.Sprintf("afade=t=out:st=%.3f:d=1", secs-1))
+		}
 	}
 	switch r.Output.Encoder {
 	case "", "libx264":
@@ -229,8 +254,25 @@ func renderPart(ctx context.Context, ff string, comp *Composer, sb *Storyboard, 
 		if err := ctx.Err(); err != nil {
 			return fail(errors.New("zrušeno"))
 		}
-		i := min(int(float64(k)/hold), n-1)
+		i := slide
+		if i < 0 {
+			i = 0
+		}
+		for i+1 < n && starts[i+1] <= k {
+			i++
+		}
 		if i != slide {
+			// Slides too short for a single frame are skipped, but their
+			// composed frames still have to be taken off the pool.
+			for j := slide + 1; j < i; j++ {
+				if j == slide+1 && nxt != nil {
+					nxt = nil
+					continue
+				}
+				if _, err := get(j); err != nil {
+					return fail(err)
+				}
+			}
 			if nxt != nil && i == slide+1 {
 				cur, nxt = nxt, nil
 			} else {
@@ -242,15 +284,23 @@ func renderPart(ctx context.Context, ff string, comp *Composer, sb *Storyboard, 
 			slide = i
 		}
 		out := cur
-		phase := (float64(k) - float64(i)*hold) / hold
-		if i+1 < n && fade > 0 && phase > 1-fade {
+		f := fade
+		if fades != nil {
+			f = fades[i]
+		}
+		span := starts[i+1] - starts[i]
+		phase := 0.0
+		if span > 0 {
+			phase = float64(k-starts[i]) / float64(span)
+		}
+		if i+1 < n && f > 0 && phase > 1-f {
 			if nxt == nil {
 				var err error
 				if nxt, err = get(i + 1); err != nil {
 					return fail(err)
 				}
 			}
-			a := int((phase - (1 - fade)) / fade * 256)
+			a := int((phase - (1 - f)) / f * 256)
 			blend(mix, cur, nxt, a)
 			out = mix
 		}

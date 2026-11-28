@@ -173,6 +173,7 @@ návod `tools/lab/README.md`. Recept v YAML, `lab video plan` (scénář bez
 renderu), `lab video render` / `make lab-video` (Go + ffmpeg, výstup
 `build/lab/_video/<jméno>/`). Studio ve Svelte na `/video/` (odkaz „video →“
 v hlavičce labu): rodiny běhů, pokrytí, skladba, náhled a render bez terminálu.
+`time.sync` střídá snímky na kopák skladby (detekce dob v Go, breakdown zpomalí).
 
 **Kompletní matice z jedné fotky** (`make lab-complete REF=…`,
 `tools/lab/complete.sh`): repose s tváří přes všechny SDXL modely × všechny

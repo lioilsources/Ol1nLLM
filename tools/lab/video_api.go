@@ -184,9 +184,41 @@ func (a *videoAPI) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, 200, map[string]any{
 		"families": col.Families(1), "runs": runs, "errors": col.Errors, "templates": tmpls,
-		"axes": video.AllAxes, "axisNames": axisNames(),
+		"axes": video.AllAxes, "axisNames": axisNames(), "audio": a.tracks(),
 	})
 }
+
+// audioTrack: a track for time.sync, from build/lab/_video/_audio.
+type audioTrack struct {
+	Path  string `json:"path"` // relative to build/lab, as the recipe takes it
+	Name  string `json:"name"`
+	URL   string `json:"url"`
+	Bytes int64  `json:"bytes"`
+}
+
+func (a *videoAPI) tracks() []audioTrack {
+	out := []audioTrack{}
+	entries, err := os.ReadDir(filepath.Join(a.videoDir(), "_audio"))
+	if err != nil {
+		return out
+	}
+	for _, e := range entries {
+		ext := strings.ToLower(filepath.Ext(e.Name()))
+		if e.IsDir() || strings.HasPrefix(e.Name(), ".") || !audioExt[ext] {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		rel := "_video/_audio/" + e.Name()
+		out = append(out, audioTrack{Path: rel, Name: strings.TrimSuffix(e.Name(), filepath.Ext(e.Name())),
+			URL: "/media/" + rel, Bytes: info.Size()})
+	}
+	return out
+}
+
+var audioExt = map[string]bool{".mp3": true, ".wav": true, ".flac": true, ".m4a": true, ".aac": true, ".ogg": true}
 
 func axisNames() map[string]string {
 	out := map[string]string{}
@@ -445,7 +477,7 @@ func (a *videoAPI) handlePlan(w http.ResponseWriter, r *http.Request) {
 		apiErr(w, 500, err)
 		return
 	}
-	sb, err := video.Plan(col, rec)
+	sb, err := video.PlanSynced(r.Context(), col, rec, a.labDir, "")
 	if err != nil {
 		apiErr(w, 422, err)
 		return
@@ -618,7 +650,7 @@ func (a *videoAPI) handleRender(w http.ResponseWriter, r *http.Request) {
 		apiErr(w, 500, err)
 		return
 	}
-	sb, err := video.Plan(col, rec)
+	sb, err := video.PlanSynced(r.Context(), col, rec, a.labDir, "")
 	if err != nil {
 		apiErr(w, 422, err)
 		return

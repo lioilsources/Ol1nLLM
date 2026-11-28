@@ -157,6 +157,26 @@ type Time struct {
 	Order    map[string]string `yaml:"order,omitempty" json:"order,omitempty"`
 	Rate     float64           `yaml:"rate,omitempty" json:"rate"`
 	Fade     *float64          `yaml:"fade,omitempty" json:"fade"`
+	// Sync cuts on the beats of a track instead of a fixed rate.
+	Sync *Sync `yaml:"sync,omitempty" json:"sync,omitempty"`
+}
+
+// Sync: slides change on the beat grid of Audio (see beats.go).
+type Sync struct {
+	// Audio is the track: absolute, or relative to build/lab
+	// (_video/_audio/techno.mp3). It is also the sound of the video.
+	Audio string `yaml:"audio" json:"audio"`
+	// Every: beats per slide — 1 a quarter note, 0.5 an eighth, 4 a bar.
+	Every float64 `yaml:"every,omitempty" json:"every"`
+	// BPM narrows the tempo search (±4 %); 0 = find it (90–180).
+	BPM float64 `yaml:"bpm,omitempty" json:"bpm,omitempty"`
+	// Offset moves every cut by seconds (+ later), if the eye says so.
+	Offset float64 `yaml:"offset,omitempty" json:"offset,omitempty"`
+	// Start: where in the track every video starts, seconds.
+	Start float64 `yaml:"start,omitempty" json:"start,omitempty"`
+	// Breakdown: beats per slide where the kick drops out, with a crossfade;
+	// 0 = no change.
+	Breakdown *float64 `yaml:"breakdown,omitempty" json:"breakdown"`
 }
 
 type Output struct {
@@ -244,6 +264,15 @@ func (r *Recipe) Defaults() {
 	if r.Time.Fade == nil {
 		f := 0.4
 		r.Time.Fade = &f
+	}
+	if sy := r.Time.Sync; sy != nil {
+		if sy.Every == 0 {
+			sy.Every = 1
+		}
+		if sy.Breakdown == nil {
+			b := 2.0
+			sy.Breakdown = &b
+		}
 	}
 	if r.Output.Size == "" {
 		r.Output.Size = "1080x1920"
@@ -370,6 +399,29 @@ func (r *Recipe) Validate() error {
 	}
 	if r.Time.Rate <= 0 || r.Time.Rate > float64(r.Output.FPS) {
 		add("time.rate %g: musí být v (0, %d] (nejvýš snímků videa za vteřinu)", r.Time.Rate, r.Output.FPS)
+	}
+	if sy := r.Time.Sync; sy != nil {
+		if sy.Audio == "" {
+			add("time.sync.audio: chybí skladba")
+		}
+		if sy.Every <= 0 || sy.Every > 16 {
+			add("time.sync.every %g: dob na snímek, (0, 16] — 0.5 osmina, 1 doba, 4 takt", sy.Every)
+		}
+		if sy.BPM != 0 && (sy.BPM < 60 || sy.BPM > 200) {
+			add("time.sync.bpm %g: 60–200, nebo vynech", sy.BPM)
+		}
+		if sy.Start < 0 {
+			add("time.sync.start nesmí být záporný")
+		}
+		if b := *sy.Breakdown; b < 0 || b > 16 {
+			add("time.sync.breakdown %g: dob na snímek v breakdownu, 0–16", b)
+		}
+		if r.Output.MaxSeconds > 0 {
+			add("output.max_seconds nejde s time.sync — délku dává skladba (zkrať ji output.split)")
+		}
+		if r.Output.Audio != "" && r.Output.Audio != sy.Audio {
+			add("output.audio a time.sync.audio se liší — zvuk videa je skladba ze sync")
+		}
 	}
 	if f := *r.Time.Fade; f < 0 || f >= 1 {
 		add("time.fade %g: podíl snímku, 0 až 0.99", f)
