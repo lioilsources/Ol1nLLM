@@ -22,6 +22,8 @@ type Storyboard struct {
 	Stats    Stats                 `json:"stats"`
 	Warnings []string              `json:"warnings,omitempty"`
 	Sync     *SyncInfo             `json:"sync,omitempty"`
+	// Smooth: per order: smooth axis, how much smaller the jumps got.
+	Smooth map[string]SmoothInfo `json:"smooth,omitempty"`
 }
 
 // Slide is one stretch of the video: one picture, or one tile per tile value.
@@ -321,6 +323,9 @@ func Plan(col *Collection, r Recipe) (*Storyboard, error) {
 				"dlaždice mají jen %d px na šířku — v telefonu budou malé; zkus frame.cols s víc řádky", l.TileW))
 		}
 	}
+	if len(ord.info) > 0 {
+		sb.Smooth = ord.info
+	}
 	return sb, nil
 }
 
@@ -418,12 +423,39 @@ func selection(s SelectSpec) Selection {
 type orderer struct {
 	pool *Pool
 	by   map[string]string
+	// smooth: rank of each value of an order: smooth axis, made on first use.
+	smooth map[string]map[string]int
+	info   map[string]SmoothInfo
 }
 
-func newOrderer(p *Pool, by map[string]string) *orderer { return &orderer{pool: p, by: by} }
+func newOrderer(p *Pool, by map[string]string) *orderer {
+	return &orderer{pool: p, by: by, smooth: map[string]map[string]int{}, info: map[string]SmoothInfo{}}
+}
+
+func (o *orderer) smoothRank(axis string) map[string]int {
+	if r, ok := o.smooth[axis]; ok {
+		return r
+	}
+	base := o.pool.Values(axis)
+	sort.SliceStable(base, func(i, j int) bool {
+		ri, rj := o.pool.Rank(axis, base[i]), o.pool.Rank(axis, base[j])
+		if ri != rj {
+			return ri < rj
+		}
+		return base[i] < base[j]
+	})
+	r, info := smoothRank(o.pool, axis, base)
+	o.smooth[axis], o.info[axis] = r, info
+	return r
+}
 
 func (o *orderer) less(axis, a, b string) bool {
 	switch o.by[axis] {
+	case "smooth":
+		r := o.smoothRank(axis)
+		if r[a] != r[b] {
+			return r[a] < r[b]
+		}
 	case "label":
 		la, lb := o.pool.Label(axis, a), o.pool.Label(axis, b)
 		if la != lb {

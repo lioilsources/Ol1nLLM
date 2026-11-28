@@ -1,52 +1,17 @@
 package main
 
 import (
-	"bytes"
-	"image"
-	"math"
 	"sort"
+
+	"github.com/lioilsources/ol1n-lab/internal/video"
 )
 
-// Histogram is a 512-bin RGB histogram (8 levels per channel) of a downscaled
-// image — the same measure the style matrix was calibrated with, so numbers
-// from the lab and from docs/style-matrix.md stay comparable.
-func Histogram(data []byte) ([]float64, error) {
-	img, _, err := image.Decode(bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	b := img.Bounds()
-	const side = 96
-	h := make([]float64, 512)
-	n := 0.0
-	for y := 0; y < side; y++ {
-		for x := 0; x < side; x++ {
-			sx := b.Min.X + x*b.Dx()/side
-			sy := b.Min.Y + y*b.Dy()/side
-			r, g, bb, _ := img.At(sx, sy).RGBA()
-			h[(r>>13)*64+(g>>13)*8+(bb>>13)]++
-			n++
-		}
-	}
-	for i := range h {
-		h[i] /= n
-	}
-	return h, nil
-}
+// Histogram and CosDist live in internal/video (order: smooth uses them too);
+// the style matrix was calibrated with this very measure.
+func Histogram(data []byte) ([]float64, error) { return video.Histogram(data) }
 
 // CosDist is 1 - cosine similarity: 0 = identical palettes, 1 = nothing shared.
-func CosDist(a, b []float64) float64 {
-	var num, da, db float64
-	for i := range a {
-		num += a[i] * b[i]
-		da += a[i] * a[i]
-		db += b[i] * b[i]
-	}
-	if da == 0 || db == 0 {
-		return 1
-	}
-	return 1 - num/(math.Sqrt(da)*math.Sqrt(db))
-}
+func CosDist(a, b []float64) float64 { return video.CosDist(a, b) }
 
 type CellMetric struct {
 	// Reaction is the distance from this group's style-less baseline: "did the

@@ -481,6 +481,9 @@ func printStoryboard(sb *video.Storyboard, withSlides bool) {
 		fmt.Printf("  hudba: %s · %.1f BPM · %s · střih každých %g dob, v breakdownu %g\n", filepath.Base(sy.Audio),
 			sy.BPM, clock(sy.Duration), r.Time.Sync.Every, *r.Time.Sync.Breakdown)
 	}
+	for a, in := range sb.Smooth {
+		fmt.Printf("  plynule (%s): %s\n", video.AxisName(a), in)
+	}
 	d := sb.Stats.Dropped
 	fmt.Printf("  obrázků ve výběru %d · vyřazeno: neúplné snímky %d, prázdné soubory %d, kolize %d, filtr %d",
 		sb.Stats.Pictures, d["incomplete"], d["empty_file"], d["collision"], d["filtered"])

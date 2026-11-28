@@ -298,7 +298,7 @@ func (r *Recipe) Validate() error {
 		add("name %q: jen písmena, číslice, - a _", r.Name)
 	}
 	if len(r.Source.Runs) == 0 && r.Source.Family == "" {
-		add("source: chybí runs nebo family")
+		add("source: chybí runs nebo family — vyber běhy nebo rodinu")
 	}
 	if len(r.Source.Runs) > 0 && r.Source.Family != "" {
 		add("source: buď runs, nebo family")
@@ -391,10 +391,11 @@ func (r *Recipe) Validate() error {
 	}
 	for axis, o := range r.Time.Order {
 		switch {
+		case o == "smooth":
 		case axis == AxStyle && (o == "picker" || o == "year" || o == "label"):
 		case axis != AxStyle && (o == "run" || o == "label"):
 		default:
-			add("time.order.%s: %q (styl: picker | year | label, ostatní: run | label)", axis, o)
+			add("time.order.%s: %q (styl: picker | year | label | smooth, ostatní: run | label | smooth)", axis, o)
 		}
 	}
 	if r.Time.Rate <= 0 || r.Time.Rate > float64(r.Output.FPS) {

@@ -173,14 +173,18 @@
       <option value="">otevřít…</option>
       {#each st.saved as s}<option value={s.name}>{s.name} ({s.videos})</option>{/each}
     </select>
-    <button onclick={save}>Uložit</button>
-    <button class:on={st.showYaml} onclick={toggleYaml}>YAML</button>
+    <button onclick={save} disabled={!hasSource()} title={hasSource() ? '' : 'nejdřív vyber běhy vlevo'}>Uložit</button>
+    <button class:on={st.showYaml} onclick={toggleYaml} disabled={!hasSource() && !st.showYaml}
+      title={hasSource() ? '' : 'nejdřív vyber běhy vlevo'}>YAML</button>
     <button onclick={() => loadIndex(true)} title="znovu načíst běhy z disku">↻</button>
   </div>
 </header>
 
 {#if st.error}<div class="banner bad" role="alert">{st.error} <button onclick={() => (st.error = '')}>×</button></div>{/if}
 {#each st.notes as n}<div class="banner">{n}</div>{/each}
+{#if st.index && !hasSource()}
+  <div class="banner">Začni vlevo v <b>1 Zdroj</b>: zaškrtni běhy, nebo u rodiny „vybrat celou rodinu“. Pak nahoře šablona, nebo role os ve <b>3 Skladba</b>.</div>
+{/if}
 
 {#if st.showYaml}
   <section class="yaml">
