@@ -677,14 +677,50 @@ spočítá jen nové buňky. Starší běh dostane čísla přes `lab score <adr
 
 Plán a slovník: [`docs/plan-video-studio.md`](../../docs/plan-video-studio.md).
 Kód je v `internal/video` (bez HTTP a `Env`), příkazy v `video_cli.go`.
-Hotové je **M0**: kolekce, rodiny, pokrytí a návrhy z terminálu. Videa zatím
-dál dělá `make stylemap-video` (`tools/stylemap/README.md`, „Video na výšku“).
+Hotové **M0** (kolekce, rodiny, pokrytí, návrhy) a **M1** (recept, scénář).
+Render zatím dál dělá `make stylemap-video` (`tools/stylemap/README.md`,
+„Video na výšku“).
 
 ```bash
 lab video index [--min 50] [--refresh]                 # rodiny běhů, modely, počty
 lab video coverage --family <běh> --where flow=txt2img # model × styl, u kolika promptů
 lab video suggest  --runs a,b,c --tiles model --loose style --k 6
+lab video new --runs a,b --template mix > recept.yaml  # kostra receptu
+lab video plan recept.yaml [--slides]                  # snímky, videa, délky, co vypadlo
 ```
+
+### Recept
+
+YAML, klíče jako v `candidates/video-examples.yaml`; neznámý klíč je chyba
+s číslem řádku, víc receptů v jednom souboru odděluje `---`. Šablony
+`stroboskop`, `prulet`, `platno`, `mix` (`lab video new`).
+
+```yaml
+name: mix                         # jméno výstupu (díly: mix-01, mix-02 …)
+source: {runs: [a, b, c]}         # nebo {family: a}; prompt_identity, prefer
+select: {model: [m1, m2], flow: txt2img, style: {not: [x]}}   # pořadí = pořadí dlaždic
+frame:  {tiles: model, cols: auto, title: prompt, captions: [model, style], fit: contain}
+time:   {axes: [prompt, style], loose: [style], pair: kind, complete: true, rate: 2, fade: 0.2}
+output: {per: [flow], split: {seconds: 60, at: prompt}, max_seconds: 170, size: 1080x1920}
+```
+
+**Pravidlo rolí**: každá osa obsahu, která má po `select` víc hodnot, má
+právě jednu roli — dlaždice (`frame.tiles`), čas (`time.axes`, vnější →
+vnitřní) nebo samostatné video na hodnotu (`output.per`). Chybí-li
+`time.axes`, doplní se osy bez role v pořadí prompt, postava, prefix, styl,
+flow, sweep, model. Osa bez role je chyba, která řekne hodnoty a opravy.
+
+**Volné osy** (`time.loose`, vnitřní konec `time.axes`, jen s dlaždicemi):
+mezi dlaždicemi se smí lišit. Žebřík `pair`: `exact` (jen co mají všechny
+dlaždice), `kind` (navíc stejný druh stylu — kultura, umělec, médium — s
+nejbližším rokem), `order` (navíc zbytek v pořadí pickeru). Plán vypíše
+podíl snímků z každé příčky: tak se pozná, jestli jsou dlaždice „aspoň trochu
+podobné“, dřív než se renderuje.
+
+`complete: true` (výchozí) zahodí snímky s prázdnou dlaždicí. `split` řeže jen
+na hranici osy `at` (výchozí vnější osa času). `max_seconds` vybírá
+rovnoměrně celé jednotky (u `[styl, model]` celé styly). Geometrii snímku
+(`layout`) počítá plán; náhled i render ji jen kreslí.
 
 - **Kolekce** = obrázky všech běhů v `build/lab` (adresáře s `_` jsou labu).
   Obrázek je buňka manifestu s neprázdným souborem; 0bajtový soubor je
