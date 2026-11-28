@@ -54,12 +54,17 @@ type ManifestCell struct {
 	PromptIndex int     `json:"promptIndex"`
 	// PromptBody names the entry of the prompt file this column came from;
 	// empty when the prompt box was the whole axis.
-	PromptBody string              `json:"promptBody"`
-	Prompt     *string             `json:"prompt"`
-	Negative   *string             `json:"negative"`
-	Variant    *Variant            `json:"variant"`
-	Params     map[string]any      `json:"params"`
-	Applied    map[string][]string `json:"applied"`
+	PromptBody string `json:"promptBody"`
+	// PromptPrefix and Character are the other two parts of the column: the
+	// line of the prompt box and the line of the character box. Empty in
+	// manifests written before the video studio read them.
+	PromptPrefix string              `json:"promptPrefix,omitempty"`
+	Character    string              `json:"character,omitempty"`
+	Prompt       *string             `json:"prompt"`
+	Negative     *string             `json:"negative"`
+	Variant      *Variant            `json:"variant"`
+	Params       map[string]any      `json:"params"`
+	Applied      map[string][]string `json:"applied"`
 	// PresetOverridden marks a cell whose sampler settings no longer are the
 	// model's own — such a result must not be quoted back as a model verdict.
 	PresetOverridden bool `json:"presetOverridden"`

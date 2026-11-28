@@ -166,6 +166,12 @@ Prohlížeč nemůže volat ComfyUI přímo (nevrací CORS hlavičky a CF Access
 odmítá preflight 403), proto ten lokální server; drží CF creds, takže
 poslouchá jen na loopbacku a mutující požadavky chtějí `X-Lab-Token`.
 
+**Video napříč běhy (`lab video`)**: index všech obrázků všech běhů podle os
+(model, styl, prompt, flow…), rodiny běhů se stejnými prompty, matice pokrytí
+a návrhy, které modely dát vedle sebe. Plán `docs/plan-video-studio.md`,
+návod `tools/lab/README.md`. Hotové M0 (terminál); recept, render v Go
+a studio ve Svelte přijdou v dalších milnících.
+
 **Kompletní matice z jedné fotky** (`make lab-complete REF=…`,
 `tools/lab/complete.sh`): repose s tváří přes všechny SDXL modely × všechny
 styly a na čtyřech modelech, které danbooru tagy znají, přes nativní umělce

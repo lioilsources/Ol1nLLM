@@ -673,6 +673,48 @@ spočítá jen nové buňky. Starší běh dostane čísla přes `lab score <adr
 - Prohlížeč nemůže volat ComfyUI přímo: nevrací CORS hlavičky a CF Access
   odmítá preflight (403). Proto ten lokální server.
 
+## Video napříč běhy (`lab video`)
+
+Plán a slovník: [`docs/plan-video-studio.md`](../../docs/plan-video-studio.md).
+Kód je v `internal/video` (bez HTTP a `Env`), příkazy v `video_cli.go`.
+Hotové je **M0**: kolekce, rodiny, pokrytí a návrhy z terminálu. Videa zatím
+dál dělá `make stylemap-video` (`tools/stylemap/README.md`, „Video na výšku“).
+
+```bash
+lab video index [--min 50] [--refresh]                 # rodiny běhů, modely, počty
+lab video coverage --family <běh> --where flow=txt2img # model × styl, u kolika promptů
+lab video suggest  --runs a,b,c --tiles model --loose style --k 6
+```
+
+- **Kolekce** = obrázky všech běhů v `build/lab` (adresáře s `_` jsou labu).
+  Obrázek je buňka manifestu s neprázdným souborem; 0bajtový soubor je
+  chybějící obrázek a `index` ho u běhu vypíše. Fotka pozice restylu
+  (`flow: position`) do matice nepatří.
+- **Osy**: `model`, `style` (`__baseline` = bez stylu), `prompt`, `character`,
+  `prefix`, `flow`, `variant` (hodnota sweepu); původ `run` a `setup`.
+- **Identita promptu**: s promptovým souborem id scény (`promptBody`) — text
+  je pro každou rodinu modelů jiný, scéna táž; bez něj celý popisek sloupce.
+  **Postava a prefix jsou osa jen tam, kde v jednom běhu rozlišují sloupce.**
+  Běh s jedinou postavou ji napsal pro svou rodinu modelů jako prompt, takže
+  jde do otisku nastavení (`setup`) a běhy s jinak napsanou postavou se dál
+  spárují podle scény.
+- **Rodina** = běhy se stejnou sadou naplánovaných promptů (i přerušené).
+- **Kolize**: stejný obrázek (všechny osy obsahu) ve dvou bězích. `--prefer
+  first|newest|error`; když se liší nastavení (seed, postava, síla úpravy…),
+  příkaz to vypíše — jsou to jiné obrázky.
+- **Pokrytí** u stylů nad 16 sloupců sčítá po druzích (kultury, umělci,
+  média): procento dvojic (styl, prompt), které mají obrázek. `--json` dá
+  celou matici.
+- **Návrhy**: pro každý počet dlaždic nejlepší kombinace se dvěma čísly —
+  *striktně* úplné snímky (stejný prompt i styl) a *volně* úplné (osy z
+  `--loose` se mezi dlaždicemi smí lišit; tolik snímků dá video `MIX=1`
+  s `COMPLETE=1`). Nad 16 hodnot bere těch 16 s nejvíc obrázky.
+- **Cache** indexu: `build/lab/_video/.index/<běh>.json`, platí podle velikosti
+  a času manifestu; které obrázky existují, se čte pokaždé (běžící běh je
+  vidět hned). Studený průchod ~25 s (manifesty mají stovky MB), teplý ~1 s.
+- Nové běhy nesou `promptPrefix` a `character` v buňce (`dump.dart`); u starých
+  se odvozují z popisku sloupce.
+
 ## Kompletní matice z jedné fotky (`complete.sh`)
 
 ```bash

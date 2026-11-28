@@ -37,6 +37,32 @@ jobs:
         # on this runner they would fail on rendering, not on a regression.
         run: flutter test --exclude-tags screenshots
 
+  lab:
+    name: Lab (Go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/lab
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/lab/go.mod
+          cache-dependency-path: tools/lab/go.sum
+
+      - name: Format
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
   build-android-debug:
     name: Android Debug Build
     runs-on: ubuntu-latest

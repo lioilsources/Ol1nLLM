@@ -125,6 +125,7 @@ func usage() {
   lab score [ID|DIR|last]                          přepočítat metriky (bez argumentu poslední běh)
   lab hairmasks --ref portrét.png                  masky Kadeřníka pro flow hair
   lab export DIR                                   odeslat běh do FINETUNE gallery
+  lab video …                                      videa napříč běhy (lab video bez argumentů = nápověda)
 
 Přepínače pro `+"`lab run`"+` odpovídají ovládacím prvkům v UI:
   --models a,b   --prompts soubor   --styles a,b   --styles-file f.json
@@ -166,6 +167,8 @@ func main() {
 		fatal(hairmasksCLI(env, args))
 	case "export":
 		fatal(exportCLI(env, args))
+	case "video":
+		fatal(videoCLI(env, args))
 	case "-h", "--help", "help":
 		usage()
 	default:
