@@ -281,3 +281,64 @@ func TestExampleRecipesParse(t *testing.T) {
 		t.Fatalf("ukázek %d", len(rs))
 	}
 }
+
+func fp(v float64) *float64 { return &v }
+
+func TestReferenceTile(t *testing.T) {
+	lab := t.TempDir()
+	// A repose run with a reference picture, and a restyle drawn over a
+	// position photo.
+	writeRun(t, lab, fakeRun{id: "20260201-000001", ref: "_refs/foto.png", styles: registry, cells: []fakeCell{
+		{model: "a", flow: "repose", scene: "s1"}, {model: "b", flow: "repose", scene: "s1"},
+	}})
+	writeRun(t, lab, fakeRun{id: "20260201-000002", styles: registry, cells: []fakeCell{
+		{id: "pos-s1", model: "p", flow: "position", scene: "s1"},
+		{model: "a", flow: "restyle", scene: "s1", dependsOn: "pos-s1"},
+		{model: "b", flow: "restyle", scene: "s1", dependsOn: "pos-s1"},
+	}})
+	col := mustLoad(t, lab)
+	y := "frame: {tiles: model, reference: true, captions: auto}\n"
+	sb := mustPlan(t, col, "source: {runs: [20260201-000001]}\n"+y)
+	if sb.Tiles[0].ID != refSlot || len(sb.Layout.Tiles) != 3 {
+		t.Fatalf("předloha je první dlaždice: %+v, rozložení %d", sb.Tiles, len(sb.Layout.Tiles))
+	}
+	s := sb.Slides[0]
+	if s.Tiles[0] == nil || s.Tiles[0].Img != "_refs/foto.png" || s.Captions[0][0] != "předloha" {
+		t.Fatalf("předloha běhu: %+v %v", s.Tiles[0], s.Captions)
+	}
+	sb = mustPlan(t, col, "source: {runs: [20260201-000002]}\n"+y)
+	if got := sb.Slides[0].Tiles[0]; got == nil || got.Img != "20260201-000002/img/pos-s1.png" {
+		t.Fatalf("u restylu je předloha fotka pozice: %+v", got)
+	}
+	if _, err := ParseRecipes([]byte("source: {runs: [a]}\nframe: {reference: true}\n")); err == nil {
+		t.Fatal("předloha bez dlaždic má být chyba")
+	}
+}
+
+func TestMinReaction(t *testing.T) {
+	lab := t.TempDir()
+	writeRun(t, lab, fakeRun{id: "20260301-000001", styles: registry, cells: []fakeCell{
+		{model: "a", scene: "s1"},
+		{model: "a", scene: "s1", style: "cave", reaction: fp(0.05)},
+		{model: "a", scene: "s1", style: "vermeer", reaction: fp(0.5)},
+	}})
+	writeRun(t, lab, fakeRun{id: "20260301-000002", styles: registry, cells: []fakeCell{
+		{model: "b", scene: "s1", style: "ink"},
+	}})
+	col := mustLoad(t, lab)
+	sb := mustPlan(t, col, "source: {runs: [20260301-000001]}\nselect: {min_reaction: 0.15}\n")
+	var styles []string
+	for _, s := range sb.Slides {
+		styles = append(styles, s.Key[AxStyle])
+	}
+	if strings.Join(styles, ",") != Baseline+",vermeer" || sb.Stats.Dropped["reaction"] != 1 {
+		t.Fatalf("bez stylu zůstává, cave (0.05) vypadne: %v, vyřazeno %v", styles, sb.Stats.Dropped)
+	}
+	sb = mustPlan(t, col, "source: {runs: [20260301-000002]}\nselect: {min_reaction: 0.15}\n")
+	if len(sb.Slides) != 1 || len(sb.Warnings) == 0 || !strings.Contains(sb.Warnings[0], "nemá metriky") {
+		t.Fatalf("běh bez metrik se nefiltruje, ale řekne to: %v %v", len(sb.Slides), sb.Warnings)
+	}
+	if _, err := ParseRecipes([]byte("source: {runs: [a]}\nselect: {min_reaction: hodně}\n")); err == nil {
+		t.Fatal("min_reaction musí být číslo")
+	}
+}

@@ -220,6 +220,9 @@ func (a *videoAPI) pool(req poolReq) (*video.Pool, error) {
 	}
 	sel := video.Selection{Only: map[string][]string{}, Not: map[string][]string{}}
 	for axis, f := range req.Select {
+		if axis == video.MinReaction {
+			continue // a filter on pictures, not an axis; the plan applies it
+		}
 		if len(f.Only) > 0 {
 			sel.Only[axis] = f.Only
 		}

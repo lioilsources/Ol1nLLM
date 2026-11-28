@@ -62,6 +62,18 @@ func (f *AxisFilter) UnmarshalYAML(n *yaml.Node) error {
 	return fmt.Errorf("řádek %d: filtr osy je hodnota, seznam nebo {only, not, kind}", n.Line)
 }
 
+// MinReaction is the select key that keeps pictures where the style did
+// something: select: {min_reaction: 0.15}.
+const MinReaction = "min_reaction"
+
+// MinValue reads select.min_reaction (a scalar lands in Only).
+func (f AxisFilter) MinValue() (float64, error) {
+	if len(f.Only) != 1 {
+		return 0, fmt.Errorf("čekám jedno číslo")
+	}
+	return strconv.ParseFloat(f.Only[0], 64)
+}
+
 func mustMarshal(n *yaml.Node) []byte {
 	b, _ := yaml.Marshal(n)
 	return b
@@ -75,6 +87,9 @@ type Frame struct {
 	Fit      string    `yaml:"fit,omitempty" json:"fit,omitempty"`
 	Title    string    `yaml:"title,omitempty" json:"title,omitempty"`
 	Captions Captions  `yaml:"captions,omitempty" json:"captions"`
+	// Reference puts the picture the tiles were drawn from (the run's
+	// reference, a restyle's position photo) in a first tile.
+	Reference bool `yaml:"reference,omitempty" json:"reference,omitempty"`
 }
 
 // IntOrAuto is 0 for auto.
@@ -270,6 +285,12 @@ func (r *Recipe) Validate() error {
 		add("source.prefer: %q, čekám first, newest nebo error", r.Source.Prefer)
 	}
 	for axis, f := range r.Select {
+		if axis == MinReaction {
+			if v, err := f.MinValue(); err != nil || v < 0 || v > 1 {
+				add("select.min_reaction: číslo 0–1 (vzdálenost barev od obrázku bez stylu)")
+			}
+			continue
+		}
 		if !IsAxis(axis) {
 			add("select.%s: neznámá osa (osy: %s)", axis, strings.Join(AllAxes, ", "))
 		}
@@ -284,6 +305,9 @@ func (r *Recipe) Validate() error {
 	case "contain", "cover":
 	default:
 		add("frame.fit: %q, čekám contain nebo cover", r.Frame.Fit)
+	}
+	if r.Frame.Reference && r.Frame.Tiles == "" {
+		add("frame.reference: předloha jako dlaždice jde jen s frame.tiles")
 	}
 	if r.Frame.Fit == "cover" && r.Frame.Tiles != "" {
 		add("frame.fit: cover jde jen bez dlaždic (s dlaždicemi se obrázky vejdou celé)")

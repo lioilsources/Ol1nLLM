@@ -52,6 +52,25 @@
       error = e.message;
     }
   }
+  // The same recipe at other paces, each as its own set <name>-<rate>fps.
+  let variants = $state('');
+  async function renderVariants() {
+    const rates = variants.split(/[ ,;]+/).map(Number).filter((v) => v > 0 && v <= 30);
+    for (const rate of rates) {
+      const recipe = recipeJSON();
+      recipe.time.rate = rate;
+      recipe.name = `${recipe.name}-${String(rate).replace('.', '_')}fps`;
+      try {
+        const j = await post('/api/video/render', { recipe });
+        jobs = [j, ...jobs];
+        follow(j.id);
+      } catch (e) {
+        error = e.message;
+        return;
+      }
+    }
+  }
+
   async function cancel(id) {
     try {
       await api('/api/video/jobs/' + id, { method: 'DELETE' });
@@ -88,6 +107,10 @@
     <button class="primary" disabled={!sb} onclick={() => render(false)}>Renderovat</button>
     <button disabled={!sb} onclick={() => render(true)} title="z náhledů 320 px — rychlý koncept">Koncept</button>
     <button onclick={copyCommand}>{copied ? 'zkopírováno' : 'Kopírovat příkaz'}</button>
+    <span class="variants">
+      <input bind:value={variants} placeholder="1, 4" title="další tempa (snímků za vteřinu), čárkami" />
+      <button disabled={!sb || !variants.trim()} onclick={renderVariants}>Varianty tempa</button>
+    </span>
     <span class="hint">výstup: build/lab/_video/{st.recipe.name}/</span>
   </div>
   {#if error}<p class="bad">{error}</p>{/if}
