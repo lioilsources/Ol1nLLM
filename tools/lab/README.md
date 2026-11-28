@@ -694,7 +694,8 @@ kód `internal/video` (bez HTTP a `Env`), příkazy `video_cli.go`.
 │ běhy, přepnout flow   │ vypadne z dlaždic; „Navrhni kombinace“    │ jako render; ▶ v tempu  │
 │                       ├─ 3 SKLADBA ───────────────────────────────┤ s prolínačkou, rysky    │
 │                       │ obrázek / mřížka, popisky, osy času       │ dílů, bezpečné zóny     │
-│                       │ (‹ › pořadí, ~ volně), tempo, dělení;     │                         │
+│                       │ (‹ › pořadí, ~ volně), tempo / do hudby,  │ ♪ hraje skladbu         │
+│                       │ dělení;                                   │                         │
 │                       │ chybějící role = tlačítka s opravou       │                         │
 ├───────────────────────┴───────────────────────────────────────────┴─────────────────────────┤
 │ 5 RENDER  [Renderovat] [Koncept]  průběh po dílech · Zrušit · videa ▶ · Ve Finderu          │
@@ -703,6 +704,11 @@ kód `internal/video` (bez HTTP a `Env`), příkazy `video_cli.go`.
 
 - Každá změna receptu se hned naplánuje (bez čtení obrázků), náhled
   i souhrn (snímků, délka, shoda stylu, varování) se přepočítají.
+- **Do hudby**: v řádku *tempo* místo „pevné tempo“ vyber skladbu
+  z `build/lab/_video/_audio/` (viz `time.sync` níž). Objeví se řádek
+  *do hudby* (snímek na dobu / osminu / takt, od kolikáté sekundy, breakdown,
+  posun) s nalezeným BPM; ▶ v náhledu pak hraje skladbu a střídá snímky
+  podle jejího času, tedy tam, kde střihne render.
 - **Varianty tempa**: do pole napiš třeba `1, 4` — tentýž recept se
   vyrenderuje i v těchto tempech jako sady `<jméno>-1fps`, `<jméno>-4fps`.
 - **Uložit** zapíše `build/lab/_video/<jméno>/recipe.yaml`; **YAML** ukáže
@@ -723,6 +729,7 @@ lab video coverage --runs a,b                          # model × styl: u kolika
 lab video new --runs a,b --template mix > r.yaml       # kostra receptu (stroboskop|prulet|platno|mix)
 lab video plan   r.yaml [--slides]                     # snímky, videa, délky, co vypadlo a proč
 lab video render r.yaml [--only jméno-03] [--draft]    # MP4 do build/lab/_video/<jméno>/
+lab video beats  _video/_audio/techno.mp3 [--bpm 126]  # tempo, doby, breakdowny skladby (time.sync)
 make lab-video RECIPE=r.yaml                           # totéž z kořene repa
 ```
 
@@ -874,6 +881,55 @@ output.split: {seconds: 60, at: prompt}
 | Nahota | stáhne | stáhne | stáhne |
 
 `plan` varuje u dílu nad 180 s.
+
+### Do hudby (`time.sync`)
+
+Snímky se střídají na kopák skladby místo pevného `rate`. Skladbu dej do
+`build/lab/_video/_audio/` (MusicStudio / SPARK, nebo cokoliv s pravidelným
+kopákem); je to zároveň zvuk videa.
+
+```yaml
+time:
+  axes: [style]
+  fade: 0                  # na kopák tvrdý střih
+  sync:
+    audio: _video/_audio/techno-126bpm-seed4242.mp3   # relativně k build/lab, nebo absolutně
+    every: 1               # dob na snímek: 0.25 šestnáctina, 0.5 osmina, 1 doba, 4 takt
+    start: 44              # od které sekundy skladby hraje každé video
+    breakdown: 2           # kde kopák zmizí: dob na snímek + prolínačka; 0 = beze změny
+    # bpm: 126             # zúží hledání tempa na ±4 % (proti půlenému tempu)
+    # offset: 0.02         # posune všechny střihy (s, + později), kdyby oko nesouhlasilo
+output: {split: {seconds: 15}}
+```
+
+```
+skladba od start ─▶
+kopák   │   │   │   │   │   │   │   │               │   │   │   │
+doby    ▲   ▲   ▲   ▲   ▲   ▲   ▲   ▲   ·   ·   ·   ▲   ▲   ▲   ▲
+snímky  ├─1─┼─2─┼─3─┼─4─┼─5─┼─6─┼─7─┼─8─────╱╲──9────╱╲10─┼11─┼12─┤
+                                        └ breakdown: 2 doby, prolínačka ┘
+ díl končí na hranici taktu; další díl hraje skladbu znovu od start
+```
+
+- **Detekce** (`internal/video/beats.go`, Go nad ffmpeg): mono 11 kHz,
+  obálka v pásmu 30–75 Hz (výš už v technu hraje offbeatová basa a střih by
+  padal o půl doby vedle), nástupy, tempo autokorelací 90–180 BPM, pak
+  perioda a fáze mřížky laděné přes celou skladbu najednou — po minutě se
+  nic neposune. Breakdown = aspoň 8 dob se slabým kopákem; začátek taktu
+  podle první doby po breakdownu. Výsledek v
+  `build/lab/_video/.index/beats-*.json`.
+- **Plán**: díl trvá nejvýš do konce skladby (nebo `output.split.seconds`)
+  a dělí se přednostně na změně vnější osy, která padne na takt; poslední
+  snímek dílu drží do dalšího taktu. `storyboard.json` nese u dílu `times`
+  (začátky snímků), `fades` a `audioStart`, u plánu `sync` (BPM, délka,
+  breakdowny).
+- **Render**: střih je na snímku videa nejbližším k době (při 30 fps ≤ 17 ms),
+  zaokrouhlení se nesčítá; zvuk od `start`, poslední sekunda se ztlumí.
+  Snímek kratší než dva snímky videa (osmina při 240 BPM…) `plan` hlásí.
+- `time.rate`, `output.max_seconds` a varianty tempa se se `sync` neberou;
+  `output.audio` smí být jen tatáž skladba.
+- `lab video beats soubor` ukáže BPM, první dobu, breakdowny a sílu kopáku
+  po taktech — první, co zkusit, když střih „neladí“.
 
 ### Index a cache
 

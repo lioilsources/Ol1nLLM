@@ -168,3 +168,19 @@ func TestStudioPageServesTokenOrHowToBuild(t *testing.T) {
 		t.Fatalf("nesestavené studio má říct jak sestavit: %d %s", res.StatusCode, body)
 	}
 }
+
+func TestVideoAPIIndexListsTracks(t *testing.T) {
+	srv, lab := videoServer(t)
+	dir := filepath.Join(lab, "_video", "_audio")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{"techno.mp3", "notes.txt", ".skryta.mp3"} {
+		_ = os.WriteFile(filepath.Join(dir, f), []byte("x"), 0o644)
+	}
+	_, idx := call(t, srv, "GET", "/api/video/index", nil)
+	tr, _ := idx["audio"].([]any)
+	if len(tr) != 1 || tr[0].(map[string]any)["path"] != "_video/_audio/techno.mp3" {
+		t.Fatalf("skladby: %v", idx["audio"])
+	}
+}

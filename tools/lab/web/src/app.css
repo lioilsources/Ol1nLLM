@@ -18,7 +18,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--ink); color: var(--paper); font: 400 12.5px/1.5 var(--mono); }
 button, input, select, textarea { font: inherit; color: inherit; }
-button, select, input[type='text'], input:not([type]), textarea {
+button, select, input[type='text'], input[type='number'], input:not([type]), textarea {
   background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px;
 }
 button { cursor: pointer; }
