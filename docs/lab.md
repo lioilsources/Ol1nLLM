@@ -169,8 +169,9 @@ poslouchá jen na loopbacku a mutující požadavky chtějí `X-Lab-Token`.
 **Video napříč běhy (`lab video`)**: index všech obrázků všech běhů podle os
 (model, styl, prompt, flow…), rodiny běhů se stejnými prompty, matice pokrytí
 a návrhy, které modely dát vedle sebe. Plán `docs/plan-video-studio.md`,
-návod `tools/lab/README.md`. Hotové M0 (terminál); recept, render v Go
-a studio ve Svelte přijdou v dalších milnících.
+návod `tools/lab/README.md`. Recept v YAML, `lab video plan` (scénář bez
+renderu), `lab video render` / `make lab-video` (Go + ffmpeg, výstup
+`build/lab/_video/<jméno>/`). Studio ve Svelte přijde v dalším milníku.
 
 **Kompletní matice z jedné fotky** (`make lab-complete REF=…`,
 `tools/lab/complete.sh`): repose s tváří přes všechny SDXL modely × všechny

@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/lioilsources/ol1n-lab/internal/video"
 )
@@ -30,6 +33,8 @@ func videoCLI(env *Env, args []string) error {
 		return videoNewCLI(labDir, args[1:])
 	case "plan":
 		return videoPlanCLI(labDir, args[1:])
+	case "render":
+		return videoRenderCLI(labDir, args[1:])
 	default:
 		videoUsage()
 		return fmt.Errorf("neznámý příkaz lab video %s", args[0])
@@ -52,7 +57,26 @@ func videoUsage() {
         kostra receptu se všemi osami, které běhy mají
   lab video plan recept.yaml [--slides] [--json]
         scénář: snímky, videa, délky, co vypadlo a proč — nic nerenderuje
+  lab video render recept.yaml [--only jméno-01,jméno-02] [--out DIR] [--draft]
+        MP4 do build/lab/_video/<jméno>/ (s receptem a souhrnem scénáře);
+        --draft kreslí z náhledů 320 px — rychlý koncept, ne výsledek
 `)
+}
+
+// parseArgs parses flags wherever they stand: `lab video plan r.yaml --json`
+// as well as `lab video plan --json r.yaml`. Go's flag package stops at the
+// first positional argument and would ignore everything after it.
+func parseArgs(fs *flag.FlagSet, args []string) []string {
+	var pos []string
+	for {
+		_ = fs.Parse(args)
+		rest := fs.Args()
+		if len(rest) == 0 {
+			return pos
+		}
+		pos = append(pos, rest[0])
+		args = rest[1:]
+	}
 }
 
 type multiFlag []string
@@ -65,7 +89,9 @@ func videoIndexCLI(labDir string, args []string) error {
 	minPics := fs.Int("min", 50, "jen běhy s aspoň tolika obrázky")
 	refresh := fs.Bool("refresh", false, "zahodit cache indexu")
 	asJSON := fs.Bool("json", false, "JSON")
-	_ = fs.Parse(args)
+	if extra := parseArgs(fs, args); len(extra) > 0 {
+		return fmt.Errorf("nečekaný argument %q", extra[0])
+	}
 	if *refresh {
 		if err := video.ClearCache(labDir); err != nil {
 			return err
@@ -193,7 +219,9 @@ func videoCoverageCLI(labDir string, args []string) error {
 	cols := fs.String("cols", video.AxStyle, "osa sloupců")
 	count := fs.String("count", video.AxPrompt, "co se v buňce počítá")
 	asJSON := fs.Bool("json", false, "JSON")
-	_ = fs.Parse(args)
+	if extra := parseArgs(fs, args); len(extra) > 0 {
+		return fmt.Errorf("nečekaný argument %q", extra[0])
+	}
 	pool, err := pf.pool(labDir)
 	if err != nil {
 		return err
@@ -265,7 +293,9 @@ func videoSuggestCLI(labDir string, args []string) error {
 	k := fs.Int("k", 6, "nejvýš tolik dlaždic")
 	top := fs.Int("top", 3, "kolik návrhů na počet dlaždic")
 	asJSON := fs.Bool("json", false, "JSON")
-	_ = fs.Parse(args)
+	if extra := parseArgs(fs, args); len(extra) > 0 {
+		return fmt.Errorf("nečekaný argument %q", extra[0])
+	}
 	pool, err := pf.pool(labDir)
 	if err != nil {
 		return err
@@ -330,7 +360,9 @@ func videoNewCLI(labDir string, args []string) error {
 	pf := addPoolFlags(fs)
 	tmpl := fs.String("template", "platno", "stroboskop | prulet | platno | mix")
 	name := fs.String("name", "", "jméno videa (výchozí podle šablony)")
-	_ = fs.Parse(args)
+	if extra := parseArgs(fs, args); len(extra) > 0 {
+		return fmt.Errorf("nečekaný argument %q", extra[0])
+	}
 	id, err := video.TemplateID(*tmpl)
 	if err != nil {
 		return err
@@ -376,11 +408,11 @@ func videoPlanCLI(labDir string, args []string) error {
 	fs := flag.NewFlagSet("video plan", flag.ExitOnError)
 	slides := fs.Bool("slides", false, "vypsat i snímky")
 	asJSON := fs.Bool("json", false, "JSON")
-	_ = fs.Parse(args)
-	if fs.NArg() != 1 {
+	pos := parseArgs(fs, args)
+	if len(pos) != 1 {
 		return fmt.Errorf("lab video plan recept.yaml")
 	}
-	data, err := os.ReadFile(fs.Arg(0))
+	data, err := os.ReadFile(pos[0])
 	if err != nil {
 		return err
 	}
@@ -494,4 +526,85 @@ func hasString(list []string, s string) bool {
 		}
 	}
 	return false
+}
+
+func videoRenderCLI(labDir string, args []string) error {
+	fs := flag.NewFlagSet("video render", flag.ExitOnError)
+	only := fs.String("only", "", "jen tyto díly (jména čárkami)")
+	out := fs.String("out", "", "výstupní adresář (výchozí build/lab/_video/<jméno receptu>)")
+	draft := fs.Bool("draft", false, "kreslit z náhledů 320 px (rychlý koncept)")
+	pos := parseArgs(fs, args)
+	if len(pos) != 1 {
+		return fmt.Errorf("lab video render recept.yaml")
+	}
+	data, err := os.ReadFile(pos[0])
+	if err != nil {
+		return err
+	}
+	recipes, err := video.ParseRecipes(data)
+	if err != nil {
+		return err
+	}
+	col, err := video.Load(labDir)
+	if err != nil {
+		return err
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	var onlyList []string
+	for _, n := range strings.Split(*only, ",") {
+		if n = strings.TrimSpace(n); n != "" {
+			onlyList = append(onlyList, n)
+		}
+	}
+	rendered := 0
+	for _, r := range recipes {
+		sb, err := video.Plan(col, r)
+		if err != nil {
+			return fmt.Errorf("%s:\n  %w", r.Name, err)
+		}
+		// --only names parts; a recipe without any of them is skipped.
+		if len(onlyList) > 0 {
+			has := false
+			for _, v := range sb.Videos {
+				for _, n := range onlyList {
+					has = has || v.Name == n
+				}
+			}
+			if !has {
+				continue
+			}
+		}
+		rendered++
+		if *out != "" && rendered > 1 {
+			return fmt.Errorf("--out jde jen s jedním receptem (vyber ho přes --only)")
+		}
+		printStoryboard(sb, false)
+		dir := *out
+		if dir == "" {
+			dir = filepath.Join(labDir, "_video", sb.Recipe.Name)
+		}
+		last := time.Time{}
+		done, err := video.Render(ctx, sb, video.RenderOptions{
+			LabDir: labDir, OutDir: dir, Only: onlyList, Thumbs: *draft,
+			Progress: func(p video.Progress) {
+				if p.Frames == 0 || time.Since(last) < 2*time.Second && p.Frame < p.Frames {
+					return
+				}
+				last = time.Now()
+				fmt.Printf("\r  %d/%d %-32s %3d %%  (%.0f s)   ", p.Part, p.Parts, p.Name, 100*p.Frame/p.Frames, p.ElapsedSecs)
+			},
+		})
+		fmt.Println()
+		for _, d := range done {
+			fmt.Printf("  ✓ %s  %s  %.1f MB\n", d.File, clock(d.Seconds), float64(d.Bytes)/1e6)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	if rendered == 0 {
+		return fmt.Errorf("žádný recept nemá díl %s", strings.Join(onlyList, ", "))
+	}
+	return nil
 }
